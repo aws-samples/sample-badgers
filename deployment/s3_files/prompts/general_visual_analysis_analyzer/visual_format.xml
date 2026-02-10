@@ -1,0 +1,42 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="visual_element">
+        <metadata>
+            <page_number>{PAGE_NUMBER}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_VISUAL_ELEMENTS_DETECTED}</element_count>
+        </metadata>
+        <!-- Reference for visual element styles -->
+        <visual_styles>
+            <style name="Raster">Pixel-based images, typically used for photographs and complex
+                graphics.</style>
+            <style name="Vector">Scalable graphics based on mathematical formulas, often used for
+                logos and illustrations.</style>
+            <style name="Hand-drawn">Illustrations or sketches created by hand or simulating a
+                hand-drawn appearance.</style>
+            <style name="3D Rendered">Computer-generated three-dimensional graphics.</style>
+            <style name="Data Visualization">Graphics that represent data or statistics visually.</style>
+            <style name="Mixed Media">Combinations of different visual styles or techniques.</style>
+        </visual_styles>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per visual element found -->
+        <elements>
+            <element type="visual_element">
+                <type>{ELEMENT TYPE (e.g., image, diagram, workflow)}</type>
+                <sub_type>{SUB-TYPE IF APPLICABLE}</sub_type>
+                <description>{BRIEF DESCRIPTION OF THE VISUAL CONTENT}</description>
+                <style>{IDENTIFIED STYLE (e.g., Raster, Vector, Hand-drawn)}</style>
+                <color_scheme>{DESCRIPTION OF COLOR USAGE (e.g., full color, grayscale, monochrome)}</color_scheme>
+                <location>
+                    <page>{PAGE NUMBER}</page>
+                    <position>{POSITION ON PAGE (e.g., top, bottom, full-page)}</position>
+                </location>
+                <size>{APPROXIMATE SIZE (e.g., quarter-page, half-page, full-page)}</size>
+                <caption>{EXTRACTED CAPTION TEXT IF PRESENT}</caption>
+                <reference>{IN-TEXT REFERENCE TO THE VISUAL ELEMENT IF PRESENT}</reference>
+                <context>{BRIEF DESCRIPTION OF SURROUNDING CONTENT AND RELEVANCE}</context>
+            </element>
+        </elements>
+    </response>
+</response_format>

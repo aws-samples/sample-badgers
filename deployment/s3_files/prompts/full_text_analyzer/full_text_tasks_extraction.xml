@@ -1,0 +1,44 @@
+<tasks>
+    <task>Extract all relevant topics for this content.</task>
+    
+    <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
+
+    <task>Examine the given page, identifying all textual elements as defined in the <full_text_dictionary /> XML tags.</task>
+
+    <task>Determine the primary reading direction and any additional languages present on the page.</task>
+
+    <task>For each identified text element:
+        <sub_task>Assign a unique sequential ID (elem_001, elem_002, elem_003, etc.).</sub_task>
+        <sub_task>Determine its type (e.g., h1, h2, paragraph, header, footer, sidebar, figure, footnote, caption).</sub_task>
+        <sub_task>Assign an order number reflecting its position in the logical reading sequence.</sub_task>
+        <sub_task>Extract the full text content of the element.</sub_task>
+        <sub_task>For footnotes and captions, set the ref attribute to the ID of the element they reference.</sub_task>
+        <sub_task>For figures, include both caption (visible text) and alt_text (description of visual content).</sub_task>
+    </task>
+
+    <task>Pay special attention to the layout of the page, including columns, sidebars, and any non-standard text arrangements.</task>
+
+    <task>Determine heading hierarchy:
+        <sub_task>Identify the main title or most prominent heading as h1.</sub_task>
+        <sub_task>Identify major section headings as h2.</sub_task>
+        <sub_task>Identify subsection headings as h3 or h4.</sub_task>
+        <sub_task>Use visual prominence (size, weight, spacing) to determine hierarchy.</sub_task>
+    </task>
+
+    <task>Ensure that footnotes, captions, and other supplementary text are extracted in a logical order relative to their references in the main text.</task>
+
+    <task>For complex layouts, mentally map out the reading flow before beginning the extraction process.</task>
+
+    <task>If you encounter unusual text arrangements or are unsure of the correct reading order, refer to the guidance in the <full_text_help /> XML tags.</task>
+
+    <task>Organize your extracted text according to the structure provided in the <response_format /> XML tags, ensuring that:
+        <sub_task>Every element has a unique id attribute.</sub_task>
+        <sub_task>Every element has an order attribute reflecting reading sequence.</sub_task>
+        <sub_task>Order numbers are sequential with no gaps (1, 2, 3, not 1, 3, 5).</sub_task>
+        <sub_task>Cross-references use the ref attribute where applicable.</sub_task>
+    </task>
+
+    <task>Review your extracted text to ensure completeness, accuracy, and proper ordering, checking that you've captured all textual content from the page.</task>
+
+    <task>Take a final deep breath and ensure your extraction is thorough, follows all provided guidelines, and accurately represents the full textual content of the page in its original reading order.</task>
+</tasks>

@@ -1,0 +1,14 @@
+<!-- This is an example of the conversation history you have received as input. -->
+<conversation_example_image_examples>
+1. USER: "The following images are EXAMPLES. Do not analyze these, only use them for reference."
+2. ASSISTANT: "Understood. I will not analyze these example images, only use them as reference."
+3. USER: [Provides example images]
+4. ASSISTANT: "I've received the example images and will use them only as reference."
+5. USER: "The next image I send will be the ONLY image for analysis. Disregard all previous images for analysis purposes."
+6. ASSISTANT: "Understood. I will only analyze the next image you send, disregarding all previous images for analysis."
+7. USER: [Provides the image to be analyzed]
+8. ASSISTANT: "I've received the image for analysis. To confirm, this is the only image I should analyze, correct?"
+9. USER: "Correct."
+10. ASSISTANT: "Understood. I'm ready to receive and follow your instructions for analyzing only the last image you sent."
+11. USER: "Instruction: Begin your tasks according to to the details in this prompt: {PROMPT_PROVIDED HERE}"
+</conversation_example_image_examples>

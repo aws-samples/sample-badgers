@@ -1,0 +1,70 @@
+<!-- Provides guidance on identifying and transcribing handwritten text -->
+<handwriting_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Absence of handwritten text is a valid outcome. Do not force transcription if no clear handwriting is present.</item>
+        <item>When in doubt about character identification, do NOT guess. Mark uncertain characters with confidence indicators.</item>
+        <item>NEVER transcribe printed text, typed text, or non-handwritten elements as handwriting.</item>
+        <item>Handwritten text must show evidence of human pen/pencil formation with characteristic stroke patterns.</item>
+        <item>Apply morphological analysis techniques to validate character identification.</item>
+    </critical_instructions>
+
+    <handwriting_definition>
+        <item>Handwritten text is visual content created by human hand using writing implements (pen, pencil, quill, etc.).</item>
+        <item>Shows characteristic stroke formation patterns: pressure variation, connection points, directional flow.</item>
+        <item>May include cursive (connected) or print (disconnected) styles across various historical periods.</item>
+        <item>Can contain abbreviations, symbols, corrections, and period-specific orthographic conventions.</item>
+        <item>Often shows individual writer characteristics: slant, spacing, character formation habits.</item>
+    </handwriting_definition>
+
+    <analysis_methodology>
+        <morphological_analysis>
+            <item>Examine stroke direction patterns (clockwise vs counterclockwise curves).</item>
+            <item>Analyze pressure variations creating thick/thin line variations.</item>
+            <item>Identify connection points between characters and within character formations.</item>
+            <item>Measure proportional relationships: ascender/descender heights, x-height ratios.</item>
+        </morphological_analysis>
+        <comparative_methodology>
+            <item>Collect multiple instances of each character throughout the document.</item>
+            <item>Create statistical patterns from repeated character formations.</item>
+            <item>Identify consistent variations and allographic forms used by the writer.</item>
+            <item>Use pattern consistency to resolve ambiguous character instances.</item>
+        </comparative_methodology>
+        <contextual_analysis>
+            <item>Apply linguistic probability based on language and historical period.</item>
+            <item>Consider orthographic patterns and historical spelling conventions.</item>
+            <item>Ensure semantic coherence within sentence and document context.</item>
+            <item>Verify syntactic structure follows period-appropriate grammar.</item>
+        </contextual_analysis>
+        <physical_evidence>
+            <item>Examine ink flow patterns and pooling at character junctions.</item>
+            <item>Analyze paper interaction effects and writing implement characteristics.</item>
+            <item>Identify correction patterns: overwriting, erasures, amendments.</item>
+            <item>Use bleed-through or impression evidence to clarify ambiguous strokes.</item>
+        </physical_evidence>
+    </analysis_methodology>
+
+    <not_handwriting>
+        <item>Printed text from typography or mechanical reproduction is NOT handwriting.</item>
+        <item>Computer-generated or digitally created text is NOT handwriting.</item>
+        <item>Stamps, seals, or pre-printed forms are NOT handwriting.</item>
+        <item>Decorative flourishes without linguistic content are NOT transcribable text.</item>
+        <item>Illegible marks or stains without clear letter formation are NOT transcribable.</item>
+    </not_handwriting>
+
+    <confidence_scoring>
+        <item>HIGH confidence: Clear character formation with supporting contextual evidence.</item>
+        <item>MEDIUM confidence: Recognizable character with minor ambiguity or degradation.</item>
+        <item>LOW confidence: Character formation present but unclear, requiring contextual support.</item>
+        <item>UNCERTAIN: Mark with [?] or alternative readings when character cannot be definitively identified.</item>
+        <item>ILLEGIBLE: Mark with [...] when handwriting is present but completely unreadable.</item>
+    </confidence_scoring>
+
+    <decision_process>
+        <item>Follow the multi-step verification process defined in handwriting_verification_process.xml.</item>
+        <item>Apply morphological analysis first to identify character formation patterns.</item>
+        <item>Use comparative methodology to validate character identifications.</item>
+        <item>Apply contextual analysis to resolve remaining ambiguities.</item>
+        <item>Document confidence levels and alternative readings for uncertain elements.</item>
+    </decision_process>
+</handwriting_help>

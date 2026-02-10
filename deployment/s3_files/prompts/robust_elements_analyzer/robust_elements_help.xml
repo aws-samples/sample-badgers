@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<help>
+    <guidance>
+        <section name="Coordinate Accuracy">
+            <tip>Carefully observe element boundaries in the image</tip>
+            <tip>Ensure bounding boxes tightly fit the content</tip>
+            <tip>Double-check that x1 &lt; x2 and y1 &lt; y2</tip>
+            <tip>Verify coordinates are within image dimensions</tip>
+        </section>
+
+        <section name="Element Identification">
+            <tip>Look for visual cues like font size, weight, and spacing</tip>
+            <tip>Identify heading hierarchy based on visual prominence</tip>
+            <tip>Group related content appropriately</tip>
+            <tip>Don't miss small elements like footnotes or page numbers</tip>
+        </section>
+
+        <section name="Reading Order">
+            <tip>Follow natural left-to-right, top-to-bottom flow</tip>
+            <tip>Handle multi-column layouts by completing left column first</tip>
+            <tip>Place headers before body content</tip>
+            <tip>Place footers and footnotes after main content</tip>
+        </section>
+
+        <section name="Content Extraction">
+            <tip>Extract complete text including special characters</tip>
+            <tip>For images, provide meaningful descriptive text</tip>
+            <tip>Preserve formatting indicators like bullet points</tip>
+            <tip>Include URLs when visible in link elements</tip>
+        </section>
+    </guidance>
+
+    <common_issues>
+        <issue>
+            <problem>Overlapping bounding boxes</problem>
+            <solution>Ensure each element has distinct, non-overlapping boundaries</solution>
+        </issue>
+
+        <issue>
+            <problem>Incorrect coordinate order</problem>
+            <solution>Always use x1 &lt; x2 and y1 &lt; y2</solution>
+        </issue>
+
+        <issue>
+            <problem>Missing elements</problem>
+            <solution>Scan entire image systematically, including margins</solution>
+        </issue>
+
+        <issue>
+            <problem>Incorrect reading order</problem>
+            <solution>Follow visual flow and document structure conventions</solution>
+        </issue>
+    </common_issues>
+</help>

@@ -1,0 +1,41 @@
+[
+    {
+        "name": "aggregate_analysis_results_tool",
+        "description": "Aggregate results from executed analysis tasks. Combines results from all analysis tasks into a structured summary organized by page. Takes execution results from multiple analyzer tools and creates a cohesive document-level analysis report.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "execution_results": {
+                    "type": "string",
+                    "description": "JSON string containing execution results from all analysis tasks (output from various analyzer tools)"
+                },
+                "pdf_name": {
+                    "type": "string",
+                    "description": "Name of PDF being processed"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID for organizing output in S3"
+                }
+            },
+            "required": [
+                "execution_results",
+                "pdf_name",
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Aggregated analysis results organized by page with comprehensive summary"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether aggregation completed successfully"
+                }
+            }
+        }
+    }
+]

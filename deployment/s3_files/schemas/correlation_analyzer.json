@@ -1,0 +1,70 @@
+[
+    {
+        "name": "correlate_page_results_tool",
+        "description": "Correlates outputs from multiple analyzers for a single page into a unified_document structure. Call this AFTER running 2+ analyzers on the same page. Takes S3 URIs of analyzer results (full_text required as spine, plus diagram/table/chart/etc.), produces a correlated unified_document with enrichments attached to the content spine, saves to S3, and returns the S3 URI with a brief summary. Do NOT call for pages with only one analyzer result.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "full_text_uri": {
+                    "type": "string",
+                    "description": "S3 URI of the full_text_analyzer result (required as canonical spine)"
+                },
+                "analyzer_uris": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "analyzer_name": {
+                                "type": "string",
+                                "description": "Name of the analyzer (e.g., diagram, table, chart)"
+                            },
+                            "s3_uri": {
+                                "type": "string",
+                                "description": "S3 URI of the analyzer result"
+                            }
+                        },
+                        "required": [
+                            "analyzer_name",
+                            "s3_uri"
+                        ]
+                    },
+                    "description": "Array of other analyzer results to correlate with full_text"
+                },
+                "page_number": {
+                    "type": "string",
+                    "description": "Page number or identifier for this correlation"
+                },
+                "source_image_path": {
+                    "type": "string",
+                    "description": "Original image path for metadata"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "full_text_uri",
+                "analyzer_uris",
+                "page_number",
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "unified_document_uri": {
+                    "type": "string",
+                    "description": "S3 URI of the saved unified_document"
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief summary of the correlation results"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+]

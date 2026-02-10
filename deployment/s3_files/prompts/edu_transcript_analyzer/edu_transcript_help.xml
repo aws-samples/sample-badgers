@@ -1,0 +1,128 @@
+<!-- Provides guidance on identifying and extracting educational transcripts -->
+<edu_transcript_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Absence of educational transcripts is a valid and expected outcome. Do not force identification.</item>
+        <item>When in doubt, do NOT classify a document as a transcript. Accuracy is more important than comprehensiveness.</item>
+        <item>NEVER classify report cards, grade sheets, or course schedules as transcripts.</item>
+        <item>Transcripts must contain cumulative academic records spanning multiple courses or terms.</item>
+    </critical_instructions>
+
+    <transcript_definition>
+        <item>A transcript is an official or unofficial document from an educational institution documenting cumulative academic history.</item>
+        <item>Must include: courses taken, grades earned, credits awarded, and typically cumulative metrics (GPA).</item>
+        <item>Spans multiple terms, semesters, or academic years - not just a single grading period.</item>
+        <item>Issued by the institution's registrar or records office.</item>
+        <item>May include degree conferral information, honors, and authentication features.</item>
+    </transcript_definition>
+
+    <not_transcripts>
+        <item>Single-term report cards (only show one grading period).</item>
+        <item>Individual course grade sheets (only show one course).</item>
+        <item>Diplomas or certificates alone (credential without course history).</item>
+        <item>Course catalogs (describe available courses, not student records).</item>
+        <item>Class schedules (show enrolled courses, not completed grades).</item>
+        <item>Enrollment verification letters (confirm attendance, not grades).</item>
+        <item>Degree audit worksheets (planning documents, not official records).</item>
+        <item>Academic planning documents (future courses, not completed work).</item>
+    </not_transcripts>
+
+    <educational_levels>
+        <level name="K-12">
+            <characteristics>Elementary, middle, or high school records.</characteristics>
+            <typical_format>Often organized by grade level or academic year.</typical_format>
+            <grading>Letter grades (A-F), percentages, or standards-based marks.</grading>
+        </level>
+        <level name="High School">
+            <characteristics>Grades 9-12, includes graduation requirements tracking.</characteristics>
+            <typical_format>Organized by year or semester, shows credits toward graduation.</typical_format>
+            <grading>Letter grades, GPA on 4.0 scale, class rank common.</grading>
+        </level>
+        <level name="Undergraduate">
+            <characteristics>College or university bachelor's degree programs.</characteristics>
+            <typical_format>Organized by semester/quarter, credit hours, major/minor.</typical_format>
+            <grading>Letter grades, 4.0 GPA scale, credit hours.</grading>
+        </level>
+        <level name="Graduate">
+            <characteristics>Master's or doctoral programs.</characteristics>
+            <typical_format>Similar to undergraduate, may include thesis/dissertation.</typical_format>
+            <grading>Often requires B or higher, may use different GPA thresholds.</grading>
+        </level>
+        <level name="Professional">
+            <characteristics>Law, medical, dental, or other professional schools.</characteristics>
+            <typical_format>May use pass/fail, honors/pass/fail, or letter grades.</typical_format>
+            <grading>Varies by program; class rank often emphasized.</grading>
+        </level>
+        <level name="Vocational/Technical">
+            <characteristics>Trade schools, technical colleges, certification programs.</characteristics>
+            <typical_format>May focus on competencies, clock hours, or credit hours.</typical_format>
+            <grading>Pass/fail, competency-based, or letter grades.</grading>
+        </level>
+    </educational_levels>
+
+    <grading_systems>
+        <system name="Letter Grades (US)">
+            <scale>A, B, C, D, F (with +/- modifiers)</scale>
+            <gpa>A=4.0, B=3.0, C=2.0, D=1.0, F=0.0</gpa>
+        </system>
+        <system name="Percentage">
+            <scale>0-100%</scale>
+            <conversion>Often shown with letter grade equivalent.</conversion>
+        </system>
+        <system name="Pass/Fail">
+            <scale>P (Pass), F (Fail), or S (Satisfactory), U (Unsatisfactory)</scale>
+            <note>May not affect GPA calculation.</note>
+        </system>
+        <system name="International">
+            <note>Varies widely: 1-10 scales, 1-20 scales, first/second/third class honors, etc.</note>
+            <action>Extract as shown; do not convert unless conversion table provided.</action>
+        </system>
+    </grading_systems>
+
+    <authentication_features>
+        <feature name="Official Seal">Embossed or printed institutional seal.</feature>
+        <feature name="Registrar Signature">Handwritten or printed signature of registrar.</feature>
+        <feature name="Issue Date">Date the transcript was generated.</feature>
+        <feature name="Watermark">Security watermark in paper or background.</feature>
+        <feature name="Security Paper">Special paper stock, colored backgrounds.</feature>
+        <feature name="Statement of Authenticity">"This is an official transcript" language.</feature>
+        <feature name="Unofficial Marking">May say "Unofficial" or "Student Copy".</feature>
+    </authentication_features>
+
+    <verification_process>
+        <pass_1_identification>
+            <step>Look for institutional headers, logos, or school names.</step>
+            <step>Identify student information sections (name, ID, dates).</step>
+            <step>Find structured course listings organized by term.</step>
+            <step>Locate grade columns and credit hour information.</step>
+            <step>Check for cumulative GPA or performance summaries.</step>
+            <step>Note any authentication features (seals, signatures).</step>
+        </pass_1_identification>
+        <pass_2_verification>
+            <step>Confirm document shows CUMULATIVE records (multiple terms/courses).</step>
+            <step>Verify it's from an educational institution, not a testing service.</step>
+            <step>Ensure it's a transcript, not a report card or schedule.</step>
+            <step>Check that grades and credits are present, not just course listings.</step>
+            <step>Confirm institutional identification is present.</step>
+        </pass_2_verification>
+    </verification_process>
+
+    <common_mistakes_to_avoid>
+        <mistake>Classifying a single-semester report card as a transcript.</mistake>
+        <mistake>Extracting a course schedule (no grades) as a transcript.</mistake>
+        <mistake>Confusing a diploma with a transcript.</mistake>
+        <mistake>Inventing course names or grades not visible on the document.</mistake>
+        <mistake>Converting grades between systems without explicit conversion table.</mistake>
+        <mistake>Assuming missing information - only extract what's visible.</mistake>
+    </common_mistakes_to_avoid>
+
+    <decision_process>
+        <step>Scan for institutional identification and student information.</step>
+        <step>Look for structured academic records with courses, grades, and credits.</step>
+        <step>Verify records span multiple terms or courses (cumulative history).</step>
+        <step>Confirm this is a transcript, not a report card, schedule, or diploma.</step>
+        <step>Extract all visible information without inferring missing data.</step>
+        <step>Note official vs. unofficial status and authentication features.</step>
+        <step>If criteria not met, respond with not_found format.</step>
+    </decision_process>
+</edu_transcript_help>

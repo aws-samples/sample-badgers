@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Charts Analyzer -->
+<gestalt_perception analyzer="charts">
+
+    <prescan>
+        <instruction>Before extracting chart data, perceive the visual representation:</instruction>
+        <step>Identify the chart type by its visual pattern (bars, lines, pie slices, scatter points).</step>
+        <step>Locate axes and understand their scales (linear, logarithmic, categorical).</step>
+        <step>Identify the legend and map colors/patterns to data series.</step>
+        <step>Note the title and axis labels for context.</step>
+        <step>Observe data patterns: trends, outliers, clusters, comparisons.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="similarity">
+            <guidance> Color and shape consistency defines data series: - Same color = same data series across the chart - Same marker shape = same category - Consistent line style (solid, dashed) = same series type Use color/shape mapping from the legend to track series throughout the chart. </guidance>
+        </primary>
+
+        <primary principle="continuity">
+            <guidance> For line charts and trends: - Follow each line from left to right to understand the trend - The eye naturally connects points along a smooth path - Identify where trends change direction (inflection points) - Note gaps or discontinuities in data series </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Spatial relationships convey data relationships: - Grouped bars represent related categories - Clustered scatter points suggest correlation - Stacked elements show part-to-whole relationships - Spacing between groups indicates categorical boundaries </guidance>
+        </primary>
+
+        <secondary principle="figure_ground">
+            <guidance> Separate data from chart infrastructure: - FIGURE: Data points, bars, lines, pie slices (extract these) - GROUND: Gridlines, axis lines, background, borders (use for reference) Focus extraction on the data; use ground elements for scale and context. </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <chart_type_recognition>
+        <type name="bar_chart">Rectangular bars with length proportional to values. Vertical or horizontal.</type>
+        <type name="line_chart">Points connected by lines showing trends over continuous axis.</type>
+        <type name="pie_chart">Circular chart divided into slices showing proportions.</type>
+        <type name="scatter_plot">Individual points plotted on x-y axes showing correlation.</type>
+        <type name="area_chart">Line chart with filled area below, showing volume over time.</type>
+        <type name="stacked_bar">Bars divided into segments showing composition.</type>
+        <type name="grouped_bar">Multiple bars per category for comparison.</type>
+        <type name="histogram">Bars showing frequency distribution of continuous data.</type>
+        <type name="box_plot">Shows distribution through quartiles and outliers.</type>
+        <type name="radar_spider">Multivariate data on axes radiating from center.</type>
+    </chart_type_recognition>
+
+    <data_series_tracking>
+        <instruction>Track each data series through the chart:</instruction>
+        <step>Identify all series from the legend (color, shape, line style).</step>
+        <step>For each series, trace its values across all data points.</step>
+        <step>Note the relationship between series (comparison, composition, correlation).</step>
+        <step>Identify any series that are highlighted or emphasized.</step>
+    </data_series_tracking>
+
+    <scale_interpretation>
+        <element>Axis labels: identify what each axis represents.</element>
+        <element>Scale type: linear, logarithmic, percentage, categorical.</element>
+        <element>Tick marks: use to estimate values between labeled points.</element>
+        <element>Gridlines: reference for reading precise values.</element>
+        <element>Zero baseline: critical for accurate bar/area interpretation.</element>
+    </scale_interpretation>
+
+    <validation>
+        <instruction>After extraction, verify chart perception accuracy:</instruction>
+        <check>Did you correctly identify all data series using similarity (color/shape)?</check>
+        <check>For line charts, did you trace trends accurately using continuity?</check>
+        <check>Are grouped/related data correctly associated using proximity?</check>
+        <check>Did you correctly separate data (figure) from chart structure (ground)?</check>
+        <check>Are axis scales and values correctly interpreted?</check>
+    </validation>
+
+</gestalt_perception>

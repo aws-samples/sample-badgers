@@ -1,0 +1,119 @@
+{
+    "tool": {
+        "name": "analyze_elements_tool",
+        "description": "Specialized tool for extracting and identifying structural elements from document images. ONLY use for: document structure analysis, layout element identification, page component extraction, structural markup analysis, and document element classification. NOT for: content analysis, text extraction, metadata extraction, diagrams, or tables. If no structural elements are found, returns that no document elements were detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing document for structural elements analysis. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "elements_analyzer",
+        "description": "Analyzes document images to extract and identify structural elements",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "elements_gestalt.xml",
+            "elements_job_role.xml",
+            "elements_context.xml",
+            "elements_rules.xml",
+            "elements_tasks_extraction.xml",
+            "elements_format.xml",
+            "elements_help.xml",
+            "elements_dictionary.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "document elements",
+        "expected_output_tokens": 2500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.081482+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "element_classification",
+                    "text": "Were structural elements correctly classified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "boundary_accuracy",
+                    "text": "Were element boundaries accurately identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "nesting_representation",
+                    "text": "Was element nesting/hierarchy correctly represented?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

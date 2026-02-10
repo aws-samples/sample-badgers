@@ -1,0 +1,123 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="war_map">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_WAR_MAPS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per war map found -->
+        <elements>
+            <element type="war_map">
+                <type>War Map</type>
+                <summary>
+                    <title>{MAP_TITLE_IF_VISIBLE}</title>
+                    <date>{DATE_ON_MAP_OR_ESTIMATED_PERIOD}</date>
+                    <scale>{SCALE_IF_INDICATED}</scale>
+                    <orientation>{NORTH_ARROW_DIRECTION_OR_ASSUMED}</orientation>
+                    <source>{AUTHOR_PUBLISHER_OR_SOURCE_IF_VISIBLE}</source>
+                </summary>
+                <content>
+                    <historical_context>
+                        <conflict>{IDENTIFIED_WAR_OR_CONFLICT}</conflict>
+                        <battle_campaign>{SPECIFIC_BATTLE_OR_CAMPAIGN}</battle_campaign>
+                        <approximate_date>{WHEN_THE_DEPICTED_ACTION_OCCURRED}</approximate_date>
+                    </historical_context>
+
+                    <legend>
+                        <symbol_definition>
+                            <symbol>{VISUAL_DESCRIPTION_OF_SYMBOL}</symbol>
+                            <meaning>{WHAT_IT_REPRESENTS}</meaning>
+                        </symbol_definition>
+                    </legend>
+
+                    <military_forces>
+                        <force affiliation="{SIDE_NAME}">
+                            <unit>
+                                <designation>{UNIT_NAME_OR_NUMBER}</designation>
+                                <type>{INFANTRY/CAVALRY/ARTILLERY/ARMOR/ETC}</type>
+                                <position>{LOCATION_ON_MAP}</position>
+                                <symbol_used>{DESCRIPTION_OF_SYMBOL}</symbol_used>
+                            </unit>
+                        </force>
+                    </military_forces>
+
+                    <movements>
+                        <movement>
+                            <type>{ATTACK/RETREAT/FLANKING/REINFORCEMENT/ETC}</type>
+                            <direction>{FROM_WHERE_TO_WHERE}</direction>
+                            <associated_unit>{UNIT_IF_IDENTIFIABLE}</associated_unit>
+                            <visual_indicator>{ARROW_TYPE_COLOR_STYLE}</visual_indicator>
+                            <temporal_phase>{PHASE_OR_TIME_IF_INDICATED}</temporal_phase>
+                        </movement>
+                    </movements>
+
+                    <defensive_elements>
+                        <fortification>
+                            <type>{FORT/TRENCH/BUNKER/DEFENSIVE_LINE/ETC}</type>
+                            <location>{WHERE_ON_MAP}</location>
+                            <description>{DETAILED_DESCRIPTION}</description>
+                        </fortification>
+                    </defensive_elements>
+
+                    <terrain>
+                        <feature>
+                            <type>{RIVER/HILL/FOREST/ROAD/BRIDGE/SETTLEMENT/ETC}</type>
+                            <name>{NAME_IF_LABELED}</name>
+                            <location>{WHERE_ON_MAP}</location>
+                            <tactical_significance>{WHY_IT_MATTERS_MILITARILY}</tactical_significance>
+                        </feature>
+                    </terrain>
+
+                    <place_names>
+                        <place>
+                            <name>{EXACT_TEXT}</name>
+                            <type>{CITY/TOWN/RIVER/REGION/ETC}</type>
+                            <location>{WHERE_ON_MAP}</location>
+                        </place>
+                    </place_names>
+
+                    <battle_phases>
+                        <phase>
+                            <sequence>{PHASE_NUMBER_OR_ORDER}</sequence>
+                            <description>{WHAT_HAPPENED_IN_THIS_PHASE}</description>
+                            <time_indicator>{DATE_OR_TIME_IF_SHOWN}</time_indicator>
+                        </phase>
+                    </battle_phases>
+
+                    <logistics>
+                        <element>
+                            <type>{SUPPLY_ROUTE/DEPOT/COMMUNICATION_LINE/ETC}</type>
+                            <location>{WHERE_ON_MAP}</location>
+                            <description>{DETAILS}</description>
+                        </element>
+                    </logistics>
+
+                    <annotations>
+                        <annotation>
+                            <text>{EXACT_TEXT_OF_ANNOTATION}</text>
+                            <location>{WHERE_ON_MAP}</location>
+                            <interpretation>{WHAT_IT_MEANS}</interpretation>
+                        </annotation>
+                    </annotations>
+
+                    <color_coding>
+                        <color>
+                            <color_name>{COLOR}</color_name>
+                            <apparent_meaning>{WHAT_IT_REPRESENTS}</apparent_meaning>
+                            <elements_using_color>{WHAT_USES_THIS_COLOR}</elements_using_color>
+                        </color>
+                    </color_coding>
+
+                    <tactical_summary>
+                        <situation>{OVERALL_MILITARY_SITUATION_DEPICTED}</situation>
+                        <key_features>{MOST_IMPORTANT_TACTICAL_ELEMENTS}</key_features>
+                        <apparent_objective>{WHAT_THE_MAP_APPEARS_TO_SHOW}</apparent_objective>
+                    </tactical_summary>
+                </content>
+            </element>
+        </elements>
+    </response>
+</response_format>

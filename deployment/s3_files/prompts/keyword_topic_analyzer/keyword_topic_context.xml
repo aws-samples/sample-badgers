@@ -1,0 +1,34 @@
+<keyword_topic_analyzer_context>
+    <context_title>Industry Keyword Mapping for SEO Optimization</context_title>
+    <context_summary>This analysis maps source material to ESTABLISHED INDUSTRY KEYWORDS and MARKET
+        SEARCH TERMS that external audiences actually use. The goal is NOT to extract what's
+        literally in the content, but to identify what real-world search phrases this content could
+        rank for based on industry terminology and market demand.</context_summary>
+    <context_details>
+        <detail>Focus on EXTERNAL market keywords - what terms do people in this industry/market
+            actually search for?</detail>
+        <detail>Think like a SEMRUSH keyword researcher - what established, high-volume search terms
+            relate to this content?</detail>
+        <detail>Keywords should be industry-standard phrases that exist in the broader market, not
+            just document-derived terms</detail>
+        <detail>Consider what a potential reader would type into Google to find content like this</detail>
+        <detail>Map content themes to established industry terminology and common market phrases</detail>
+        <detail>Identify the competitive keyword landscape this content operates in</detail>
+        <detail>Topics should reflect industry categories and market segments, not just document
+            themes</detail>
+        <detail>The output should help position content against real search demand and competitor
+            keywords</detail>
+        <detail>Consider trending industry terms, established jargon, and common question patterns
+            in the market</detail>
+    </context_details>
+    <context_scope>
+        <scope_item>Map content to ESTABLISHED industry keywords that people actually search for</scope_item>
+        <scope_item>Identify market-relevant topics and industry categories this content relates to</scope_item>
+        <scope_item>Suggest high-value search terms the content could target based on industry
+            knowledge</scope_item>
+        <scope_item>Categorize by search volume potential (high-competition vs long-tail
+            opportunities)</scope_item>
+        <scope_item>Provide keyword targeting recommendations based on market demand, not just
+            content analysis</scope_item>
+    </context_scope>
+</keyword_topic_analyzer_context>

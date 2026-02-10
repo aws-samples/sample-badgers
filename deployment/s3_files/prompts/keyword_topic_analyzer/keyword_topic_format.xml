@@ -1,0 +1,140 @@
+<response_format>
+  <response>
+    <format_title>Keyword and Topic Analysis Output Format</format_title>
+    <format_description>Output MUST be valid JSON only. No markdown, no explanatory text, no code
+      fences. Just raw JSON that can be parsed directly.</format_description>
+
+    <grounding_requirements>
+      <requirement>CRITICAL: Every topic and primary keyword MUST include source_excerpt and
+        excerpt_element_id</requirement>
+      <requirement>source_excerpt: The exact verbatim text from the document that supports this
+        assignment (1-3 sentences)</requirement>
+      <requirement>excerpt_element_id: The element ID (e.g., "elem_010") from the source XML where
+        this excerpt appears</requirement>
+      <requirement>confidence: "high" if excerpt directly mentions the concept, "medium" if strongly
+        implied, "low" if inferred</requirement>
+      <requirement>This grounding ensures traceability and prevents hallucinated topic/keyword
+        assignments</requirement>
+    </grounding_requirements>
+
+    <output_schema>
+        <![CDATA[
+{
+  "page_number": "Page number visible on the page or inferred from context",
+  "primary_keywords": [
+    {
+      "keyword": "string - the search phrase",
+      "intent": "informational | commercial | transactional | navigational",
+      "prominence": "high | medium | low",
+      "competition": "high | medium | low",
+      "content_fit": "strong | partial | opportunity",
+      "source_excerpt": "string - exact verbatim quote from document supporting this keyword",
+      "excerpt_element_id": "string - element ID from source XML (e.g., elem_010)",
+      "confidence": "high | medium | low"
+    }
+  ],
+  "secondary_keywords": [
+    {
+      "keyword": "string",
+      "intent": "string",
+      "category": "long-tail | question-based | technical | comparative",
+      "content_fit": "strong | partial | opportunity"
+    }
+  ],
+  "industry_topics": [
+    {
+      "name": "string - topic name using industry terminology",
+      "description": "string - 1-2 sentence description",
+      "coverage": "extensive | moderate | minimal",
+      "prominence": "high | medium | low",
+      "subfield": "string - academic/industry subfield",
+      "field": "string - broader field",
+      "domain": "string - top-level domain",
+      "source_excerpt": "string - exact verbatim quote from document establishing this topic coverage",
+      "excerpt_element_id": "string - element ID from source XML (e.g., elem_013)",
+      "confidence": "high | medium | low"
+    }
+  ],
+  "primary_topic": {
+    "name": "string - most relevant topic",
+    "subfield": "string",
+    "field": "string",
+    "domain": "string",
+    "source_excerpt": "string - the key passage that establishes this as the primary topic",
+    "excerpt_element_id": "string - element ID from source XML",
+    "confidence": "high | medium | low"
+  },
+  "keyword_topic_mapping": [
+    {
+      "topic": "string - topic name",
+      "strong_keywords": ["array of strongly related keywords"],
+      "moderate_keywords": ["array of moderately related keywords"],
+      "weak_keywords": ["array of weakly related keywords"]
+    }
+  ],
+  "topic_clusters": [
+    {
+      "cluster_name": "string",
+      "pillar_topic": "string - main topic in cluster",
+      "related_topics": ["array of related topic names"],
+      "theme": "string - cluster theme description"
+    }
+  ],
+  "competitive_landscape": {
+    "high_competition": ["keywords with high competition"],
+    "medium_competition": ["keywords with medium competition"],
+    "low_competition_niches": ["keywords with low competition - opportunities"]
+  },
+  "search_intent_mapping": {
+    "informational": {
+      "keywords": ["array"],
+      "content_fit": "strong | partial | weak",
+      "optimization_notes": "string"
+    },
+    "commercial": {
+      "keywords": ["array"],
+      "content_fit": "strong | partial | weak",
+      "optimization_notes": "string"
+    },
+    "transactional": {
+      "keywords": ["array"],
+      "content_fit": "strong | partial | weak",
+      "optimization_notes": "string"
+    }
+  },
+  "recommendations": {
+    "priority_keywords": [
+      {
+        "keyword": "string",
+        "rationale": "string",
+        "action": "string"
+      }
+    ],
+    "quick_wins": ["keywords close to ranking"],
+    "content_gaps": ["areas needing content"],
+    "keywords_to_avoid": ["keywords with poor fit"]
+  },
+  "ai_overview_opportunities": {
+    "featured_snippet_targets": ["question-based keywords for snippets"],
+    "people_also_ask": ["related questions to target"]
+  }
+}
+        ]]>
+    </output_schema>
+
+    <format_requirements>
+      <requirement>Output ONLY valid JSON - no markdown, no explanations, no code blocks</requirement>
+      <requirement>All string values must be properly escaped</requirement>
+      <requirement>Arrays can be empty [] if no items apply</requirement>
+      <requirement>Use consistent naming conventions (snake_case for keys)</requirement>
+      <requirement>Include 5-10 primary keywords, 10-20 secondary keywords</requirement>
+      <requirement>Include 3-7 industry topics</requirement>
+      <requirement>Ensure all keywords are real market search terms, not document-derived phrases</requirement>
+      <requirement>The output must parse with JSON.parse() or json.loads() without errors</requirement>
+      <requirement>EVERY primary_keyword and industry_topic MUST have source_excerpt,
+        excerpt_element_id, and confidence</requirement>
+      <requirement>source_excerpt must be VERBATIM text from the document - do not paraphrase</requirement>
+      <requirement>excerpt_element_id must reference actual element IDs from the input XML</requirement>
+    </format_requirements>
+  </response>
+</response_format>

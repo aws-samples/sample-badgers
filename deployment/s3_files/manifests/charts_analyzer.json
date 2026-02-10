@@ -1,0 +1,121 @@
+{
+    "tool": {
+        "name": "analyze_charts_tool",
+        "description": "Specialized tool for analyzing chart and graph images to extract data visualizations and structured information. ONLY use for: bar charts, line graphs, pie charts, scatter plots, histograms, box plots, area charts, bubble charts, scientific graphs, business charts, statistical visualizations, and any data visualization with axes, data points, or quantitative information. NOT for: diagrams, flowcharts, tables, handwriting, or non-quantitative visual content. If no chart or graph is found, returns that no chart content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing chart or graph to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "charts_analyzer",
+        "description": "Analyzes chart and graph images to extract data visualizations and structured information",
+        "enhancement_eligible": false,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "charts_gestalt.xml",
+            "charts_job_role.xml",
+            "charts_context.xml",
+            "charts_rules.xml",
+            "charts_tasks_extraction.xml",
+            "charts_format.xml",
+            "charts_help.xml",
+            "charts_conversation_example.xml",
+            "charts_two_step_verfication_process.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 6,
+        "analysis_text": "chart and graph content",
+        "expected_output_tokens": 4000,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.078809+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "chart_type_accuracy",
+                    "text": "Was the chart type correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "axis_label_extraction",
+                    "text": "Were axes, labels, and legends accurately captured?",
+                    "type": "likert"
+                },
+                {
+                    "id": "data_series_representation",
+                    "text": "Were data series and visual encodings correctly described?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

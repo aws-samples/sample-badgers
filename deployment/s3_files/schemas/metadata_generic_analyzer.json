@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_metadata_generic_tool",
+        "description": "Specialized tool for extracting generic metadata from document images. ONLY use for: documents requiring metadata extraction, bibliographic information extraction, document classification, archival processing, and general document metadata analysis. NOT for: content analysis, text extraction, diagrams, or tables. If no metadata-relevant content is found, returns that no metadata was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Metadata Generic Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

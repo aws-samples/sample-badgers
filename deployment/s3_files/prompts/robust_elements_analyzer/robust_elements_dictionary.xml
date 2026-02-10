@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dictionary>
+    <element_types>
+        <type name="heading">
+            <description>Section or subsection titles with hierarchical levels</description>
+            <properties>Requires 'level' field (1, 2, 3, etc.)</properties>
+        </type>
+
+        <type name="paragraph">
+            <description>Body text content, can span multiple lines</description>
+            <properties>Standard text block</properties>
+        </type>
+
+        <type name="table">
+            <description>Tabular data structure</description>
+            <properties>Identified as single element</properties>
+        </type>
+
+        <type name="image">
+            <description>Visual content (photos, diagrams, illustrations)</description>
+            <properties>Content field should contain descriptive alt text</properties>
+        </type>
+
+        <type name="list">
+            <description>Bullet or numbered list items</description>
+            <properties>Can be identified as group or individual items</properties>
+        </type>
+
+        <type name="footnote">
+            <description>Reference notes, typically at bottom of page</description>
+            <properties>Often contains citation or supplementary information</properties>
+        </type>
+
+        <type name="link">
+            <description>Hyperlink or URL reference</description>
+            <properties>Content should include the URL if visible</properties>
+        </type>
+
+        <type name="keyword">
+            <description>Keywords, tags, or metadata section</description>
+            <properties>Often in dedicated section</properties>
+        </type>
+
+        <type name="caption">
+            <description>Descriptive text for figures or tables</description>
+            <properties>Usually positioned near associated element</properties>
+        </type>
+
+        <type name="header">
+            <description>Repeated content at top of page</description>
+            <properties>May include page numbers, document title</properties>
+        </type>
+
+        <type name="footer">
+            <description>Repeated content at bottom of page</description>
+            <properties>May include page numbers, copyright info</properties>
+        </type>
+    </element_types>
+
+    <coordinate_terms>
+        <term name="bbox">Bounding box - rectangular area containing the element</term>
+        <term name="x1">Left edge x-coordinate in pixels</term>
+        <term name="y1">Top edge y-coordinate in pixels</term>
+        <term name="x2">Right edge x-coordinate in pixels</term>
+        <term name="y2">Bottom edge y-coordinate in pixels</term>
+        <term name="origin">Top-left corner of image (0, 0)</term>
+    </coordinate_terms>
+</dictionary>

@@ -1,0 +1,9 @@
+<!-- Help in the form of information or guidance, to help you do great work. -->
+<help>
+   <guidance>To understand page layout concepts, refer to the information in the <layout_concepts/>
+ XML tags section within the <layout_dictionary/>
+ XML tags.</guidance>
+<guidance>Pages may have multiple columns, a single column, or no columns at all.</guidance>
+<guidance>When analyzing layouts, consider factors such as typeface choices, hierarchy, spacing, alignment, grid structure, and overall visual organization.</guidance>
+<guidance>The header_zone and footer_zone may contain multiple elements. Analyze the information to determine what elements compose these zones.  The header areas may take up more space than they would traditionally would, especially in documents of the magazine or newspaper type.</guidance>
+</help>

@@ -1,0 +1,13 @@
+<!-- Provides overall context for the visual element extraction task, outlining the types of visual content to analyze and their importance in publications. -->
+<context>
+    <item>You will analyze various types of publications to identify and extract visual elements such as images, photos, diagrams, workflows, architectures, figures, and other graphical representations.</item>
+    <item>These visual elements are crucial for conveying complex information, illustrating concepts, and enhancing the overall comprehension of the publication's content.</item>
+    <item>Pay close attention to the placement, captions, and references to these visual elements within the text.</item>
+    <item>Your analysis should cover both full-page visuals and in-text graphics, noting their relationship to the surrounding content.</item>
+    <item>Be prepared to encounter a wide range of visual styles and complexities across different types of publications (e.g., scientific journals, textbooks, technical reports).</item>
+    <item>When identifying visual elements, refer to the definitions provided in the <visual_dictionary/> XML tags.</item>
+    <item>Use the format specifications in the <visual_format/> XML tags to structure your responses.</item>
+    <item>If you're unsure about a visual element's classification or description, refer to the guidance in the <visual_help/> XML tags.</item>
+    <item>Consider the role of color, shading, and other visual attributes in conveying information within the visual elements.</item>
+    <item>Be aware that some visual elements may serve multiple purposes or combine different types, requiring a nuanced analysis.</item>
+</context>

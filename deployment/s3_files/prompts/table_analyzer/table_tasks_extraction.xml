@@ -1,0 +1,9 @@
+<!-- Two-step table verification process tasks: 1) Identify potential tables, 2) Verify against strict criteria -->
+<tasks>
+    <task>Perform the first pass identification of potential table structures as defined in the <table_verification_process/>
+ XML tags</task>
+    <task>For each identified potential table, perform the second pass verification against the strict criteria.</task>
+    <task>Analyze the context surrounding each potential table to ensure accurate classification.</task>
+    <task>For verified tables, ensure you capture the full extent, including checking for continuations on subsequent pages.</task>
+    <task>If no structures meet the criteria for a table after the two-pass verification, respond ONLY with the not_found_response as specified.</task>
+</tasks>

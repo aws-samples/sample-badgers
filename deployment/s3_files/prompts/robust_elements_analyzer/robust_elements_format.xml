@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response_format>
+    <response>
+        <format_type>JSON</format_type>
+
+        <structure>
+            <root_object>
+                <field name="page_info" type="object" required="true">
+                    <description>Image dimensions and page identification</description>
+                    <properties>
+                        <property name="page_number" type="string">Page number visible on the page
+                            or
+                            inferred from context</property>
+                        <property name="width" type="integer">[[PIXEL_WIDTH]]</property>
+                        <property name="height" type="integer">[[PIXEL_HEIGHT]]</property>
+                    </properties>
+                </field>
+
+                <field name="elements" type="array" required="true">
+                    <description>Array of identified structural elements</description>
+                    <item_schema>
+                        <property name="order" type="integer" required="true">
+                            Sequential reading order number (starting at 1)
+                        </property>
+                        <property name="type" type="string" required="true">
+                            Element type (heading, paragraph, table, image, list, footnote, link,
+                            keyword, caption, header, footer)
+                        </property>
+                        <property name="level" type="integer" required="false">
+                            Hierarchical level (for headings: 1, 2, 3, etc.)
+                        </property>
+                        <property name="content" type="string" required="true">
+                            Extracted text content or description
+                        </property>
+                        <property name="bbox" type="object" required="true">
+                            <description>Bounding box coordinates in pixels</description>
+                            <coordinates>
+                                <coord name="x1" type="integer">Left edge x-coordinate</coord>
+                                <coord name="y1" type="integer">Top edge y-coordinate</coord>
+                                <coord name="x2" type="integer">Right edge x-coordinate</coord>
+                                <coord name="y2" type="integer">Bottom edge y-coordinate</coord>
+                            </coordinates>
+                        </property>
+                    </item_schema>
+                </field>
+            </root_object>
+        </structure>
+
+        <example>
+        <![CDATA[
+{
+    "page_info": {
+        "page_number": "1",
+        "width": [[PIXEL_WIDTH]],
+        "height": [[PIXEL_HEIGHT]]
+    },
+    "elements": [
+        {
+            "order": 1,
+            "type": "heading",
+            "level": 1,
+            "content": "Document Title",
+            "bbox": {
+                "x1": 45,
+                "y1": 43,
+                "x2": 450,
+                "y2": 145
+            }
+        },
+        {
+            "order": 2,
+            "type": "paragraph",
+            "content": "This is a paragraph of text.",
+            "bbox": {
+                "x1": 45,
+                "y1": 150,
+                "x2": 500,
+                "y2": 200
+            }
+        }
+    ]
+}
+        ]]>
+    </example>
+    </response>
+</response_format>

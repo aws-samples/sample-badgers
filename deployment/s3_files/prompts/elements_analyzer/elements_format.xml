@@ -1,0 +1,43 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="document_element">
+        <metadata>
+            <page_number>{PAGE_NUMBER}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_ELEMENTS_DETECTED}</element_count>
+        </metadata>
+        <!-- Reference for citation format styles -->
+        <format_styles>
+            <style name="APA">American Psychological Association style, commonly used in social
+                sciences.</style>
+            <style name="MLA">Modern Language Association style, often used in humanities.</style>
+            <style name="Chicago">Chicago Manual of Style, used in various disciplines, especially
+                in historical research.</style>
+            <style name="Harvard">Harvard referencing style, commonly used in universities and
+                scientific publications.</style>
+            <style name="IEEE">Institute of Electrical and Electronics Engineers style, used in
+                technical fields.</style>
+            <style name="Vancouver">Vancouver system, commonly used in medical and scientific
+                papers.</style>
+        </format_styles>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per document element found -->
+        <elements>
+            <element type="document_element">
+                <type>{ELEMENT TYPE (e.g., section, heading, paragraph, citation)}</type>
+                <order>{SEQUENTIAL NUMBER BASED ON APPEARANCE}</order>
+                <sub_type>{SUB-TYPE IF APPLICABLE}</sub_type>
+                <hierarchical_level>{LEVEL IN DOCUMENT STRUCTURE, IF APPLICABLE}</hierarchical_level>
+                <content>{EXTRACTED CONTENT}</content>
+                <style>{IDENTIFIED STYLE (e.g., APA, MLA) IF APPLICABLE}</style>
+                <location>
+                    <page>{PAGE NUMBER}</page>
+                    <position>{POSITION ON PAGE (e.g., top, bottom, inline)}</position>
+                </location>
+                <context>{BRIEF DESCRIPTION OF SURROUNDING CONTENT AND RELATION TO DOCUMENT
+                    STRUCTURE}</context>
+            </element>
+        </elements>
+    </response>
+</response_format>

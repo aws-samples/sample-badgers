@@ -1,0 +1,76 @@
+<keyword_topic_analyzer_tasks>
+    <task>
+        <task_name>Identify Industry Keywords to Target</task_name>
+        <task_description>Based on the content's subject matter, identify ESTABLISHED INDUSTRY
+            KEYWORDS that this content could realistically rank for. Think like a keyword researcher
+            - what are people in this market actually searching for?</task_description>
+        <task_instructions>
+            <instruction>List 5-10 high-value industry keywords this content relates to (terms that
+                exist in the broader market)</instruction>
+            <instruction>Focus on established search terms, not phrases invented from the document</instruction>
+            <instruction>Include estimated search volume category (high, medium, low competition)</instruction>
+            <instruction>Note how well the content currently addresses each keyword (strong fit,
+                partial fit, opportunity)</instruction>
+            <instruction>Consider what competitors in this space are likely targeting</instruction>
+        </task_instructions>
+    </task>
+    <task>
+        <task_name>Map to Long-Tail Market Opportunities</task_name>
+        <task_description>Identify specific long-tail keywords and question-based searches that
+            represent real market demand this content could capture.</task_description>
+        <task_instructions>
+            <instruction>List 10-20 long-tail keywords people actually search for in this industry</instruction>
+            <instruction>Include common question patterns (how to, what is, why does, best way to)</instruction>
+            <instruction>Focus on phrases with clear search intent that match the content's value</instruction>
+            <instruction>Identify niche keyword opportunities with lower competition</instruction>
+            <instruction>Consider voice search and conversational query patterns</instruction>
+        </task_instructions>
+    </task>
+    <task>
+        <task_name>Identify Industry Topics and Categories</task_name>
+        <task_description>Map the content to established INDUSTRY CATEGORIES and MARKET SEGMENTS -
+            not just what the document discusses, but what broader industry topics it belongs to.</task_description>
+        <task_instructions>
+            <instruction>List 3-7 industry topics/categories this content falls under</instruction>
+            <instruction>Use standard industry terminology for topic names</instruction>
+            <instruction>Indicate where this content fits in the broader market landscape</instruction>
+            <instruction>Note related industry topics the content could expand into</instruction>
+        </task_instructions>
+    </task>
+    <task>
+        <task_name>Competitive Keyword Landscape</task_name>
+        <task_description>Analyze what keyword territory this content competes in and identify
+            strategic positioning opportunities.</task_description>
+        <task_instructions>
+            <instruction>Identify the primary keyword categories this content competes in</instruction>
+            <instruction>Note high-competition keywords where content would need strengthening</instruction>
+            <instruction>Highlight underserved keyword niches the content could own</instruction>
+            <instruction>Suggest keyword differentiation strategies</instruction>
+        </task_instructions>
+    </task>
+    <task>
+        <task_name>Market Search Intent Mapping</task_name>
+        <task_description>Map the content to different types of search intent in the market - what
+            are people trying to accomplish when they search for related terms?</task_description>
+        <task_instructions>
+            <instruction>Categorize relevant keywords by intent: informational, navigational,
+                transactional, commercial</instruction>
+            <instruction>Identify which intent types the content best serves</instruction>
+            <instruction>Note intent gaps where content could be optimized</instruction>
+            <instruction>Suggest content modifications to better match high-value intents</instruction>
+        </task_instructions>
+    </task>
+    <task>
+        <task_name>Keyword Targeting Recommendations</task_name>
+        <task_description>Provide actionable recommendations for which industry keywords to
+            prioritize and how to optimize for them.</task_description>
+        <task_instructions>
+            <instruction>Recommend top 5 keywords to prioritize based on fit and opportunity</instruction>
+            <instruction>Suggest content additions needed to rank for target keywords</instruction>
+            <instruction>Identify quick wins (keywords content is close to ranking for)</instruction>
+            <instruction>Note keywords to avoid (poor fit or too competitive)</instruction>
+            <instruction>Provide AI Overview optimization opportunities for featured snippet
+                potential</instruction>
+        </task_instructions>
+    </task>
+</keyword_topic_analyzer_tasks>

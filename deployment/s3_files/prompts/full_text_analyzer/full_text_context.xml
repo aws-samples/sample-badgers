@@ -1,0 +1,13 @@
+<context>
+    <item>You will analyze various types of documents to extract all text content while maintaining the natural reading order and flow of the document.</item>
+    <item>This task is crucial for preserving the original structure and intent of the document, ensuring that extracted text can be understood in its proper context.</item>
+    <item>Your structured output will be used for PDF accessibility tagging (PDF/UA compliance), enabling screen readers to present content in the correct order.</item>
+    <item>Each element you extract will be assigned a unique ID that allows joining with bounding box data from a separate extraction process.</item>
+    <item>Pay close attention to the layout of the page, including columns, sidebars, footnotes, and any non-standard text arrangements.</item>
+    <item>Your extraction should cover all textual elements, including headers, body text, captions, footnotes, and any other text present on the page.</item>
+    <item>Heading hierarchy (h1, h2, h3, h4) is critical for accessibility - screen reader users navigate documents by jumping between headings.</item>
+    <item>Be prepared to handle documents with multiple languages, different writing systems, and varying text directions.</item>
+    <item>When extracting text, refer to the definitions provided in the <full_text_dictionary/> XML tags.</item>
+    <item>Use the format specifications in the <response_format/> XML tags to structure your responses.</item>
+    <item>If you're unsure about the correct reading order or encounter complex layouts, refer to the guidance in the <full_text_help/> XML tags.</item>
+</context>

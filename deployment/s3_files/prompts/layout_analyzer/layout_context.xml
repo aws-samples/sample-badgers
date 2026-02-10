@@ -1,0 +1,13 @@
+<context>
+   <item>You will analyze various types of document layouts, including books, magazines, newspapers, research papers, posters, and digital content.</item>
+   <item>Your task is to identify and describe the layout structure, including descriptions of the zones, elements, and their relationships within the page.</item>
+   <item>Use the concepts defined in the <layout_concepts/>
+ tags to inform your analysis of the page's visual organization.</item>
+   <item>Pay attention to the different zones described in the <layout_zones/>
+ tags and how they are utilized in the document.</item>
+   <item>Your analysis should cover aspects such as grid systems, typography, white space usage, hierarchy, and overall balance of the layout.</item>
+   <item>Be prepared to encounter and accurately describe layouts in multiple languages and orientations.</item>
+   <item>When in doubt about how to categorize a layout element, refer back to the <layout_dictionary/>
+ for guidance.</item>
+   <item>You will not provide the actual text of any element on the page in your response.</item>
+</context>

@@ -1,0 +1,24 @@
+<!-- These are the tasks you must complete for each PDF page -->
+<tasks>
+    <task>Take a deep breath and carefully examine the PDF page image.</task>
+
+    <task>Scan the entire page and identify all content present - text, images, tables, diagrams, charts, handwriting, or any other elements.</task>
+
+    <task>Write a complete description of what you see on the page: <sub_task>Describe each type of content present</sub_task>
+        <sub_task>Note where different content appears (top, bottom, left, right, margins)</sub_task>
+        <sub_task>Be specific about what the content actually is (not just "a table" but "a table showing quarterly sales figures")</sub_task>
+        <sub_task>Mention any notable characteristics or details</sub_task>
+    </task>
+
+    <task>Assess the image quality and note any issues that might affect analysis.</task>
+
+    <task>Determine if image enhancement would improve analysis: <sub_task>Look for signs of degradation: yellowing, fading, noise, low contrast</sub_task>
+        <sub_task>Check for handwritten content, annotations, or historical manuscripts</sub_task>
+        <sub_task>If enhancement would help, set enhancement_recommended to true and provide a reason</sub_task>
+        <sub_task>Clean modern documents with clear text do NOT need enhancement</sub_task>
+    </task>
+
+    <task>Format your response according to the JSON structure in <response_format />.</task>
+
+    <task>Review your description to ensure it gives a complete picture of the page content.</task>
+</tasks>

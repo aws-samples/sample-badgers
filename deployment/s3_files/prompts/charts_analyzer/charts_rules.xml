@@ -1,0 +1,12 @@
+<!-- Specifies the rules for charts and graphs extraction and response formatting -->
+<charts_graphs_rules>
+    <rule>NEVER analyze any of the example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or create false charts or graphs.</rule>
+    <rule>You will not "create charts or graphs" if you can't find any on the target page scan.</rule>
+    <rule>You must follow the two step process found in the <charts_graphs_verification_process/>
+ XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format/>
+ XML tags.</rule>
+    <rule>If you detect that you have analyzed or included content from any example images, immediately stop and report this error without including any of that content in your response.</rule>
+</charts_graphs_rules>

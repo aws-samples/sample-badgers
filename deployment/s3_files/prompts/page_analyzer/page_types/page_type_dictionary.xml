@@ -1,0 +1,38 @@
+<!-- The types of pages you will encounter and the elements that are typically in them. -->
+<page_types>
+    <page_type type="cover_page" description="The first page of a document, usually found at the beginning of periodicals. It often features large graphic elements, prominent titles, and key information about the publication. Examples include magazine covers or the title page of a research paper."></page_type>
+
+    <page_type type="introductory_pages" description="Pages that introduce the content of the document. This may include prefaces, forewords, abstracts, or executive summaries."></page_type>
+
+    <page_type type="table_of_contents" description="A list of the main sections, chapters, or articles in the document, usually with corresponding page numbers."></page_type>
+
+    <page_type type="list_of_figures" description="A catalog of all figures, illustrations, or images used in the document, typically with corresponding page numbers."></page_type>
+
+    <page_type type="list_of_tables" description="An index of all tables used in the document, usually with corresponding page numbers."></page_type>
+
+    <page_type type="page_standard" description="A typical page within the main body of the document. These usually appear between the introductory and concluding sections and contain the primary content."></page_type>
+
+    <page_type type="article_page" description="A page containing a self-contained piece of writing, often found in magazines, newspapers, or academic journals."></page_type>
+
+    <page_type type="data_visualization" description="Pages primarily featuring charts, graphs, or other visual representations of data."></page_type>
+
+    <page_type type="methodology" description="In research papers, a section detailing the methods and procedures used in the study."></page_type>
+
+    <page_type type="results" description="In research papers, a section presenting the findings or outcomes of the study."></page_type>
+
+    <page_type type="discussion" description="In research papers, a section interpreting the results and relating them to existing literature."></page_type>
+
+    <page_type type="conclusion" description="The final section of a document, summarizing key points and providing closure."></page_type>
+
+    <page_type type="appendix" description="Supplementary material that is too detailed for the main body of the work but relevant to the document."></page_type>
+
+    <page_type type="reference_material" description="Pages containing citations and sources used in the document.">
+        <page_sub_type type="works_cited" description="A list of all sources directly referenced in the document, typically following a specific citation style."></page_sub_type>
+        <page_sub_type type="bibliography" description="A comprehensive list of all sources consulted during research, including those not directly cited in the document."></page_sub_type>
+        <page_sub_type type="references" description="Similar to works cited, a list of sources referenced in the document, often used interchangeably with bibliography in some citation styles."></page_sub_type>
+    </page_type>
+
+    <page_type type="index" description="An alphabetical list of key terms, concepts, or names mentioned in the document, along with their page numbers."></page_type>
+
+    <page_type type="glossary" description="A list of specialized or technical terms used in the document, along with their definitions."></page_type>
+</page_types>

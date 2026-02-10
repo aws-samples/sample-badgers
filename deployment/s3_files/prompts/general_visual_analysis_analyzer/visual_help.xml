@@ -1,0 +1,13 @@
+<!-- Offers guidance on identifying and extracting different visual element types, including tips on recognizing various styles and handling complex visual information. -->
+<help>
+    <guidance>When identifying images and photos, look for realistic representations of objects, people, or scenes.</guidance>
+    <guidance>Diagrams typically use simplified shapes, lines, and labels to represent concepts or structures.</guidance>
+    <guidance>Workflows and architectures often use boxes, arrows, or other connectors to show relationships and processes.</guidance>
+    <guidance>Figures may include various types of charts, graphs, or plots, often with axes and data points.</guidance>
+    <guidance>Pay attention to captions and in-text references, as they often provide context and identify the type of visual element.</guidance>
+    <guidance>Consider the purpose of the visual element in relation to the surrounding text - is it illustrative, explanatory, or presenting data?</guidance>
+    <guidance>Note any color coding or legends used to convey additional information within the visual element.</guidance>
+    <guidance>For complex visuals, break down the analysis into components (e.g., main elements, labels, color scheme).</guidance>
+    <guidance>If you encounter a visual element that doesn't fit the predefined categories, describe its key features and purpose as best you can.</guidance>
+    <guidance>Remember that some visual elements may combine multiple types (e.g., a diagram within a photograph) - be prepared to describe these hybrid forms.</guidance>
+</help>

@@ -1,0 +1,12 @@
+<correlation_rules>
+    <rule priority="critical">full_text elements are the CANONICAL SPINE — preserve ALL IDs exactly (elem_001, elem_002, etc.)</rule>
+    <rule priority="critical">NEVER modify, merge, rename, or omit full_text elements</rule>
+    <rule priority="critical">Every correlation MUST have explicit evidence — do not guess or assume relationships</rule>
+    <rule priority="critical">If no clear relationship exists between elements, do not fabricate one</rule>
+    <rule priority="high">Enrichments attach INSIDE each element's enrichments block, not as separate sections</rule>
+    <rule priority="high">For figures: identify "referenced_by" (text that cites it), "illustrates" (text it visualizes), "grounded_to" (the figure element itself)</rule>
+    <rule priority="high">Include the full structure from diagram/table/chart analyzers in the enrichment — do not summarize or truncate</rule>
+    <rule priority="medium">Build cross_reference_index for efficient downstream lookup by diagram, table, or layout region</rule>
+    <rule priority="medium">Include raw_outputs section with S3 URIs of all source analyzer results</rule>
+    <rule priority="low">Summary should be 2-4 sentences describing what was correlated and key findings</rule>
+</correlation_rules>

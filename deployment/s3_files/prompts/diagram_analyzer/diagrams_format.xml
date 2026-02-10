@@ -1,0 +1,128 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="diagram">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_DIAGRAMS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per diagram found -->
+        <!-- Diagram category determines which key_elements structure to use -->
+        <elements>
+            <element type="diagram">
+                <type>{DIAGRAM_TYPE}</type>
+                <category>{flow|hierarchy|network|process|structural|comparison|other}</category>
+                <content>
+                    <description>{DETAILED_DESCRIPTION_OF_DIAGRAM}</description>
+
+                    <!-- USE THE APPROPRIATE key_elements STRUCTURE BASED ON CATEGORY -->
+
+                    <!-- FOR FLOW DIAGRAMS (sankey, alluvial, flow charts): -->
+                    <key_elements type="flow">
+                        <nodes>
+                            <node>
+                                <id>{NODE_ID}</id>
+                                <label>{NODE_LABEL}</label>
+                                <value>{NODE_VALUE_IF_SHOWN}</value>
+                                <position>{left|middle|right|top|bottom}</position>
+                            </node>
+                        </nodes>
+                        <flows>
+                            <flow>
+                                <source>{SOURCE_NODE_LABEL}</source>
+                                <target>{TARGET_NODE_LABEL}</target>
+                                <value>{FLOW_VALUE_IF_SHOWN}</value>
+                                <label>{FLOW_LABEL_IF_ANY}</label>
+                            </flow>
+                        </flows>
+                    </key_elements>
+
+                    <!-- FOR HIERARCHY DIAGRAMS (org charts, tree diagrams): -->
+                    <key_elements type="hierarchy">
+                        <root>{ROOT_NODE_LABEL}</root>
+                        <levels>
+                            <level depth="{LEVEL_NUMBER}">
+                                <node>
+                                    <label>{NODE_LABEL}</label>
+                                    <parent>{PARENT_NODE_LABEL}</parent>
+                                </node>
+                            </level>
+                        </levels>
+                    </key_elements>
+
+                    <!-- FOR NETWORK DIAGRAMS (architecture, system diagrams): -->
+                    <key_elements type="network">
+                        <components>
+                            <component>
+                                <label>{COMPONENT_LABEL}</label>
+                                <type>{COMPONENT_TYPE}</type>
+                            </component>
+                        </components>
+                        <connections>
+                            <connection>
+                                <from>{SOURCE_COMPONENT}</from>
+                                <to>{TARGET_COMPONENT}</to>
+                                <type>{CONNECTION_TYPE}</type>
+                                <label>{CONNECTION_LABEL_IF_ANY}</label>
+                            </connection>
+                        </connections>
+                    </key_elements>
+
+                    <!-- FOR PROCESS DIAGRAMS (flowcharts, workflows, sequences): -->
+                    <key_elements type="process">
+                        <steps>
+                            <step order="{STEP_NUMBER}">
+                                <label>{STEP_LABEL}</label>
+                                <type>{start|process|decision|end}</type>
+                                <next>{NEXT_STEP_LABEL_OR_LABELS}</next>
+                            </step>
+                        </steps>
+                    </key_elements>
+
+                    <!-- FOR STRUCTURAL DIAGRAMS (UML, ER diagrams, class diagrams): -->
+                    <key_elements type="structural">
+                        <entities>
+                            <entity>
+                                <name>{ENTITY_NAME}</name>
+                                <attributes>{LIST_OF_ATTRIBUTES}</attributes>
+                            </entity>
+                        </entities>
+                        <relationships>
+                            <relationship>
+                                <from>{SOURCE_ENTITY}</from>
+                                <to>{TARGET_ENTITY}</to>
+                                <type>{RELATIONSHIP_TYPE}</type>
+                                <cardinality>{CARDINALITY_IF_SHOWN}</cardinality>
+                            </relationship>
+                        </relationships>
+                    </key_elements>
+
+                    <!-- FOR COMPARISON DIAGRAMS (Venn, side-by-side): -->
+                    <key_elements type="comparison">
+                        <items>
+                            <item>
+                                <label>{ITEM_LABEL}</label>
+                                <attributes>{ITEM_ATTRIBUTES}</attributes>
+                            </item>
+                        </items>
+                        <overlaps>{SHARED_ELEMENTS_IF_ANY}</overlaps>
+                    </key_elements>
+
+                </content>
+                <figure_reference>
+                    <figure_id>{FIGURE_NUMBER e.g. "Figure 5", "Figure 6(A)", "Diagram 3"}</figure_id>
+                    <caption>{EXACT_CAPTION_TEXT_AS_SHOWN_BELOW_OR_ABOVE_DIAGRAM}</caption>
+                    <sub_label>{SUB_LABEL_IF_PART_OF_MULTI_PANEL e.g. "A", "B", "(a)", "(b)"}</sub_label>
+                </figure_reference>
+                <document_context>
+                    <referencing_text>{TEXT_ON_PAGE_THAT_MENTIONS_THIS_FIGURE}</referencing_text>
+                    <section_heading>{NEAREST_SECTION_HEADING_IF_VISIBLE}</section_heading>
+                    <explanatory_text>{ANY_TEXT_DIRECTLY_EXPLAINING_THE_DIAGRAM}</explanatory_text>
+                </document_context>
+                <context>{BRIEF_DESCRIPTION_OF_WHAT_THIS_DIAGRAM_REPRESENTS_IN_THE_DOCUMENT}</context>
+            </element>
+        </elements>
+    </response>
+</response_format>

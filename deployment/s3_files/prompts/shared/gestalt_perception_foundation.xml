@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception Foundation - Universal visual perception principles for Vision LLMs -->
+<gestalt_perception_foundation>
+
+    <purpose> You possess powerful visual perception capabilities. This guidance helps you leverage human-like perceptual strategies before applying your extraction abilities. See like a human. Extract like a machine. </purpose>
+
+    <visual_scanning_strategy>
+        <instruction>Before analyzing any specific element, complete this holistic scan:</instruction>
+        <step order="1">View the entire page at once without focusing on any single element.</step>
+        <step order="2">Identify the dominant visual element (largest, boldest, highest contrast).</step>
+        <step order="3">Note major spatial divisions (columns, sections, zones, margins).</step>
+        <step order="4">Observe natural groupings: what clusters together spatially?</step>
+        <step order="5">Identify visual hierarchy: what is primary, secondary, tertiary?</step>
+        <step order="6">Distinguish foreground content from background/decorative elements.</step>
+        <step order="7">Now proceed to detailed element extraction.</step>
+    </visual_scanning_strategy>
+
+    <gestalt_principles>
+
+        <principle name="proximity">
+            <definition>Elements close together are perceived as a group.</definition>
+            <application> Text blocks near images likely form caption-figure pairs. Items with minimal spacing belong to the same logical unit. Clustered elements share semantic relationships. </application>
+        </principle>
+
+        <principle name="similarity">
+            <definition>Elements sharing visual properties are perceived as related.</definition>
+            <application> Same font weight/size/color = same function (headings, captions, footnotes). Consistent styling indicates categorical membership. Use visual patterns to classify unknown elements. </application>
+        </principle>
+
+        <principle name="continuity">
+            <definition>The eye follows lines, curves, and sequences along the smoothest path.</definition>
+            <application> Follow arrows, connecting lines, and aligned elements to understand flow. In diagrams, trace connections from start to end. In text, follow column gutters and alignment guides. </application>
+        </principle>
+
+        <principle name="closure">
+            <definition>The mind completes incomplete shapes or patterns.</definition>
+            <application> Recognize implied boundaries even when not fully drawn. A box doesn't need all four sides to be perceived as a container. Grouped elements may share an invisible boundary defining their relationship. </application>
+        </principle>
+
+        <principle name="figure_ground">
+            <definition>The eye separates foreground content from background.</definition>
+            <application> Watermarks, background colors, decorative borders = ground (artifacts). Text, figures, data, meaningful content = figure (extract this). Distinguish what to capture from what to ignore. </application>
+        </principle>
+
+        <principle name="common_fate">
+            <definition>Elements moving or pointing in the same direction are perceived as a group.</definition>
+            <application> Elements with arrows pointing the same direction represent a process flow. Items aligned along the same axis suggest sequence or relationship. Parallel structures indicate related content. </application>
+        </principle>
+
+    </gestalt_principles>
+
+    <visual_cues>
+        <cue type="size">Larger elements signal greater importance (headings > body text).</cue>
+        <cue type="weight">Bolder elements indicate emphasis or hierarchy level.</cue>
+        <cue type="color">Color draws attention; colored text often indicates links, warnings, or emphasis.</cue>
+        <cue type="position">Top-left (LTR) or top-right (RTL) positions signal primary content.</cue>
+        <cue type="spacing">More whitespace around an element increases its perceived importance.</cue>
+        <cue type="contrast">High contrast elements are meant to be noticed first.</cue>
+        <cue type="isolation">Isolated elements with surrounding whitespace are emphasized.</cue>
+    </visual_cues>
+
+    <reading_flow>
+        <pattern type="ltr">Left-to-right languages: top-left → right → down, following Z or F pattern.</pattern>
+        <pattern type="rtl">Right-to-left languages: top-right → left → down.</pattern>
+        <pattern type="diagram">Follow arrows and connecting lines from entry to exit points.</pattern>
+        <pattern type="table">Headers first, then row-by-row or column-by-column as structure dictates.</pattern>
+        <pattern type="multi_column">Complete each column before moving to the next.</pattern>
+    </reading_flow>
+
+</gestalt_perception_foundation>

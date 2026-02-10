@@ -1,0 +1,13 @@
+<!-- These are the rules about how YOU MUST format your response. -->
+<decision_tree_rules>
+    <rule>As an LLM, you will not hallucinate.</rule>
+    <rule>You will not "create decision trees" if you can't find any on the page scan.</rule>
+    <rule>You must follow the two step process found in the <decision_tree_verification_process/> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format/> XML tags.</rule>
+    <rule>If no structures meet the criteria for a decision tree after the two-pass verification, respond ONLY with the not_found_response as specified in the format.</rule>
+    <rule>Do not force identification of decision trees where none exist - absence of decision trees is a valid outcome.</rule>
+    <rule>Capture complete logical pathways including all conditional branching and multiple valid endpoints.</rule>
+    <rule>When decision trees reference external figures or procedures, include those cross-references in your analysis.</rule>
+    <rule>Maintain accuracy in representing the logical flow - do not simplify complex branching structures.</rule>
+    <rule>For decision trees with probabilistic outcomes, capture probability information where present.</rule>
+</decision_tree_rules>

@@ -1,0 +1,70 @@
+{
+    "tool": {
+        "name": "enhance_image_tool",
+        "description": "Pre-processes historical or degraded document images to improve quality before analysis. Use BEFORE calling enhancement-eligible analyzers (handwriting, editorial, full_text) when the image shows: faded text, yellowing, noise, low contrast, skew, or other degradation. Returns S3 URI of enhanced image to pass to subsequent analyzers. NOT needed for clean printed documents, tables, charts, or diagrams.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both."
+                },
+                "document_type": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "manuscript",
+                        "annotated",
+                        "sheet_music",
+                        "diagram",
+                        "printed",
+                        "mixed"
+                    ],
+                    "description": "Type of document for optimized enhancement. Default: auto (auto-detect)."
+                },
+                "enhancement_level": {
+                    "type": "string",
+                    "enum": [
+                        "minimal",
+                        "moderate",
+                        "aggressive"
+                    ],
+                    "description": "Enhancement intensity. Default: moderate."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID for organizing outputs in S3."
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "image_enhancer",
+        "description": "Enhances historical document images using OpenCV for better vision LLM processing",
+        "enhancement_eligible": false,
+        "is_gateway_tool": true,
+        "model_selections": {
+            "primary": null,
+            "fallback_list": []
+        },
+        "output_extension": "png"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "opencv-python-headless",
+            "numpy",
+            "boto3"
+        ],
+        "wizard_managed": false,
+        "analyzer_type": "container",
+        "container_path": "deployment/lambdas/containers/image_enhancer"
+    }
+}

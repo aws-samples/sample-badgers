@@ -1,0 +1,43 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="full_text">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_TEXT_ELEMENTS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per text element found -->
+        <!-- Types: header, footer, h1, h2, h3, paragraph, sidebar, footnote, caption, figure,
+        table_content, pull_quote, list -->
+        <elements>
+            <element type="header" id="elem_001" order="1">
+                <text>{PAGE_HEADER_TEXT}</text>
+            </element>
+
+            <element type="h1" id="elem_002" order="2">
+                <text>{MAIN_TITLE}</text>
+            </element>
+
+            <element type="paragraph" id="elem_003" order="3">
+                <text>{BODY_PARAGRAPH_TEXT}</text>
+            </element>
+
+            <element type="figure" id="elem_004" order="4">
+                <caption>{FIGURE_CAPTION}</caption>
+                <alt_text>{BRIEF_DESCRIPTION_OF_VISUAL_CONTENT_FOR_ACCESSIBILITY}</alt_text>
+            </element>
+
+            <element type="footnote" id="elem_005" order="5" ref="elem_003">
+                <text>{FOOTNOTE_TEXT}</text>
+            </element>
+
+            <element type="footer" id="elem_006" order="6">
+                <text>{PAGE_FOOTER_TEXT}</text>
+            </element>
+        </elements>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+    </response>
+</response_format>

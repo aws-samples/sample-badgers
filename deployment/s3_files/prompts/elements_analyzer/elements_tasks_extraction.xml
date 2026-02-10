@@ -1,0 +1,64 @@
+<!-- Provides a step-by-step process for element extraction and analysis, guiding the AI through the task of identifying and documenting atomic elements in publications. -->
+<tasks>
+    <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
+
+    <task>Begin by examining the overall structure of the document:
+        <sub_task>Identify the document title, if present.</sub_task>
+        <sub_task>Look for a table of contents and note its structure.</sub_task>
+        <sub_task>Check for an abstract and keywords at the beginning of the document.</sub_task>
+        <sub_task>Identify major sections and subsections of the document.</sub_task>
+    </task>
+
+    <task>Examine the given publication page by page, focusing on identifying atomic elements as defined in the <elements_dictionary/>
+ XML tags.</task>
+
+    <task>For each identified element:
+        <sub_task>Determine its type and sub-type if applicable.</sub_task>
+        <sub_task>If it's a heading or section, determine its hierarchical level within the document structure.</sub_task>
+        <sub_task>Extract the full content of the element.</sub_task>
+        <sub_task>Identify the formatting style (e.g., APA, MLA) if applicable.</sub_task>
+        <sub_task>Note the element's location on the page and its context within the document structure.</sub_task>
+        <sub_task>Assign a sequential number based on its order of appearance, starting from the top-left of each page and moving right and down.</sub_task>
+    </task>
+
+    <task>Pay special attention to the following elements:
+        <sub_task>In-text citations and their corresponding full references, ensuring you capture both.</sub_task>
+        <sub_task>Captions, noting which figure, table, or image they correspond to.</sub_task>
+        <sub_task>Footnotes or endnotes, linking them to their in-text references.</sub_task>
+        <sub_task>Equations, both inline and display types.</sub_task>
+        <sub_task>Lists, including their type and relationship to surrounding text.</sub_task>
+    </task>
+
+    <task>When extracting paragraphs:
+        <sub_task>Note their relationship to surrounding headings and sections.</sub_task>
+        <sub_task>Identify any topic sentences or key ideas within each paragraph.</sub_task>
+    </task>
+
+    <task>For elements that span multiple pages:
+        <sub_task>Consider their logical place in the document hierarchy when determining order.</sub_task>
+        <sub_task>Make note of where the element begins and ends.</sub_task>
+    </task>
+
+    <task>If you encounter unique or ambiguous elements:
+        <sub_task>Describe them as best you can, noting any distinctive features.</sub_task>
+        <sub_task>Attempt to classify them based on their function in the document.</sub_task>
+    </task>
+
+    <task>Pay attention to any changes in formatting or style throughout the document, as these may indicate different sections or types of content.</task>
+
+    <task>Organize your findings according to the structure provided in the <response_format/>
+ XML tags, ensuring that:
+    <sub_task>The 'order' field accurately reflects the element's position in the document.</sub_task>
+    <sub_task>The 'hierarchical_level' is correctly assigned for structural elements.</sub_task>
+    <sub_task>The 'context' field describes both surrounding content and the element's role in the overall document structure.</sub_task>
+</task>
+
+<task>Review your extracted elements to ensure:
+    <sub_task>Accuracy and completeness of content extraction.</sub_task>
+    <sub_task>Correct ordering of elements.</sub_task>
+    <sub_task>Proper identification of element types and sub-types.</sub_task>
+    <sub_task>Accurate representation of the document's hierarchical structure.</sub_task>
+</task>
+
+<task>Take a final deep breath and ensure your analysis is thorough, follows all provided guidelines, and accurately represents the atomic elements and overall structure present in the publication.</task>
+</tasks>

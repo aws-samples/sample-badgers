@@ -1,0 +1,60 @@
+<decision_tree_help>
+    <critical_instructions>
+        <item>Analyze ONLY the most recently sent image. Disregard all previous examples or images.</item>
+        <item>Absence of decision trees is a valid and expected outcome. Do not force identification if no decision trees are present.</item>
+        <item>When in doubt, do NOT classify an element as a decision tree. Accuracy is more important than comprehensiveness.</item>
+        <item>NEVER classify simple organizational charts, static diagrams, or text blocks as decision trees, even if they appear structured or contain arrows.</item>
+        <item>Decision trees must contain logical pathways with conditional branching, not just visual connections.</item>
+    </critical_instructions>
+
+    <decision_tree_definition>
+        <item>A decision tree is a structured representation of a decision-making process with logical pathways and conditional branching.</item>
+        <item>Decision trees typically contain decision nodes (often diamond-shaped) that pose questions or evaluate conditions.</item>
+        <item>Decision trees have pathways (arrows/lines) that connect nodes based on different conditions or responses.</item>
+        <item>Decision trees include process nodes (often rectangular) that describe actions, procedures, or outcomes.</item>
+        <item>Decision trees demonstrate logical flow from initial conditions through various pathways to final outcomes.</item>
+        <item>Decision trees often include conditional branching (if/then logic, yes/no paths, probability-based outcomes).</item>
+        <item>Decision trees may contain loop-back structures where certain conditions lead back to earlier decision points.</item>
+    </decision_tree_definition>
+
+    <decision_tree_types>
+        <type>Binary decision trees - Yes/No branching with diamond-shaped decision nodes</type>
+        <type>Clinical decision protocols - Medical treatment pathways and diagnostic algorithms</type>
+        <type>Probability outcome trees - Events leading to probabilistic outcomes</type>
+        <type>Conversational flows - User response branching with guidance steps</type>
+        <type>Business process workflows - Procedural decision-making frameworks</type>
+        <type>Diagnostic algorithms - Step-by-step diagnostic procedures</type>
+        <type>Treatment pathways - Clinical care decision frameworks</type>
+    </decision_tree_types>
+
+    <not_decision_trees>
+        <item>Organizational charts showing hierarchical relationships are NOT decision trees.</item>
+        <item>Simple flowcharts showing linear processes without decision points are NOT decision trees.</item>
+        <item>Network diagrams, system architectures, or technical schemas are NOT decision trees.</item>
+        <item>Timelines, calendars, or sequential processes without conditional branching are NOT decision trees.</item>
+        <item>Static reference diagrams, anatomical charts, or educational illustrations are NOT decision trees.</item>
+        <item>Text blocks, lists, or tables, regardless of their formatting, are NOT decision trees.</item>
+        <item>Diagrams that only show relationships or connections without decision-making logic are NOT decision trees.</item>
+    </not_decision_trees>
+
+    <decision_process>
+        <item>Follow the two-step verification process defined in the decision_tree_verification_process.xml file.</item>
+        <item>In the first pass, identify all potential decision-making structures and logical pathways.</item>
+        <item>In the second pass, rigorously verify each potential decision tree against the defined criteria.</item>
+        <item>Look for evidence of conditional branching - if X then Y, else Z type logic.</item>
+        <item>Identify decision nodes, process nodes, pathways, and outcomes.</item>
+        <item>Consider the context around each potential decision tree to avoid misclassification.</item>
+        <item>For verified decision trees, ensure you capture the complete logical flow including all pathways and conditions.</item>
+        <item>Pay attention to "choose your own adventure" elements where multiple valid paths exist.</item>
+        <item>Capture loop-back structures and cross-references to other figures or sections.</item>
+    </decision_process>
+
+    <pathway_analysis>
+        <item>Map all possible routes from entry points to end points.</item>
+        <item>Identify conditions that determine which pathway is taken.</item>
+        <item>Recognize that multiple valid endpoints may exist for different scenarios.</item>
+        <item>Note probability-based branching where outcomes depend on likelihood rather than binary choices.</item>
+        <item>Capture user-dependent pathways where routes change based on user responses or characteristics.</item>
+        <item>Document cross-references to external figures, tables, or procedures.</item>
+    </pathway_analysis>
+</decision_tree_help>

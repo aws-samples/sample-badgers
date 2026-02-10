@@ -1,0 +1,20 @@
+<!-- Outlines the steps for identifying and extracting war map information -->
+<tasks>
+    <task>Perform initial scan to identify the type of military map (battle map, campaign map,
+        strategic overview, tactical detail, etc.).</task>
+    <task>Locate and transcribe the map legend/key if present, documenting all symbol definitions.</task>
+    <task>Identify map metadata: title, date, scale, orientation, source/author if visible.</task>
+    <task>Extract all geographic and place names visible on the map.</task>
+    <task>Document all military unit positions, identifying unit types and affiliations where
+        possible.</task>
+    <task>Trace and describe all movement arrows, noting direction, type of movement, and associated
+        units.</task>
+    <task>Identify all defensive positions, fortifications, and prepared positions.</task>
+    <task>Analyze terrain features and their tactical significance.</task>
+    <task>Extract temporal information showing battle phases or progression.</task>
+    <task>Document any logistical elements (supply routes, depots, communication lines).</task>
+    <task>Note color coding schemes and their apparent meanings.</task>
+    <task>Identify the historical context: specific battle, campaign, war, and approximate date.</task>
+    <task>Capture any annotations, notes, or explanatory text on the map.</task>
+    <task>If no war/battle map content is found, respond with the not_found_response as specified.</task>
+</tasks>

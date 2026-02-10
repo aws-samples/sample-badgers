@@ -1,0 +1,18 @@
+<!-- Quick reference -->
+<quick_reference>
+    <checklist>
+        <step>1. Look at the entire page</step>
+        <step>2. Identify all content present</step>
+        <step>3. Write a description covering everything you see</step>
+        <step>4. Include where things are located</step>
+        <step>5. Note any quality issues</step>
+        <step>6. Format as JSON</step>
+    </checklist>
+
+    <good_description_traits>
+        <trait>Specific (describes actual content, not generic labels)</trait>
+        <trait>Complete (covers all significant content on the page)</trait>
+        <trait>Located (says where things appear on the page)</trait>
+        <trait>Natural (reads like a sentence, not a list)</trait>
+    </good_description_traits>
+</quick_reference>

@@ -1,0 +1,5 @@
+<!-- Offers guidance on identifying and extracting different element types, including tips on recognizing formatting cues and handling ambiguous cases. -->
+<help>
+    <guidance>Sometime a page will have elements on it that will make you think it is one page type, when it is actually another.  For example, sometimes papers, begin a works cited section at the end of an existing standard page.  You could also find things like "methods" and the like as section headers instead of existing as an entire page type concept.  Review carefully.</guidance>
+    <guidance>If you are unsure of the page type, define it as "Standard Page"</guidance>
+</help>

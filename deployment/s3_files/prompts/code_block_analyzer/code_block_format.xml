@@ -1,0 +1,45 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="code_block">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_CODE_BLOCKS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per code block found -->
+        <elements>
+            <element type="code_block">
+                <type>Code Block</type>
+                <content>
+                    <language>{PROGRAMMING_LANGUAGE_OR_FORMAT_TYPE}</language>
+                    <format_type>{script|config|markup|query|command|other}</format_type>
+                    <context>{DESCRIPTION_OF_CODE_PURPOSE_OR_CONTEXT}</context>
+                    <structure>
+                        <syntax_elements>
+                            <element>
+                                <name>{SYNTAX_ELEMENT_NAME}</name>
+                                <pattern>{PATTERN_DESCRIPTION}</pattern>
+                                <description>{ELEMENT_DESCRIPTION}</description>
+                            </element>
+                        </syntax_elements>
+                        <formatting>
+                            <indentation>{INDENTATION_STYLE e.g. "4 spaces", "tabs"}</indentation>
+                            <spacing>{SPACING_CONVENTIONS}</spacing>
+                            <line_breaks>{LINE_BREAK_PATTERNS}</line_breaks>
+                        </formatting>
+                    </structure>
+                    <original_code>{EXACT_CODE_AS_SHOWN_PRESERVING_ALL_FORMATTING}</original_code>
+                    <explanation>{EDUCATIONAL_EXPLANATION_OF_WHAT_THE_CODE_DOES}</explanation>
+                    <line_count>{NUMBER_OF_LINES}</line_count>
+                    <has_line_numbers>{YES/NO}</has_line_numbers>
+                </content>
+                <figure_reference>
+                    <figure_id>{FIGURE_OR_LISTING_NUMBER e.g. "Listing 1", "Code Example 3"}</figure_id>
+                    <caption>{EXACT_CAPTION_TEXT_IF_PRESENT}</caption>
+                </figure_reference>
+            </element>
+        </elements>
+    </response>
+</response_format>

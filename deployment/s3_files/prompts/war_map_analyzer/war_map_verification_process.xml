@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file defines the verification process for war map detection and analysis -->
+<war_map_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for
+            analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- First pass: Identification of war map content -->
+    <pass_1_identification>
+        <step>Scan ONLY the target image for military cartographic content.</step>
+        <step>Look for key indicators: military symbols, movement arrows, unit positions,
+            fortifications, tactical annotations.</step>
+        <step>If no military map content is found, proceed to final_verification to report no war
+            map detected.</step>
+        <step>If potential war map content is found, note all areas of interest in your analysis.</step>
+        <step>Confirm that you have not considered any example images in this process.</step>
+    </pass_1_identification>
+
+    <!-- Second pass: Detailed extraction -->
+    <pass_2_extraction>
+        <!-- Criteria for war map verification -->
+        <war_map_criteria>
+            <criterion>Contains military unit symbols, positions, or designations.</criterion>
+            <criterion>Shows movement indicators (arrows, lines) representing military operations.</criterion>
+            <criterion>Includes tactical or strategic annotations.</criterion>
+            <criterion>Depicts fortifications, defensive positions, or military installations.</criterion>
+            <criterion>Contains terrain analysis relevant to military operations.</criterion>
+            <criterion>Shows temporal progression of military events.</criterion>
+            <criterion>Includes a legend explaining military symbology.</criterion>
+        </war_map_criteria>
+
+        <!-- At least TWO criteria should be met for classification as a war map -->
+        <minimum_criteria>At least TWO of the above criteria must be present to classify as a war
+            map.</minimum_criteria>
+
+        <!-- Extraction priorities -->
+        <extraction_priorities>
+            <priority level="1">Map metadata (title, date, scale, orientation)</priority>
+            <priority level="2">Legend/key transcription</priority>
+            <priority level="3">Military unit positions and identifications</priority>
+            <priority level="4">Movement arrows and their meanings</priority>
+            <priority level="5">Defensive positions and fortifications</priority>
+            <priority level="6">Terrain features with tactical significance</priority>
+            <priority level="7">Place names and geographic labels</priority>
+            <priority level="8">Temporal/phase information</priority>
+            <priority level="9">Logistical elements</priority>
+            <priority level="10">Color coding analysis</priority>
+            <priority level="11">Annotations and notes</priority>
+        </extraction_priorities>
+    </pass_2_extraction>
+
+    <!-- Exhaustive capture -->
+    <exhaustive_capture>
+        <step>For verified war maps, extract ALL visible information following the extraction
+            priorities.</step>
+        <step>Do not skip elements because they seem minor - capture everything.</step>
+        <step>When text is partially visible or unclear, note what can be read and indicate
+            uncertainty.</step>
+        <step>For ambiguous symbols, describe visually and provide possible interpretations.</step>
+        <step>Note any damage, fading, or obscured areas that limit extraction.</step>
+    </exhaustive_capture>
+
+    <!-- Historical context analysis -->
+    <historical_context_analysis>
+        <step>Based on visual evidence, attempt to identify the specific conflict depicted.</step>
+        <step>Look for clues: unit designations, place names, uniform styles, equipment,
+            cartographic conventions.</step>
+        <step>Note the apparent perspective (which side created the map).</step>
+        <step>Identify the map's apparent purpose (tactical planning, historical record,
+            educational).</step>
+        <step>Distinguish between contemporary maps and later historical reconstructions.</step>
+    </historical_context_analysis>
+
+    <!-- Final verification -->
+    <final_verification>
+        <step>Review your extraction for completeness - have you captured all visible elements?</step>
+        <step>Verify that all information comes from the target image only.</step>
+        <step>Ensure your tactical summary accurately reflects what the map shows.</step>
+        <step>Confirm you have distinguished between explicit information and your interpretations.</step>
+        <step>If no war map content was found, prepare the appropriate not_found response.</step>
+    </final_verification>
+
+    <!-- Not found response -->
+    <not_found_response>
+        <format>
+            <war_map_extraction>
+                <confirm_no_example_analysis>I confirm I did NOT analyze any example images.</confirm_no_example_analysis>
+                <map_identified>NO</map_identified>
+                <explanation>No war or battle map content was detected in the target image. The
+                    image appears to contain: {BRIEF_DESCRIPTION_OF_WHAT_IS_ACTUALLY_IN_THE_IMAGE}</explanation>
+                <recommendation>Consider using a different analyzer tool appropriate for the content
+                    type.</recommendation>
+            </war_map_extraction>
+        </format>
+    </not_found_response>
+</war_map_verification_process>

@@ -1,0 +1,37 @@
+<!-- This file provides an example conversation flow for handwritten text recognition -->
+<conversation_example_handwriting>
+    <!-- Initial instruction about example images -->
+    <step>
+        <user>The following images are EXAMPLES. Do not analyze these under any circumstances. They
+            are for reference only.</user>
+        <assistant>Understood. I will not analyze these example images under any circumstances. They
+            are for reference only.</assistant>
+    </step>
+    <!-- Provision of example images -->
+    <step>
+        <user>
+            <example_images>
+                <example_image>[Historical Letter Example]</example_image>
+                <example_image>[Modern Handwriting Sample]</example_image>
+                <example_image>[Cursive Manuscript Example]</example_image>
+            </example_images>
+        </user>
+        <assistant>I acknowledge receipt of the example images. I will not analyze these examples
+            and will only use them as reference for handwriting styles.</assistant>
+    </step>
+    <!-- Instruction about the target image -->
+    <step>
+        <user>The next image I send will be the ONLY image for analysis. Disregard all previous
+            images for analysis purposes.</user>
+        <assistant>Understood. I will only analyze the next image you send, disregarding all
+            previous images for analysis purposes.</assistant>
+    </step>
+    <!-- Provision of the target image - proceed directly with analysis output -->
+    <step>
+        <user>
+            <image_to_analyze>[Target Handwritten Document]</image_to_analyze>
+        </user>
+        <assistant>[Responds immediately with the XML output format as specified in response_format,
+            starting with the opening XML tag - no preamble or acknowledgment text]</assistant>
+    </step>
+</conversation_example_handwriting>

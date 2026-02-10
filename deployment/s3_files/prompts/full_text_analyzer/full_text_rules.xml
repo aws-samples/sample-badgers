@@ -1,0 +1,19 @@
+<full_text_rules>
+    <rule>Extract ALL text from the page, regardless of its perceived importance or relevance.</rule>
+    <rule>Maintain the original reading order of the text as it would be read by a human.</rule>
+    <rule>Assign a unique sequential ID to every element (elem_001, elem_002, etc.). IDs must never repeat within a document.</rule>
+    <rule>Assign an order number to every element reflecting its position in the reading sequence. Order must be sequential (1, 2, 3...) with no gaps.</rule>
+    <rule>Do not omit any textual content, including headers, footers, captions, or footnotes.</rule>
+    <rule>Preserve the relationship between different text elements using the ref attribute (e.g., footnotes referencing their source paragraph).</rule>
+    <rule>Do not attempt to interpret or summarize the content; extract it verbatim.</rule>
+    <rule>If text is present in images, extract and include it in your response as a figure element with alt_text.</rule>
+    <rule>For multi-language documents, extract text in all present languages without translation.</rule>
+    <rule>Ensure proper spacing between words, hyphens as needed, and proper punctuation as a whole in your output.</rule>
+    <rule>Use the correct element type from the dictionary. When in doubt:
+        - Large/bold text at section starts = h1, h2, h3
+        - Regular body text = paragraph
+        - Text below images/charts = caption
+        - Small text at page bottom with reference marks = footnote
+    </rule>
+    <rule>Decorative elements, watermarks, and purely visual content with no informational value should be typed as "artifact" or omitted entirely.</rule>
+</full_text_rules>

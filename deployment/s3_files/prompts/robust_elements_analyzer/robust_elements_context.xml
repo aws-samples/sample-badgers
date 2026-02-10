@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <purpose>
+        Extract structural elements from document images with precise coordinate information.
+        Each element must include its bounding box in pixel coordinates.
+    </purpose>
+
+    <coordinate_system>
+        <origin>Top-left corner of the image</origin>
+        <x_axis>Increases from left to right</x_axis>
+        <y_axis>Increases from top to bottom</y_axis>
+        <units>Pixels</units>
+    </coordinate_system>
+
+    <image_dimensions>
+        The image dimensions will be provided in the analysis request.
+        All coordinates must be within the image bounds.
+    </image_dimensions>
+</context>

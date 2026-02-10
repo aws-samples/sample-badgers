@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mods_dictionary>
+    <title>MODS 3.8 Key Terms and Concepts</title>
+
+    <terms>
+        <term>
+            <name>MODS</name>
+            <definition>Metadata Object Description Schema - An XML schema for bibliographic
+                metadata maintained by the Library of Congress</definition>
+        </term>
+
+        <term>
+            <name>titleInfo</name>
+            <definition>Container for title information including main title, subtitle, and
+                alternative titles</definition>
+        </term>
+
+        <term>
+            <name>name</name>
+            <definition>Container for names of persons, organizations, conferences, or families
+                associated with the resource</definition>
+            <attributes>
+                <attribute>type: personal, corporate, conference, family</attribute>
+                <attribute>usage: primary (for main entry)</attribute>
+            </attributes>
+        </term>
+
+        <term>
+            <name>namePart</name>
+            <definition>Component of a name (family name, given name, date, etc.)</definition>
+        </term>
+
+        <term>
+            <name>role</name>
+            <definition>Specifies the relationship between a name and the resource</definition>
+        </term>
+
+        <term>
+            <name>roleTerm</name>
+            <definition>The specific role (author, editor, publisher, creator, etc.)</definition>
+        </term>
+
+        <term>
+            <name>typeOfResource</name>
+            <definition>Broad category of resource content (text, cartographic, notated music, sound
+                recording, etc.)</definition>
+        </term>
+
+        <term>
+            <name>genre</name>
+            <definition>More specific categorization of the resource (article, report, guideline,
+                thesis, etc.)</definition>
+        </term>
+
+        <term>
+            <name>originInfo</name>
+            <definition>Container for publication and distribution information</definition>
+        </term>
+
+        <term>
+            <name>publisher</name>
+            <definition>Entity responsible for making the resource available</definition>
+        </term>
+
+        <term>
+            <name>dateIssued</name>
+            <definition>Date the resource was published or issued</definition>
+        </term>
+
+        <term>
+            <name>place</name>
+            <definition>Geographic location associated with publication or creation</definition>
+        </term>
+
+        <term>
+            <name>physicalDescription</name>
+            <definition>Container for physical or digital characteristics of the resource</definition>
+        </term>
+
+        <term>
+            <name>internetMediaType</name>
+            <definition>MIME type of digital resource (e.g., application/pdf, text/html)</definition>
+        </term>
+
+        <term>
+            <name>extent</name>
+            <definition>Physical size or duration (e.g., page count, file size)</definition>
+        </term>
+
+        <term>
+            <name>abstract</name>
+            <definition>Summary or description of the resource content</definition>
+        </term>
+
+        <term>
+            <name>subject</name>
+            <definition>Container for subject terms, topics, names, or geographic locations that
+                describe the content</definition>
+        </term>
+
+        <term>
+            <name>topic</name>
+            <definition>Subject term or keyword describing the content</definition>
+        </term>
+
+        <term>
+            <name>identifier</name>
+            <definition>Unique identifier for the resource (DOI, ISBN, URL, etc.)</definition>
+            <attributes>
+                <attribute>type: doi, isbn, issn, uri, local, etc.</attribute>
+            </attributes>
+        </term>
+
+        <term>
+            <name>language</name>
+            <definition>Container for language information about the resource</definition>
+        </term>
+
+        <term>
+            <name>languageTerm</name>
+            <definition>Language code or text for the resource language</definition>
+            <attributes>
+                <attribute>type: code or text</attribute>
+                <attribute>authority: iso639-2b, rfc3066, etc.</attribute>
+            </attributes>
+        </term>
+
+        <term>
+            <name>note</name>
+            <definition>General textual information about the resource</definition>
+            <attributes>
+                <attribute>type: version, citation, bibliography, etc.</attribute>
+            </attributes>
+        </term>
+
+        <term>
+            <name>recordInfo</name>
+            <definition>Container for metadata about the MODS record itself (not the resource)</definition>
+        </term>
+
+        <term>
+            <name>recordCreationDate</name>
+            <definition>Date the MODS record was created</definition>
+        </term>
+
+        <term>
+            <name>recordContentSource</name>
+            <definition>Organization or entity that created the MODS record</definition>
+        </term>
+
+        <term>
+            <name>relatedItem</name>
+            <definition>Information about related resources (NOT used for standalone documents)</definition>
+            <note>For standalone documents, do NOT use relatedItem type="host"</note>
+        </term>
+
+        <term>
+            <name>part</name>
+            <definition>Information about parts of a resource (volume, issue, pages)</definition>
+            <note>NOT used for standalone documents - only for articles within journals</note>
+        </term>
+    </terms>
+
+    <common_values>
+        <category name="typeOfResource">
+            <value>text</value>
+            <value>cartographic</value>
+            <value>notated music</value>
+            <value>sound recording</value>
+            <value>still image</value>
+            <value>moving image</value>
+            <value>three dimensional object</value>
+            <value>software, multimedia</value>
+            <value>mixed material</value>
+        </category>
+
+        <category name="genre">
+            <value>article</value>
+            <value>report</value>
+            <value>guideline</value>
+            <value>technical report</value>
+            <value>white paper</value>
+            <value>thesis</value>
+            <value>conference publication</value>
+            <value>book</value>
+            <value>periodical</value>
+        </category>
+
+        <category name="roleTerm">
+            <value>author</value>
+            <value>creator</value>
+            <value>editor</value>
+            <value>publisher</value>
+            <value>contributor</value>
+            <value>translator</value>
+            <value>illustrator</value>
+        </category>
+
+        <category name="identifier types">
+            <value>doi</value>
+            <value>uri</value>
+            <value>url</value>
+            <value>isbn</value>
+            <value>issn</value>
+            <value>pmid</value>
+            <value>local</value>
+        </category>
+    </common_values>
+</mods_dictionary>

@@ -1,0 +1,19 @@
+<mads_rules>
+    <rule>Each MADS record must have an authority element with at least one child element.</rule>
+    <rule>Variant forms of the authority (alternative names, spellings, etc.) should be included
+        when identified.</rule>
+    <rule>Related authorities should be linked with appropriate relationship types.</rule>
+    <rule>Use appropriate xlink attributes when referencing external resources.</rule>
+    <rule>Include language and script information when applicable.</rule>
+    <rule>Record metadata about the MADS record itself in the recordInfo element.</rule>
+    <rule>Make educated inferences when complete information isn't available, but indicate
+        uncertainty.</rule>
+    <rule>Prioritize authoritative sources for name forms when they can be determined.</rule>
+    <rule>When extracting from unstructured content, be conservative in what you claim as
+        definitive.</rule>
+    <rule>CRITICAL: Always include ALL relevant MADS elements in the output, even if their content
+        is empty or unknown. Use empty tags (e.g., &lt;namePart type="date"/&gt;) or placeholder
+        text when information is not available rather than omitting the element entirely.</rule>
+    <rule>For required elements where no information is found, include the element with empty
+        content or a placeholder like "Unknown" or "Not specified".</rule>
+</mads_rules>

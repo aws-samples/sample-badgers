@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_full_text_tool",
+        "description": "Specialized tool for extracting and analyzing all text content from document images while maintaining natural reading order. ONLY use for: documents with mixed text content, articles, reports, books, papers, manuscripts, typed documents, printed text, multi-column layouts, and any content requiring comprehensive text extraction. NOT for: diagrams, tables, handwriting, or specialized scripts. If no readable text is found, returns that no text content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Full Text Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

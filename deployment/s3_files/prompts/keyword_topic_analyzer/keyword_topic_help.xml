@@ -1,0 +1,115 @@
+<!-- Provides guidance on keyword and topic extraction for SEO optimization -->
+<keyword_topic_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Focus on MARKET keywords, not document-derived phrases. Think like a SEMRUSH researcher.</item>
+        <item>Keywords must be real search terms people actually use, not invented phrases from the content.</item>
+        <item>Every primary keyword and topic MUST include source_excerpt and excerpt_element_id for grounding.</item>
+        <item>Output must be valid JSON only - no markdown, no explanations, no code fences.</item>
+    </critical_instructions>
+
+    <keyword_identification_guidance>
+        <item>Primary keywords: High-value industry terms with significant search volume (5-10 keywords).</item>
+        <item>Secondary keywords: Long-tail phrases, questions, and niche terms (10-20 keywords).</item>
+        <item>Ask: "What would someone type into Google to find this content?"</item>
+        <item>Consider competitor keywords - what terms do similar content pieces rank for?</item>
+        <item>Include question-based keywords: "how to", "what is", "why does", "best way to".</item>
+    </keyword_identification_guidance>
+
+    <search_intent_types>
+        <intent name="informational">
+            <description>User wants to learn or understand something.</description>
+            <signals>How to, what is, why, guide, tutorial, explained, definition</signals>
+            <example>"what is document accessibility" or "how to optimize PDF for SEO"</example>
+        </intent>
+        <intent name="commercial">
+            <description>User is researching before a purchase decision.</description>
+            <signals>Best, top, review, comparison, vs, alternative</signals>
+            <example>"best OCR software 2024" or "document management tools comparison"</example>
+        </intent>
+        <intent name="transactional">
+            <description>User is ready to take action or purchase.</description>
+            <signals>Buy, download, pricing, free trial, sign up</signals>
+            <example>"buy PDF accessibility checker" or "document converter free download"</example>
+        </intent>
+        <intent name="navigational">
+            <description>User is looking for a specific site or page.</description>
+            <signals>Brand names, product names, login, official</signals>
+            <example>"Adobe Acrobat accessibility checker" or "WCAG guidelines PDF"</example>
+        </intent>
+    </search_intent_types>
+
+    <content_fit_assessment>
+        <fit level="strong">
+            <description>Content directly and thoroughly addresses the keyword topic.</description>
+            <action>Target this keyword - content is well-positioned to rank.</action>
+        </fit>
+        <fit level="partial">
+            <description>Content touches on the topic but doesn't fully address it.</description>
+            <action>Optimize content to better cover this keyword's intent.</action>
+        </fit>
+        <fit level="opportunity">
+            <description>Content could expand to cover this valuable keyword.</description>
+            <action>Consider content additions to capture this search demand.</action>
+        </fit>
+    </content_fit_assessment>
+
+    <competition_assessment>
+        <level name="high">
+            <description>Dominated by major brands, high domain authority sites.</description>
+            <strategy>Target only if content is exceptional; consider long-tail alternatives.</strategy>
+        </level>
+        <level name="medium">
+            <description>Mix of established and emerging content; achievable with quality.</description>
+            <strategy>Good targets for well-optimized content with unique value.</strategy>
+        </level>
+        <level name="low">
+            <description>Underserved niche; few quality results exist.</description>
+            <strategy>Quick win opportunities - prioritize these for faster ranking.</strategy>
+        </level>
+    </competition_assessment>
+
+    <topic_hierarchy_guidance>
+        <item>Domain: Broadest category (e.g., "Information Technology", "Healthcare", "Finance").</item>
+        <item>Field: Major discipline within domain (e.g., "Document Management", "Medical Records").</item>
+        <item>Subfield: Specific area within field (e.g., "PDF Accessibility", "OCR Technology").</item>
+        <item>Use established industry terminology, not invented categories.</item>
+        <item>Topics should reflect how the industry organizes knowledge, not just document structure.</item>
+    </topic_hierarchy_guidance>
+
+    <grounding_requirements>
+        <item>source_excerpt: Copy EXACT text from the document - do not paraphrase.</item>
+        <item>excerpt_element_id: Reference the actual element ID from input XML (e.g., "elem_010").</item>
+        <item>confidence "high": Excerpt directly mentions the concept or keyword.</item>
+        <item>confidence "medium": Excerpt strongly implies the concept.</item>
+        <item>confidence "low": Concept is inferred from context.</item>
+        <item>Without grounding, keyword assignments may be hallucinated - always provide evidence.</item>
+    </grounding_requirements>
+
+    <common_mistakes_to_avoid>
+        <mistake>Extracting phrases verbatim from document instead of mapping to market keywords.</mistake>
+        <mistake>Inventing keywords that no one actually searches for.</mistake>
+        <mistake>Ignoring search intent - all keywords should have clear intent classification.</mistake>
+        <mistake>Missing source_excerpt or excerpt_element_id for primary keywords and topics.</mistake>
+        <mistake>Outputting markdown or explanatory text instead of pure JSON.</mistake>
+        <mistake>Using document headings as topics instead of industry-standard categories.</mistake>
+    </common_mistakes_to_avoid>
+
+    <ai_overview_optimization>
+        <item>Featured snippets favor concise, direct answers to questions.</item>
+        <item>"People Also Ask" targets should be natural question phrasings.</item>
+        <item>Structure content to answer questions in 40-60 word paragraphs for snippet capture.</item>
+        <item>List-based and step-by-step content performs well for featured snippets.</item>
+    </ai_overview_optimization>
+
+    <decision_process>
+        <step>Read content and identify the core subject matter and value proposition.</step>
+        <step>Think: "What industry does this belong to? What do people in this industry search for?"</step>
+        <step>Generate market keywords based on industry knowledge, not just document text.</step>
+        <step>For each keyword, find supporting evidence in the document (source_excerpt).</step>
+        <step>Assess content fit and competition level for each keyword.</step>
+        <step>Map keywords to topics and identify clusters.</step>
+        <step>Provide actionable recommendations prioritized by opportunity.</step>
+        <step>Output valid JSON only.</step>
+    </decision_process>
+</keyword_topic_help>

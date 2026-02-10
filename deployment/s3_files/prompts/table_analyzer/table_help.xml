@@ -1,0 +1,34 @@
+<table_help>
+    <critical_instructions>
+        <item>Analyze ONLY the most recently sent image. Disregard all previous examples or images.</item>
+        <item>Absence of tables is a valid and expected outcome. Do not force identification if no tables are present.</item>
+        <item>When in doubt, do NOT classify an element as a table. Accuracy is more important than comprehensiveness.</item>
+        <item>NEVER classify paragraphs or text blocks as tables, even if they appear visually distinct or are formatted differently from the rest of the text.</item>
+        <item>Tables must contain data organized in a grid of rows and columns, not continuous text.</item>
+    </critical_instructions>
+
+    <table_definition>
+        <item>A table is a structured arrangement of data in a clear grid format with multiple rows and columns.</item>
+        <item>Tables typically have a header row describing the content of each column.</item>
+        <item>Data in tables should have clear relationships and be organized systematically.</item>
+        <item>Tables primarily contain individual data points, not full sentences or paragraphs.</item>
+        <item>Each cell in a table typically contains a single piece of information, not a full paragraph.</item>
+    </table_definition>
+
+    <not_tables>
+        <item>Paragraphs or blocks of text are NEVER tables, regardless of their formatting or visual distinction.</item>
+        <item>Abstracts, even if they appear in a box or with distinct formatting, are NOT tables.</item>
+        <item>Page layouts, even if structured, are NOT tables.</item>
+        <item>Headers, titles, author information are NOT tables, even if they contain aligned text.</item>
+        <item>Text blocks, regardless of their formatting or visual separation from other content, are NOT tables.</item>
+        <item>Any content that consists primarily of full sentences or paragraphs is NOT a table.</item>
+    </not_tables>
+
+    <decision_process>
+        <item>Follow the two-step verification process defined in the table_verification_process.xml file.</item>
+        <item>In the first pass, identify all potential table-like structures.</item>
+        <item>In the second pass, rigorously verify each potential table against the defined criteria.</item>
+        <item>Consider the context around each potential table to avoid misclassification.</item>
+        <item>For verified tables, ensure you capture the full extent, including any continuations.</item>
+    </decision_process>
+</table_help>

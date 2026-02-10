@@ -1,0 +1,77 @@
+<!-- Provides context and guidelines for analyzing war and battle maps -->
+<context>
+    <item>You will be provided with images. The initial images (if any) are examples and should
+        NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the
+        target for analysis.</item>
+    <item>In this final image, search for war map elements including military positions, movements,
+        terrain, and tactical information.</item>
+    <item>Your task is to perform exhaustive extraction of ALL cartographic and military information
+        present in the map.</item>
+
+    <military_elements_to_identify>
+        <category name="unit_positions">
+            <element>Infantry positions and formations</element>
+            <element>Cavalry/armor unit locations</element>
+            <element>Artillery emplacements</element>
+            <element>Naval positions (if applicable)</element>
+            <element>Air assets and airfields (if applicable)</element>
+            <element>Command posts and headquarters</element>
+            <element>Reserve positions</element>
+        </category>
+
+        <category name="movement_indicators">
+            <element>Attack arrows and assault directions</element>
+            <element>Retreat or withdrawal routes</element>
+            <element>Flanking movements</element>
+            <element>Encirclement maneuvers</element>
+            <element>Pursuit paths</element>
+            <element>Reinforcement routes</element>
+            <element>Feint or diversionary movements</element>
+        </category>
+
+        <category name="defensive_elements">
+            <element>Fortifications and strongpoints</element>
+            <element>Trench systems</element>
+            <element>Defensive lines (e.g., Maginot, Siegfried)</element>
+            <element>Obstacles (wire, mines, tank traps)</element>
+            <element>Bunkers and pillboxes</element>
+            <element>Natural defensive features utilized</element>
+        </category>
+
+        <category name="terrain_features">
+            <element>Elevation and contour lines</element>
+            <element>Rivers, streams, and water bodies</element>
+            <element>Forests and vegetation</element>
+            <element>Roads and transportation networks</element>
+            <element>Bridges and crossing points</element>
+            <element>Urban areas and settlements</element>
+            <element>Hills, ridges, and high ground</element>
+            <element>Valleys and defiles</element>
+        </category>
+
+        <category name="temporal_information">
+            <element>Phase lines and time markers</element>
+            <element>Date annotations</element>
+            <element>Sequential movement indicators</element>
+            <element>Before/after positions</element>
+            <element>Battle progression stages</element>
+        </category>
+
+        <category name="logistical_elements">
+            <element>Supply depots and dumps</element>
+            <element>Supply routes</element>
+            <element>Communication lines</element>
+            <element>Medical facilities</element>
+            <element>Prisoner collection points</element>
+        </category>
+    </military_elements_to_identify>
+
+    <item>Extract ALL text visible on the map including place names, unit designations, dates, and
+        annotations.</item>
+    <item>Pay special attention to the map legend/key and apply its definitions consistently.</item>
+    <item>Note the scale, orientation (north arrow), and any coordinate systems present.</item>
+    <item>If you can identify the specific battle, campaign, or historical context, include this
+        information.</item>
+    <item>When in doubt about symbology, describe what you see and provide possible interpretations.</item>
+</context>

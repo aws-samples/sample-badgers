@@ -1,0 +1,8 @@
+<!-- Outlines the steps for identifying and extracting diagrams -->
+<tasks>
+    <task>Perform the first pass identification of potential diagram structures as defined in the diagram_verification_process.xml file.</task>
+    <task>For each identified potential diagram, perform the second pass verification against the strict criteria.</task>
+    <task>Analyze the context surrounding each potential diagram to ensure accurate classification.</task>
+    <task>For verified diagrams, ensure you capture the full description, including all elements and relationships.</task>
+    <task>If no structures meet the criteria for a diagram after the two-pass verification, respond ONLY with the not_found_response as specified.</task>
+</tasks>

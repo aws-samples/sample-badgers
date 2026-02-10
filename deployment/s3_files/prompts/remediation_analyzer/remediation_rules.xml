@@ -1,0 +1,81 @@
+<!-- ===================================================================
+SECTION 4: RULES
+=================================================================== -->
+
+<rules>
+    <rule category="reading_order">
+        <title>Logical Reading Order</title>
+        <description>Elements must be returned in the order a screen reader should announce them.</description>
+        <guidelines>
+            <item>For single-column layouts: top to bottom</item>
+            <item>For multi-column layouts: complete each column before moving to the next</item>
+            <item>Headers and footers are typically artifacts unless they contain meaningful content</item>
+            <item>Sidebars should be placed at a logical break point in the main content</item>
+        </guidelines>
+    </rule>
+
+    <rule category="heading_hierarchy">
+        <title>Heading Level Assignment</title>
+        <description>Headings must follow a logical hierarchy without skipping levels.</description>
+        <guidelines>
+            <item>Document title is typically H1</item>
+            <item>Major sections are H2</item>
+            <item>Subsections increment by one level</item>
+            <item>Visual size alone does not determine heading level - use document structure</item>
+        </guidelines>
+    </rule>
+
+    <rule category="figures">
+        <title>Figure Identification</title>
+        <description>All non-text visual content requires Figure tagging with alt text.</description>
+        <guidelines>
+            <item>Charts, graphs, diagrams, photos, and illustrations are Figures</item>
+            <item>Decorative images with no informational content are Artifacts</item>
+            <item>Figure captions are separate Caption elements linked via parent_order</item>
+            <item>Complex figures may need extended descriptions in alt_text</item>
+        </guidelines>
+    </rule>
+
+    <rule category="tables">
+        <title>Table Structure</title>
+        <description>Tables must be identified as complete units.</description>
+        <guidelines>
+            <item>Include the entire table from outer border to outer border</item>
+            <item>Table captions are separate Caption elements</item>
+            <item>Note whether the table has header rows/columns in the content field</item>
+        </guidelines>
+    </rule>
+
+    <rule category="lists">
+        <title>List Structure</title>
+        <description>Lists should be identified as complete units.</description>
+        <guidelines>
+            <item>The L element encompasses all list items as one bounding box</item>
+            <item>Individual LI elements can be identified for complex lists</item>
+            <item>Nested lists are contained within their parent list bounding box</item>
+        </guidelines>
+    </rule>
+
+    <rule category="artifacts">
+        <title>Artifact Identification</title>
+        <description>Non-content elements should be marked as Artifacts.</description>
+        <examples>
+            <item>Page numbers</item>
+            <item>Running headers/footers</item>
+            <item>Decorative borders and lines</item>
+            <item>Background images and watermarks</item>
+        </examples>
+    </rule>
+
+    <rule category="bounding_box_precision">
+        <title>Bounding Box Precision</title>
+        <description>Use the grid overlay to identify tight bounding boxes.</description>
+        <guidelines>
+            <item>Boxes should tightly fit content without excessive padding</item>
+            <item>Do not include whitespace margins in bounding boxes</item>
+            <item>For text, include from the first character to the last character</item>
+            <item>For figures, include the entire visual boundary</item>
+            <item>Use the grid lines and symbols as reference points</item>
+        </guidelines>
+    </rule>
+</rules>

@@ -1,0 +1,8 @@
+<!-- Outlines the steps for identifying and extracting charts and graphs -->
+<tasks>
+    <task>Perform the first pass identification of potential chart and graph structures as defined in the charts_graphs_verification_process.xml file.</task>
+    <task>For each identified potential chart or graph, perform the second pass verification against the strict criteria.</task>
+    <task>Analyze the context surrounding each potential chart or graph to ensure accurate classification.</task>
+    <task>For verified charts and graphs, ensure you capture the key elements, data representation, and overall structure.</task>
+    <task>If no structures meet the criteria for a chart or graph after the two-pass verification, respond ONLY with the not_found_response as specified.</task>
+</tasks>

@@ -1,0 +1,54 @@
+[
+    {
+        "name": "analyze_remediation_tool",
+        "description": "Specialized tool for PDF accessibility remediation that analyzes document page images to identify all structural elements and their precise bounding boxes for Section 508 compliance tagging. ONLY use for: PDF accessibility tagging, document structure analysis, identifying headings/paragraphs/lists/tables/figures for PDF/UA compliance.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL or absolute file path to the document page image"
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data (alternative to image_path)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "Enable confidence scoring"
+                },
+                "grid_cols": {
+                    "type": "integer",
+                    "description": "Grid columns (default: 36)"
+                },
+                "grid_rows": {
+                    "type": "integer",
+                    "description": "Grid rows (default: 36)"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "JSON array of detected structural elements with bounding boxes"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    }
+]

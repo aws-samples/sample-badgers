@@ -1,0 +1,86 @@
+<tasks>
+    <task>Take a deep breath and carefully review the content provided for analysis.</task>
+
+    <task>Begin by identifying the main authority entities in the content: <sub_task>Look for people
+        (authors, creators, subjects).</sub_task>
+        <sub_task>Identify organizations or institutions.</sub_task>
+        <sub_task>Note
+        geographic locations.</sub_task>
+        <sub_task>Identify subject terms or concepts.</sub_task>
+        <sub_task>Look
+        for titles of works.</sub_task>
+    </task>
+
+    <task>For each identified authority entity: <sub_task>Determine its type (personal, corporate,
+        geographic, etc.).</sub_task>
+        <sub_task>Extract the authoritative form of its name or term.</sub_task>
+        <sub_task>Note
+        any variant forms (alternative names, abbreviations, etc.).</sub_task>
+        <sub_task>Identify
+        relationships to other entities if present.</sub_task>
+        <sub_task>Gather any additional
+        information (dates, affiliations, etc.).</sub_task>
+    </task>
+
+    <task>For personal names: <sub_task>Separate into appropriate namePart elements (given, family,
+        date).</sub_task>
+        <sub_task>Extract any personal information like birth/death dates,
+        occupation, etc.</sub_task>
+        <sub_task>Note fields of endeavor (professional fields, areas of
+        expertise).</sub_task>
+        <sub_task>Identify affiliations if mentioned.</sub_task>
+    </task>
+
+    <task>For organizational names: <sub_task>Determine if hierarchy exists within the name.</sub_task>
+        <sub_task>Extract
+        foundation/termination dates if available.</sub_task>
+        <sub_task>Identify field of activity or
+        purpose.</sub_task>
+        <sub_task>Note any subordinate or related organizations.</sub_task>
+    </task>
+
+    <task>For geographic names: <sub_task>Determine if the name should be represented
+        hierarchically.</sub_task>
+        <sub_task>Extract components (country, state, city, etc.) if
+        applicable.</sub_task>
+        <sub_task>Note any historical information about the location.</sub_task>
+    </task>
+
+    <task>For topics and subjects: <sub_task>Identify the main concept and any qualifiers.</sub_task>
+        <sub_task>Note
+        any hierarchical relationships to broader or narrower terms.</sub_task>
+        <sub_task>Extract any
+        scope notes or definitions provided.</sub_task>
+    </task>
+
+    <task>Begin constructing the MADS record: <sub_task>Create the mads root element with
+        appropriate version attribute.</sub_task>
+        <sub_task>Add the authority element with the
+        authoritative form.</sub_task>
+        <sub_task>Add variant forms in variant elements.</sub_task>
+        <sub_task>Add
+        related entities in related elements.</sub_task>
+        <sub_task>Include specific info elements
+        (personInfo, organizationInfo, etc.).</sub_task>
+        <sub_task>Add record metadata in the
+        recordInfo element.</sub_task>
+    </task>
+
+    <task>Review the MADS record for completeness: <sub_task>Ensure all required elements are
+        present.</sub_task>
+        <sub_task>CRITICAL: Include ALL relevant MADS elements even if
+        information is missing - use empty tags or placeholder values rather than omitting elements.</sub_task>
+        <sub_task>For
+        elements where no information was found, include the element with empty content (e.g.,
+        &lt;namePart type="date"/&gt;) or a placeholder value.</sub_task>
+        <sub_task>Verify correct
+        use of attributes and namespace declarations.</sub_task>
+        <sub_task>Check that relationships
+        are properly expressed.</sub_task>
+        <sub_task>Confirm that all extracted information is
+        represented.</sub_task>
+    </task>
+
+    <task>Format the final MADS XML record according to the specifications in the mads_format.xml
+        file.</task>
+</tasks>

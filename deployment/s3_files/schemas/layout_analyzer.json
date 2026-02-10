@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_layout_tool",
+        "description": "Specialized tool for analyzing document images to extract layout structure and spatial organization. ONLY use for: document layout analysis, page structure identification, spatial organization analysis, column detection, text block positioning, visual hierarchy analysis, document formatting analysis, and spatial relationship mapping. NOT for: content extraction, text transcription, diagrams, tables, or handwriting analysis. If no layout structure is found, returns that no layout content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Layout Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

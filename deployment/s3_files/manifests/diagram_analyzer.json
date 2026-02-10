@@ -1,0 +1,121 @@
+{
+    "tool": {
+        "name": "analyze_diagram_tool",
+        "description": "Specialized tool for analyzing conceptual diagrams that visually explain processes, systems, or ideas. ONLY use for: flowcharts, process diagrams, system architecture diagrams, network diagrams, organizational charts, mind maps, workflow diagrams, and other visual representations that explain concepts or show relationships between elements. NOT for: charts with data, tables, layouts, decorative graphics, photographs, or plain text. If no conceptual diagram is found, returns that no diagram content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing potential conceptual diagrams to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "diagram_analyzer",
+        "description": "Analyzes diagram images to extract structural and textual information",
+        "enhancement_eligible": false,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "diagrams_gestalt.xml",
+            "diagrams_job_role.xml",
+            "diagrams_context.xml",
+            "diagrams_rules.xml",
+            "diagrams_tasks_extraction.xml",
+            "diagrams_format.xml",
+            "diagrams_help.xml",
+            "diagrams_conversation_example.xml",
+            "diagrams_two_step_verfication_process.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 3,
+        "analysis_text": "diagram content",
+        "expected_output_tokens": 3500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.080760+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "component_identification",
+                    "text": "Were all diagram components correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "relationship_accuracy",
+                    "text": "Were connections and relationships accurately captured?",
+                    "type": "likert"
+                },
+                {
+                    "id": "flow_direction",
+                    "text": "Was the flow/direction of the diagram correctly represented?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,94 @@
+<!-- Defines and describes various types of atomic elements found in publications, including citations, references, captions, headings, quotes, lists, footnotes, equations, and structural elements. -->
+<elements_dictionary>
+    <element type="document_title">
+        <description>The main title of the entire document.</description>
+    </element>
+    <element type="section">
+        <description>A major division of the document, often containing multiple subsections or paragraphs.</description>
+        <sub_types>
+            <sub_type>Chapter</sub_type>
+            <sub_type>Main section</sub_type>
+            <sub_type>Subsection</sub_type>
+            <sub_type>Sub-subsection</sub_type>
+        </sub_types>
+    </element>
+    <element type="heading">
+        <description>A title or subtitle within the document, used to organize content and indicate hierarchy.</description>
+        <sub_types>
+            <sub_type>Title (H1)</sub_type>
+            <sub_type>Section heading (H2)</sub_type>
+            <sub_type>Subsection heading (H3)</sub_type>
+            <sub_type>Sub-subsection heading (H4)</sub_type>
+            <sub_type>Lower-level heading (H5, H6)</sub_type>
+            <sub_type>Running head</sub_type>
+        </sub_types>
+    </element>
+    <element type="paragraph">
+        <description>A self-contained unit of text, typically focusing on a single idea or topic.</description>
+        <sub_types>
+            <sub_type>Body paragraph</sub_type>
+            <sub_type>Introduction paragraph</sub_type>
+            <sub_type>Conclusion paragraph</sub_type>
+        </sub_types>
+    </element>
+    <element type="citation">
+        <description>A reference to a source of information, typically found within the text or as a footnote.</description>
+        <sub_types>
+            <sub_type>In-text citation</sub_type>
+            <sub_type>Footnote citation</sub_type>
+            <sub_type>Endnote citation</sub_type>
+        </sub_types>
+    </element>
+    <element type="reference">
+        <description>A detailed description of a source, usually found in a bibliography or reference list.</description>
+        <sub_types>
+            <sub_type>Book reference</sub_type>
+            <sub_type>Journal article reference</sub_type>
+            <sub_type>Web page reference</sub_type>
+            <sub_type>Conference paper reference</sub_type>
+        </sub_types>
+    </element>
+    <element type="caption">
+        <description>A brief explanation or description accompanying a figure, table, or image.</description>
+        <sub_types>
+            <sub_type>Figure caption</sub_type>
+            <sub_type>Table caption</sub_type>
+            <sub_type>Image caption</sub_type>
+        </sub_types>
+    </element>
+    <element type="quote">
+        <description>A direct reproduction of text from another source.</description>
+        <sub_types>
+            <sub_type>Block quote</sub_type>
+            <sub_type>Inline quote</sub_type>
+            <sub_type>Pull quote</sub_type>
+        </sub_types>
+    </element>
+    <element type="equation">
+        <description>A mathematical expression, often set apart from the main text.</description>
+        <sub_types>
+            <sub_type>Inline equation</sub_type>
+            <sub_type>Display equation</sub_type>
+        </sub_types>
+    </element>
+    <element type="list">
+        <description>A series of items presented in a structured format.</description>
+        <sub_types>
+            <sub_type>Bulleted list</sub_type>
+            <sub_type>Numbered list</sub_type>
+            <sub_type>Definition list</sub_type>
+        </sub_types>
+    </element>
+    <element type="footnote">
+        <description>Additional information or a citation placed at the bottom of a page.</description>
+    </element>
+    <element type="table_of_contents">
+        <description>A list of the main sections or chapters of a document, typically including page numbers.</description>
+    </element>
+    <element type="abstract">
+        <description>A brief summary of the document's main points, typically found at the beginning of academic papers.</description>
+    </element>
+    <element type="keyword">
+        <description>A word or phrase that represents the main topics or themes of the document.</description>
+    </element>
+</elements_dictionary>

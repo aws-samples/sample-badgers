@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_handwriting_tool",
+        "description": "Specialized tool for recognizing and transcribing handwritten text in any form. ONLY use for: handwritten notes, annotations, margin notes, scribbles, cursive writing, print handwriting, historical letters, personal notes, signatures, handwritten forms, journal entries, and any text written by hand. NOT for: printed text, typed text, diagrams, tables, or machine-generated content. If no handwriting is found, returns that no handwritten content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Handwriting Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

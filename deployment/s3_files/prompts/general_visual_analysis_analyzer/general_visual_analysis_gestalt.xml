@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for General Visual Analysis Analyzer -->
+<gestalt_perception analyzer="general_visual_analysis">
+
+    <prescan>
+        <instruction>Before analyzing visual content, establish perceptual context:</instruction>
+        <step>View the entire image without focusing on details. What is the overall impression?</step>
+        <step>Identify the most salient element - what demands attention first through size, color, contrast, or position?</step>
+        <step>Map the visual hierarchy: primary focal point → secondary elements → supporting details → background.</step>
+        <step>Note spatial organization: is content centered, asymmetric, grid-based, or organic?</step>
+        <step>Identify relationships between visual elements through proximity and alignment.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="visual_saliency">
+            <guidance> Identify what draws the eye first and why: - High contrast against background - Largest element in the composition - Brightest or most saturated color - Central or golden-ratio positioning - Isolated element with surrounding whitespace Report saliency hierarchy in your analysis. </guidance>
+        </primary>
+
+        <primary principle="figure_ground">
+            <guidance> Clearly distinguish: - FIGURE: Primary visual content meant to convey information - GROUND: Background, decorative elements, framing devices Some elements may be ambiguous - note when figure/ground relationship is unclear or intentionally blurred. </guidance>
+        </primary>
+
+        <primary principle="proximity_and_grouping">
+            <guidance> Identify visual groups formed by spatial proximity: - Elements clustered together share semantic relationship - Whitespace creates boundaries between groups - Alignment creates implicit groupings even without proximity Report these groupings as part of your visual analysis. </guidance>
+        </primary>
+
+        <secondary principle="similarity">
+            <guidance> Note patterns of visual consistency: - Color coding that links related elements - Shape repetition indicating category membership - Size consistency suggesting equal importance </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <visual_hierarchy_detection>
+        <level name="primary">Largest, boldest, highest contrast, most central - the main subject.</level>
+        <level name="secondary">Supporting elements that complement the primary - moderate visual weight.</level>
+        <level name="tertiary">Details, labels, annotations - smallest visual weight.</level>
+        <level name="background">Ground elements, decorative features, framing - not primary content.</level>
+    </visual_hierarchy_detection>
+
+    <relationship_identification>
+        <relationship type="containment">One element visually contains another (frame around image).</relationship>
+        <relationship type="adjacency">Elements side-by-side or stacked suggest comparison or sequence.</relationship>
+        <relationship type="connection">Lines, arrows, or visual bridges link elements.</relationship>
+        <relationship type="overlap">Overlapping elements suggest layering or emphasis.</relationship>
+    </relationship_identification>
+
+    <validation>
+        <instruction>After analysis, verify perceptual accuracy:</instruction>
+        <check>Did you identify the correct visual hierarchy based on saliency cues?</check>
+        <check>Are figure/ground distinctions clear and accurate?</check>
+        <check>Did you capture spatial groupings and their implied relationships?</check>
+        <check>Does your analysis reflect what a human viewer would perceive as important?</check>
+        <check>Are visual relationships (containment, adjacency, connection) accurately described?</check>
+    </validation>
+
+</gestalt_perception>

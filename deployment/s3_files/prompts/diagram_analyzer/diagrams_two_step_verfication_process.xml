@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file defines the two-step verification process for diagram detection with improved
+criteria -->
+<diagram_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for
+            analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- First pass: Identification of potential diagrams -->
+    <pass_1_identification>
+        <step>Scan ONLY within the target image for potential diagram structures.</step>
+        <step>If no potential diagrams are found, immediately skip to the final_verification step.</step>
+        <step>Mark all potential diagram areas in the target image and keep it in your mind.</step>
+        <step>Confirm that you have not considered any example images in this process.</step>
+    </pass_1_identification>
+
+    <!-- Second pass: Verification of identified potential diagrams -->
+    <pass_2_verification>
+        <!-- Criteria for diagram verification -->
+        <diagram_criteria>
+            <criterion>Must occupy a distinct, bounded area of the page, not the entire page.</criterion>
+            <criterion>Uses visual elements (shapes, lines, arrows) to represent relationships or
+                processes, not just to format text.</criterion>
+            <criterion>Represents a complete visual representation of a system, process, or concept.</criterion>
+            <criterion>Can be classified into a specific diagram type (e.g., flowchart, mind map,
+                org chart).</criterion>
+            <criterion>Size threshold: Large enough to convey complex information but not exceeding
+                75% of the page area.</criterion>
+            <criterion>Contains multiple interconnected elements that convey meaning through their
+                arrangement and connections.</criterion>
+        </diagram_criteria>
+        <!-- Exclusion criteria -->
+        <exclusion_criteria>
+            <criterion>Exclude tables unless they incorporate significant graphical elements that
+                represent processes or relationships.</criterion>
+            <criterion>Exclude simple text boxes or formatted text without visual representation of
+                relationships.</criterion>
+            <criterion>Exclude standalone images or illustrations without structured information
+                flow.</criterion>
+        </exclusion_criteria>
+        <!-- Context checking for each potential diagram -->
+        <context_check>
+            <step>Analyze text immediately before and after the potential diagram in the target
+                image, to help you. Don't return that text, just keep it in your mind.</step>
+            <step>Check for labels or captions associated with the diagram in the target image.</step>
+            <step>Verify that the potential diagram is not part of a larger illustration without
+                clear diagrammatic content.</step>
+        </context_check>
+        <!-- Additional checks to prevent example image analysis -->
+        <additional_checks>
+            <step>For each potential diagram, explicitly confirm it exists in the target image, not
+                in any example.</step>
+            <step>If you realize a diagram is from an example, immediately discard it.</step>
+        </additional_checks>
+    </pass_2_verification>
+
+    <!-- Capture verified diagrams -->
+    <full_diagram_capture>
+        <step>If a diagram is verified in the target image, capture all related elements and
+            relationships within the diagram element according to the format provided.</step>
+        <step>If no diagrams were found or verified, prepare to report that no diagrams were
+            detected.</step>
+    </full_diagram_capture>
+
+    <!-- Final verification to ensure accuracy -->
+    <final_verification>
+        <step>Review each captured diagram and confirm its presence in the target image.</step>
+        <step>Ensure each identified diagram meets ALL criteria and does not violate any exclusion
+            criteria.</step>
+        <step>If any doubt exists about a diagram's validity or source, discard it.</step>
+        <step>Confirm one last time that you have only analyzed the target image and have not
+            included any information from the example images.</step>
+    </final_verification>
+</diagram_verification_process>

@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_robust_elements_tool",
+        "description": "Specialized tool for extracting structural elements from document images with precise bounding box coordinates. ONLY use for: document structure analysis with coordinate requirements, layout element identification with positioning, page component extraction with spatial data. Returns JSON with elements array containing order, type, level, content, and bbox (x1, y1, x2, y2) for each element. NOT for: simple element extraction without coordinates, content analysis, text extraction, metadata extraction. If no structural elements are found, returns that no document elements were detected.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_path, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Robust Elements Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

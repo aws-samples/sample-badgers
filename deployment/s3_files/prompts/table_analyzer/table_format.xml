@@ -1,0 +1,40 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="table">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_TABLES_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per table found -->
+        <elements>
+            <element type="table">
+                <type>Table</type>
+                <content>
+                    <table border="1">
+                        <caption>{TABLE_CAPTION_IF_ANY}</caption>
+                        <thead>
+                            <tr>
+                                <th>{HEADER_1}</th>
+                                <th>{HEADER_2}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{DATA_1_1}</td>
+                                <td>{DATA_1_2}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="{TOTAL_NUMBER_OF_COLUMNS}">{FOOTNOTE_OR_SUMMARY_IF_ANY}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </content>
+            </element>
+        </elements>
+    </response>
+</response_format>

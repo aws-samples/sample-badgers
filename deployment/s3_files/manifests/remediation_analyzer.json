@@ -1,0 +1,138 @@
+{
+    "tool": {
+        "name": "analyze_remediation_tool",
+        "description": "Specialized tool for PDF accessibility remediation that analyzes document page images to identify all structural elements and their precise bounding boxes for Section 508 compliance tagging. ONLY use for: PDF accessibility tagging, document structure analysis, identifying headings/paragraphs/lists/tables/figures for PDF/UA compliance. Returns structured JSON with element types, reading order, and grid-based coordinates for automated PDF tagging.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL or absolute file path to the document page image to analyze"
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data (alternative to image_path)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags"
+                },
+                "grid_cols": {
+                    "type": "integer",
+                    "description": "Number of grid columns for coordinate system (default: 36)",
+                    "default": 36
+                },
+                "grid_rows": {
+                    "type": "integer",
+                    "description": "Number of grid rows for coordinate system (default: 36)",
+                    "default": 36
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "remediation_analyzer",
+        "description": "Analyzes document page images to identify structural elements for PDF/UA accessibility tagging",
+        "enhancement_eligible": false,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "max_retries": 3,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "remediation_job_role.xml",
+            "remediation_context.xml",
+            "remediation_grid_specification.xml",
+            "remediation_element_types.xml",
+            "remediation_rules.xml",
+            "remediation_coordinate_system.xml",
+            "remediation_format.xml",
+            "remediation_common_errors.xml",
+            "remediation_critical_reminders.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "document structure elements",
+        "expected_output_tokens": 6000,
+        "output_extension": "json"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": false,
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of element detection",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all structural elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "bounding_box_accuracy",
+                    "text": "Were bounding boxes accurate and tight?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly bounded?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "reading_order",
+                    "text": "Was reading order logical for screen readers?",
+                    "type": "likert"
+                },
+                {
+                    "id": "heading_hierarchy",
+                    "text": "Were heading levels correctly assigned?",
+                    "type": "likert"
+                },
+                {
+                    "id": "alt_text_quality",
+                    "text": "Were alt texts descriptive and accurate?",
+                    "type": "likert"
+                },
+                {
+                    "id": "artifact_identification",
+                    "text": "Were artifacts correctly identified?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

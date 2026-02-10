@@ -1,0 +1,121 @@
+{
+    "tool": {
+        "name": "analyze_handwriting_tool",
+        "description": "Specialized tool for recognizing and transcribing handwritten text in any form. ONLY use for: handwritten notes, annotations, margin notes, scribbles, cursive writing, print handwriting, historical letters, personal notes, signatures, handwritten forms, journal entries, and any text written by hand. NOT for: printed text, typed text, diagrams, tables, or machine-generated content. If no handwriting is found, returns that no handwritten content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing potential handwriting to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "handwriting_analyzer",
+        "description": "Analyzes handwritten text images to extract and transcribe content",
+        "enhancement_eligible": true,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "handwriting_gestalt.xml",
+            "handwriting_context.xml",
+            "handwriting_conversation_example.xml",
+            "handwriting_format.xml",
+            "handwriting_help.xml",
+            "handwriting_job_role.xml",
+            "handwriting_rules.xml",
+            "handwriting_tasks.xml",
+            "handwriting_verification.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 3,
+        "analysis_text": "handwritten text",
+        "expected_output_tokens": 3000,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.082446+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "transcription_accuracy",
+                    "text": "Was the handwritten text accurately transcribed?",
+                    "type": "likert"
+                },
+                {
+                    "id": "legibility_handling",
+                    "text": "Were difficult-to-read sections appropriately flagged?",
+                    "type": "likert"
+                },
+                {
+                    "id": "script_style_recognition",
+                    "text": "Was the writing style (cursive, print, mixed) correctly identified?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,101 @@
+<!-- Provides guidance on identifying and extracting diagrams -->
+<diagram_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example
+            images provided earlier.</item>
+        <item>Absence of diagrams is a valid and expected outcome. Do not force identification if no
+            diagrams are present.</item>
+        <item>When in doubt, do NOT classify an element as a diagram. Accuracy is more important
+            than comprehensiveness.</item>
+        <item>NEVER classify regular illustrations or non-diagrammatic visuals as diagrams, even if
+            they contain shapes or lines.</item>
+        <item>Diagrams must represent structured information, relationships, or processes beyond
+            simple illustrations.</item>
+    </critical_instructions>
+
+    <diagram_definition>
+        <item>A diagram is a visual representation of information, concepts, or processes using
+            graphical elements.</item>
+        <item>Diagrams can be simple or complex, representing various types of information and
+            relationships.</item>
+        <item>Diagrams often use shapes, lines, arrows, and text to convey information and
+            relationships.</item>
+        <item>Diagrams typically have a clear structure and purpose, often representing abstract
+            concepts or processes.</item>
+    </diagram_definition>
+
+    <!-- Diagram categories and types - use appropriate output structure -->
+    <diagram_categories>
+        <category name="flow">
+            <description>Diagrams showing movement, transfer, or flow between entities</description>
+            <types>sankey diagram, alluvial diagram, flow chart with quantities, data flow diagram</types>
+            <output_structure>Use nodes (with position and values) and flows (source, target, value)</output_structure>
+        </category>
+        <category name="hierarchy">
+            <description>Diagrams showing parent-child or ranked relationships</description>
+            <types>org chart, tree diagram, taxonomy, family tree, directory structure</types>
+            <output_structure>Use root node and levels with parent references</output_structure>
+        </category>
+        <category name="network">
+            <description>Diagrams showing interconnected components</description>
+            <types>architecture diagram, system diagram, network topology, infrastructure diagram</types>
+            <output_structure>Use components and connections with types and labels</output_structure>
+        </category>
+        <category name="process">
+            <description>Diagrams showing sequential steps or workflows</description>
+            <types>flowchart, workflow diagram, sequence diagram, swimlane diagram, BPMN</types>
+            <output_structure>Use ordered steps with type (start/process/decision/end) and next
+                references</output_structure>
+        </category>
+        <category name="structural">
+            <description>Diagrams showing entity structures and relationships</description>
+            <types>UML class diagram, ER diagram, database schema, component diagram</types>
+            <output_structure>Use entities with attributes and relationships with cardinality</output_structure>
+        </category>
+        <category name="comparison">
+            <description>Diagrams comparing multiple items or showing overlaps</description>
+            <types>Venn diagram, comparison chart, side-by-side diagram</types>
+            <output_structure>Use items with attributes and overlaps for shared elements</output_structure>
+        </category>
+    </diagram_categories>
+
+    <!-- Figure reference and document context extraction -->
+    <figure_reference_guidance>
+        <item>ALWAYS capture the figure caption exactly as written (e.g., "Figure 5. Cost overruns
+            for...")</item>
+        <item>Extract the figure identifier (e.g., "Figure 5", "Diagram 3", "Fig. 2")</item>
+        <item>For multi-panel diagrams, note sub-labels like (A), (B), (a), (b) in both the diagram
+            and caption</item>
+        <item>The caption typically appears directly below or above the diagram</item>
+    </figure_reference_guidance>
+
+    <document_context_guidance>
+        <item>Look for text on the page that references this figure (e.g., "as shown in Figure 5",
+            "see Diagram 3")</item>
+        <item>Capture the nearest section heading if visible on the page</item>
+        <item>Include any explanatory text that directly describes what the diagram shows</item>
+        <item>Note text that explains how to interpret the diagram (e.g., "left nodes show X, right
+            nodes show Y")</item>
+    </document_context_guidance>
+
+    <not_diagrams>
+        <item>Simple illustrations without structured information are NOT diagrams.</item>
+        <item>Photographs or realistic drawings are NOT diagrams.</item>
+        <item>Decorative graphics or design elements are NOT diagrams.</item>
+        <item>Charts without graphical elements connecting information are NOT diagrams.</item>
+        <item>Tables are NOT diagrams.</item>
+        <item>Any visual content that lacks a clear structure or relationship representation is NOT
+            a diagram.</item>
+    </not_diagrams>
+
+    <decision_process>
+        <item>Follow the two-step verification process defined in the
+            diagram_verification_process.xml file.</item>
+        <item>In the first pass, identify all potential diagram structures.</item>
+        <item>In the second pass, rigorously verify each potential diagram against the defined
+            criteria.</item>
+        <item>Consider the context around each potential diagram to avoid misclassification.</item>
+        <item>For verified diagrams, ensure you capture a full description, including all elements
+            and relationships.</item>
+    </decision_process>
+</diagram_help>

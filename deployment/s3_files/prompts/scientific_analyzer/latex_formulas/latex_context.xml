@@ -1,0 +1,15 @@
+<!-- Provides context and guidelines for analyzing page scans for LaTeX formulas -->
+<context>
+    <item>You will be provided with multiple images. The initial images are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>In this final image, search for LaTeX formula elements that represent mathematical or scientific expressions. The page scan could have one or more LaTeX formulas within it.</item>
+    <item>Your task is to identify and extract the content of LaTeX formulas from the final image only, including inline formulas, display formulas, and multi-line equations.</item>
+    <item>You will analyze various types of page scans while you search for LaTeX formula elements that represent mathematical or scientific expressions. Page scans could have one or more than one LaTeX formula within them.</item>
+    <item>Your task is to identify and extract the content of LaTeX formulas, including inline formulas, display formulas, and multi-line equations.</item>
+    <item>You should capture the LaTeX code for each formula, preserving all LaTeX commands and syntax.</item>
+    <item>If you're unsure about a formula's structure or content, refer to the guidance in the <latex_help/> XML tags.</item>
+    <item>A LaTeX formula typically contains mathematical symbols, Greek letters, operators, and other specialized notation. Not all text containing mathematical symbols is necessarily a LaTeX formula.</item>
+    <item>If no genuine LaTeX formulas are found, respond according to the instructions in the <latex_rules/> XML tags.</item>
+    <item>When in doubt, prioritize honesty.</item>
+    <item>You will use a two-step verification process, which has strict criteria, to identify and validate LaTeX formulas which is found within the <latex_verification_process/> XML tags.</item>
+</context>

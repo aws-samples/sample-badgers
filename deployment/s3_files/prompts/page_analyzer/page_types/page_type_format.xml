@@ -1,0 +1,11 @@
+<!-- This is your page type response format. -->
+<response_format>
+    <response>
+        <page type="{PAGE TYPE}">
+            <page_sub_type>{SUB-TYPE IF APPLICABLE}</page_sub_type>
+            <page_number>{PAGE NUMBER}</page_number>
+            <writing_direction>{LANGUAGE WRITING DIRECTION}</writing_direction>
+            <language>{ELEMENT LANGUAGE}</language>
+        </page>
+    </response>
+</response_format>

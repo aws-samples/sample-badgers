@@ -1,0 +1,89 @@
+[project]
+name = "BADGERS"
+version = "1.2.0"
+description = "BADGERS (Broad Agentic Document Generative Extraction & Recognition System) transforms document processing through vision-enabled AI and deep layout analysis. Unlike traditional text extraction tools, BADGERS understands document structure and meaning by recognizing visual hierarchies, reading patterns, and contextual relationships between elements. The system currently processes 21 distinct document elements including text extraction, handwriting recognition, mathematical equations, complex tables, diagrams, and accessibility compliance features. Built on Amazon Bedrock with vision-enabled LLMs, it maintains semantic connections and document hierarchy throughout extraction, delivering structured outputs that preserve original organization and meaning. BADGERS automates document processing workflows while improving accuracy and completeness, enabling organizations to focus on using information rather than extracting it. The system accelerates research, compliance, content management, and accessibility remediation across diverse document types from simple forms to complex scientific papers."
+authors = [{ name = "Randall Potter", email = "rbpotter@amazon.com" }]
+readme = "README.md"
+requires-python = ">=3.12.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "aws-cdk-lib",
+    "boto3",
+    "botocore",
+    "constructs",
+    "defusedxml>=0.7.1",
+    "gradio",
+    "gradio_pdf",
+    "jpype1",
+    "lxml>=6.0.2",
+    "markdown2docx>=0.1.0",
+    "mcp",
+    "networkx",
+    "opencv-python>=4.12.0.88",
+    "pdfreader>=0.1.15",
+    "pikepdf>=10.0.2",
+    "pillow",
+    "PyMuPDF",
+    "pypdf>=6.2.0",
+    "pypdf2>=3.0.1",
+    "pdf2image",
+    "python-dotenv",
+    "pyvis",
+    "reportlab>=4.4.4",
+    "strands-agents",
+    "strands-agents[otel]",
+    "strands-agents-tools",
+    "tomli; python_version < '3.11'",
+    "xmlschema>=4.2.0",
+    "xmltoxsd>=0.1.1",
+    "aws-cdk-lib>=2.227.0",
+    "constructs>=10.4.3",
+    "aws-cdk-aws-bedrock-agentcore-alpha>=2.230.0a0",
+    "aws-cdk-aws-bedrock-alpha>=2.230.0a0",
+    "cdk-nag>=2.37.55",
+    "pydantic<2.12.0",
+    "gradio-pdf>=0.0.24",
+    "pymupdf>=1.26.6",
+    "jpype1>=1.6.0",
+    "websockets>=15.0.1",
+    "bedrock-agentcore>=1.1.2",
+    "urllib3>=2.6.2",
+    "pip-audit>=2.10.0",
+    "requests>=2.28.0",
+    "pyjwt>=2.8.0",
+    "uvicorn>=0.24.0",
+    "itsdangerous>=2.2.0",
+    "aws-cdk-mixins-preview==2.234.1a0",
+    "realesrgan>=0.3.0",
+    "basicsr>=1.4.2",
+    "setuptools>=80.10.2",
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+    "spandrel>=0.4.1",
+    "super-image>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "mypy", "pylint"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tools*", "config*", "server*", "main*"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pylint.messages_control]
+disable = ["C0103", "R0903"]
+
+[dependency-groups]
+dev = ["types-requests>=2.32.4.20260107"]

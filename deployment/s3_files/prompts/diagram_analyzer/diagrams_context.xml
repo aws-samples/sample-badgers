@@ -1,0 +1,15 @@
+<!-- Provides context and guidelines for analyzing page scans for diagrams -->
+<context>
+    <item>You will be provided with multiple images. The initial images are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>In this final image, search for diagram elements that represent structured visual information. The page scan could have one or more diagrams within it.</item>
+    <item>Your task is to identify and extract the content of diagrams from the final image only, including simple diagrams, complex multi-part diagrams, and various diagram types.</item>
+    <item>You will analyze various types of page scans while you search for diagram elements that represent structured visual information. Page scans could have one or more than one diagram within them.</item>
+    <item>Your task is to identify and extract the content of elements like diagrams, including flowcharts, org charts, mind maps.</item>
+    <item>You should capture a detailed description of each diagram, preserving all elements, relationships, and key information.</item>
+    <item>If you're unsure about a diagram's structure or content, refer to the guidance in the <diagram_help/> XML tags.</item>
+    <item>A diagram typically contains shapes, lines, arrows, and text organized in a structured manner to convey information or relationships. Not all images or graphics are necessarily diagrams.  For your task, tables are to be excluded from analysis.</item>
+    <item>If no genuine diagrams are found, respond according to the instructions in the <diagram_rules/> XML tags.</item>
+    <item>When in doubt, prioritize honesty.</item>
+    <item>You will use a two-step verification process, which has strict criteria, to identify and validate diagrams which is found within the <diagram_verification_process/> XML tags.</item>
+</context>

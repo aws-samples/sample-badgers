@@ -1,0 +1,66 @@
+{
+    "tool": {
+        "name": "analyze_edu_transcript_tool",
+        "description": "Analyze educational transcripts of various sorts.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image to analyze."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "edu_transcript_analyzer",
+        "description": "Analyze educational transcripts of various sorts.",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "edu_transcript_gestalt.xml",
+            "edu_transcript_job_role.xml",
+            "edu_transcript_context.xml",
+            "edu_transcript_rules.xml",
+            "edu_transcript_tasks.xml",
+            "edu_transcript_format.xml",
+            "edu_transcript_help.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "educational transcripts",
+        "expected_output_tokens": 5000,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2026-01-25T16:45:00.000000+00:00"
+    }
+}

@@ -1,0 +1,137 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="chart">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_CHARTS_AND_GRAPHS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per chart or graph found -->
+        <!-- Chart category determines which key_elements structure to use -->
+        <elements>
+            <element type="chart">
+                <type>{CHART_OR_GRAPH_TYPE}</type>
+                <category>{cartesian|proportional|flow|composite|matrix|radar|other}</category>
+                <content>
+                    <title>{TITLE_OF_CHART_OR_GRAPH}</title>
+                    <description>{DETAILED_DESCRIPTION_OF_CHART_OR_GRAPH}</description>
+
+                    <!-- USE THE APPROPRIATE key_elements STRUCTURE BASED ON CATEGORY -->
+
+                    <!-- FOR CARTESIAN CHARTS (bar, line, scatter, area, etc.): -->
+                    <key_elements type="cartesian">
+                        <x_axis>
+                            <label>{X_AXIS_LABEL}</label>
+                            <scale>{X_AXIS_SCALE}</scale>
+                        </x_axis>
+                        <y_axis>
+                            <label>{Y_AXIS_LABEL}</label>
+                            <scale>{Y_AXIS_SCALE}</scale>
+                        </y_axis>
+                        <data_series>
+                            <series_name>{SERIES_NAME}</series_name>
+                            <data_points>
+                                <point>
+                                    <x>{X_VALUE}</x>
+                                    <y>{Y_VALUE}</y>
+                                </point>
+                            </data_points>
+                        </data_series>
+                        <legend>{DESCRIPTION_OF_LEGEND}</legend>
+                    </key_elements>
+
+                    <!-- FOR PROPORTIONAL CHARTS (pie, donut, treemap): -->
+                    <key_elements type="proportional">
+                        <segments>
+                            <segment>
+                                <label>{SEGMENT_LABEL}</label>
+                                <value>{RAW_VALUE_IF_SHOWN}</value>
+                                <percentage>{PERCENTAGE}</percentage>
+                                <color>{COLOR_IF_RELEVANT}</color>
+                            </segment>
+                        </segments>
+                        <total>{TOTAL_VALUE_IF_SHOWN}</total>
+                        <legend>{DESCRIPTION_OF_LEGEND}</legend>
+                    </key_elements>
+
+                    <!-- FOR FLOW CHARTS (sankey, alluvial): -->
+                    <key_elements type="flow">
+                        <nodes>
+                            <node>
+                                <id>{NODE_ID}</id>
+                                <label>{NODE_LABEL}</label>
+                                <value>{NODE_VALUE}</value>
+                                <position>{left|middle|right}</position>
+                            </node>
+                        </nodes>
+                        <flows>
+                            <flow>
+                                <source>{SOURCE_NODE_LABEL}</source>
+                                <target>{TARGET_NODE_LABEL}</target>
+                                <value>{FLOW_VALUE}</value>
+                            </flow>
+                        </flows>
+                        <legend>{DESCRIPTION_OF_LEGEND}</legend>
+                    </key_elements>
+
+                    <!-- FOR COMPOSITE/MULTI-PANEL FIGURES: -->
+                    <key_elements type="composite">
+                        <layout>{GRID_DESCRIPTION e.g. 2x2, 1x4}</layout>
+                        <sub_charts>
+                            <sub_chart>
+                                <panel_id>{PANEL_LABEL e.g. (a), (b), A, B}</panel_id>
+                                <panel_title>{PANEL_TITLE}</panel_title>
+                                <chart_type>{TYPE_OF_THIS_PANEL}</chart_type>
+                                <description>{DESCRIPTION_OF_THIS_PANEL}</description>
+                            </sub_chart>
+                        </sub_charts>
+                        <shared_elements>{SHARED_AXES_OR_LEGENDS}</shared_elements>
+                    </key_elements>
+
+                    <!-- FOR MATRIX/HEATMAP CHARTS: -->
+                    <key_elements type="matrix">
+                        <row_labels>{LIST_OF_ROW_LABELS}</row_labels>
+                        <column_labels>{LIST_OF_COLUMN_LABELS}</column_labels>
+                        <cells>
+                            <cell>
+                                <row>{ROW_LABEL}</row>
+                                <column>{COLUMN_LABEL}</column>
+                                <value>{CELL_VALUE}</value>
+                            </cell>
+                        </cells>
+                        <color_scale>{DESCRIPTION_OF_COLOR_SCALE}</color_scale>
+                        <legend>{DESCRIPTION_OF_LEGEND}</legend>
+                    </key_elements>
+
+                    <!-- FOR RADAR/SPIDER CHARTS: -->
+                    <key_elements type="radar">
+                        <axes>
+                            <axis>{AXIS_LABEL}</axis>
+                        </axes>
+                        <data_series>
+                            <series>
+                                <name>{SERIES_NAME}</name>
+                                <values>
+                                    <value>
+                                        <axis>{AXIS}</axis>
+                                        <amount>{VALUE}</amount>
+                                    </value>
+                                </values>
+                            </series>
+                        </data_series>
+                        <legend>{DESCRIPTION_OF_LEGEND}</legend>
+                    </key_elements>
+
+                </content>
+                <figure_reference>
+                    <figure_id>{FIGURE_NUMBER e.g. "Figure 5", "Figure 6(A)"}</figure_id>
+                    <caption>{EXACT_CAPTION_TEXT_AS_SHOWN}</caption>
+                    <referencing_text>{ANY_NEARBY_TEXT_THAT_REFERENCES_THIS_FIGURE}</referencing_text>
+                </figure_reference>
+                <context>{BRIEF_DESCRIPTION_OF_WHAT_THIS_CHART_REPRESENTS_IN_THE_DOCUMENT}</context>
+            </element>
+        </elements>
+    </response>
+</response_format>

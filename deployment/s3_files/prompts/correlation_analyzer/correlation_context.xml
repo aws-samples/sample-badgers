@@ -1,0 +1,8 @@
+<context>
+    <item>You are correlating outputs from specialized analyzers that each extracted different aspects of the same document page.</item>
+    <item>The full_text analyzer provides the canonical reading-order spine with element IDs (elem_001, elem_002, etc.).</item>
+    <item>Other analyzers (diagram, table, chart) provide structured extractions of visual elements with their own IDs.</item>
+    <item>Your unified_document will be saved to S3 and used by downstream systems for document understanding, search, and retrieval.</item>
+    <item>The orchestrating agent will report your summary to the user — keep it concise and informative.</item>
+    <item>Enrichments must attach INSIDE each element, not as separate sections, so a single traversal yields everything.</item>
+</context>

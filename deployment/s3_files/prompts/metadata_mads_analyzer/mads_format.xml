@@ -1,0 +1,98 @@
+<response_format>
+    <response>
+        <xml_declaration>&#60;?xml version="1.0" encoding="UTF-8"?&#62;</xml_declaration>
+        <namespace_declarations>
+            <namespace>xmlns:mads="http://www.loc.gov/mads/v2"</namespace>
+            <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
+            <namespace>xmlns:xlink="http://www.w3.org/1999/xlink"</namespace>
+            <namespace>xsi:schemaLocation="http://www.loc.gov/mads/v2
+                http://www.loc.gov/standards/mads/v2/mads-2-1.xsd"</namespace>
+        </namespace_declarations>
+
+        <output_format>
+            <page_number_note>Include source page number as a note element in the MADS record</page_number_note>
+            <sample>
+                &#60;mads xmlns="http://www.loc.gov/mads/v2"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:xlink="http://www.w3.org/1999/xlink"
+                xsi:schemaLocation="http://www.loc.gov/mads/v2
+                http://www.loc.gov/standards/mads/v2/mads-2-1.xsd" version="2.1"&#62;
+                &#60;note
+                type="source_page"&#62;{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}&#60;/note&#62;
+                &#60;authority&#62;
+                &#60;name type="personal"&#62;
+                &#60;namePart type="family"&#62;{FAMILY_NAME}&#60;/namePart&#62;
+                &#60;namePart type="given"&#62;{GIVEN_NAME}&#60;/namePart&#62;
+                &#60;namePart type="date"&#62;{DATES}&#60;/namePart&#62;
+                &#60;/name&#62;
+                &#60;/authority&#62;
+
+                &#60;personInfo&#62;
+                &#60;fieldOfEndeavor&#62;{FIELD_OF_ENDEAVOR}&#60;/fieldOfEndeavor&#62;
+                &#60;/personInfo&#62;
+
+                &#60;variant type="other"&#62;
+                &#60;name type="personal"&#62;
+                &#60;namePart&#62;{VARIANT_NAME}&#60;/namePart&#62;
+                &#60;/name&#62;
+                &#60;/variant&#62;
+
+                &#60;related type="other" otherType="{RELATIONSHIP_TYPE}"&#62;
+                &#60;name type="{RELATED_ENTITY_TYPE}"&#62;
+                &#60;namePart&#62;{RELATED_ENTITY_NAME}&#60;/namePart&#62;
+                &#60;/name&#62;
+                &#60;/related&#62;
+
+                &#60;recordInfo&#62;
+                &#60;recordCreationDate
+                encoding="w3cdtf"&#62;{CREATION_DATE}&#60;/recordCreationDate&#62;
+                &#60;recordContentSource&#62;{CONTENT_SOURCE}&#60;/recordContentSource&#62;
+                &#60;languageOfCataloging&#62;
+                &#60;languageTerm type="code" authority="iso639-2b"&#62;eng&#60;/languageTerm&#62;
+                &#60;/languageOfCataloging&#62;
+                &#60;/recordInfo&#62;
+                &#60;/mads&#62;
+            </sample>
+        </output_format>
+
+        <common_entity_templates>
+            <personal_name>
+                <template>
+                    &#60;authority&#62;
+                    &#60;name type="personal"&#62;
+                    &#60;namePart type="family"&#62;{FAMILY_NAME}&#60;/namePart&#62;
+                    &#60;namePart type="given"&#62;{GIVEN_NAME}&#60;/namePart&#62;
+                    &#60;namePart type="date"&#62;{DATES}&#60;/namePart&#62;
+                    &#60;/name&#62;
+                    &#60;/authority&#62;
+                </template>
+            </personal_name>
+
+            <corporate_name>
+                <template>
+                    &#60;authority&#62;
+                    &#60;name type="corporate"&#62;
+                    &#60;namePart&#62;{CORPORATE_NAME}&#60;/namePart&#62;
+                    &#60;/name&#62;
+                    &#60;/authority&#62;
+                </template>
+            </corporate_name>
+
+            <geographic>
+                <template>
+                    &#60;authority&#62;
+                    &#60;geographic&#62;{GEOGRAPHIC_NAME}&#60;/geographic&#62;
+                    &#60;/authority&#62;
+                </template>
+            </geographic>
+
+            <topic>
+                <template>
+                    &#60;authority&#62;
+                    &#60;topic&#62;{TOPIC_TERM}&#60;/topic&#62;
+                    &#60;/authority&#62;
+                </template>
+            </topic>
+        </common_entity_templates>
+    </response>
+</response_format>

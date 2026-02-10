@@ -1,0 +1,66 @@
+{
+    "tool": {
+        "name": "analyze_keyword_topic_tool",
+        "description": "This analyzer extracts semantic keywords and topics from source material. ",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image to analyze."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "keyword_topic_analyzer",
+        "description": "This analyzer extracts semantic keywords and topics from source material. ",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "keyword_topic_gestalt.xml",
+            "keyword_topic_job_role.xml",
+            "keyword_topic_context.xml",
+            "keyword_topic_rules.xml",
+            "keyword_topic_tasks.xml",
+            "keyword_topic_format.xml",
+            "keyword_topic_help.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "keyword_topic_analyzer",
+        "expected_output_tokens": 1500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "json"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2026-01-07T14:40:47.857081+00:00"
+    }
+}

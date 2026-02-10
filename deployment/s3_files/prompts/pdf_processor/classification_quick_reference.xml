@@ -1,0 +1,31 @@
+<!-- This is your quick reference guide for tool selection -->
+<quick_reference>
+    <!-- Use this summary for fast tool identification -->
+    <tool_summary>
+        <tool name="analyze_diagram_tool">
+            <primary_use>Flowcharts, process diagrams, organizational charts</primary_use>
+            <key_indicators>Connected shapes, arrows, hierarchical structures</key_indicators>
+            <confidence_trigger>Clear process flows or system relationships</confidence_trigger>
+        </tool>
+
+        <tool name="analyze_table_tool">
+            <primary_use>Data tables, spreadsheets, structured information</primary_use>
+            <key_indicators>Rows, columns, grid layouts, headers</key_indicators>
+            <confidence_trigger>Clear tabular organization with data cells</confidence_trigger>
+        </tool>
+
+        <tool name="analyze_handwriting_tool">
+            <primary_use>Handwritten notes, annotations, cursive text</primary_use>
+            <key_indicators>Irregular letter formation, pen/pencil marks</key_indicators>
+            <confidence_trigger>Hand-drawn text or cursive elements</confidence_trigger>
+        </tool>
+    </tool_summary>
+
+    <!-- Quick decision checklist -->
+    <decision_checklist>
+        <step>1. Identify dominant visual pattern (shapes+arrows=diagram, grid=table, irregular text=handwriting)</step>
+        <step>2. Check confidence indicators from tool summary above</step>
+        <step>3. Apply confidence scoring from <classification_rules /> guidelines</step>
+        <step>4. Use appropriate format from <response_format /> conditional formats</step>
+    </decision_checklist>
+</quick_reference>

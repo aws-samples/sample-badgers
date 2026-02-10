@@ -1,0 +1,15 @@
+<!-- Definition of a table -->
+<table_dictionary>
+    <element type="table">
+        <strict_definition>A table is a standalone child element within a page scan, identified and verified through a two-step process:
+            1) Initial identification: A structured arrangement of data resembling a grid.
+            2) Strict verification: Must meet all of the following criteria:
+                a) Organized in clear rows and columns with distinct boundaries or separators (separators are lines of some sort, could be markdown style, dashes, or solid lines.  You may even find small gaps where the lines would connect).
+                b) Contains at least 3 rows (including a header row) and 2 columns of data.
+                c) Header row clearly describes the content of each column.
+                d) Cells primarily contain individual data points or short phrases, not full sentences or paragraphs.
+                e) Data types are consistent within columns.
+                f) Visually and contextually distinct from surrounding page elements.
+            The table must be a sub-element within a page's layout, not the layout itself. Page layouts, reference lists, or text blocks, even if structured, are not considered tables.</strict_definition>
+    </element>
+</table_dictionary>

@@ -1,0 +1,60 @@
+<!-- Details the process for identifying and verifying charts and graphs -->
+<charts_graphs_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for
+            analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- First pass: Identification of potential charts and graphs -->
+    <pass_1_identification>
+        <!-- Scan only the target image -->
+        <step>Scan ONLY within the target image for potential chart and graph structures.</step>
+        <!-- Early exit if no charts or graphs found -->
+        <step>If no potential charts or graphs are found, immediately skip to the final_verification
+            step.</step>
+        <!-- Confirmation to avoid example image analysis -->
+        <step>Confirm that you have not considered any example images in this process.</step>
+    </pass_1_identification>
+
+    <!-- Second pass: Verification of identified potential charts and graphs -->
+    <pass_2_verification>
+        <!-- Criteria for chart and graph verification -->
+        <charts_graphs_criteria>
+            <criterion>Contains visual elements representing numerical or statistical data</criterion>
+            <criterion>Uses axes, data points, bars, lines, or areas to represent data</criterion>
+            <criterion>Includes labels, scales, and potentially a legend</criterion>
+            <criterion>Represents a complete and coherent visual representation of data</criterion>
+        </charts_graphs_criteria>
+        <!-- Context checking for each potential chart or graph -->
+        <context_check>
+            <step>Analyze text immediately before and after the potential chart or graph in the
+                target image, to help you. Don't return that text, just keep it in mind.</step>
+            <step>Check for captions or titles associated with the chart or graph in the target
+                image.</step>
+            <step>Reject if it's a standalone image without clear data representation.</step>
+        </context_check>
+        <!-- Additional checks to prevent example image analysis -->
+        <additional_checks>
+            <step>For each potential chart or graph, explicitly confirm it exists in the target
+                image, not in any example.</step>
+            <step>If you realize a chart or graph is from an example, immediately discard it.</step>
+        </additional_checks>
+    </pass_2_verification>
+
+    <!-- Capture verified charts and graphs -->
+    <full_charts_graphs_capture>
+        <step>If a chart or graph is verified in the target image, capture all key elements, data
+            representation, and overall structure according to the format provided.</step>
+        <step>If no charts or graphs were found or verified, prepare to report that no charts or
+            graphs were detected.</step>
+    </full_charts_graphs_capture>
+
+    <!-- Final verification to ensure accuracy -->
+    <final_verification>
+        <step>Review each captured chart or graph and confirm its presence in the target image.</step>
+        <step>If any doubt exists about a chart's or graph's source, discard it.</step>
+        <step>Confirm one last time that you have only analyzed the target image and have not
+            included any information from the example images.</step>
+    </final_verification>
+</charts_graphs_verification_process>

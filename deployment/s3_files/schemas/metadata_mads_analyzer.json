@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_metadata_mads_tool",
+        "description": "Specialized tool for extracting MADS 2.1 compliant metadata from document images. ONLY use for: library and archival documents requiring MADS (Metadata Authority Description Schema) 2.1 standard compliance, authority records, bibliographic descriptions, and institutional repository processing. NOT for: general metadata, content analysis, text extraction, diagrams, or tables. If no MADS-relevant content is found, returns that no MADS metadata was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Metadata Mads Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

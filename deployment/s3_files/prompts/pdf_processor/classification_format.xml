@@ -1,0 +1,91 @@
+<!-- This defines how you must format your responses -->
+<response_format>
+  <!-- These are the mandatory requirements for your JSON response -->
+  <response_format_requirements>
+    <requirement>Always use exact tool names from the available tools list</requirement>
+    <requirement>Confidence scores must be decimal values between 0.0 and 1.0</requirement>
+    <requirement>tool_recommendations must ALWAYS be an array, even for single tool recommendations</requirement>
+    <requirement>For multiple tools, order them by priority (most important first)</requirement>
+    <requirement>Include priority field (1=highest, 2=second, etc.) for system processing order</requirement>
+    <requirement>Empty array [] if no tools are recommended</requirement>
+    <requirement>Provide specific, actionable reasoning for each recommendation</requirement>
+    <requirement>Include content_match details that justify the tool selection</requirement>
+    <requirement>Include tools_not_recommended section explaining which available tools were
+      excluded and why, referencing specific prompt guidelines</requirement>
+    <requirement>Use proper JSON formatting with no syntax errors</requirement>
+  </response_format_requirements>
+
+  <!-- This is the exact JSON structure you must follow -->
+  <json_output_schema>
+    <!-- These comments guide your decision on which format to use -->
+    <!-- IF NO TOOLS ARE RECOMMENDED: Use empty array format -->
+    <!-- IF ONE TOOL IS RECOMMENDED: Use single tool array format with priority 1 -->
+    <!-- IF MULTIPLE TOOLS ARE RECOMMENDED: Use multiple tools array format with ascending
+    priorities -->
+
+    <base_structure> { "page_analysis": { "content_description": "Brief description of what you
+      observe on this page", "dominant_content_type": "Primary content category identified",
+      "secondary_content_types": ["List", "of", "additional", "content", "types", "if", "present"],
+      "image_quality": "Assessment of image clarity and analyzability" }, "tool_recommendations": [ <!--
+      CONDITIONAL CONTENT BASED ON NUMBER OF TOOLS - SEE EXAMPLES BELOW -->
+      ], "tools_not_recommended": { "explanation": "Explain which available tools were NOT
+      recommended and why they don't match this page's content", "excluded_tools": [ { "tool_name":
+      "name_of_excluded_tool", "reason": "Specific reason why this tool was not selected based on
+      content analysis and prompt guidelines" } ] }, "classification_metadata": {
+      "analysis_timestamp": "Current timestamp", "total_tools_considered": 4,
+      "recommendation_count": "Number of tools in recommendations array", "fallback_used": false,
+      "notes": "Any additional observations or concerns about the classification" } } </base_structure>
+
+    <!-- These are the specific formats to use based on your analysis results -->
+    <conditional_formats>
+      <!-- Use this format when no tools meet the confidence threshold -->
+      <no_tools_format>
+        "tool_recommendations": []
+      </no_tools_format>
+
+      <!-- Use this format when one tool clearly matches the content -->
+      <single_tool_format>
+        "tool_recommendations": [
+        {
+        "tool_name": "exact_tool_name_from_available_tools",
+        "confidence": 0.85,
+        "reasoning": "Detailed explanation of why this tool was selected and confidence level",
+        "content_match": "Specific content elements that match this tool's capabilities",
+        "priority": 1
+        }
+        ]
+      </single_tool_format>
+
+      <!-- Use this format when multiple distinct content areas need different tools -->
+      <multiple_tools_format>
+        "tool_recommendations": [
+        {
+        "tool_name": "primary_tool_name",
+        "confidence": 0.88,
+        "reasoning": "Explanation for primary tool selection",
+        "content_match": "Content elements for primary tool",
+        "priority": 1
+        },
+        {
+        "tool_name": "secondary_tool_name",
+        "confidence": 0.76,
+        "reasoning": "Explanation for secondary tool selection",
+        "content_match": "Content elements for secondary tool",
+        "priority": 2
+        }
+        ]
+      </multiple_tools_format>
+    </conditional_formats>
+
+    <!-- This is your step-by-step decision process for choosing the right format -->
+    <decision_logic>
+      <!-- Follow this decision tree to select the correct format -->
+      <!-- 1. Analyze page content -->
+      <!-- 2. IF no suitable tools found OR confidence too low: USE no_tools_format -->
+      <!-- 3. IF one dominant content type with clear tool match: USE single_tool_format -->
+      <!-- 4. IF multiple distinct content regions requiring different tools: USE
+      multiple_tools_format -->
+      <!-- 5. ALWAYS prioritize tools by content area size and importance -->
+    </decision_logic>
+  </json_output_schema>
+</response_format>

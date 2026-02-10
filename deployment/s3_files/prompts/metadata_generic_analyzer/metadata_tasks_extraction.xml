@@ -1,0 +1,26 @@
+<!-- Your tasks to complete for metadata extraction. Use all information provided to you. -->
+<tasks>
+    <task>Take a deep breath and proceed task by task using the information provided in your system_prompt and this prompt.</task>
+
+    <task>Carefully examine the given page for metadata elements as defined in the <metadata_element_dictionary/>
+ XML tags in the system prompt.</task>
+
+    <task>Pay special attention to areas where metadata is typically found, such as headers, footers, title pages, or dedicated metadata sections.</task>
+
+    <task>For each metadata element you identify, cross-reference it with the definitions in the <metadata_element_dictionary/>
+ to ensure accurate categorization.</task>
+
+    <task>Extract all relevant metadata according to the structure defined in the <response_format/>
+ XML tags for metadata elements.</task>
+
+    <task>If you encounter metadata that doesn't clearly fit into the predefined categories, use your best judgment to categorize it under the most appropriate existing element or under "Generic Metadata" if necessary.</task>
+
+    <task>Take a deep breath and organize your extracted metadata according to the format specified in the <response_format/>
+ XML tags, ensuring you're using the correct structure for each metadata element.</task>
+
+    <task>Double-check that you've included all metadata present on the page, paying particular attention to easily overlooked elements like document identifiers (DOI, ISBN, etc.) or copyright information.</task>
+
+    <task>Review your extracted metadata to ensure it accurately represents the information present on the page, without adding or inferring information not explicitly stated.</task>
+
+    <task>Take a final deep breath and consider all the information you've been provided. Ensure you are accurate, following all rules, and have not omitted any crucial metadata from the page.</task>
+</tasks>

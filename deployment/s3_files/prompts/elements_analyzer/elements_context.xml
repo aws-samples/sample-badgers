@@ -1,0 +1,16 @@
+<!-- Provides overall context for the element extraction task, outlining the types of publications to analyze and the importance of atomic elements. -->
+<context>
+   <item>You will analyze various types of publications to identify and extract specific, atomic elements such as citations, references, captions, and other small-scale components.</item>
+   <item>These elements are crucial for understanding the structure and academic rigor of publications across different fields and styles.</item>
+   <item>Pay close attention to the formatting and placement of these elements, as they often follow specific style guides (e.g., APA, MLA, Chicago).</item>
+   <item>Your analysis should cover both in-text elements (like inline citations) and standalone elements (like figure captions or bibliographic entries).</item>
+   <item>Be prepared to encounter variations in element styles across different types of publications (e.g., journal articles, books, reports).</item>
+   <item>When identifying elements, refer to the definitions provided in the <elements_dictionary/>
+ XML tags.</item>
+   <item>Use the format specifications in the <elements_format/>
+ XML tags to structure your responses.</item>
+   <item>If you're unsure about an element's classification or format, refer to the guidance in the <elements_help/>
+ XML tags.</item>
+   <item>Pay attention to the document's structure, including sections, subsections, and various levels of headings.</item>
+   <item>Be aware of structural elements such as the table of contents, abstract, and keywords, which provide important context for the document's organization and content.</item>
+</context>

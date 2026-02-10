@@ -1,0 +1,92 @@
+{
+    "tool": {
+        "name": "correlate_page_results_tool",
+        "description": "Correlates outputs from multiple analyzers for a single page into a unified_document structure. Call this AFTER running 2+ analyzers on the same page. Takes S3 URIs of analyzer results (full_text required as spine, plus diagram/table/chart/etc.), produces a correlated unified_document with enrichments attached to the content spine, saves to S3, and returns the S3 URI with a brief summary. Do NOT call for pages with only one analyzer result.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "full_text_uri": {
+                    "type": "string",
+                    "description": "S3 URI of the full_text_analyzer result (required as canonical spine)"
+                },
+                "analyzer_uris": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "analyzer_name": {
+                                "type": "string",
+                                "description": "Name of the analyzer (e.g., diagram, table, chart)"
+                            },
+                            "s3_uri": {
+                                "type": "string",
+                                "description": "S3 URI of the analyzer result"
+                            }
+                        },
+                        "required": [
+                            "analyzer_name",
+                            "s3_uri"
+                        ]
+                    },
+                    "description": "Array of other analyzer results to correlate with full_text"
+                },
+                "page_number": {
+                    "type": "string",
+                    "description": "Page number or identifier for this correlation"
+                },
+                "source_image_path": {
+                    "type": "string",
+                    "description": "Original image path for metadata"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "full_text_uri",
+                "analyzer_uris",
+                "page_number",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "correlation_analyzer",
+        "description": "Correlates multiple analyzer outputs into a unified document structure",
+        "enhancement_eligible": false,
+        "model_selections": {
+            "primary": {
+                "model_id": "us.anthropic.claude-opus-4-6-v1",
+                "adaptive_thinking": true,
+                "effort": "high"
+            },
+            "fallback_list": [
+                {
+                    "model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    "extended_thinking": true,
+                    "budget_tokens": 8192
+                }
+            ]
+        },
+        "max_retries": 2,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "correlation_job_role.xml",
+            "correlation_context.xml",
+            "correlation_rules.xml",
+            "correlation_tasks.xml",
+            "correlation_format.xml"
+        ],
+        "expected_output_tokens": 40000,
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": false,
+        "analyzer_type": "correlation"
+    }
+}

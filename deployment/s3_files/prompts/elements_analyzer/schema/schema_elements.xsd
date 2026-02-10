@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+    <!-- Root element -->
+    <xs:element name="elements_format">
+        <xs:annotation>
+            <xs:documentation> Outlines different citation styles and provides a structured response
+                format for extracted elements. </xs:documentation>
+        </xs:annotation>
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="format_styles" type="FormatStylesType" />
+                <xs:element name="response_format" type="ResponseFormatType" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Format Styles section -->
+    <xs:complexType name="FormatStylesType">
+        <xs:sequence>
+            <xs:element name="style" type="StyleType" minOccurs="1" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="StyleType">
+        <xs:simpleContent>
+            <xs:extension base="xs:string">
+                <xs:attribute name="name" type="StyleNameEnum" use="required" />
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+
+    <!-- Response Format section -->
+    <xs:complexType name="ResponseFormatType">
+        <xs:sequence>
+            <xs:element name="response" type="ResponseType" />
+        </xs:sequence>
+        <xs:attribute name="type" type="xs:string" use="required" />
+    </xs:complexType>
+
+    <xs:complexType name="ResponseType">
+        <xs:sequence>
+            <xs:element name="element" type="ElementType" minOccurs="0" maxOccurs="unbounded" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Element details -->
+    <xs:complexType name="ElementType">
+        <xs:sequence>
+            <xs:element name="order" type="xs:positiveInteger" />
+            <xs:element name="type" type="ElementTypeEnum" />
+            <xs:element name="sub_type" type="xs:string" minOccurs="0">
+                <xs:annotation>
+                    <xs:documentation> Should match a valid sub-type for the specified element type. </xs:documentation>
+                </xs:annotation>
+            </xs:element>
+            <xs:element name="hierarchical_level" type="xs:string" minOccurs="0" />
+            <xs:element name="content" type="xs:string" />
+            <xs:element name="style" type="StyleNameEnum" minOccurs="0" />
+            <xs:element name="location" type="LocationType" />
+            <xs:element name="context" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="LocationType">
+        <xs:sequence>
+            <xs:element name="page" type="xs:positiveInteger" />
+            <xs:element name="position" type="xs:string" />
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Enumerations -->
+    <xs:simpleType name="ElementTypeEnum">
+        <xs:annotation>
+            <xs:documentation> Element types as defined in the elements dictionary. </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="document_title" />
+            <xs:enumeration value="section" />
+            <xs:enumeration value="heading" />
+            <xs:enumeration value="paragraph" />
+            <xs:enumeration value="citation" />
+            <xs:enumeration value="reference" />
+            <xs:enumeration value="caption" />
+            <xs:enumeration value="quote" />
+            <xs:enumeration value="equation" />
+            <xs:enumeration value="list" />
+            <xs:enumeration value="footnote" />
+            <xs:enumeration value="table_of_contents" />
+            <xs:enumeration value="abstract" />
+            <xs:enumeration value="keyword" />
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- Element Type Documentation -->
+    <xs:annotation>
+        <xs:documentation> Valid sub-types per element type: - section: Chapter, Main section,
+            Subsection, Sub-subsection - heading: Title (H1), Section heading (H2), Subsection
+            heading (H3), Sub-subsection heading (H4), Lower-level heading (H5, H6), Running head -
+            paragraph: Body paragraph, Introduction paragraph, Conclusion paragraph - citation:
+            In-text citation, Footnote citation, Endnote citation - reference: Book reference,
+            Journal article reference, Web page reference, Conference paper reference - caption:
+            Figure caption, Table caption, Image caption - quote: Block quote, Inline quote, Pull
+            quote - equation: Inline equation, Display equation - list: Bulleted list, Numbered
+            list, Definition list </xs:documentation>
+    </xs:annotation>
+
+    <xs:simpleType name="StyleNameEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="APA" />
+            <xs:enumeration value="MLA" />
+            <xs:enumeration value="Chicago" />
+            <xs:enumeration value="Harvard" />
+            <xs:enumeration value="IEEE" />
+            <xs:enumeration value="Vancouver" />
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

@@ -1,0 +1,33 @@
+<!-- Provides a step-by-step process for visual element extraction and analysis, guiding the AI through the task of identifying and documenting visual elements in publications. -->
+<tasks>
+    <task>Before proceeding, carefully examine the page to determine if any visual elements are present. If no visual elements are found, respond with:
+        <response><element>NOT FOUND</element></response>
+        Then end your analysis for this task.</task>
+
+    <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
+
+    <task>Examine the given publication page, focusing on identifying visual elements as defined in the <visual_dictionary/> XML tags.</task>
+
+    <task>For each identified visual element:
+        <sub_task>Determine its type and sub-type if applicable.</sub_task>
+        <sub_task>Describe the content and purpose of the visual element.</sub_task>
+        <sub_task>Identify the visual style (e.g., raster, vector, hand-drawn) based on the guidelines in the <visual_styles/> section.</sub_task>
+        <sub_task>Note the element's location on the page, size, and its context within the document.</sub_task>
+        <sub_task>Extract any captions or labels associated with the visual element.</sub_task>
+        <sub_task>Identify any in-text references to the visual element.</sub_task>
+    </task>
+
+    <task>Pay special attention to the relationship between the visual element and the surrounding text, noting how they complement each other.</task>
+
+    <task>For complex visual elements (e.g., multi-part figures or detailed diagrams), break down your analysis into logical components.</task>
+
+    <task>If you encounter unique or ambiguous visual elements, describe them as best you can, noting any distinctive features or unusual aspects.</task>
+
+    <task>Consider the role of color, shading, and other visual attributes in conveying information within the element.</task>
+
+    <task>Organize your findings according to the structure provided in the <response_format/> XML tags.</task>
+
+    <task>Review your extracted visual elements to ensure accuracy and completeness, checking that you've captured all relevant information for each element type.</task>
+
+    <task>Take a final deep breath and ensure your analysis is thorough, follows all provided guidelines, and accurately represents the visual elements present in the publication.</task>
+</tasks>

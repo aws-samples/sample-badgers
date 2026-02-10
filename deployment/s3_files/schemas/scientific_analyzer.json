@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_scientific_tool",
+        "description": "Specialized tool for analyzing scientific document images to extract LaTeX formulas and mathematical expressions. ONLY use for: mathematical equations, scientific formulas, LaTeX expressions, mathematical notation, scientific papers with formulas, research documents with equations, academic papers with mathematical content, and any document containing mathematical or scientific expressions. NOT for: diagrams, tables, handwriting, or non-mathematical content. If no scientific formulas are found, returns that no scientific content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_path, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Scientific Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

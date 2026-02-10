@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for PDF Content Classification -->
+<gestalt_perception analyzer="classify_pdf_content">
+
+    <prescan>
+        <instruction>Before classifying content, perceive the page holistically:</instruction>
+        <step>View the entire page to identify the dominant content type.</step>
+        <step>Note the visual hierarchy: what is most prominent?</step>
+        <step>Identify distinct content regions and their relative sizes.</step>
+        <step>Observe the balance between text, images, diagrams, and whitespace.</step>
+        <step>Note any special content requiring enhancement (historical, degraded, handwritten).</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="visual_hierarchy">
+            <guidance> Dominant content determines primary classification: - What occupies the most visual space? - What draws the eye first (saliency)? - What appears to be the main purpose of the page? The visually dominant element type guides classification. </guidance>
+        </primary>
+
+        <primary principle="figure_ground">
+            <guidance> Separate meaningful content from page artifacts: - FIGURE: Text, images, diagrams, tables, charts (classify these) - GROUND: Margins, backgrounds, decorative elements, watermarks Focus classification on figure elements; note ground for context. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Spatial grouping indicates content relationships: - Clustered elements form logical units - Captions near images belong together - Headers with following content form sections Describe relationships, not just isolated elements. </guidance>
+        </primary>
+
+        <secondary principle="similarity">
+            <guidance> Visual consistency indicates content categories: - Similar styling = same content type - Repeated patterns = structured content - Consistent formatting = document organization </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <content_type_detection>
+        <type name="text_dominant">Page primarily contains paragraphs, headings, body text.</type>
+        <type name="image_dominant">Page primarily contains photographs, illustrations, graphics.</type>
+        <type name="diagram_dominant">Page primarily contains flowcharts, schematics, visual explanations.</type>
+        <type name="table_dominant">Page primarily contains tabular data in rows/columns.</type>
+        <type name="chart_dominant">Page primarily contains data visualizations, graphs.</type>
+        <type name="mixed">Page contains multiple content types in significant proportions.</type>
+        <type name="form">Page is a structured form with fields and labels.</type>
+        <type name="handwritten">Page contains significant handwritten content.</type>
+    </content_type_detection>
+
+    <enhancement_detection>
+        <condition type="historical">Aged paper, faded text, period typography, archival appearance.</condition>
+        <condition type="degraded">Poor scan quality, noise, artifacts, low contrast.</condition>
+        <condition type="handwritten">Manuscript, annotations, personal writing.</condition>
+        <condition type="low_resolution">Pixelation, blur, insufficient detail.</condition>
+        <instruction>Flag content requiring enhancement for better extraction.</instruction>
+    </enhancement_detection>
+
+    <description_guidance>
+        <principle>Be specific about what you see, not generic.</principle>
+        <principle>Include spatial location (top, center, left margin, etc.).</principle>
+        <principle>Note relationships between elements.</principle>
+        <principle>Describe visual characteristics that inform classification.</principle>
+    </description_guidance>
+
+    <validation>
+        <instruction>After classification, verify perception accuracy:</instruction>
+        <check>Does the classification match the visually dominant content?</check>
+        <check>Did you correctly separate content (figure) from artifacts (ground)?</check>
+        <check>Are content relationships accurately described?</check>
+        <check>Are enhancement needs correctly identified?</check>
+        <check>Is the description specific and location-aware?</check>
+    </validation>
+
+</gestalt_perception>

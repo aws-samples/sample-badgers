@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<context>
+    <item>MODS 3.8 is an XML schema developed by the Library of Congress for bibliographic metadata
+        description.</item>
+    <item>It's used to describe resources such as books, articles, reports, guidelines, and other
+        documents.</item>
+    <item>MODS is designed to complement the Metadata Authority Description Schema (MADS) and can
+        carry data from MARC 21 bibliographic records.</item>
+    <item>Version 3.8 (released in 2025) is the current version with enhanced support for modern
+        bibliographic needs.</item>
+    <item>Bibliographic metadata is crucial for resource discovery, identification, and management
+        in libraries and digital repositories.</item>
+    <item>Your task is to analyze the provided document and create a valid MODS 3.8 representation
+        of its bibliographic metadata.</item>
+    <item>Focus on extracting core required elements while including additional metadata when
+        available in the document.</item>
+    <item>The resulting MODS 3.8 XML should be well-formed and adhere to the MODS schema
+        specifications.</item>
+    <item>When analyzing documents, pay attention to title information, authorship, publication
+        details, subjects, and identifiers.</item>
+    <item>For standalone documents, focus on document-level metadata rather than article-in-journal
+        structures.</item>
+</context>

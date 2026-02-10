@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response_format>
+    <response>
+        <xml_declaration>&lt;?xml version="1.0" encoding="UTF-8"?&gt;</xml_declaration>
+        <namespace_declarations>
+            <namespace>xmlns="http://www.loc.gov/mods/v3"</namespace>
+            <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
+            <namespace>xsi:schemaLocation="http://www.loc.gov/mods/v3
+                http://www.loc.gov/standards/mods/v3/mods-3-8.xsd"</namespace>
+        </namespace_declarations>
+
+        <output_format>
+            <page_number_note>Include page_number element at the start of the MODS record as a note
+                element</page_number_note>
+            <sample>
+                &lt;mods xmlns="http://www.loc.gov/mods/v3"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://www.loc.gov/mods/v3
+                http://www.loc.gov/standards/mods/v3/mods-3-8.xsd" version="3.8"&gt;
+                &lt;note
+                type="source_page"&gt;{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}&lt;/note&gt;
+                &lt;titleInfo&gt;
+                &lt;title&gt;{DOCUMENT_TITLE}&lt;/title&gt;
+                &lt;subTitle&gt;{SUBTITLE}&lt;/subTitle&gt;
+                &lt;/titleInfo&gt;
+
+                &lt;name type="personal"&gt;
+                &lt;namePart&gt;{AUTHOR_NAME}&lt;/namePart&gt;
+                &lt;role&gt;
+                &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
+                &lt;/role&gt;
+                &lt;/name&gt;
+
+                &lt;name type="corporate"&gt;
+                &lt;namePart&gt;{ORGANIZATION_NAME}&lt;/namePart&gt;
+                &lt;role&gt;
+                &lt;roleTerm type="text"&gt;publisher&lt;/roleTerm&gt;
+                &lt;/role&gt;
+                &lt;/name&gt;
+
+                &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
+                &lt;genre&gt;{DOCUMENT_TYPE}&lt;/genre&gt;
+
+                &lt;originInfo&gt;
+                &lt;publisher&gt;{PUBLISHER}&lt;/publisher&gt;
+                &lt;dateIssued encoding="w3cdtf"&gt;{YYYY-MM-DD}&lt;/dateIssued&gt;
+                &lt;place&gt;
+                &lt;placeTerm type="text"&gt;{LOCATION}&lt;/placeTerm&gt;
+                &lt;/place&gt;
+                &lt;/originInfo&gt;
+
+                &lt;physicalDescription&gt;
+                &lt;internetMediaType&gt;application/pdf&lt;/internetMediaType&gt;
+                &lt;extent&gt;{PAGE_COUNT} pages&lt;/extent&gt;
+                &lt;/physicalDescription&gt;
+
+                &lt;abstract&gt;{DOCUMENT_SUMMARY}&lt;/abstract&gt;
+
+                &lt;subject&gt;
+                &lt;topic&gt;{TOPIC_1}&lt;/topic&gt;
+                &lt;/subject&gt;
+
+                &lt;subject&gt;
+                &lt;topic&gt;{TOPIC_2}&lt;/topic&gt;
+                &lt;/subject&gt;
+
+                &lt;identifier type="doi"&gt;{DOI}&lt;/identifier&gt;
+                &lt;identifier type="uri"&gt;{URL}&lt;/identifier&gt;
+
+                &lt;language&gt;
+                &lt;languageTerm type="code" authority="iso639-2b"&gt;eng&lt;/languageTerm&gt;
+                &lt;/language&gt;
+
+                &lt;note&gt;{ADDITIONAL_INFORMATION}&lt;/note&gt;
+
+                &lt;recordInfo&gt;
+                &lt;recordCreationDate encoding="w3cdtf"&gt;{YYYY-MM-DD}&lt;/recordCreationDate&gt;
+                &lt;recordContentSource&gt;{SOURCE}&lt;/recordContentSource&gt;
+                &lt;languageOfCataloging&gt;
+                &lt;languageTerm type="code" authority="iso639-2b"&gt;eng&lt;/languageTerm&gt;
+                &lt;/languageOfCataloging&gt;
+                &lt;/recordInfo&gt;
+                &lt;/mods&gt;
+            </sample>
+        </output_format>
+
+        <common_document_templates>
+            <report>
+                <template>
+                    &lt;mods version="3.8"&gt;
+                    &lt;titleInfo&gt;
+                    &lt;title&gt;{REPORT_TITLE}&lt;/title&gt;
+                    &lt;/titleInfo&gt;
+                    &lt;name type="corporate"&gt;
+                    &lt;namePart&gt;{AUTHORING_ORGANIZATION}&lt;/namePart&gt;
+                    &lt;role&gt;
+                    &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
+                    &lt;/role&gt;
+                    &lt;/name&gt;
+                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
+                    &lt;genre&gt;report&lt;/genre&gt;
+                    &lt;originInfo&gt;
+                    &lt;publisher&gt;{PUBLISHER}&lt;/publisher&gt;
+                    &lt;dateIssued&gt;{YEAR}&lt;/dateIssued&gt;
+                    &lt;/originInfo&gt;
+                    &lt;/mods&gt;
+                </template>
+            </report>
+
+            <guideline>
+                <template>
+                    &lt;mods version="3.8"&gt;
+                    &lt;titleInfo&gt;
+                    &lt;title&gt;{GUIDELINE_TITLE}&lt;/title&gt;
+                    &lt;/titleInfo&gt;
+                    &lt;name type="corporate"&gt;
+                    &lt;namePart&gt;{ISSUING_ORGANIZATION}&lt;/namePart&gt;
+                    &lt;role&gt;
+                    &lt;roleTerm type="text"&gt;creator&lt;/roleTerm&gt;
+                    &lt;/role&gt;
+                    &lt;/name&gt;
+                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
+                    &lt;genre&gt;guideline&lt;/genre&gt;
+                    &lt;abstract&gt;{GUIDELINE_SCOPE}&lt;/abstract&gt;
+                    &lt;note type="version"&gt;{VERSION_INFO}&lt;/note&gt;
+                    &lt;/mods&gt;
+                </template>
+            </guideline>
+
+            <article>
+                <template>
+                    &lt;mods version="3.8"&gt;
+                    &lt;titleInfo&gt;
+                    &lt;title&gt;{ARTICLE_TITLE}&lt;/title&gt;
+                    &lt;/titleInfo&gt;
+                    &lt;name type="personal"&gt;
+                    &lt;namePart&gt;{AUTHOR_NAME}&lt;/namePart&gt;
+                    &lt;role&gt;
+                    &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
+                    &lt;/role&gt;
+                    &lt;/name&gt;
+                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
+                    &lt;genre&gt;article&lt;/genre&gt;
+                    &lt;abstract&gt;{ABSTRACT}&lt;/abstract&gt;
+                    &lt;/mods&gt;
+                </template>
+            </article>
+        </common_document_templates>
+    </response>
+</response_format>

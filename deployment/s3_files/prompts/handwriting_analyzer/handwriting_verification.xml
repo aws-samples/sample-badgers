@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file defines the multi-step verification process for handwritten text recognition -->
+<handwriting_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for
+            analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- Phase 1: Text Region Identification -->
+    <phase_1_text_identification>
+        <step>Scan ONLY within the target image for potential handwritten text regions.</step>
+        <step>If no potential handwriting is found, immediately skip to the final_verification step.</step>
+        <step>Mark all potential handwritten text areas and keep it in your mind.</step>
+        <step>Distinguish handwritten from printed text, stamps, or mechanical marks.</step>
+        <step>Identify different handwriting styles or writers if multiple are present.</step>
+    </phase_1_text_identification>
+
+    <!-- Phase 2: Morphological Analysis -->
+    <phase_2_morphological_analysis>
+        <morphological_criteria>
+            <criterion>Stroke direction analysis: Identify pen movement patterns and directional
+                flow.</criterion>
+            <criterion>Pressure variation: Detect thick/thin line variations indicating pen angle
+                and speed.</criterion>
+            <criterion>Connection patterns: Analyze how characters connect within words and letter
+                formations.</criterion>
+            <criterion>Proportional relationships: Measure ascender/descender heights relative to
+                x-height.</criterion>
+            <criterion>Character formation: Identify individual letter construction patterns and
+                allographs.</criterion>
+        </morphological_criteria>
+
+        <analysis_steps>
+            <step>Examine stroke formation patterns for each potential character.</step>
+            <step>Identify consistent writing characteristics across the document.</step>
+            <step>Note variations that may indicate multiple writers or different writing
+                implements.</step>
+            <step>Document uncertain characters requiring further analysis.</step>
+        </analysis_steps>
+    </phase_2_morphological_analysis>
+
+    <!-- Phase 3: Comparative Methodology -->
+    <phase_3_comparative_analysis>
+        <comparison_criteria>
+            <criterion>Collect multiple instances of each character throughout the document.</criterion>
+            <criterion>Create pattern templates from repeated character formations.</criterion>
+            <criterion>Identify consistent allographic variations used by the writer.</criterion>
+            <criterion>Use statistical patterns to resolve ambiguous character instances.</criterion>
+            <criterion>Cross-reference character forms with known paleographic standards if
+                historical.</criterion>
+        </comparison_criteria>
+
+        <validation_steps>
+            <step>Build character exemplar database from clear instances in the document.</step>
+            <step>Compare uncertain characters against established patterns.</step>
+            <step>Identify outliers that may indicate errors or special cases.</step>
+            <step>Validate character identification consistency throughout the text.</step>
+        </validation_steps>
+    </phase_3_comparative_analysis>
+
+    <!-- Phase 4: Contextual Analysis -->
+    <phase_4_contextual_verification>
+        <contextual_criteria>
+            <criterion>Linguistic probability: Apply letter frequency data for the relevant
+                language/period.</criterion>
+            <criterion>Orthographic patterns: Consider historical spelling conventions and
+                abbreviations.</criterion>
+            <criterion>Semantic coherence: Verify that character choices create meaningful words.</criterion>
+            <criterion>Syntactic structure: Ensure transcription follows period-appropriate grammar.</criterion>
+            <criterion>Document context: Consider the type and purpose of the document being
+                analyzed.</criterion>
+        </contextual_criteria>
+
+        <contextual_steps>
+            <step>Apply linguistic knowledge to resolve remaining character ambiguities.</step>
+            <step>Verify word formations make sense within document context.</step>
+            <step>Check for consistent spelling patterns and abbreviation usage.</step>
+            <step>Validate sentence structure and meaning coherence.</step>
+        </contextual_steps>
+    </phase_4_contextual_verification>
+
+    <!-- Phase 5: Physical Evidence Examination -->
+    <phase_5_physical_evidence>
+        <physical_criteria>
+            <criterion>Ink flow patterns: Track how ink pools or spreads at letter junctions.</criterion>
+            <criterion>Paper interaction: Note how writing instrument interacts with paper texture.</criterion>
+            <criterion>Correction analysis: Identify overwriting, erasures, or amendments.</criterion>
+            <criterion>Bleed-through evidence: Use reverse-side impressions to clarify ambiguous
+                strokes.</criterion>
+            <criterion>Writing implement characteristics: Assess pen/pencil type and condition
+                effects.</criterion>
+        </physical_criteria>
+
+        <evidence_steps>
+            <step>Examine ink behavior and flow patterns for character clarification.</step>
+            <step>Analyze paper-ink interaction effects on character formation.</step>
+            <step>Identify and document any corrections or editorial marks.</step>
+            <step>Use physical evidence to support or refute character identifications.</step>
+        </evidence_steps>
+    </phase_5_physical_evidence>
+
+    <!-- Confidence Assessment -->
+    <confidence_assessment>
+        <confidence_levels>
+            <level>HIGH: Clear character formation with multiple supporting evidence types.</level>
+            <level>MEDIUM: Good character formation with minor ambiguity resolved by context.</level>
+            <level>LOW: Recognizable character pattern but requires contextual or comparative
+                support.</level>
+            <level>UNCERTAIN: Character present but multiple interpretations possible - mark with
+                [?].</level>
+            <level>ILLEGIBLE: Clear handwriting present but completely unreadable - mark with [...].</level>
+        </confidence_levels>
+
+        <scoring_steps>
+            <step>Assign confidence levels to each transcribed character or word.</step>
+            <step>Provide alternative readings for uncertain elements when possible.</step>
+            <step>Document reasoning for low-confidence transcriptions.</step>
+            <step>Mark illegible sections appropriately without forced interpretation.</step>
+        </scoring_steps>
+    </confidence_assessment>
+
+    <!-- Final verification to ensure accuracy -->
+    <final_verification>
+        <step>Review each transcribed element against all verification criteria.</step>
+        <step>Ensure no information has been included from example images.</step>
+        <step>Verify confidence scores accurately reflect transcription certainty.</step>
+        <step>Confirm transcription preserves original document structure and meaning.</step>
+        <step>Validate that only genuine handwriting has been transcribed (no printed text).</step>
+        <step>Check that uncertain elements are appropriately marked with confidence indicators.</step>
+    </final_verification>
+</handwriting_verification_process>

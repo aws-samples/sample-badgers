@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Layout Analyzer -->
+<gestalt_perception analyzer="layout">
+
+    <prescan>
+        <instruction>Before analyzing layout structure, perceive the page holistically:</instruction>
+        <step>View the entire page as a unified composition. What is the overall layout pattern?</step>
+        <step>Identify major spatial divisions: how is the page partitioned into zones?</step>
+        <step>Note the grid structure if present: columns, rows, gutters, margins.</step>
+        <step>Observe visual weight distribution: is the layout balanced, asymmetric, or weighted?</step>
+        <step>Identify the visual entry point and natural reading flow path.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="figure_ground">
+            <guidance> For layout analysis, figure/ground determines content zones vs. structural elements: - FIGURE: Content areas (text blocks, image regions, data zones) - GROUND: Margins, gutters, background colors, decorative borders The layout IS the relationship between figure and ground. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Proximity defines layout zones: - Tightly grouped elements form a single zone - Whitespace/gutters separate distinct zones - Margin size indicates zone boundaries Use proximity to identify: headers, sidebars, main content, footers, callout boxes. </guidance>
+        </primary>
+
+        <primary principle="alignment">
+            <guidance> Alignment reveals grid structure: - Vertical alignment indicates columns - Horizontal alignment indicates rows or baselines - Consistent margins reveal the underlying grid - Breaking alignment signals intentional emphasis or separate zones </guidance>
+        </primary>
+
+        <secondary principle="similarity">
+            <guidance> Visual similarity indicates zone function: - Similar background colors = same zone type - Consistent typography = same content category - Repeated structural patterns = modular layout </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <zone_detection>
+        <zone type="header">Top of page, often full-width, contains title/navigation/branding.</zone>
+        <zone type="main_content">Largest content area, primary reading zone.</zone>
+        <zone type="sidebar">Narrower column adjacent to main content, supplementary information.</zone>
+        <zone type="footer">Bottom of page, often full-width, contains metadata/references.</zone>
+        <zone type="margin">Edge areas, may contain annotations, page numbers, running headers.</zone>
+        <zone type="callout">Visually distinct box or region highlighting specific content.</zone>
+        <zone type="gutter">Whitespace between columns or zones, not content.</zone>
+    </zone_detection>
+
+    <grid_analysis>
+        <instruction>Identify the underlying grid structure:</instruction>
+        <element>Column count and relative widths</element>
+        <element>Row structure if present</element>
+        <element>Gutter widths between columns</element>
+        <element>Margin sizes (top, bottom, left, right)</element>
+        <element>Baseline grid for text alignment</element>
+        <element>Modular units if layout is component-based</element>
+    </grid_analysis>
+
+    <visual_flow>
+        <instruction>Determine the intended reading path:</instruction>
+        <pattern>Single column: top to bottom</pattern>
+        <pattern>Multi-column: column by column (left to right in LTR)</pattern>
+        <pattern>Z-pattern: header → right → diagonal down-left → footer</pattern>
+        <pattern>F-pattern: header → left column emphasis → scanning right</pattern>
+        <pattern>Modular: grid-based, may have multiple entry points</pattern>
+    </visual_flow>
+
+    <validation>
+        <instruction>After layout extraction, verify perceptual accuracy:</instruction>
+        <check>Do identified zones match visual proximity groupings?</check>
+        <check>Does the grid structure align with observed alignment patterns?</check>
+        <check>Is figure/ground correctly mapped to content vs. structural elements?</check>
+        <check>Does the reading flow match visual hierarchy and entry points?</check>
+        <check>Are zone boundaries consistent with whitespace and margin patterns?</check>
+    </validation>
+
+</gestalt_perception>

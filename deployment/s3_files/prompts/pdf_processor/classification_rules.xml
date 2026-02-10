@@ -1,0 +1,68 @@
+<!-- These are the rules you must follow when making classification decisions -->
+<classification_rules>
+
+    <!-- These are the tools you must always use regardless of what you find in your classification
+    analysis. -->
+    <mandatory_tools>
+        <tool name="analyze_full_text_tool" confidence="0.999999" priority="high">Always extract
+            full
+            text from every page</tool>
+        <tool name="analyze_metadata_mods_tool" confidence="0.999999" priority="high">Always extract
+            MODS metadata from every page</tool>
+    </mandatory_tools>
+
+    <!-- These are your core decision-making rules -->
+    <rule priority="critical">You MUST include analyze_metadata_mods_tool in your
+        tool_recommendations array for EVERY page, with forced confidence 0.999999.</rule>
+
+    <rule>Only recommend tools when confidence is above the configured threshold</rule>
+    <rule>Recommend multiple tools only when page contains distinct, separable content types</rule>
+    <rule>Analyze the dominant content type on each page before making tool recommendations</rule>
+    <rule>Consider secondary content that might benefit from additional analysis</rule>
+    <rule>Provide confidence scores based on content clarity and tool specialization match</rule>
+    <rule>Include detailed reasoning for tool selection decisions</rule>
+    <rule>Handle edge cases where no tools are perfectly suited</rule>
+    <rule>Use proper JSON formatting with no syntax errors in responses</rule>
+    <rule>Always use exact tool names from the available tools list</rule>
+    <rule>Provide specific, actionable reasoning for each recommendation</rule>
+
+
+    <!-- This is how you should assign confidence scores (also referenced in tasks and help
+    sections) -->
+    <confidence_scoring_guidelines>
+        <confidence_level range="0.8-1.0" name="High Confidence">Content clearly matches tool
+            specialization, no ambiguity. Use when confidence_indicators from <available_tools />
+            are clearly present.</confidence_level>
+        <confidence_level range="0.6-0.79" name="Medium Confidence">Content likely matches but has
+            some unclear elements. See <classification_help /> for guidance on mixed content
+            scenarios.</confidence_level>
+        <confidence_level range="0.4-0.59" name="Low Confidence">Content might match but significant
+            uncertainty exists. Consider edge_case_handling approaches below.</confidence_level>
+        <confidence_level range="0.0-0.39" name="Very Low Confidence">Content does not match tool
+            capabilities. Use fallback_strategy below or no_tools_format from <response_format />.</confidence_level>
+    </confidence_scoring_guidelines>
+
+    <!-- This is how you should handle difficult or unclear situations (referenced in tasks and help
+    sections) -->
+    <edge_case_handling>
+        <case name="No Clear Match">Recommend the most general-purpose available tool with low
+            confidence, or use no_tools_format from <response_format /> if confidence is too low</case>
+        <case name="Multiple Content Types">Recommend primary tool for dominant content, note
+            secondary content. Use multiple_tools_format from <response_format /> only if content
+            regions are clearly separable</case>
+        <case name="Poor Image Quality">Lower confidence scores and note quality issues in
+            reasoning. See <classification_help /> for additional guidance</case>
+        <case name="Empty or Minimal Content">Return no tool recommendations using no_tools_format
+            from <response_format /> with appropriate reasoning</case>
+    </edge_case_handling>
+
+    <!-- This is your backup plan when no tools are suitable (referenced in tasks section) -->
+    <fallback_strategy>
+        <step>Identify the closest matching tool from <available_tools /> based on partial
+            similarity</step>
+        <step>Set confidence below threshold using confidence_scoring_guidelines above</step>
+        <step>Provide detailed reasoning about content mismatch in your response</step>
+        <step>Use no_tools_format from <response_format /> and suggest what type of tool would be
+            needed for proper analysis</step>
+    </fallback_strategy>
+</classification_rules>

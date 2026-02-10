@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Educational Transcript Analyzer -->
+<gestalt_perception analyzer="edu_transcript">
+
+    <prescan>
+        <instruction>Before extracting transcript data, perceive the document structure:</instruction>
+        <step>Identify the institutional header/letterhead region.</step>
+        <step>Locate the student information section.</step>
+        <step>Find the main grade/course table structure.</step>
+        <step>Note any authentication features (seals, signatures, watermarks).</step>
+        <step>Identify summary sections (GPA, totals, degree information).</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="alignment">
+            <guidance> Transcript tables rely on alignment for structure: - Vertical alignment defines columns (course, grade, credits, etc.) - Horizontal alignment defines rows (individual courses) - Header row alignment indicates column meanings - Consistent alignment = well-structured data </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Visual consistency indicates data categories: - Same font/style for all course names - Consistent grade formatting - Uniform credit/unit display - Header styling distinct from data rows Use similarity to classify data types. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Spatial grouping indicates logical sections: - Student info clustered together - Courses grouped by term/semester - Summary data grouped at bottom - Authentication features in designated areas </guidance>
+        </primary>
+
+        <secondary principle="figure_ground">
+            <guidance> Separate transcript data from document features: - FIGURE: Student info, courses, grades, GPA (extract these) - GROUND: Letterhead design, background patterns, decorative borders Authentication features (seals, signatures) are figure but serve verification, not data. </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <document_region_detection>
+        <region name="header">Institution name, logo, address - typically top of document.</region>
+        <region name="student_info">Name, ID, program, dates - usually below header.</region>
+        <region name="course_table">Main data table with courses, grades, credits.</region>
+        <region name="term_sections">Groupings by semester/quarter/year.</region>
+        <region name="summary">GPA, total credits, degree status - often at bottom.</region>
+        <region name="authentication">Seals, signatures, registrar info, issue date.</region>
+        <region name="legend">Grade scale explanations, abbreviation keys.</region>
+    </document_region_detection>
+
+    <table_structure_cues>
+        <cue>Column headers: Course/Subject, Number, Title, Grade, Credits/Units, Points.</cue>
+        <cue>Row structure: One course per row, aligned with headers.</cue>
+        <cue>Term dividers: Lines, spacing, or labels separating academic periods.</cue>
+        <cue>Subtotals: Term GPA, term credits at end of each term section.</cue>
+        <cue>Cumulative totals: Overall GPA, total credits, typically at document end.</cue>
+    </table_structure_cues>
+
+    <authentication_feature_detection>
+        <feature type="seal">Embossed or printed institutional seal, often circular.</feature>
+        <feature type="signature">Handwritten or digital signature of registrar/official.</feature>
+        <feature type="watermark">Background security pattern or institutional mark.</feature>
+        <feature type="security_paper">Special paper patterns, microprinting.</feature>
+        <feature type="issue_date">Date of transcript generation.</feature>
+        <feature type="official_stamp">"Official Transcript" designation.</feature>
+    </authentication_feature_detection>
+
+    <validation>
+        <instruction>After extraction, verify transcript perception accuracy:</instruction>
+        <check>Is the table structure correctly identified using alignment?</check>
+        <check>Are data categories correctly classified using similarity?</check>
+        <check>Are document sections correctly identified using proximity?</check>
+        <check>Are authentication features noted for verification?</check>
+        <check>Does extracted data match the visual organization of the transcript?</check>
+    </validation>
+
+</gestalt_perception>

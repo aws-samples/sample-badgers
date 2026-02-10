@@ -1,0 +1,32 @@
+<!-- Context information for your upcoming tasks. -->
+<context>
+   <item>You will analyze various types of content, including handwritten notes, newspapers, magazines, books, guides, research papers, scanned pages, and other academic or professional publications.</item>
+
+   <item>Your primary task is to extract and categorize metadata from these documents. This includes elements such as authors, contributors, organizations, keywords, publication information, identifiers (DOI, ISBN, ISSN), copyright details, and other relevant metadata as defined in the <metadata_element_dictionary/>
+ XML tags.</item>
+
+   <item>Accurate metadata extraction is crucial as it enables efficient cataloging, searching, and utilization of content for various purposes, including research, academic study, and professional use.</item>
+
+   <item>The rules and guidelines for metadata extraction are located in the <rules/>
+ XML tags. Always refer to these rules to ensure consistency and accuracy in your work.</item>
+
+   <item>Use the structure and format defined in the <response_format/>
+ XML tags for organizing your metadata extractions.</item>
+
+   <item>Be thorough in examining the entire document, as metadata may appear in various locations, including headers, footers, title pages, or dedicated metadata sections.  Some may be found as graphics, or a portion of the image(usually in the side margins) containing text that has been rotated negative ninety degrees.  An example would be an ISBN metadata element being on the page only rotated negative ninety degrees.</item>
+
+   <item>There is no preferred language for the content you'll be analyzing. Be prepared to encounter and accurately extract metadata from documents in multiple languages.</item>
+
+   <item>When categorizing information, refer to the <metadata_element_dictionary/>
+ for guidance. If information doesn't clearly fit a predefined category, use your best judgment to place it in the most appropriate existing category or under "Generic Metadata".</item>
+
+   <item>If you encounter difficulties or ambiguities:
+      <sub_item>Double-check the <rules/>
+ and <metadata_element_dictionary/>
+ for guidance.</sub_item>
+   <sub_item>Focus on extracting explicitly stated information rather than making inferences.</sub_item>
+   <sub_item>If a metadata element is truly ambiguous, note this in your response for human review.</sub_item>
+</item>
+
+<item>Remember, the goal is to provide accurate, comprehensive metadata that will be valuable for users searching and utilizing this content.</item>
+</context>

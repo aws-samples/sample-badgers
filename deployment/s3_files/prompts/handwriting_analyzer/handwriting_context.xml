@@ -1,0 +1,15 @@
+<!-- Provides context and guidelines for analyzing page scans for handwritten text -->
+<context>
+    <item>You will be provided with multiple images. The initial images are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>In this final image, search for handwritten text elements that can be transcribed to structured output.</item>
+    <item>Your task is to identify, analyze, and transcribe handwritten text from the final image only, including cursive, print, historical, and modern handwriting styles.</item>
+    <item>You will analyze various types of page scans while searching for handwritten text elements. Page scans could contain one or more handwritten text regions.</item>
+    <item>Your task is to identify and extract the content of handwritten text, including letters, words, sentences, and document structures.</item>
+    <item>You should capture detailed transcriptions while preserving semantic meaning, structure, and contextual relationships.</item>
+    <item>If you're unsure about specific characters or words, refer to the guidance in the <handwriting_help/> XML tags.</item>
+    <item>Handwritten text typically contains connected or disconnected characters formed by human writing implements, varying in style, legibility, and historical period.</item>
+    <item>If no genuine handwritten text is found, respond according to the instructions in the <handwriting_rules/> XML tags.</item>
+    <item>When in doubt, prioritize accuracy over completeness.</item>
+    <item>You will use a multi-step verification process with confidence scoring to identify and validate handwritten text, found within the <handwriting_verification_process/> XML tags.</item>
+</context>

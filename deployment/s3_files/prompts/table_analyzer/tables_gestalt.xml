@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Table Analyzer -->
+<gestalt_perception analyzer="tables">
+
+    <prescan>
+        <instruction>Before extracting table data, perceive the tabular structure visually:</instruction>
+        <step>Scan for grid-like patterns: aligned vertical and horizontal elements.</step>
+        <step>Identify header regions through visual prominence (bold, background color, larger text).</step>
+        <step>Note column boundaries through vertical alignment of content.</step>
+        <step>Note row boundaries through horizontal alignment and consistent spacing.</step>
+        <step>Distinguish the table from surrounding content (figure/ground separation).</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="alignment">
+            <guidance> Alignment is the primary cue for table structure: - Vertical alignment defines columns - Horizontal alignment defines rows - Consistent left/right/center alignment within columns indicates data type - Breaking alignment may indicate merged cells or spanning content Use alignment patterns to detect column and row boundaries even without visible gridlines. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Proximity defines cell groupings: - Content within a cell clusters together - Whitespace or lines separate cells - Tighter spacing within cells, looser spacing between cells - Row spacing typically greater than line spacing within cells </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Visual similarity indicates table structure: - Header row: often bold, different background, larger text - Data rows: consistent styling throughout - Column types: numbers right-aligned, text left-aligned - Alternating row colors indicate row boundaries </guidance>
+        </primary>
+
+        <secondary principle="figure_ground">
+            <guidance> Separate table content from table structure: - FIGURE: Cell content (text, numbers, data) - GROUND: Gridlines, borders, background colors, cell boundaries Extract the figure; use the ground to understand structure. </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <grid_detection_cues>
+        <cue type="explicit_grid">Visible lines forming cell boundaries - easiest case.</cue>
+        <cue type="implicit_grid">No lines but consistent alignment creates virtual grid.</cue>
+        <cue type="partial_grid">Some lines present (header separator, outer border only).</cue>
+        <cue type="alternating_rows">Background color alternation defines row boundaries.</cue>
+        <cue type="whitespace_grid">Consistent gutters between columns, spacing between rows.</cue>
+    </grid_detection_cues>
+
+    <header_detection>
+        <cue>Bold or heavier font weight than data rows.</cue>
+        <cue>Different background color or shading.</cue>
+        <cue>Underline or bottom border separating from data.</cue>
+        <cue>Different text alignment than data (centered headers, left-aligned data).</cue>
+        <cue>Larger font size than data rows.</cue>
+        <cue>Position: typically first row, sometimes first column for row headers.</cue>
+    </header_detection>
+
+    <validation>
+        <instruction>After extraction, verify table perception accuracy:</instruction>
+        <check>Do extracted columns match vertical alignment patterns?</check>
+        <check>Do extracted rows match horizontal alignment and spacing?</check>
+        <check>Were headers correctly identified through visual prominence cues?</check>
+        <check>Are merged/spanning cells correctly detected where alignment breaks?</check>
+        <check>Is the table boundary correctly separated from surrounding content?</check>
+    </validation>
+
+</gestalt_perception>

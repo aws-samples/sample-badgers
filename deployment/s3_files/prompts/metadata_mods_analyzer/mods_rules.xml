@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mods_rules>
+    <rule>The root mods element is mandatory and must include version="3.8".</rule>
+    <rule>At least one top-level element is required (typically titleInfo).</rule>
+    <rule>Use the MODS namespace: http://www.loc.gov/mods/v3</rule>
+    <rule>Include titleInfo with at least a title element for every document.</rule>
+    <rule>Use name elements with appropriate type attributes (personal, corporate, conference,
+        family).</rule>
+    <rule>Include role information for names using roleTerm elements.</rule>
+    <rule>Specify typeOfResource to indicate the nature of the content (typically "text").</rule>
+    <rule>Use genre to classify the document type (report, guideline, article, etc.).</rule>
+    <rule>Include originInfo with publication details when available (publisher, date, place).</rule>
+    <rule>Add physicalDescription for format information (PDF, page count, etc.).</rule>
+    <rule>Include abstract when a summary or description is available in the document.</rule>
+    <rule>Use subject elements for topics and keywords found in or relevant to the document.</rule>
+    <rule>Add identifier elements for DOI, URL, or other persistent identifiers.</rule>
+    <rule>Specify language using languageTerm with ISO 639-2b codes.</rule>
+    <rule>Include recordInfo to document metadata about the MODS record itself.</rule>
+    <rule>Make educated inferences when complete information isn't available, but indicate
+        uncertainty in notes.</rule>
+    <rule>Extract information conservatively - only include what can be reasonably determined from
+        the document.</rule>
+    <rule>For standalone documents, do NOT use relatedItem type="host" or part elements with
+        volume/issue/pages.</rule>
+    <rule>Use empty elements or placeholder text like "Unknown" when required information is not
+        available.</rule>
+</mods_rules>
