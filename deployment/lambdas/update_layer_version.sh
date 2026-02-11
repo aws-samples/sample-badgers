@@ -36,7 +36,7 @@ echo ""
 # Update each function
 for FUNCTION in $FUNCTIONS; do
     # Skip container-based functions
-    if [[ $FUNCTION == "badgers_remediation_analyzer" ]]; then
+    if [[ $FUNCTION == "remediation_analyzer" ]]; then
         echo "Skipping ${FUNCTION} (container-based)..."
         continue
     fi

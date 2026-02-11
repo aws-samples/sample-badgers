@@ -98,7 +98,6 @@ Use cases: research acceleration, compliance automation, content management, acc
 | 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction               |
 | 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction           |
 | 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction           |
-| 🧩 `aggregate_analysis_results`       | Combine multiple analyzer outputs         |
 | 🔑 `keyword_topic_analyzer`           | Extract keywords and topics               |
 | 🔧 `remediation_analyzer`             | Analyze remediation requirements          |
 | 📄 `page_analyzer`                    | Single page content analysis              |

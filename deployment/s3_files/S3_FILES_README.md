@@ -79,7 +79,6 @@ JSON configuration files defining each analyzer tool's metadata, model selection
 | 💻 `code_block_analyzer.json`    | Source code extraction                      |
 | 📐 `layout_analyzer.json`        | Page layout structure analysis              |
 | 🧩 `elements_analyzer.json`      | Document element identification             |
-| ♿ `accessibility_analyzer.json` | PDF/UA accessibility tagging                |
 | 🏷️ `metadata_*_analyzer.json`    | MODS/MADS/Generic metadata extraction       |
 | 🗺️ `war_map_analyzer.json`       | Historical military map analysis            |
 | 🔬 `scientific_analyzer.json`    | Scientific notation and formulas            |

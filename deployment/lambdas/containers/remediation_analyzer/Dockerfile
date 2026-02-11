@@ -7,8 +7,9 @@ RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 # Copy foundation code
 COPY foundation/ ${LAMBDA_TASK_ROOT}/foundation/
 
-# Copy the PDF accessibility tagger and handler
+# Copy the PDF accessibility tagger, cell grid resolver, and handler
 COPY pdf_accessibility_tagger.py ${LAMBDA_TASK_ROOT}/
+COPY cell_grid_resolver.py ${LAMBDA_TASK_ROOT}/
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
 CMD ["lambda_handler.lambda_handler"]

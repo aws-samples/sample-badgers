@@ -406,7 +406,6 @@ class LambdaAnalyzerStack(Stack):
         key_functions = [
             "pdf_to_images_converter",
             "classify_pdf_content",
-            "aggregate_analysis_results",
         ]
         for func_name in key_functions:
             if func_name in self.functions:

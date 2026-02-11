@@ -1,40 +1,41 @@
 [
     {
         "name": "analyze_remediation_tool",
-        "description": "Specialized tool for PDF accessibility remediation that analyzes document page images to identify all structural elements and their precise bounding boxes for Section 508 compliance tagging. ONLY use for: PDF accessibility tagging, document structure analysis, identifying headings/paragraphs/lists/tables/figures for PDF/UA compliance.",
+        "description": "PDF accessibility remediation tool that processes entire PDF documents to identify structural elements, apply PDF/UA tags, and generate Section 508 compliant output. Supports correlation-guided tagging when a content spine is provided, with fallback to full vision model analysis.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "image_path": {
+                "pdf_path": {
                     "type": "string",
-                    "description": "S3 URL or absolute file path to the document page image"
-                },
-                "image_data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data (alternative to image_path)"
-                },
-                "aws_profile": {
-                    "type": "string",
-                    "description": "Optional AWS profile name"
+                    "description": "S3 URI to the PDF document to remediate"
                 },
                 "session_id": {
                     "type": "string",
-                    "description": "Runtime session ID"
+                    "description": "Runtime session ID for tracking"
                 },
-                "audit_mode": {
-                    "type": "boolean",
-                    "description": "Enable confidence scoring"
+                "title": {
+                    "type": "string",
+                    "description": "Document title for PDF metadata (default: 'Accessible Document')"
                 },
-                "grid_cols": {
+                "lang": {
+                    "type": "string",
+                    "description": "Document language code (default: 'en-US')"
+                },
+                "dpi": {
                     "type": "integer",
-                    "description": "Grid columns (default: 36)"
+                    "description": "Render DPI for page image analysis (default: 150)"
                 },
-                "grid_rows": {
-                    "type": "integer",
-                    "description": "Grid rows (default: 36)"
+                "correlation_uri": {
+                    "type": "string",
+                    "description": "S3 URI to correlation XML content spine for guided element resolution"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication"
                 }
             },
             "required": [
+                "pdf_path",
                 "session_id"
             ]
         },
@@ -42,11 +43,48 @@
             "type": "object",
             "properties": {
                 "result": {
-                    "type": "string",
-                    "description": "JSON array of detected structural elements with bounding boxes"
+                    "type": "object",
+                    "description": "Remediation result containing tagged PDF path, analysis, and accessibility report",
+                    "properties": {
+                        "output_pdf": {
+                            "type": "string",
+                            "description": "Local path to the tagged PDF output"
+                        },
+                        "pages_processed": {
+                            "type": "integer",
+                            "description": "Number of pages processed"
+                        },
+                        "analysis": {
+                            "type": "array",
+                            "description": "Per-page element detection results"
+                        },
+                        "correlation_used": {
+                            "type": "boolean",
+                            "description": "Whether correlation data was used for tagging"
+                        },
+                        "accessibility_report": {
+                            "type": "object",
+                            "description": "Pre and post remediation compliance audit"
+                        },
+                        "s3_output_uri": {
+                            "type": "string",
+                            "description": "S3 URI of the uploaded tagged PDF (when OUTPUT_BUCKET is configured)"
+                        },
+                        "s3_report_uri": {
+                            "type": "string",
+                            "description": "S3 URI of the uploaded accessibility report JSON"
+                        }
+                    }
                 },
                 "success": {
                     "type": "boolean"
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "compliance": {
+                    "type": "string",
+                    "description": "Post-remediation compliance level"
                 }
             }
         }

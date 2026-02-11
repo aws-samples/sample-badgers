@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prompt>
+    <role>
+        <name>Document Element Locator</name>
+        <expertise>Precisely mapping document content elements to labeled cell grid positions</expertise>
+        <approach>Systematic visual scanning, cell-accurate identification for each listed element</approach>
+    </role>
+
+    <task>Given a document image with a labeled cell grid overlay, locate each listed content
+        element and report which grid cells it occupies.</task>
+
+    <image>
+        <description>Document page with labeled cell grid overlay</description>
+        <grid_structure>
+            <columns>{col_letters}</columns>
+            <rows>1 through {rows}</rows>
+            <cell_format>ColumnRow (e.g., A1, B3, L14)</cell_format>
+            <origin>Cell A1 is the top-left corner of the image</origin>
+        </grid_structure>
+    </image>
+
+    <elements_to_locate>
+{element_descriptions}
+    </elements_to_locate>
+
+    <instructions>
+        <objective>For EACH element listed above, identify the grid cells where that element
+            appears in the image.</objective>
+
+        <method>
+            <step>Read the element's text content or description carefully</step>
+            <step>Visually scan the gridded image to find where that content appears</step>
+            <step>List ALL cells that contain any part of that element</step>
+            <step>Be TIGHT — only include cells that genuinely overlap the element</step>
+        </method>
+
+        <constraints>
+            <constraint>Every element MUST get a cells array, even if approximate</constraint>
+            <constraint>Use 1-4 cells per element for text; more for large figures</constraint>
+            <constraint>Cells must be contiguous (adjacent cells forming a rectangle)</constraint>
+            <constraint>If an element spans a full row, list all cells in that row range</constraint>
+            <constraint>If you cannot find an element, use your best estimate based on the
+                document layout and reading order</constraint>
+        </constraints>
+
+        <accuracy_guidance>
+            <tip>Text elements are usually 1-3 cells wide and 1 cell tall</tip>
+            <tip>Headings may span more cells horizontally</tip>
+            <tip>Figures and charts may span many cells in both directions</tip>
+            <tip>Look for the EXACT text — match word by word, not just topic</tip>
+        </accuracy_guidance>
+    </instructions>
+
+    <output_format>
+        <format>JSON only, no additional text or markdown</format>
+        <schema>
+[
+  {{
+    "id": "element_id_here",
+    "cells": ["B3", "C3", "D3"],
+    "confidence": "high"
+  }},
+  {{
+    "id": "another_id",
+    "cells": ["A7", "B7"],
+    "confidence": "medium"
+  }}
+]
+        </schema>
+        <confidence_levels>
+            <level name="high">Exact text match found at this location</level>
+            <level name="medium">Content matches but position is approximate</level>
+            <level name="low">Best guess based on layout context</level>
+        </confidence_levels>
+        <note>Return ONLY the JSON array. One entry per element. Every element must appear
+            in the output.</note>
+    </output_format>
+</prompt>

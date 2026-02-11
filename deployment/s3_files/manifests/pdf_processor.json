@@ -127,32 +127,6 @@
             }
         },
         {
-            "name": "aggregate_analysis_results_tool",
-            "description": "Aggregate results from executed analysis tasks. Combines results from all tasks into a structured summary organized by page. This is step 5 (final) in the PDF analysis workflow after task execution.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "execution_results": {
-                        "type": "string",
-                        "description": "JSON string containing execution results from execute_analysis_tasks_tool"
-                    },
-                    "pdf_name": {
-                        "type": "string",
-                        "description": "Name of PDF being processed"
-                    },
-                    "session_id": {
-                        "type": "string",
-                        "description": "Runtime session ID for organizing output in S3"
-                    }
-                },
-                "required": [
-                    "execution_results",
-                    "pdf_name",
-                    "session_id"
-                ]
-            }
-        },
-        {
             "name": "intelligent_pdf_analyzer",
             "description": "Intelligent PDF analysis system that automatically analyzes PDF documents using vision-capable LLMs to classify content and route pages to appropriate specialized analysis tools. This orchestrator tool provides end-to-end automated PDF analysis without manual tool selection.",
             "inputSchema": {
