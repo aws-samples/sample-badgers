@@ -1,0 +1,121 @@
+{
+    "tool": {
+        "name": "analyze_clinical_decision_tree_tool",
+        "description": "Specialized tool for analyzing clinical decision trees and medical workflow diagrams. ONLY use for: clinical decision trees, medical flowcharts, diagnostic algorithms, treatment pathways, clinical protocols, medical workflow diagrams, patient care pathways, and healthcare decision-making diagrams. NOT for: general diagrams, tables, handwriting, or non-medical content. If no clinical decision tree is found, returns that no clinical content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing potential clinical decision tree to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "decision_tree_analyzer",
+        "description": "Analyzes clinical decision trees and medical workflow diagrams",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "decision_tree_gestalt.xml",
+            "decision_tree_job_role.xml",
+            "decision_tree_context.xml",
+            "decision_tree_rules.xml",
+            "decision_tree_tasks.xml",
+            "decision_tree_format.xml",
+            "decision_tree_help.xml",
+            "decision_tree_conversation_example.xml",
+            "decision_tree_verification.xml",
+            "decision_tree_notes.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 3,
+        "analysis_text": "clinical decision tree",
+        "expected_output_tokens": 2500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.079419+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "decision_node_accuracy",
+                    "text": "Were decision nodes and branches correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "pathway_logic",
+                    "text": "Was the clinical pathway logic accurately captured?",
+                    "type": "likert"
+                },
+                {
+                    "id": "outcome_identification",
+                    "text": "Were outcomes and endpoints correctly identified?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

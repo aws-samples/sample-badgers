@@ -1,0 +1,308 @@
+/* ==========================================================================
+   BASE / GLOBAL STYLES
+   ========================================================================== */
+
+body, gradio-app {
+  background-color: #769DB3 !important;
+}
+
+gradio-app main {
+  background-color: #FFF;
+  border-radius: 1rem;
+  margin: 2rem auto !important;
+  max-width: 80% !important;
+  flex-grow: unset !important;
+}
+
+.gradio-container-6-3-0 {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+.warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-left: 4px solid #ffc107;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin: 10px 0 20px 0;
+}
+/* ==========================================================================
+   TYPOGRAPHY
+   ========================================================================== */
+
+h1, h2, h3, h4 {
+  overflow: hidden;
+}
+
+span.prose p {
+  font-family: "Arial";
+}
+
+div span.prose h3 {
+  line-height: auto !important;
+}
+
+/* ==========================================================================
+   HORIZONTAL RULES
+   ========================================================================== */
+
+hr {
+  height: 0.1rem !important;
+  background-color: black !important;
+  border: medium;
+}
+
+.gradio-container.gradio-container-6-3-0 .contain hr {
+  height: 0.1rem !important;
+  background-color: #E7E7E7 !important;
+  border: medium;
+  margin: 1rem 0 !important;
+}
+
+/* ==========================================================================
+   NAVIGATION
+   ========================================================================== */
+
+div.nav-holder {
+  margin-top: 2rem !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+div.nav-holder nav a {
+  background-color: #E7E7E7 !important;
+  color: #000 !important;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+div.nav-holder nav a.active {
+  background-color: #FFF !important;
+}
+
+gradio-app div.nav-holder {
+  border: none !important;
+}
+
+/* ==========================================================================
+   FORM ELEMENTS
+   ========================================================================== */
+
+/* Buttons */
+.gradio-container-6-3-0 button.primary {
+  background-color: #629EFF !important;
+  color: #FFFFFF !important;
+}
+
+.gradio-container.gradio-container-6-3-0 .contain button.secondary {
+  background: #5e6a7d !important;
+  color: #FFFFFF !important;
+}
+
+/* Inputs */
+input[type="checkbox"], input[type="radio"]  {
+  background-color: #2d2d2d !important;
+}
+
+fieldset label {
+  margin: 0 1rem 1rem;
+}
+
+textarea {
+  border: 1px solid #E7E7E7 !important;
+}
+
+/* Labels */
+div.form label div span p,
+div.form .container div span p {
+  color: rgb(45, 45, 45) !important;
+}
+
+/* Block Info */
+[data-testid="block-info"] {
+  background: none;
+  color: black;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+  margin-bottom: 1rem;
+  text-align: left !important;
+  padding: 0;
+}
+
+/* Listbox / Dropdowns */
+[role="listbox"] ul {
+  border: 1px solid #000;
+}
+
+[role="listbox"] li {
+  background-color: #efefef !important;
+}
+
+/* ==========================================================================
+   COMPONENTS
+   ========================================================================== */
+
+/* Chatbot */
+div[aria-label="chatbot conversation"] {
+  border: 1px solid #E7E7E7 !important;
+}
+
+/* Tools List */
+div .tools-list {
+  background-color: rgb(255, 255, 255);
+  padding: 1rem;
+  border: .1rem solid #efefef;
+  border-radius: 4px;
+}
+
+.gradio-container.gradio-container-6-0-1 .contain .tools-list {
+  background-color: rgb(255, 255, 255);
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+/* Expanders */
+.s3_badgers_expander {
+  width: 30%;
+  margin-left: 0;
+  border: 1px solid #E7E7E7 !important;
+}
+
+.badgers_expander {
+  border: 1px solid #E7E7E7 !important;
+  margin: 0 1rem !important;
+  width: 95% !important;
+}
+
+/* ==========================================================================
+   PAGE-SPECIFIC: HOME
+   ========================================================================== */
+
+div.home-page {
+  width: 80%;
+  margin: 0 auto;
+  padding: 10%;
+}
+
+img.logo {
+  width: 30%;
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   PAGE-SPECIFIC: OVERVIEW
+   ========================================================================== */
+
+div.overview hr {
+  background-color: #e7e7e7 !important;
+  width: 80%;
+  align-content: center;
+  margin: 2rem auto;
+}
+
+div.overview p {
+  margin: 1rem 0 1rem 0 !important;
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.row-padding {
+  padding: 1rem;
+}
+
+.row-gray,
+.row-gray .block {
+  background-color: #f5f5f5 !important;
+}
+
+.row-cost-calculation,
+.row-cost-calculation .block {
+  background-color: #f5f5f5;
+}
+
+div.align-middle-middle {
+  align-self: center !important;
+}
+
+.gr-group {
+  padding: 1rem !important;
+  border: 1px solid #E7E7E7 !important;
+  border-radius: 8px !important;
+  background-color: #fafafa !important;
+}
+
+/* Content sections - subtle grouping */
+.section-card {
+  background-color: #fff !important;
+  border: 1px solid #E7E7E7 !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+}
+
+/* Content panels - light gray background for visual anchoring */
+.content-panel {
+  background-color: #f8f9fa !important;
+  border: 1px solid #E7E7E7 !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+  margin: 0.5rem !important;
+}
+
+
+/* ==========================================================================
+   CHAT BUTTONS ROW - Right aligned
+   ========================================================================== */
+
+.chat-buttons-row {
+  justify-content: flex-end !important;
+}
+
+div.chat-window {
+  height: 350px !important;
+}
+
+footer {visibility: hidden}
+
+
+/* ==== */
+:root {
+  --badgers-base-size: .7rem;
+}
+
+h1 {
+  font-size: calc(var(--badgers-base-size) * 2) !important;
+}
+h2 {
+  font-size: calc(var(--badgers-base-size) * 1.5) !important;
+}
+h3 {
+  font-size: calc(var(--badgers-base-size) * 1.2) !important;
+}
+
+[data-testid="block-info"] {
+  font-size: calc(var(--badgers-base-size) * 1) !important;
+}
+
+input[type=text],
+input[type=number],
+input[type=select],
+[role="listbox"] {
+  font-size: calc(var(--badgers-base-size) * 1) !important;
+}
+div.overview {
+  font-size: var(--badgers-base-size)!important;
+}
+
+.chat-window * {
+font-size: calc(var(--badgers-base-size) * 1.1) !important;
+}
+
+body, p.prose{
+  font-size: var(--badgers-base-size)!important;
+}
+
+small {
+  font-size: calc(var(--badgers-base-size) * 0.8)!important;
+}
+

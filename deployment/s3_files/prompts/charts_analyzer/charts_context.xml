@@ -1,0 +1,19 @@
+<!-- This file provides context and guidelines for analyzing page scans for charts and graphs -->
+<context>
+    <!-- General instructions for the charts and graphs detection task -->
+    <item>You will analyze various types of page scans while you search for chart and graph elements that represent data visually. Page scans could have one or more than one chart or graph within them.</item>
+    <item>You will be provided with multiple images. The initial images are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>Your task is to identify and extract the content of charts and graphs, including bar charts, line graphs, pie charts, scatter plots, and other visual representations of data.</item>
+    <item>You should capture the key elements of each chart or graph, including axes, labels, data points, legends, and overall structure.</item>
+    <!-- Guidance for uncertain cases -->
+    <item>If you're unsure about a chart or graph's structure or content, refer to the guidance in the <charts_graphs_help/> XML tags.</item>
+    <!-- Definition of what constitutes a chart or graph -->
+    <item>A chart or graph typically contains visual elements organized to represent numerical or statistical data. Not all images or visual elements are charts or graphs.</item>
+    <!-- Instructions for cases where no charts or graphs are found -->
+    <item>If no genuine charts or graphs are found, respond according to the instructions in the <charts_graphs_rules/> XML tags.</item>
+    <!-- Emphasis on honesty and accuracy -->
+    <item>When in doubt, prioritize honesty and accuracy over completeness.</item>
+    <!-- Reference to the two-step verification process -->
+    <item>You will use a two-step verification process, which has strict criteria, to identify and validate charts and graphs which is found within the <charts_graphs_verification_process/> XML tags.</item>
+</context>

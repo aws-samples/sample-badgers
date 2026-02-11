@@ -1,0 +1,17 @@
+<!-- Rules for content description -->
+<classification_rules>
+    <rule>Describe what you actually see - be specific and concrete.</rule>
+    <rule>Write in complete sentences, not bullet points or fragments.</rule>
+    <rule>Include location information (where on the page content appears).</rule>
+    <rule>Note relationships between different content areas if relevant.</rule>
+    <rule>Be thorough but concise - capture all significant content without padding.</rule>
+    <rule>If content is unclear due to image quality, say so honestly.</rule>
+    <rule>Use proper JSON formatting with no syntax errors.</rule>
+</classification_rules>
+
+<!-- Rules for enhancement recommendation -->
+<enhancement_rules>
+    <rule>Set enhancement_recommended=true for: - Handwritten content (notes, annotations, manuscripts) - Annotations over printed text (margin notes, corrections) - Ancient scripts (hieroglyphics) - Visible degradation (yellowing, fading, foxing, noise) - Historical documents with aged paper - Low contrast text that is difficult to read - Faded ink or pencil marks </rule>
+    <rule>Set enhancement_recommended=false for: - Clean printed/digital content - Modern tables and charts with clear lines - Clear diagrams with good contrast - High-quality scans of modern documents - Text that is already easily readable </rule>
+    <rule>Use these enhancement_reason values: - "historical_manuscript" - aged handwritten documents - "faded_handwriting" - handwriting with poor contrast - "handwritten_annotations" - notes written over other content - "degraded_scan" - poor quality scan with noise/blur - "ancient_script" - hieroglyphics, etc. - "low_contrast" - text difficult to distinguish from background </rule>
+</enhancement_rules>

@@ -1,0 +1,69 @@
+<!-- Defines and describes various types of visual elements found in publications, including images,
+photos, diagrams, workflows, architectures, and figures. -->
+<visual_dictionary>
+    <element type="image_photo">
+        <description>A visual representation captured by a camera or created digitally, often used
+            to illustrate real-world objects, scenes, or concepts.</description>
+        <sub_types>
+            <sub_type>Photograph</sub_type>
+            <sub_type>Digital illustration</sub_type>
+            <sub_type>Screenshot</sub_type>
+            <sub_type>Infographic</sub_type>
+        </sub_types>
+    </element>
+    <element type="diagram">
+        <description>A simplified drawing showing the appearance, structure, or workings of
+            something.</description>
+        <sub_types>
+            <sub_type>Flow diagram</sub_type>
+            <sub_type>Tree diagram</sub_type>
+            <sub_type>Venn diagram</sub_type>
+            <sub_type>Network diagram</sub_type>
+        </sub_types>
+    </element>
+    <element type="workflow">
+        <description>A visual representation of a sequence of operations or processes.</description>
+        <sub_types>
+            <sub_type>Linear workflow</sub_type>
+            <sub_type>Cyclical workflow</sub_type>
+            <sub_type>Swimlane diagram</sub_type>
+        </sub_types>
+    </element>
+    <element type="architecture">
+        <description>A visual representation of the structure or organization of a system or
+            concept.</description>
+        <sub_types>
+            <sub_type>Software architecture diagram</sub_type>
+            <sub_type>Network architecture</sub_type>
+            <sub_type>System architecture</sub_type>
+        </sub_types>
+    </element>
+    <element type="figure">
+        <description>A general term for any type of illustration, chart, or graph used to present
+            information visually.</description>
+        <sub_types>
+            <sub_type>Line graph</sub_type>
+            <sub_type>Bar chart</sub_type>
+            <sub_type>Pie chart</sub_type>
+            <sub_type>Scatter plot</sub_type>
+        </sub_types>
+    </element>
+    <element type="map">
+        <description>A visual representation of an area, showing physical features, cities, roads,
+            or other elements.</description>
+        <sub_types>
+            <sub_type>Geographical map</sub_type>
+            <sub_type>Thematic map</sub_type>
+            <sub_type>Topographic map</sub_type>
+        </sub_types>
+    </element>
+    <element type="technical_drawing">
+        <description>A detailed, precise diagram used in engineering, manufacturing, or
+            construction.</description>
+        <sub_types>
+            <sub_type>Blueprint</sub_type>
+            <sub_type>Schematic</sub_type>
+            <sub_type>Orthographic projection</sub_type>
+        </sub_types>
+    </element>
+</visual_dictionary>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<user_prompt>
+    <request>Create XML prompts for a new analyzer with the following details:</request>
+
+    <analyzer_details>
+        <analyzer_name>{analyzer_name}</analyzer_name>
+        <display_name>{display_name}</display_name>
+        <description>{description}</description>
+    </analyzer_details>
+</user_prompt>

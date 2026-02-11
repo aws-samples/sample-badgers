@@ -1,0 +1,83 @@
+[
+    {
+        "name": "enhance_image_tool",
+        "description": "Pre-processes historical or degraded document images to improve quality before analysis. Use BEFORE calling enhancement-eligible analyzers (handwriting, editorial, full_text) when the image shows: faded text, yellowing, noise, low contrast, skew, or other degradation. Returns S3 URI of enhanced image to pass to subsequent analyzers. NOT needed for clean printed documents, tables, charts, or diagrams.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both."
+                },
+                "document_type": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "manuscript",
+                        "annotated",
+                        "sheet_music",
+                        "diagram",
+                        "printed",
+                        "mixed"
+                    ],
+                    "description": "Type of document for optimized enhancement. Default: auto (auto-detect)."
+                },
+                "enhancement_level": {
+                    "type": "string",
+                    "enum": [
+                        "minimal",
+                        "moderate",
+                        "aggressive"
+                    ],
+                    "description": "Enhancement intensity. Default: moderate."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID for organizing outputs in S3."
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "object",
+                    "description": "Enhancement result with S3 URI of enhanced image and processing metadata",
+                    "properties": {
+                        "s3_output_uri": {
+                            "type": "string",
+                            "description": "S3 URI of the enhanced image - pass this to subsequent analyzers"
+                        },
+                        "operations_applied": {
+                            "type": "array",
+                            "description": "List of enhancement operations applied"
+                        },
+                        "original_shape": {
+                            "type": "array",
+                            "description": "Original image dimensions [height, width]"
+                        },
+                        "final_shape": {
+                            "type": "array",
+                            "description": "Enhanced image dimensions [height, width]"
+                        },
+                        "skew_angle": {
+                            "type": "number",
+                            "description": "Detected and corrected skew angle in degrees"
+                        }
+                    }
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the enhancement completed successfully"
+                }
+            }
+        }
+    }
+]

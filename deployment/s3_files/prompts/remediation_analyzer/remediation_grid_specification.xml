@@ -1,0 +1,17 @@
+<!-- ===================================================================
+SECTION 2: GRID SPECIFICATION
+================================================================== -->
+<grid_specification>
+    <configuration>
+        <total_columns>{cols}</total_columns>
+        <total_rows>{rows}</total_rows>
+        <column_labels>{col_letters}</column_labels>
+        <row_labels>1 through {rows}</row_labels>
+    </configuration>
+
+    <cell_format> Column letter + Row number (e.g., A1, B2, C3) - Columns run LEFT to RIGHT: A is leftmost, {last_col} is rightmost - Rows run TOP to BOTTOM: Row 1 is topmost, Row {rows} is bottommost </cell_format>
+
+    <spatial_math> Each cell represents exactly 1/{cols} of image width and 1/{rows} of image height. - Cell width = {cell_width_pct}% of image width - Cell height = {cell_height_pct}% of image height Use this to validate your coordinates: - An element spanning 10 columns covers ~{ten_col_pct}% of page width - An element spanning 10 rows covers ~{ten_row_pct}% of page height - Content in the top quarter of the page should end by approximately row {quarter_row} - Content in the top third of the page should end by approximately row {third_row} - Content in the top half of the page should end by approximately row {half_row} </spatial_math>
+
+    <grid_visual_aids> The grid overlay includes: - Grid lines at each cell boundary - Major lines (darker) every 5 cells for easier counting - Edge labels showing cell coordinates - Symbols at regular intervals as visual landmarks Use these visual aids to precisely locate element boundaries. </grid_visual_aids>
+</grid_specification>

@@ -1,0 +1,21 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- SKIP THE PREAMBLE - NO introductory text like "Here is my analysis..." -->
+
+<response_format>
+    <response extraction_type="metadata">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_METADATA_ELEMENTS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per metadata element found -->
+        <elements>
+            <element type="{ELEMENT_TYPE}">
+                <extracted_text>{EXTRACTED_TEXT}</extracted_text>
+                <writing_direction>{LTR_OR_RTL}</writing_direction>
+                <language>{ELEMENT_LANGUAGE}</language>
+            </element>
+        </elements>
+    </response>
+</response_format>

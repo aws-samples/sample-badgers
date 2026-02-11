@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tasks>
+    <task priority="1">
+        <name>Identify Structural Elements</name>
+        <description>
+            Locate and classify all structural elements in the document image.
+        </description>
+        <elements_to_identify>
+            <element>Headings (with hierarchy levels 1, 2, 3, etc.)</element>
+            <element>Paragraphs</element>
+            <element>Lists (bullet or numbered)</element>
+            <element>Tables</element>
+            <element>Images (with descriptive alt text)</element>
+            <element>Footnotes</element>
+            <element>Links (with URLs if visible)</element>
+            <element>Keywords/metadata sections</element>
+            <element>Captions</element>
+            <element>Headers and footers</element>
+        </elements_to_identify>
+    </task>
+
+    <task priority="2">
+        <name>Extract Content</name>
+        <description>
+            Extract the text content or description for each identified element.
+        </description>
+    </task>
+
+    <task priority="3">
+        <name>Determine Bounding Boxes</name>
+        <description>
+            Calculate precise pixel coordinates for each element's bounding box.
+            Use the standard image coordinate system (origin at top-left).
+        </description>
+        <bbox_format>
+            <field name="x1">Left edge x-coordinate</field>
+            <field name="y1">Top edge y-coordinate</field>
+            <field name="x2">Right edge x-coordinate</field>
+            <field name="y2">Bottom edge y-coordinate</field>
+        </bbox_format>
+    </task>
+
+    <task priority="4">
+        <name>Assign Reading Order</name>
+        <description>
+            Assign sequential order numbers based on logical reading flow.
+        </description>
+        <reading_order_rules>
+            <rule>Top to bottom</rule>
+            <rule>Left column before right column (if multi-column)</rule>
+            <rule>Main content before sidebars/footnotes</rule>
+            <rule>Headers before body content</rule>
+            <rule>Body content before footers</rule>
+        </reading_order_rules>
+    </task>
+</tasks>

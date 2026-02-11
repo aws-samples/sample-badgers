@@ -1,0 +1,14 @@
+<!-- Provides context and guidelines for analyzing page scans for code blocks -->
+<context>
+    <item>You will be provided with multiple images. The initial images are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>In this final image, search for code block elements that represent programming code, configuration files, or structured technical content.</item>
+    <item>Your task is to identify and extract code blocks from the final image only, including their language, structure, and content.</item>
+    <item>You will analyze various types of page scans while searching for code block elements. Page scans could have one or more code blocks within them.</item>
+    <item>You should capture the complete code content while preserving original formatting, indentation, and structure.</item>
+    <item>If you're unsure about a code block's language or structure, refer to the guidance in the <code_block_help /> XML tags.</item>
+    <item>A code block typically contains programming syntax, configuration data, or command-line instructions with distinctive formatting such as monospace fonts, syntax highlighting, or bordered containers.</item>
+    <item>If no genuine code blocks are found, respond according to the instructions in the <code_block_rules /> XML tags.</item>
+    <item>When in doubt, prioritize accuracy over completeness.</item>
+    <item>You will use a two-step verification process to identify and validate code blocks which is found within the <code_block_verification_process /> XML tags.</item>
+</context>

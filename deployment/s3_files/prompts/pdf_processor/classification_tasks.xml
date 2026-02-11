@@ -1,0 +1,59 @@
+<!-- These are the step-by-step tasks you must complete for each PDF page -->
+<tasks>
+    <!-- Start with this preparation step -->
+    <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
+
+    <!-- Begin your analysis here -->
+    <task>Examine the given PDF page image, identifying all content elements and their characteristics.</task>
+
+    <!-- CRITICAL: These two tools are MANDATORY for EVERY page -->
+    <task priority="CRITICAL">MANDATORY BASELINE TOOLS: You MUST include BOTH of these tools in your tool_recommendations array for EVERY page: <mandatory_tool>analyze_full_text_tool with confidence 0.999999 and priority 1</mandatory_tool>
+        <mandatory_tool>analyze_metadata_mods_tool with confidence 0.999999 and priority 2</mandatory_tool> These are non-negotiable baseline extraction tools required regardless of content type. </task>
+
+    <task>Determine the dominant content type on the page from the categories defined in the <available_tools /> XML tags. For quick reference, see <quick_reference /> tool summary: <sub_task>Conceptual Diagrams (flowcharts, process diagrams, system architecture)</sub_task>
+        <sub_task>Tabular Data (data tables, spreadsheets, comparison charts)</sub_task>
+        <sub_task>Handwritten Content (handwritten notes, annotations, cursive writing)</sub_task>
+        <sub_task>Mixed or Unclear Content (multiple content types or unclear categorization)</sub_task>
+    </task>
+
+    <task>For each identified content type: <sub_task>Assess how well it matches the tool capabilities defined in the <tool_usage_rules /> XML tags.</sub_task>
+        <sub_task>Determine confidence level based on content clarity and tool specialization match using guidelines from <classification_rules /> confidence_scoring_guidelines.</sub_task>
+        <sub_task>Note specific content elements that justify tool selection (refer to confidence_indicators in <available_tools /> for each tool).</sub_task>
+    </task>
+
+    <task>Evaluate image quality and its impact on analysis confidence.</task>
+
+    <!-- This is your core decision-making process -->
+    <task description="Make tool selection decisions using this decision process:">
+        <sub_task>Mandatory tools</sub_task>
+        <sub_task>SINGLE TOOL SELECTION: If page has one dominant content type that clearly matches a tool's specialization, recommend that single tool with appropriate confidence score.</sub_task>
+        <sub_task>MULTIPLE TOOL SELECTION: Only recommend multiple tools when page contains distinct, separable content regions that would each benefit from different specialized analysis (e.g., upper section has diagram, lower section has table).</sub_task>
+        <sub_task>NO TOOL SELECTION: If no available tools match the content or confidence is too low, return no recommendations with detailed reasoning.</sub_task>
+    </task>
+
+    <task>For multiple tool scenarios, ensure each recommended tool addresses a distinct content area: <sub_task>Identify separate content regions on the page (top/bottom, left/right, distinct sections).</sub_task>
+        <sub_task>Match each region to the most appropriate specialized tool.</sub_task>
+        <sub_task>Avoid recommending multiple tools for the same content area.</sub_task>
+        <sub_task>Prioritize tools by the size and importance of their target content regions.</sub_task>
+    </task>
+
+    <task>Apply confidence thresholds and classification rules as defined in the <classification_rules /> XML tags. Use the confidence_scoring_guidelines section for specific score ranges.</task>
+
+    <task>Handle edge cases systematically using guidance from <classification_help /> and <classification_rules /> edge_case_handling: <sub_task>Poor image quality: Lower confidence scores and note quality limitations.</sub_task>
+        <sub_task>Unclear content type: Choose closest matching tool with low confidence and explain uncertainty.</sub_task>
+        <sub_task>Mixed content without clear separation: Focus on dominant content type, note secondary elements.</sub_task>
+        <sub_task>No suitable tools: Follow the fallback_strategy in <classification_rules /> to explain why available tools don't match.</sub_task>
+    </task>
+
+    <!-- Format your response using the required structure -->
+    <task>Organize your analysis according to the JSON structure provided in the <response_format /> XML tags. Use the conditional_formats section to choose between no_tools_format, single_tool_format, or multiple_tools_format based on your analysis.</task>
+
+    <!-- Perform this quality check before responding -->
+    <task>Review your classification to ensure accuracy, proper confidence scoring, and detailed reasoning for each recommendation.</task>
+
+    <!-- CRITICAL VERIFICATION: Check mandatory tools -->
+    <task priority="CRITICAL">VERIFY MANDATORY TOOLS: Before finalizing your response, confirm that your tool_recommendations array includes: 1. analyze_full_text_tool (confidence 0.999999, priority 1) 2. analyze_metadata_mods_tool (confidence 0.999999, priority 2) If either is missing, ADD IT NOW. These tools are required for every page without exception. </task>
+
+    <!-- Complete with this final verification -->
+    <task>Take a final deep breath and ensure your classification follows all provided guidelines and accurately represents the optimal tool routing for the page content.</task>
+</tasks>

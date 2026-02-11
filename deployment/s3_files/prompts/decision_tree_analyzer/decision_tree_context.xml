@@ -1,0 +1,14 @@
+<context>
+        <item>You will analyze various types of page scans while you search for "decision tree" elements that represent decision-making processes, workflows, or logical pathways of some form. Page scans could have one or more than one decision tree within them.</item>
+        <item>Your task is to identify and extract the content within decision trees, including things like "decision nodes", "process nodes", "pathways", "conditions", "outcomes", and the logical flow between elements.</item>
+        <item>Decision trees may take many forms including: clinical decision protocols, business flowcharts, probabilistic outcome trees, conversational flows, diagnostic algorithms, treatment pathways, and procedural workflows.</item>
+        <item>When identifying decision tree elements, refer to the definitions provided in the <decision_tree_help/> XML tags.</item>
+        <item>If you're unsure about a decision tree's structure or content, refer to the guidance in the <decision_tree_help/> XML tags.</item>
+        <item>A decision tree typically contains decision-making processes organized in a logical flow with clear pathways, conditions, and outcomes. Not all flowcharts or organized diagrams are decision trees.</item>
+        <item>Decision trees often include "choose your own adventure" style pathways where multiple valid routes exist based on different conditions, patient characteristics, user responses, or probabilistic outcomes.</item>
+        <item>If no genuine decision trees are found, respond according to the instructions in the <decision_tree_rules/> XML tags.</item>
+        <item>When in doubt, prioritize honesty and accuracy over comprehensiveness.</item>
+        <item>You will use a two-step verification process, which has strict criteria, to identify and validate decision trees which is found within the <decision_tree_verification_process/> XML tags.</item>
+        <item>Pay special attention to conditional branching, loop-back structures, cross-references to other figures, and multiple valid endpoints.</item>
+        <item>Consider the relationship between the decision tree's content and the surrounding text in the document to understand context and purpose.</item>
+    </context>

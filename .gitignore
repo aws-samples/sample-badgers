@@ -1,0 +1,82 @@
+# Custom
+.DS_store
+deployment/cdk.out/
+layer/
+*.zip
+
+# CDK
+cdk.out/
+cdk.context.json
+
+# CDK asset staging
+.cdk.staging/
+
+# CDK Toolkit outputs
+*.js.map
+.d.ts
+
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+.kiro/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+
+# Linting
+pytest.ini
+.pytest_cache
+.mypy_cache
+mypy.ini
+py.typed
+.pylintrc
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.venv/
+.vscode/
+venv/
+env/
+ENV/
+__pycache__
+
+# Custom analyzers - keep directory structure only
+deployment/custom_analyzers/*
+!deployment/custom_analyzers/.gitkeep
+
+# Hidden dot-directories (repo-wide)
+.**/
+!.github/

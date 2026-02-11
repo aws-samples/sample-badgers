@@ -1,0 +1,26 @@
+<!-- Elements that hold metadata about the content. -->
+<metadata_element_dictionary>
+    <element type="Authors_Contributors_and_Organizations" description="A list of persons who wrote or contributed to the content, potentially including their respective companies, organizations, or institutions. May include roles such as editor, translator, or illustrator."></element>
+
+    <element type="Keywords" description="A list of important terms or phrases that represent the main topics or themes of a document, often used for indexing and searching. Usually limited to 5-10 key terms."></element>
+
+    <element type="Publication_Info" description="Details about the publication, including journal name, volume, issue number, page range, and publication date."></element>
+
+    <element type="DOI" description="Digital Object Identifier, a unique alphanumeric string assigned to a digital object, providing a persistent link to its location on the Internet."></element>
+
+    <element type="ISBN" description="International Standard Book Number, a unique numeric commercial book identifier, typically used for books and longer publications."></element>
+
+    <element type="ISSN" description="International Standard Serial Number, a unique eight-digit number used to identify periodical publications like journals and magazines."></element>
+
+    <element type="Copyright" description="Information about the copyright status of the work, usually including the copyright symbol (©), year of first publication, and copyright holder's name."></element>
+
+    <element type="License" description="Information about how the content can be used, shared, or distributed, such as Creative Commons licenses or publisher-specific terms."></element>
+
+    <element type="Subject_Classification" description="Standardized subject categories or classification codes, such as Library of Congress Classification or Dewey Decimal Classification."></element>
+
+    <element type="Language" description="The primary language(s) in which the content is written."></element>
+
+    <element type="Version" description="Information about the version or revision of the document, particularly relevant for preprints or living documents."></element>
+
+    <element type="Peer_Review_Status" description="Information about whether and how the content has been peer-reviewed."></element>
+</metadata_element_dictionary>

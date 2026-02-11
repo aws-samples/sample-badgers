@@ -1,0 +1,45 @@
+<!-- Help in the form of information or guidance, to help you do great work. -->
+<help>
+    <guidance>To understand page layout concepts, refer to the information in the <layout_concepts/> XML tags section within the <layout_dictionary/> XML tags.</guidance>
+    <guidance>Pages may have multiple columns, a single column, or no columns at all.</guidance>
+    <guidance>When analyzing layouts, consider factors such as typeface choices, hierarchy, spacing, alignment, grid structure, and overall visual organization.</guidance>
+    <guidance>The header_zone and footer_zone may contain multiple elements. Analyze the information to determine what elements compose these zones. The header areas may take up more space than they would traditionally would, especially in documents of the magazine or newspaper type.</guidance>
+    
+    <!-- Reading Order Guidance -->
+    <guidance>When determining reading order, start with the main body text and follow the natural flow of the document.</guidance>
+    <guidance>For multi-column layouts, extract text from left to right (or right to left for RTL languages), then top to bottom.</guidance>
+    <guidance>Include headers and footers in their logical position within the reading order, typically at the beginning and end of the page content.</guidance>
+    <guidance>Handle footnotes by extracting them after the main body text, maintaining their original order.</guidance>
+    <guidance>For sidebars or boxed text, consider their relationship to the main content and place them where they would most logically be read.</guidance>
+    <guidance>Captions should be extracted near their associated images or figures, maintaining context.</guidance>
+    <guidance>For complex layouts, create a mental map of the page structure before beginning extraction.</guidance>
+    <guidance>Pay attention to any numbering, bullets, or other indicators that might suggest a specific reading order.</guidance>
+    <guidance>If multiple languages are present, note the transitions between languages in your extraction.</guidance>
+    <guidance>When encountering the end of a sentence, ensure that there is a space in between the end and the next sentence. Good Example: "This is my basketball. That's cool."</guidance>
+    
+    <!-- Element ID Guidance -->
+    <guidance>Assign IDs sequentially starting with elem_001. Continue incrementing for each new element: elem_002, elem_003, etc.</guidance>
+    <guidance>The ID is used to join text extraction with bounding box data from a separate process. Consistency is critical.</guidance>
+    <guidance>If you need to reference another element (e.g., a footnote referencing its source), use the ref attribute with the target element's ID.</guidance>
+    
+    <!-- Order Number Guidance -->
+    <guidance>Order numbers represent the reading sequence for screen readers and accessibility tools.</guidance>
+    <guidance>Assign order="1" to the first element that should be read, order="2" to the second, and so on.</guidance>
+    <guidance>Order numbers must be sequential integers with no gaps. If you have 10 elements, orders should be 1 through 10.</guidance>
+    <guidance>Reading order should follow human reading patterns: typically top-to-bottom, left-to-right within columns.</guidance>
+    
+    <!-- Heading Hierarchy Guidance -->
+    <guidance>Heading hierarchy is critical for accessibility navigation. Users often jump between headings.</guidance>
+    <guidance>h1: The main title or document name. Usually only one per page.</guidance>
+    <guidance>h2: Major section headings. These divide the document into main parts.</guidance>
+    <guidance>h3: Subsection headings within h2 sections.</guidance>
+    <guidance>h4: Further subdivisions within h3 sections. Use sparingly.</guidance>
+    <guidance>Determine heading level by visual prominence: size, boldness, spacing, and position.</guidance>
+    <guidance>Do not skip heading levels (e.g., h1 directly to h3). If unsure, prefer the higher level (h2 over h3).</guidance>
+    
+    <!-- Figure Guidance -->
+    <guidance>Figures include charts, diagrams, flowcharts, photographs, and other visual content.</guidance>
+    <guidance>For figures, include the visible caption text in the caption field.</guidance>
+    <guidance>For figures, include a description of the visual content in the alt_text field. This is what screen readers will announce.</guidance>
+    <guidance>alt_text should be concise (1-2 sentences) describing what the figure shows, not what it means.</guidance>
+</help>

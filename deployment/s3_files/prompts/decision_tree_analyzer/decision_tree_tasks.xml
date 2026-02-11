@@ -1,0 +1,18 @@
+<!-- Two-step decision tree verification process tasks: 1) Identify potential decision trees, 2) Verify against strict criteria -->
+<tasks>
+    <task>Perform the first pass identification of potential decision tree structures as defined in the <decision_tree_verification_process/> XML tags</task>
+    <task>For each identified potential decision tree, perform the second pass verification against the strict criteria.</task>
+    <task>Analyze the context surrounding each potential decision tree to ensure accurate classification and avoid misidentifying organizational charts or static diagrams.</task>
+    <task>For verified decision trees, ensure you capture the complete logical flow including all decision nodes, process nodes, pathways, and outcomes.</task>
+    <task>Map all possible pathways from entry points to endpoints, documenting the "choose your own adventure" nature of complex decision trees.</task>
+    <task>Identify and document conditional branching logic, including what criteria determine which pathway is taken.</task>
+    <task>Capture any loop-back structures or recursive decision points where certain conditions lead back to earlier steps.</task>
+    <task>Document cross-references to external figures, tables, procedures, or other decision trees.</task>
+    <task>For probabilistic decision trees, capture probability values and likelihood-based branching where present.</task>
+    <task>Analyze decision points to identify critical factors that influence pathway selection.</task>
+    <task>Distinguish between different types of decision trees (binary, clinical protocol, conversational flow, probability-based, etc.) and capture type-specific elements.</task>
+    <task>Ensure all nodes are properly categorized as decision, process, outcome, or reference nodes based on their function in the logical flow.</task>
+    <task>Verify that identified pathways demonstrate actual decision-making logic rather than just visual connections or organizational relationships.</task>
+    <task>If no structures meet the criteria for a decision tree after the two-pass verification, respond ONLY with the not_found_response as specified.</task>
+    <task>Document the overall purpose and scope of each decision tree to provide context for the extracted logical pathways.</task>
+</tasks>

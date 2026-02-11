@@ -1,0 +1,239 @@
+<mads_user_guidelines version="2.0">
+    <title>MADS User Guidelines - Introduction and Implementation</title>
+
+    <introduction>
+        <overview>
+            The Metadata Authority Description Schema (MADS) is an XML schema for an authority
+            element set that may be used to provide metadata about authorized forms of agents (e.g.,
+            people, organizations), events (e.g., conferences, meetings), and terms (e.g., topics,
+            geographics, genres). MADS serves as a companion to the Metadata Object Description
+            Schema (MODS) to provide metadata about the authoritative entities used in MODS
+            descriptions. The standard is maintained by the MODS/MADS Editorial Committee with the
+            Network Development and MARC Standards Office of the Library of Congress and input from
+            users.
+        </overview>
+    </introduction>
+
+    <xml_structures>
+        <description>
+            MADS is expressed using the XML (Extensible Markup Language) schema language of the
+            World Wide Web Consortium. XML provides markup for documents and allows more flexibility
+            and detail than HTML (Hypertext Markup Language). It serves well as a syntax for
+            metadata.
+        </description>
+
+        <schema_definition>
+            <principle>By using the XML schema language, MADS defines main elements, child elements
+                (i.e., subelements), and attributes of elements and subelements.</principle>
+            <data_content_rule>Data content is included in the lowest level elements so as to avoid
+                "mixed content," which is when some elements contain character data interspersed
+                with child elements.</data_content_rule>
+            <container_elements>Some elements are only "containers"; a "container" element is one
+                that it used to bind together subelements, but contains no data other than tags.</container_elements>
+        </schema_definition>
+
+        <attributes>
+            <description>Attributes may be associated with elements at any level and are defined
+                with the element with which they are associated. They serve to modify the element.</description>
+            <rules>
+                <rule>Attributes are not in a mandated sequence</rule>
+                <rule>Attributes are not repeatable (per XML rules)</rule>
+            </rules>
+            <common_attributes>There are some common Attributes Used Throughout the MADS schema that
+                have the same use and meaning with any element or subelement for which they are
+                defined.</common_attributes>
+        </attributes>
+
+        <namespace>
+            <declaration>A MADS document contains a schema declaration that indicates the MADS
+                namespace: xmlns="http://www.loc.gov/mads/"</declaration>
+        </namespace>
+
+        <xslt_transformation>
+            An "XSLT stylesheet" (Extensible Stylesheet Language Transformation) may be written to
+            transform the MADS data in some way for output. Examples include using a stylesheet to
+            place the record into a template with easy-to-understand element names in XML; using a
+            stylesheet to transform a MARC 21 authority record to MADS; or using a stylesheet to
+            transform coded data into textual form.
+        </xslt_transformation>
+    </xml_structures>
+
+    <record_structure>
+        <root_elements>
+            <individual_record>
+                <element>mads</element>
+                <description>Each individual MADS record is contained within the mads root element.</description>
+            </individual_record>
+            <collection>
+                <element>madsCollection</element>
+                <description>A MADS Collection is a group of MADS records that are contained within
+                    the madsCollection root element.</description>
+            </collection>
+        </root_elements>
+
+        <top_level_core_elements>
+            <description>A MADS record (the elements within the mads tags) is made up of the
+                following parts:</description>
+
+            <authoritative_heading_label>
+                <element>authority</element>
+                <description>Consists of one or more authority elements. The authority element has
+                    one or more descriptors (subelements): name, titleInfo, topic, temporal, genre,
+                    geographic, hierarchicalGeographic, and/or occupation. There may be any
+                    combination of these descriptors in any order. The authority element is repeated
+                    only if needed to give multiple authoritative forms in different languages or
+                    scripts.</description>
+                <descriptors>
+                    <descriptor>name</descriptor>
+                    <descriptor>titleInfo</descriptor>
+                    <descriptor>topic</descriptor>
+                    <descriptor>temporal</descriptor>
+                    <descriptor>genre</descriptor>
+                    <descriptor>geographic</descriptor>
+                    <descriptor>hierarchicalGeographic</descriptor>
+                    <descriptor>occupation</descriptor>
+                </descriptors>
+            </authoritative_heading_label>
+
+            <variant_heading_label>
+                <element>variant</element>
+                <description>Contains references to variant forms of the authoritative heading
+                    label. The variant element includes one or more names or terms (i.e. descriptors
+                    as above) that are alternate forms of the authoritative heading but are not
+                    considered the authoritative form.</description>
+                <example>If the person's authoritative name is John J. Jones, but he is sometimes
+                    referred to as J.J. Jones, then J.J. Jones is referenced under variant.</example>
+                <catalog_equivalent>In library catalogs the variant heading is equivalent to a "see"
+                    reference and is not used in the bibliographic metadata; the variant form leads
+                    users to the correct authoritative label form.</catalog_equivalent>
+                <relationship>A special relationship between the variant and the authoritative
+                    heading may be expressed in the type attribute of the variant element.</relationship>
+            </variant_heading_label>
+
+            <related_heading_label>
+                <element>related</element>
+                <description>Contains references to other related authority records. The related
+                    element includes one or more names or terms (i.e., descriptors as above) that
+                    have some relation to the authoritative heading and is a legitimate,
+                    authoritative heading of its own.</description>
+                <catalog_equivalent>The related element is equivalent to a "see also" reference in a
+                    library catalog.</catalog_equivalent>
+                <relationship>The relationship between the related and the authoritative heading may
+                    be expressed in the type attribute of the related element.</relationship>
+            </related_heading_label>
+
+            <repeatability>There may be any number of variant and/or related elements in a MADS
+                record. Both of these elements are composed of the same descriptors (subelements) as
+                used under authority.</repeatability>
+        </top_level_core_elements>
+
+        <other_top_level_elements>
+            <description>The following additional elements have been defined to provide additional
+                information about the authoritative heading or the entity that it represents:</description>
+            <elements>
+                <element>affiliation</element>
+                <element>classification</element>
+                <element>fieldOfActivity</element>
+                <element>identifier</element>
+                <element>language</element>
+                <element>note</element>
+                <element>url</element>
+                <element>extension</element>
+            </elements>
+        </other_top_level_elements>
+
+        <administrative_element>
+            <element>recordInfo</element>
+            <description>Provides administrative information about the record and its metadata
+                rather than about the authority itself.</description>
+        </administrative_element>
+    </record_structure>
+
+    <implementation_notes>
+        <cataloging_rules>
+            <principle>Any set of cataloging rules may be used with MADS, as is the case with MODS
+                and MARC 21.</principle>
+        </cataloging_rules>
+
+        <punctuation>
+            <rule>If using International Standard Bibliographic Description (ISBD) or other
+                punctuation in creating MADS records, punctuation should be retained if it occurs
+                within an element, but should be dropped between elements.</rule>
+            <xslt_usage>If desired, an XSLT stylesheet may be used to generate an ISBD or other
+                eye-readable display from the MADS elements and data, for instance the dash used in
+                LCSH headings between facets.</xslt_usage>
+            <example>
+                <mads_metadata>
+                    <authority>
+                        <topic>Academic libraries</topic>
+                        <topic>Automation</topic>
+                        <genre>Bibliography</genre>
+                    </authority>
+                </mads_metadata>
+                <display_output>Academic libraries--Automation--Bibliography</display_output>
+            </example>
+        </punctuation>
+
+        <record_identifier>
+            <description>It is expected that a MADS record would have its own unique ID in addition
+                to any other identifiers associated with the authority (which are indicated under
+                identifier).</description>
+            <location>The MADS record identifier is indicated in recordInfo/recordIdentifier.</location>
+        </record_identifier>
+
+        <root_elements_declaration>
+            <principle>All MADS elements are declared as global. This allows them to be used as root
+                elements for instance documents, or imported into other schemas.</principle>
+        </root_elements_declaration>
+
+        <mandatory_elements>
+            <root>
+                <element>mads</element>
+                <status>mandatory</status>
+                <version_attribute>The version of MADS used may be specified with the version
+                    attribute. In version 2.0 the value "2.0" is enumerated in the schema, and thus
+                    should be used as the value if the version attribute is included.</version_attribute>
+            </root>
+            <core>
+                <requirement>At least one main element authority and at least one subelement under
+                    authority are mandatory.</requirement>
+            </core>
+            <recommended>
+                <element>recordInfo</element>
+                <status>recommended but not required</status>
+            </recommended>
+            <conditional>Some optional elements, if used, have mandatory subelements. See the
+                individual element descriptions for further information. Profiles may be developed
+                for specific applications, as needed, to specify other mandatory elements.</conditional>
+        </mandatory_elements>
+
+        <element_order>
+            <principle>The order of elements in the MADS schema does not assume display order. A
+                stylesheet is used to control the display order of MADS records.</principle>
+        </element_order>
+
+        <element_repeatability>
+            <rule>All MADS top level elements are repeatable.</rule>
+        </element_repeatability>
+
+        <marc21_relationship>
+            <overview>Most MADS elements have equivalent fields in the MARC 21 Authority Format.
+                However, since MADS has fewer data elements than MARC authorities, records converted
+                from MARC to MADS that are then converted back to MARC will lose some data or
+                specificity of tagging.</overview>
+            <no_equivalent>Where there is no equivalent MARC 21 element, the mapping section of the
+                individual element description says: "There is no MARC 21 Authority field
+                equivalent."</no_equivalent>
+            <mapping_documentation>Each element and subelement description in this User Guide
+                includes a MARC Mapping section that gives the general equivalencies between the
+                MARC 21 Authority Format and MADS, but this is not intended to be a crosswalk that
+                allows for bi-directional conversions without some loss of data. There is a separate
+                mapping document.</mapping_documentation>
+            <reference>For a summary listing of all the mappings, see the MARC 21 Authority Format
+                Mapping to MADS Schema version 2.0.</reference>
+            <marcxml>The Library of Congress' Network Development and MARC Standards Office has
+                developed a framework for working with MARC data in an XML environment. See the
+                MARCXML webpage for more information.</marcxml>
+        </marc21_relationship>
+    </implementation_notes>
+</mads_user_guidelines>

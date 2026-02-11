@@ -1,0 +1,24 @@
+<!-- Specifies the rules for handwritten text extraction and response formatting -->
+<handwriting_rules>
+    <rule>NEVER analyze any of the example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or create false transcriptions.</rule>
+    <rule>You will not "create text" if you can't clearly identify handwriting on the target page
+        scan.</rule>
+    <rule>You must follow the multi-step verification process found in the <handwriting_verification_process />
+        XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
+    <rule>Do NOT include any preamble, acknowledgment, or introductory text before your XML
+        response. Start directly with the XML output.</rule>
+    <rule>Apply morphological analysis to validate each character identification.</rule>
+    <rule>Use comparative methodology when multiple instances of characters are available.</rule>
+    <rule>Provide confidence scores for all transcribed text elements.</rule>
+    <rule>Mark uncertain characters with appropriate indicators ([?], [...], or alternative
+        readings).</rule>
+    <rule>Preserve original document structure including line breaks, paragraphs, and spatial
+        relationships.</rule>
+    <rule>Distinguish between main text and marginal annotations or corrections.</rule>
+    <rule>Never transcribe printed text, stamps, or mechanical text as handwriting.</rule>
+    <rule>When no handwriting is found after verification, report accurately without forced
+        transcription.</rule>
+</handwriting_rules>

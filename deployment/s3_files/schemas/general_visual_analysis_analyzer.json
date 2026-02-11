@@ -1,0 +1,43 @@
+[
+    {
+        "name": "visual_analysis_tool",
+        "description": "Specialized tool for analyzing generic visual elements in documents to identify and describe various types of visual content. ONLY use for: general visual elements, graphics, images, visual layouts, illustrations, photographs, visual designs, artistic elements, and other visual content that doesn't fit into specialized categories like charts, diagrams, or tables. NOT for: charts/graphs (use charts tool), flowcharts/diagrams (use diagram tool), tables (use table tool), or handwriting (use handwriting tool). If no general visual elements are found, returns that no visual content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from General Visual Analysis Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

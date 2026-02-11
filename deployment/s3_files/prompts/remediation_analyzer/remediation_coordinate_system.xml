@@ -1,0 +1,26 @@
+
+<!-- ===================================================================
+       SECTION 5: COORDINATE DETERMINATION PROCESS
+       =================================================================== -->
+
+<coordinate_determination_process>
+    <step order="1">
+        <name>Locate Element Visually</name>
+        <action> Identify the element in the image. Note its approximate position: - Is it in the top quarter? Top third? Top half? Lower portion? - Does it span the full width? Left half? Right half? A column? - What other elements are nearby (above, below, beside)? </action>
+    </step>
+
+    <step order="2">
+        <name>Find Top-Left Corner</name>
+        <action> Look at the TOPMOST and LEFTMOST pixel/character of the element. - For text: the first character of the first line - For figures: the top-left corner of the image/chart - For tables: the top-left corner of the outer border Trace to the grid to find the cell at that position. This is your top_left cell (e.g., "B3"). </action>
+    </step>
+
+    <step order="3">
+        <name>Find Bottom-Right Corner</name>
+        <action> Look at the BOTTOMMOST and RIGHTMOST pixel/character of the element. - For text: the last character of the last line - For figures: the bottom-right corner of the image/chart - For tables: the bottom-right corner of the outer border Trace to the grid to find the cell at that position. This is your bottom_right cell (e.g., "AE12"). </action>
+    </step>
+
+    <step order="4">
+        <name>Validate Proportions</name>
+        <action> CHECK your coordinates against visual reality: - If element is in top ~25% of page, bottom_right row should be around {quarter_row} - If element is in top ~33% of page, bottom_right row should be around {third_row} - If element is in top ~50% of page, bottom_right row should be around {half_row} - Side-by-side elements should have NON-OVERLAPPING column ranges - Vertically stacked elements should have NON-OVERLAPPING row ranges COMMON ERROR: Including too much whitespace or adjacent elements in the bounding box. </action>
+    </step>
+</coordinate_determination_process>

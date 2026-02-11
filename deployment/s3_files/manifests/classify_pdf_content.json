@@ -1,0 +1,65 @@
+{
+    "tool": {
+        "name": "classify_pdf_content_tool",
+        "description": "Classifies PDF page content to determine appropriate analyzer tools. Analyzes images to identify content types like text, tables, charts, diagrams, handwriting, etc.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_paths": {
+                    "type": "string",
+                    "description": "JSON array of S3 URLs or file paths to page images"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID from pdf_to_images_converter for organizing results in S3"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_paths"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "classify_pdf_content",
+        "description": "Classifies PDF page content to determine appropriate analyzer tools",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "classify_pdf_content_gestalt.xml",
+            "classification_job_role.xml",
+            "classification_context.xml",
+            "classification_tools.xml",
+            "classification_tool_rules.xml",
+            "classification_rules.xml",
+            "classification_format.xml",
+            "classification_tasks.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "content classification",
+        "expected_output_tokens": 500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "json"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "analyzer_type": "advanced"
+    }
+}

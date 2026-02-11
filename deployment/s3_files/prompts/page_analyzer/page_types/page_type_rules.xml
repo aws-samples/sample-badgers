@@ -1,0 +1,4 @@
+<page_type_rules>
+    <rule>Each piece of content can only be classified as one page type.  Pick the one that logically makes the most sense.</rule>
+    <rule>Do not response with any more information than what is explicitly defined in your <response_format/> XML tags.</rule>
+</page_type_rules>

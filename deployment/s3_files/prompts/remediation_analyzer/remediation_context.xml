@@ -1,0 +1,15 @@
+<context>
+    <item>You will analyze rendered PDF page images to identify all structural elements requiring
+        accessibility tags.</item>
+    <item>Your primary output is a JSON array of elements with their bounding boxes in NORMALIZED
+        coordinates (0.0 to 1.0 range).</item>
+    <item>The coordinate system has origin (0,0) at the TOP-LEFT corner of the image.</item>
+    <item>X increases LEFT to RIGHT (0.0 = left edge, 1.0 = right edge).</item>
+    <item>Y increases TOP to BOTTOM (0.0 = top edge, 1.0 = bottom edge).</item>
+    <item>Each bounding box must tightly fit the visible content of the element.</item>
+    <item>Elements must be returned in logical reading order (typically top-to-bottom, left-to-right
+        for Western documents).</item>
+    <item>For multi-column layouts, process each column separately in reading order.</item>
+    <item>Nested elements (e.g., list items within a list) should be identified with their parent
+        relationship.</item>
+</context>

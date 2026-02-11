@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Diagram Analyzer -->
+<gestalt_perception analyzer="diagrams">
+
+    <prescan>
+        <instruction>Before extracting diagram components, perceive the visual structure:</instruction>
+        <step>View the entire diagram. What is the overall pattern? (flow, hierarchy, network, cycle)</step>
+        <step>Identify entry and exit points - where does the diagram start and end?</step>
+        <step>Trace the primary flow path with your eye following arrows and connections.</step>
+        <step>Note node shapes - different shapes typically indicate different functions.</step>
+        <step>Identify groupings: swimlanes, clusters, bounded regions.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="continuity">
+            <guidance> Follow visual flow paths: - Trace arrows and connecting lines from source to destination - The eye naturally follows the smoothest path through connections - Identify the main flow vs. branch paths - Note where flows merge, split, or loop back Use continuity to establish the correct sequence and relationships. </guidance>
+        </primary>
+
+        <primary principle="common_fate">
+            <guidance> Elements pointing or flowing in the same direction are related: - Parallel arrows indicate parallel processes - Elements in the same swimlane share a common actor/system - Aligned nodes at the same level suggest equal status in hierarchy - Converging arrows indicate aggregation or decision points </guidance>
+        </primary>
+
+        <primary principle="closure">
+            <guidance> Recognize implied boundaries: - Swimlanes may have implied boundaries without full borders - Grouped nodes share an invisible container - Dashed lines indicate logical groupings - Background color regions define zones even without explicit borders </guidance>
+        </primary>
+
+        <secondary principle="similarity">
+            <guidance> Shape and color indicate function: - Same shape = same type of element - Same color = same category or actor - Consistent styling indicates consistent meaning </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <shape_to_meaning>
+        <mapping shape="rectangle">Process, action, task, or step.</mapping>
+        <mapping shape="diamond">Decision point, conditional branch.</mapping>
+        <mapping shape="oval_rounded">Start/end terminal, or sometimes process.</mapping>
+        <mapping shape="parallelogram">Input/output, data.</mapping>
+        <mapping shape="cylinder">Database, data store.</mapping>
+        <mapping shape="circle">Connector, reference point.</mapping>
+        <mapping shape="document">Document or report.</mapping>
+        <mapping shape="cloud">External system, cloud service.</mapping>
+        <mapping shape="stick_figure">Actor, user, person.</mapping>
+        <note>These are conventions - actual meaning depends on diagram context and legend.</note>
+    </shape_to_meaning>
+
+    <connection_types>
+        <type name="solid_arrow">Direct flow, sequence, or dependency.</type>
+        <type name="dashed_arrow">Optional flow, reference, or weak dependency.</type>
+        <type name="solid_line">Association, relationship without direction.</type>
+        <type name="dashed_line">Grouping boundary, logical association.</type>
+        <type name="bidirectional">Two-way communication or relationship.</type>
+    </connection_types>
+
+    <flow_tracing>
+        <instruction>Trace diagram flow systematically:</instruction>
+        <step>Find the entry point (often top-left, or marked "Start").</step>
+        <step>Follow the primary path through connected nodes.</step>
+        <step>At decision points, trace each branch.</step>
+        <step>Note loops that return to earlier nodes.</step>
+        <step>Identify the exit point(s) (often bottom-right, or marked "End").</step>
+        <step>Capture parallel paths that run simultaneously.</step>
+    </flow_tracing>
+
+    <validation>
+        <instruction>After extraction, verify diagram perception accuracy:</instruction>
+        <check>Did you correctly trace the flow using continuity?</check>
+        <check>Are node types correctly identified based on shape conventions?</check>
+        <check>Are connections accurately captured with correct directionality?</check>
+        <check>Did you identify all groupings (swimlanes, clusters) using closure?</check>
+        <check>Are parallel processes correctly identified using common fate?</check>
+    </validation>
+
+</gestalt_perception>

@@ -1,0 +1,14 @@
+<context>
+    <item>You will analyze page scans searching for "educational transcript" elements.</item>
+    <item>Your task is to identify and extract structured academic records that document a student's coursework, grades, credits, and academic progress over time.</item>
+    <item>Educational transcripts may take forms including: K-12 transcripts, college/university transcripts, graduate school transcripts, community college transcripts, vocational/technical school transcripts, professional development transcripts, continuing education transcripts, and international academic records.</item>
+    <item>An educational transcript is defined as: an official or unofficial document issued by an educational institution that provides a comprehensive record of a student's academic history, including courses taken, grades earned, credits awarded, cumulative performance metrics, and degrees or credentials conferred.</item>
+    <item>The following are NOT educational transcripts: single-term report cards, individual course grade sheets, diplomas or certificates alone, course catalogs, class schedules, enrollment verification letters, degree audit worksheets, or academic planning documents.</item>
+    <item>Use two-step verification: first identify potential transcript elements by scanning for institutional headers, student information, course listings, and grade tables, then verify these meet the strict criteria of comprehensive academic records.</item>
+    <item>If none found, respond with not_found format.</item>
+    <item>When in doubt, prioritize accuracy over comprehensiveness.</item>
+    <item>Transcripts typically contain: institutional identification, student identifying information, enrollment dates, course codes and titles, credit hours, grades or marks, term/semester organization, cumulative GPA or performance metrics, and registrar authentication.</item>
+    <item>Transcripts may span multiple pages and include legends explaining grading scales, academic policies, transfer credits, and degree requirements.</item>
+    <item>Official transcripts often include security features such as watermarks, official seals, registrar signatures, issue dates, and statements about authenticity.</item>
+    <item>Recognize that transcript formats vary widely by institution, country, educational level, and time period, but all share the core function of documenting cumulative academic achievement.</item>
+</context>

@@ -1,0 +1,86 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="layout">
+        <metadata>
+            <page_number>{PAGE_NUMBER}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_LAYOUT_ZONES_DETECTED}</element_count>
+        </metadata>
+
+        <document_info>
+            <document_type>{DOCUMENT_TYPE (e.g., book, magazine, research paper, periodical, newspaper)}</document_type>
+            <orientation>{ORIENTATION (portrait/landscape)}</orientation>
+            <language>{DOCUMENT_LANGUAGE}</language>
+            <additional_languages>{ADDITIONAL_LANGUAGES_IN_DOCUMENT}</additional_languages>
+            <writing_direction>{PRIMARY_WRITING_DIRECTION (left-to-right/right-to-left)}</writing_direction>
+        </document_info>
+
+        <overall_layout>
+            <grid_system>{DESCRIPTION_OF_GRID_SYSTEM_USED}</grid_system>
+            <column_structure>{NUMBER_OF_COLUMNS_AND_ARRANGEMENT}</column_structure>
+            <visual_hierarchy>{DESCRIPTION_OF_VISUAL_HIERARCHY}</visual_hierarchy>
+            <white_space_usage>{DESCRIPTION_OF_WHITE_SPACE_USAGE}</white_space_usage>
+            <color_scheme>{DESCRIPTION_OF_COLOR_USAGE}</color_scheme>
+            <overall_balance>{ASSESSMENT_OF_LAYOUT_BALANCE}</overall_balance>
+        </overall_layout>
+
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per layout zone found -->
+        <elements>
+            <element type="header_zone">
+                <presence>{PRESENT/ABSENT}</presence>
+                <description>{DESCRIPTION_OF_HEADER_CONTENT_AND_STYLE}</description>
+                <zone_elements>
+                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
+                </zone_elements>
+            </element>
+
+            <element type="footer_zone">
+                <presence>{PRESENT/ABSENT}</presence>
+                <description>{DESCRIPTION_OF_FOOTER_CONTENT_AND_STYLE}</description>
+                <zone_elements>
+                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
+                </zone_elements>
+            </element>
+
+            <element type="main_content_zone">
+                <description>{DESCRIPTION_OF_MAIN_CONTENT_LAYOUT}</description>
+                <typography>
+                    <body_text>{DESCRIPTION_OF_BODY_TEXT_STYLE}</body_text>
+                    <headings>{DESCRIPTION_OF_HEADING_STYLES}</headings>
+                </typography>
+                <zone_elements>
+                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
+                </zone_elements>
+            </element>
+
+            <element type="left_rail_zone">
+                <presence>{PRESENT/ABSENT}</presence>
+                <description>{DESCRIPTION_OF_LEFT_RAIL_CONTENT}</description>
+            </element>
+
+            <element type="right_rail_zone">
+                <presence>{PRESENT/ABSENT}</presence>
+                <description>{DESCRIPTION_OF_RIGHT_RAIL_CONTENT}</description>
+            </element>
+
+            <element type="column_zone">
+                <count>{NUMBER_OF_COLUMNS}</count>
+                <description>{DESCRIPTION_OF_COLUMN_ARRANGEMENT}</description>
+            </element>
+
+            <element type="special_element">
+                <special_type>{SPECIAL_ELEMENT_TYPE (e.g., pull quote, sidebar)}</special_type>
+                <description>{DESCRIPTION_OF_SPECIAL_ELEMENT}</description>
+                <position>{POSITION_IN_LAYOUT}</position>
+            </element>
+        </elements>
+
+        <layout_assessment>{SUMMARY_OF_OVERALL_LAYOUT_AND_NOTABLE_FEATURES}</layout_assessment>
+
+        <full_text_extract>
+            <text type="{TYPE}">{TEXT_CONTENT_IN_READING_ORDER}</text>
+        </full_text_extract>
+    </response>
+</response_format>

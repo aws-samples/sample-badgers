@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<audit_mode_assessment>
+    <description>
+        When audit_mode is enabled, include a confidence assessment section at the end of your
+        analysis.
+        This helps humans understand where to focus their review efforts.
+    </description>
+
+    <output_format>
+        <section name="CONFIDENCE_ASSESSMENT">
+            <field name="task_confidence">
+                <description>Overall confidence score from 0.0 to 1.0</description>
+                <scoring_guide>
+                    <score range="0.9-1.0">High confidence - clear content, unambiguous extraction</score>
+                    <score range="0.7-0.89">Good confidence - minor uncertainties present</score>
+                    <score range="0.5-0.69">Moderate confidence - some ambiguities or quality issues</score>
+                    <score range="0.3-0.49">Low confidence - significant uncertainties</score>
+                    <score range="0.0-0.29">Very low confidence - major issues, human review
+                        critical</score>
+                </scoring_guide>
+            </field>
+
+            <field name="confidence_rationale">
+                <description>Brief explanation of why this confidence score was assigned</description>
+            </field>
+
+            <field name="human_review_flags">
+                <description>Specific items that warrant human attention</description>
+                <format>
+                    <flag>
+                        <item>What element is uncertain</item>
+                        <location>Where to find it (page, section, position)</location>
+                        <concern>What the uncertainty is (e.g., "Could be 'Smith' or 'Smyth'")</concern>
+                    </flag>
+                </format>
+            </field>
+
+            <field name="extraction_gaps">
+                <description>Content that may have been missed or incompletely captured</description>
+                <examples>
+                    <example>Partially obscured text in bottom margin</example>
+                    <example>Handwritten annotations not fully legible</example>
+                    <example>Table continues beyond visible area</example>
+                </examples>
+            </field>
+
+            <field name="quality_factors">
+                <description>Environmental factors affecting analysis quality</description>
+                <factors>
+                    <factor name="image_quality">Resolution, clarity, contrast issues</factor>
+                    <factor name="legibility">Text clarity, font issues, handwriting quality</factor>
+                    <factor name="structural_complexity">Layout complexity, nested elements</factor>
+                    <factor name="content_density">Amount of information per area</factor>
+                </factors>
+            </field>
+        </section>
+    </output_format>
+
+    <example_output>
+        <![CDATA[
+<CONFIDENCE_ASSESSMENT>
+    <task_confidence>0.78</task_confidence>
+    <confidence_rationale>Most table content extracted clearly, but two cells had ambiguous values due to image quality.</confidence_rationale>
+    <human_review_flags>
+        <flag>
+            <item>Cell value in row 3, column 2</item>
+            <location>Upper-right quadrant of table</location>
+            <concern>Could be "1,234" or "1,284" - digit unclear</concern>
+        </flag>
+        <flag>
+            <item>Header text</item>
+            <location>Second column header</location>
+            <concern>Partially cut off - interpreted as "Revenue" but could be "Revenue YTD"</concern>
+        </flag>
+    </human_review_flags>
+    <extraction_gaps>
+        <gap>Footnote text at bottom of table appears truncated in image</gap>
+    </extraction_gaps>
+    <quality_factors>
+        <image_quality>Moderate - some compression artifacts visible</image_quality>
+        <legibility>Good for printed text, poor for small footnotes</legibility>
+        <structural_complexity>Low - standard grid table</structural_complexity>
+    </quality_factors>
+</CONFIDENCE_ASSESSMENT>
+        ]]>
+    </example_output>
+</audit_mode_assessment>

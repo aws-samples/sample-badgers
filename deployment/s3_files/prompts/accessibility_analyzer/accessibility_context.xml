@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<accessibility_context>
+    <purpose>
+        <description>This analyzer takes the output from the elements_analyzer tool and transforms
+            it into a complete PDF structure tree that can be overlaid onto an existing PDF to make
+            it fully accessible. The structure tree provides semantic meaning to visual content,
+            enabling assistive technologies to present the document in an equivalent, accessible
+            manner.</description>
+    </purpose>
+
+    <input_format>
+        <description>You will receive XML output from the elements_analyzer containing extracted
+            document elements with their type, content, hierarchical level, location, and context.</description>
+        <example_input>
+            <element>
+                <order>3</order>
+                <type>document_title</type>
+                <sub_type>N/A</sub_type>
+                <hierarchical_level>1</hierarchical_level>
+                <content>ESMO Clinical Practice Guideline interim update...</content>
+                <style>N/A</style>
+                <location>
+                    <page>1</page>
+                    <position>top</position>
+                </location>
+                <context>Main title of the document</context>
+            </element>
+        </example_input>
+    </input_format>
+
+    <output_purpose>
+        <description>Your output will be a complete PDF structure tree in XML format that maps each
+            content element to its proper semantic tag, establishes reading order, creates
+            hierarchical relationships, identifies artifacts, and provides all necessary
+            accessibility metadata.</description>
+        <usage>This structure tree will be programmatically converted to PDF internal structure and
+            overlaid onto the original PDF using pikepdf or similar PDF manipulation libraries,
+            preserving the visual appearance while adding full accessibility.</usage>
+    </output_purpose>
+
+    <accessibility_standards>
+        <standard name="PDF/UA" version="ISO 14289-1">
+            <requirement>All content must be tagged or marked as artifact</requirement>
+            <requirement>Structure tree must have proper parent-child relationships</requirement>
+            <requirement>Reading order must be explicitly defined</requirement>
+            <requirement>Alternative text required for all meaningful non-text content</requirement>
+            <requirement>Document language must be specified</requirement>
+            <requirement>Metadata must include title</requirement>
+        </standard>
+
+        <standard name="WCAG 2.1" level="AA">
+            <requirement>1.1.1 Non-text Content: Provide text alternatives</requirement>
+            <requirement>1.3.1 Info and Relationships: Structure can be programmatically determined</requirement>
+            <requirement>1.3.2 Meaningful Sequence: Correct reading sequence can be programmatically
+                determined</requirement>
+            <requirement>2.4.1 Bypass Blocks: Mechanism to skip repeated content</requirement>
+            <requirement>2.4.2 Page Titled: Pages have descriptive titles</requirement>
+            <requirement>2.4.6 Headings and Labels: Headings describe topic or purpose</requirement>
+        </standard>
+    </accessibility_standards>
+
+    <assistive_technology_considerations>
+        <screen_readers>
+            <behavior>Navigate by headings (H1-H6) to understand document structure</behavior>
+            <behavior>Read content in structure tree order, not visual layout order</behavior>
+            <behavior>Announce element types (heading, paragraph, list, table, figure)</behavior>
+            <behavior>Skip artifacts (headers, footers, page numbers, decorative elements)</behavior>
+            <behavior>Follow cross-references (footnotes, citations, figure references)</behavior>
+            <behavior>Read alternative text for images instead of "image" or filename</behavior>
+        </screen_readers>
+
+        <braille_displays>
+            <behavior>Convert structure to tactile output</behavior>
+            <behavior>Use structure to provide context (heading level, list depth)</behavior>
+            <behavior>Require proper reading order for sequential access</behavior>
+        </braille_displays>
+
+        <voice_control>
+            <behavior>Use structure to enable navigation commands ("go to next heading")</behavior>
+            <behavior>Require proper labeling of interactive elements</behavior>
+        </voice_control>
+    </assistive_technology_considerations>
+
+    <key_principles>
+        <principle>Semantic over Visual: Tag based on meaning, not appearance (a large bold text
+            might be H1, or might be emphasis in a paragraph)</principle>
+        <principle>Logical Reading Order: Structure order should follow natural reading flow, even
+            if visual layout is complex (multi-column, sidebars)</principle>
+        <principle>Complete Coverage: Every visible content element must be either tagged or marked
+            as artifact</principle>
+        <principle>Proper Hierarchy: Headings should not skip levels (H1 → H2 → H3, not H1 → H3)</principle>
+        <principle>Meaningful Alt Text: Describe the purpose/content of images, not just "image" or
+            "figure"</principle>
+        <principle>Artifact Identification: Decorative elements, page numbers, headers/footers
+            should be marked as artifacts</principle>
+    </key_principles>
+</accessibility_context>

@@ -1,0 +1,279 @@
+{
+    "tools": [
+        {
+            "name": "pdf_to_images_converter",
+            "description": "Convert PDF documents to optimized images suitable for AI analysis. This utility tool processes PDF files by converting each page to high-quality images that can then be analyzed using the existing analyzer tools (diagram, table, handwriting, etc.). Supports various output formats and optimization settings for different use cases.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "pdf_path": {
+                        "type": "string",
+                        "description": "Absolute file path to the PDF document to process. Must be a valid PDF file that exists and is readable."
+                    },
+                    "max_image_size_mb": {
+                        "type": "number",
+                        "description": "Maximum size limit for each generated image in megabytes.",
+                        "default": 4.0
+                    },
+                    "output_directory": {
+                        "type": "string",
+                        "description": "Directory path where generated images will be saved.",
+                        "default": "output"
+                    },
+                    "output_format": {
+                        "type": "string",
+                        "description": "Format for returning image data: 'base64', 'paths', or 'both'.",
+                        "enum": [
+                            "base64",
+                            "paths",
+                            "both"
+                        ],
+                        "default": "base64"
+                    },
+                    "dpi": {
+                        "type": "integer",
+                        "description": "Resolution in dots per inch for PDF to image conversion.",
+                        "default": 128
+                    },
+                    "save_images": {
+                        "type": "boolean",
+                        "description": "Whether to save generated images to disk.",
+                        "default": true
+                    },
+                    "aws_profile": {
+                        "type": "string",
+                        "description": "Optional AWS profile name for authentication."
+                    }
+                },
+                "required": [
+                    "pdf_path"
+                ]
+            }
+        },
+        {
+            "name": "classify_pdf_content_tool",
+            "description": "Classify content types in PDF page images using vision LLM. Analyzes images to determine what type of content they contain (diagrams, tables, handwriting, etc.) and recommends appropriate analysis tools. This is step 2 in the PDF analysis workflow after converting PDF to images.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "image_paths": {
+                        "type": "string",
+                        "description": "JSON string containing array of image file paths to classify."
+                    },
+                    "aws_profile": {
+                        "type": "string",
+                        "description": "Optional AWS profile name for Bedrock authentication."
+                    },
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to analyzer configuration file",
+                        "default": "./config/analyzer_config.json"
+                    }
+                },
+                "required": [
+                    "image_paths"
+                ]
+            }
+        },
+        {
+            "name": "build_analysis_tasks_tool",
+            "description": "Build task queue from page classifications. Takes classification results and creates a prioritized queue of analysis tasks. This is step 3 in the PDF analysis workflow after content classification.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "classifications": {
+                        "type": "string",
+                        "description": "JSON string containing page classifications from classify_pdf_content_tool"
+                    },
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to analyzer configuration file",
+                        "default": "./config/analyzer_config.json"
+                    }
+                },
+                "required": [
+                    "classifications"
+                ]
+            }
+        },
+        {
+            "name": "execute_analysis_tasks_tool",
+            "description": "Execute analysis tasks using appropriate analyzer tools. Takes a task queue and executes each task by calling the recommended analyzer tool. This is step 4 in the PDF analysis workflow after building the task queue.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tasks": {
+                        "type": "string",
+                        "description": "JSON string containing task queue from build_analysis_tasks_tool"
+                    },
+                    "pdf_name": {
+                        "type": "string",
+                        "description": "Name of PDF being processed (for result organization)"
+                    },
+                    "aws_profile": {
+                        "type": "string",
+                        "description": "Optional AWS profile name for tool execution"
+                    },
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to analyzer configuration file",
+                        "default": "./config/analyzer_config.json"
+                    }
+                },
+                "required": [
+                    "tasks",
+                    "pdf_name"
+                ]
+            }
+        },
+        {
+            "name": "aggregate_analysis_results_tool",
+            "description": "Aggregate results from executed analysis tasks. Combines results from all tasks into a structured summary organized by page. This is step 5 (final) in the PDF analysis workflow after task execution.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "execution_results": {
+                        "type": "string",
+                        "description": "JSON string containing execution results from execute_analysis_tasks_tool"
+                    },
+                    "pdf_name": {
+                        "type": "string",
+                        "description": "Name of PDF being processed"
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Runtime session ID for organizing output in S3"
+                    }
+                },
+                "required": [
+                    "execution_results",
+                    "pdf_name",
+                    "session_id"
+                ]
+            }
+        },
+        {
+            "name": "intelligent_pdf_analyzer",
+            "description": "Intelligent PDF analysis system that automatically analyzes PDF documents using vision-capable LLMs to classify content and route pages to appropriate specialized analysis tools. This orchestrator tool provides end-to-end automated PDF analysis without manual tool selection.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "pdf_path": {
+                        "type": "string",
+                        "description": "Absolute file path to the PDF document to process intelligently."
+                    },
+                    "aws_profile": {
+                        "type": "string",
+                        "description": "Optional AWS profile name for Bedrock authentication."
+                    },
+                    "max_image_size_mb": {
+                        "type": "number",
+                        "description": "Maximum size limit for each generated page image in megabytes.",
+                        "default": 4.0
+                    },
+                    "dpi": {
+                        "type": "integer",
+                        "description": "Resolution in dots per inch for PDF to image conversion.",
+                        "default": 128
+                    },
+                    "save_images": {
+                        "type": "boolean",
+                        "description": "Whether to save generated page images to disk.",
+                        "default": true
+                    },
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to analyzer configuration file.",
+                        "default": "./config/analyzer_config.json"
+                    }
+                },
+                "required": [
+                    "pdf_path"
+                ]
+            }
+        },
+        {
+            "name": "streaming_pdf_analyzer",
+            "description": "Streaming version of the intelligent PDF analyzer that provides real-time progress updates via Server-Sent Events (SSE). This tool performs the same comprehensive PDF analysis as the standard intelligent analyzer but streams progress updates as each processing phase completes: PDF conversion, content classification, task queue building, individual task execution, and result aggregation. Perfect for UI applications that need to show live progress and receive partial results immediately rather than waiting for complete processing.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "pdf_path": {
+                        "type": "string",
+                        "description": "Absolute file path to the PDF document to process intelligently with streaming updates."
+                    },
+                    "aws_profile": {
+                        "type": "string",
+                        "description": "Optional AWS profile name for Bedrock authentication."
+                    },
+                    "max_image_size_mb": {
+                        "type": "number",
+                        "description": "Maximum size limit for each generated page image in megabytes.",
+                        "default": 4.0
+                    },
+                    "dpi": {
+                        "type": "integer",
+                        "description": "Resolution in dots per inch for PDF to image conversion.",
+                        "default": 128
+                    },
+                    "save_images": {
+                        "type": "boolean",
+                        "description": "Whether to save generated page images to disk.",
+                        "default": true
+                    },
+                    "config_path": {
+                        "type": "string",
+                        "description": "Path to analyzer configuration file.",
+                        "default": "./config/analyzer_config.json"
+                    }
+                },
+                "required": [
+                    "pdf_path"
+                ]
+            }
+        }
+    ],
+    "analyzer": {
+        "name": "pdf_processor",
+        "description": "Vision-LLM powered PDF analysis orchestrator",
+        "enable_enhancement": true,
+        "enhancement_debug_mode": false,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "classification_context.xml",
+            "classification_rules.xml",
+            "classification_format.xml"
+        ],
+        "examples_path": "prompts/few-shot-examples",
+        "max_examples": 0,
+        "analysis_text": "page content classification",
+        "expected_output_tokens": 500,
+        "classification_confidence_threshold": 0.05,
+        "enable_fallback_analysis": true,
+        "default_task_timeout": 1000,
+        "task_timeouts": {
+            "analyze_diagram_tool": 600,
+            "analyze_table_tool": 300,
+            "analyze_handwriting_tool": 300
+        },
+        "max_tools_per_batch": 4,
+        "stop_on_first_error": true,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3",
+            "pdf2image"
+        ],
+        "enabled_in_config": "analyzer_config.json:analyzers.pdf_processor",
+        "analyzer_type": "advanced"
+    }
+}

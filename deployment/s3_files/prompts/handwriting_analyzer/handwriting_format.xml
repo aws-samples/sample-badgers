@@ -1,0 +1,72 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="handwriting">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_HANDWRITTEN_TEXT_REGIONS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per handwritten text region found -->
+        <elements>
+            <element type="handwritten_text" id="{REGION_ID}">
+                <type>Handwritten Text</type>
+                <summary>
+                    <location>{DESCRIPTION_OF_LOCATION_ON_PAGE}</location>
+                    <handwriting_style>{CURSIVE/PRINT/MIXED/HISTORICAL_SCRIPT_TYPE}</handwriting_style>
+                    <confidence_level>{HIGH/MEDIUM/LOW}</confidence_level>
+                </summary>
+                <content>
+                    <transcription>
+                        <raw_text>{EXACT_TRANSCRIPTION_WITH_CONFIDENCE_MARKERS}</raw_text>
+                        <structured_text>
+                            <line number="1">{TRANSCRIBED_LINE_1}</line>
+                            <line number="2">{TRANSCRIBED_LINE_2}</line>
+                        </structured_text>
+                        <uncertain_elements>
+                            <uncertain text="{CHARACTER_OR_WORD}" alternatives="{POSSIBLE_READINGS}"
+                                confidence="LOW" />
+                        </uncertain_elements>
+                        <illegible_sections>
+                            <illegible location="{DESCRIPTION}"
+                                length="{APPROXIMATE_CHARACTER_COUNT}" />
+                        </illegible_sections>
+                    </transcription>
+                    <analysis_notes>
+                        <morphological_characteristics>{DESCRIPTION_OF_WRITING_CHARACTERISTICS}</morphological_characteristics>
+                        <writer_identification>{SINGLE_WRITER/MULTIPLE_WRITERS/UNKNOWN}</writer_identification>
+                        <historical_period>{IF_APPLICABLE_ESTIMATED_TIME_PERIOD}</historical_period>
+                        <language_detected>{LANGUAGE_OF_TEXT}</language_detected>
+                        <document_type>{LETTER/MANUSCRIPT/FORM/DIARY/ETC}</document_type>
+                    </analysis_notes>
+                    <physical_evidence>
+                        <ink_type>{PEN/PENCIL/QUILL/OTHER}</ink_type>
+                        <paper_condition>{GOOD/FAIR/POOR/DEGRADED}</paper_condition>
+                        <corrections_present>{YES/NO}</corrections_present>
+                        <bleed_through>{YES/NO}</bleed_through>
+                    </physical_evidence>
+                </content>
+            </element>
+
+            <!-- For marginal annotations, include as separate elements -->
+            <element type="marginal_annotation" id="{ANNOTATION_ID}">
+                <type>Marginal Annotation</type>
+                <content>
+                    <location>{MARGIN_LOCATION}</location>
+                    <transcription>{ANNOTATION_TEXT}</transcription>
+                    <confidence>{HIGH/MEDIUM/LOW}</confidence>
+                    <relationship_to_main_text>{DESCRIPTION}</relationship_to_main_text>
+                </content>
+            </element>
+        </elements>
+
+        <!-- Overall assessment included at response level -->
+        <document_assessment>
+            <overall_legibility>{EXCELLENT/GOOD/FAIR/POOR}</overall_legibility>
+            <transcription_completeness>{PERCENTAGE_TRANSCRIBED}</transcription_completeness>
+            <primary_challenges>{LIST_OF_MAIN_DIFFICULTIES}</primary_challenges>
+            <recommended_follow_up>{SUGGESTIONS_FOR_IMPROVED_ANALYSIS}</recommended_follow_up>
+        </document_assessment>
+    </response>
+</response_format>

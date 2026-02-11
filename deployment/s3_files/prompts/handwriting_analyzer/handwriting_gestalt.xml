@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Handwriting Analyzer -->
+<gestalt_perception analyzer="handwriting">
+
+    <prescan>
+        <instruction>Before analyzing handwriting, locate and characterize handwritten regions:</instruction>
+        <step>Scan the entire page to identify handwritten vs. printed/typed regions.</step>
+        <step>Note the overall handwriting style: cursive, print, mixed.</step>
+        <step>Identify the writing instrument characteristics (pen, pencil, marker).</step>
+        <step>Observe line spacing and baseline consistency.</step>
+        <step>Note any annotations, corrections, or marginalia.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="figure_ground">
+            <guidance> Distinguish handwriting from other content: - HANDWRITING: Organic, variable strokes with personal characteristics - PRINTED TEXT: Uniform, mechanical letterforms - BACKGROUND: Paper texture, lines, grids, watermarks Handwriting has natural variation; printed text is consistent. </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Consistent characteristics identify the same hand: - Same letter formation patterns = same writer - Consistent slant angle throughout - Similar stroke pressure and width - Repeated distinctive letter shapes (e.g., how 'a' or 'g' is formed) Use similarity to build a character model for ambiguous letters. </guidance>
+        </primary>
+
+        <primary principle="continuity">
+            <guidance> Follow stroke flow for letter and word recognition: - Cursive connects letters in continuous strokes - Even print handwriting has characteristic stroke sequences - Follow the natural writing direction (usually left-to-right) - Identify where words begin and end by stroke breaks </guidance>
+        </primary>
+
+        <secondary principle="proximity">
+            <guidance> Spacing indicates word and line boundaries: - Tight spacing within words - Larger gaps between words - Consistent line spacing (or intentional variation) - Marginalia separated from main text </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <handwriting_region_detection>
+        <cue type="stroke_variation">Handwriting has natural thickness variation; print is uniform.</cue>
+        <cue type="baseline_drift">Handwriting may drift from ruled lines; print aligns precisely.</cue>
+        <cue type="letter_variation">Same letter varies slightly in handwriting; identical in print.</cue>
+        <cue type="connection">Cursive shows letter connections; print letters are discrete.</cue>
+        <cue type="organic_curves">Handwriting has natural curves; print has geometric precision.</cue>
+    </handwriting_region_detection>
+
+    <character_recognition_strategy>
+        <step>Identify clear, unambiguous letters first.</step>
+        <step>Build a model of how this writer forms each letter.</step>
+        <step>Use the model to interpret ambiguous characters.</step>
+        <step>Consider context (surrounding letters, words) for disambiguation.</step>
+        <step>Note characters that remain uncertain even with context.</step>
+    </character_recognition_strategy>
+
+    <writing_style_classification>
+        <style type="cursive">Connected letters, flowing strokes, loops.</style>
+        <style type="print">Discrete letters, no connections, block-like.</style>
+        <style type="mixed">Combination of cursive and print elements.</style>
+        <style type="calligraphic">Decorative, formal, with deliberate flourishes.</style>
+        <style type="hasty">Quick, abbreviated, may have unclear letters.</style>
+    </writing_style_classification>
+
+    <validation>
+        <instruction>After extraction, verify handwriting perception accuracy:</instruction>
+        <check>Did you correctly identify handwritten regions vs. printed text?</check>
+        <check>Are similar letter forms consistently interpreted throughout?</check>
+        <check>Does the reading follow natural stroke continuity?</check>
+        <check>Are word boundaries correctly identified using proximity?</check>
+        <check>Are uncertain characters appropriately flagged?</check>
+    </validation>
+
+</gestalt_perception>

@@ -1,0 +1,24 @@
+<!-- This defines how you must format your responses -->
+<response_format>
+  <!-- Response requirements -->
+  <response_format_requirements>
+    <requirement>Use proper JSON formatting with no syntax errors</requirement>
+    <requirement>Write descriptions in complete, natural sentences</requirement>
+    <requirement>Be specific about what you observe - describe the actual content</requirement>
+    <requirement>Note location and prominence of different content areas</requirement>
+  </response_format_requirements>
+
+  <!-- JSON structure -->
+  <json_output_schema> { "page_number": "Page number if visible, otherwise 'unknown'", "image_quality": "good | fair | poor", "content_description": "A complete description of what is on this page. Write in full sentences describing all the content you observe, where it's located, and any notable characteristics. Be specific and thorough.", "quality_notes": "Any issues affecting the image (blur, skew, artifacts) - null if none", "enhancement_recommended": "true | false - whether image enhancement would improve analysis", "enhancement_reason": "Reason for enhancement recommendation - null if enhancement_recommended is false" } </json_output_schema>
+
+  <!-- Examples -->
+  <example name="research_paper_title"> { "page_number": "1", "image_quality": "good", "content_description": "This is a title page for an academic research paper. The title 'Machine Learning Applications in Healthcare' appears prominently at the top. Below that are three author names with their institutional affiliations at Stanford University. The middle section contains an abstract of approximately 200 words summarizing the research. At the bottom are keywords including 'machine learning', 'healthcare', 'diagnosis', and 'neural networks'. A DOI and publication date (March 2024) appear in the footer.", "quality_notes": null, "enhancement_recommended": false, "enhancement_reason": null } </example>
+
+  <example name="mixed_content"> { "page_number": "12", "image_quality": "good", "content_description": "This page contains two distinct sections. The upper half has a data table showing quarterly revenue figures for 2023, with columns for Q1 through Q4 and rows for different product categories. The table has clear headers and numerical data in each cell. The lower half contains a flowchart diagram illustrating an approval workflow process, with rectangular boxes connected by arrows showing the sequence from 'Submit Request' through 'Manager Review' to 'Final Approval'. There are also some handwritten annotations in blue ink in the right margin that appear to be notes or comments.", "quality_notes": null, "enhancement_recommended": true, "enhancement_reason": "handwritten_annotations" } </example>
+
+  <example name="poor_quality"> { "page_number": "unknown", "image_quality": "poor", "content_description": "This page appears to contain text content but the image quality makes it difficult to read clearly. There seems to be a paragraph of body text in the upper portion and what might be a small diagram or figure in the lower right corner. The text is blurry and some words are not legible.", "quality_notes": "Image is blurry with low resolution. Text is partially illegible. Some skew detected.", "enhancement_recommended": true, "enhancement_reason": "degraded_scan" } </example>
+
+  <example name="minimal_content"> { "page_number": "8", "image_quality": "good", "content_description": "This is a nearly blank page. The only content is the page number '8' centered at the bottom footer. The rest of the page is empty white space. This appears to be an intentional separator or blank page.", "quality_notes": null, "enhancement_recommended": false, "enhancement_reason": null } </example>
+
+  <example name="historical_manuscript"> { "page_number": "unknown", "image_quality": "fair", "content_description": "This appears to be a historical manuscript page with handwritten text in cursive script. The paper shows visible yellowing and age-related discoloration. The ink has faded in several areas making some words difficult to read. There are margin notes in a different hand. The document appears to be from the 18th or 19th century based on the writing style and paper condition.", "quality_notes": "Yellowed paper, faded ink in places, some foxing visible", "enhancement_recommended": true, "enhancement_reason": "historical_manuscript" } </example>
+</response_format>

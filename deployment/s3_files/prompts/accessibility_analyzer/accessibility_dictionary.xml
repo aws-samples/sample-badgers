@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<accessibility_dictionary>
+    <structure_types>
+        <structure_type name="Document">
+            <description>Root container for all content in the document</description>
+            <usage>Single root element that contains all other structure elements</usage>
+            <pdf_tag>/Document</pdf_tag>
+        </structure_type>
+
+        <structure_type name="Part">
+            <description>Large-scale division of a document (e.g., Part I, Part II)</description>
+            <usage>Use for major document divisions above section level</usage>
+            <pdf_tag>/Part</pdf_tag>
+        </structure_type>
+
+        <structure_type name="Sect">
+            <description>Generic section container</description>
+            <usage>Groups related content together (heading + paragraphs + subsections)</usage>
+            <pdf_tag>/Sect</pdf_tag>
+            <nesting>Can contain H1-H6, P, List, Table, Figure, and nested Sect elements</nesting>
+        </structure_type>
+
+        <structure_type name="H1">
+            <description>First-level heading (highest importance)</description>
+            <usage>Document title, main title, chapter titles</usage>
+            <pdf_tag>/H1</pdf_tag>
+            <hierarchy_level>1</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="H2">
+            <description>Second-level heading</description>
+            <usage>Major section headings</usage>
+            <pdf_tag>/H2</pdf_tag>
+            <hierarchy_level>2</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="H3">
+            <description>Third-level heading</description>
+            <usage>Subsection headings</usage>
+            <pdf_tag>/H3</pdf_tag>
+            <hierarchy_level>3</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="H4">
+            <description>Fourth-level heading</description>
+            <usage>Sub-subsection headings</usage>
+            <pdf_tag>/H4</pdf_tag>
+            <hierarchy_level>4</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="H5">
+            <description>Fifth-level heading</description>
+            <usage>Minor section headings</usage>
+            <pdf_tag>/H5</pdf_tag>
+            <hierarchy_level>5</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="H6">
+            <description>Sixth-level heading (lowest)</description>
+            <usage>Smallest section headings</usage>
+            <pdf_tag>/H6</pdf_tag>
+            <hierarchy_level>6</hierarchy_level>
+        </structure_type>
+
+        <structure_type name="P">
+            <description>Paragraph of text</description>
+            <usage>Body text, standalone paragraphs</usage>
+            <pdf_tag>/P</pdf_tag>
+        </structure_type>
+
+        <structure_type name="L">
+            <description>List container</description>
+            <usage>Contains list items (LI elements)</usage>
+            <pdf_tag>/L</pdf_tag>
+            <children>Must contain LI elements</children>
+        </structure_type>
+
+        <structure_type name="LI">
+            <description>List item</description>
+            <usage>Individual item within a list</usage>
+            <pdf_tag>/LI</pdf_tag>
+            <parent>Must be child of L element</parent>
+            <children>Can contain Lbl (label/bullet) and LBody (content)</children>
+        </structure_type>
+
+        <structure_type name="Lbl">
+            <description>List item label (bullet, number)</description>
+            <usage>The marker for a list item</usage>
+            <pdf_tag>/Lbl</pdf_tag>
+            <parent>Child of LI</parent>
+        </structure_type>
+
+        <structure_type name="LBody">
+            <description>List item body content</description>
+            <usage>The actual content of a list item</usage>
+            <pdf_tag>/LBody</pdf_tag>
+            <parent>Child of LI</parent>
+        </structure_type>
+
+        <structure_type name="Table">
+            <description>Table container</description>
+            <usage>Contains table rows (TR elements)</usage>
+            <pdf_tag>/Table</pdf_tag>
+            <children>Must contain TR elements</children>
+        </structure_type>
+
+        <structure_type name="TR">
+            <description>Table row</description>
+            <usage>Row within a table</usage>
+            <pdf_tag>/TR</pdf_tag>
+            <parent>Child of Table</parent>
+            <children>Contains TH (header cells) or TD (data cells)</children>
+        </structure_type>
+
+        <structure_type name="TH">
+            <description>Table header cell</description>
+            <usage>Column or row headers in tables</usage>
+            <pdf_tag>/TH</pdf_tag>
+            <parent>Child of TR</parent>
+            <attributes>Scope attribute (row/column) for accessibility</attributes>
+        </structure_type>
+
+        <structure_type name="TD">
+            <description>Table data cell</description>
+            <usage>Regular data cells in tables</usage>
+            <pdf_tag>/TD</pdf_tag>
+            <parent>Child of TR</parent>
+        </structure_type>
+
+        <structure_type name="Figure">
+            <description>Figure or image</description>
+            <usage>Images, charts, diagrams, photos</usage>
+            <pdf_tag>/Figure</pdf_tag>
+            <required_attribute>Alt text describing the figure</required_attribute>
+        </structure_type>
+
+        <structure_type name="Caption">
+            <description>Caption for figure or table</description>
+            <usage>Descriptive text associated with figures/tables</usage>
+            <pdf_tag>/Caption</pdf_tag>
+        </structure_type>
+
+        <structure_type name="Note">
+            <description>Footnote or endnote</description>
+            <usage>Supplementary notes referenced from main text</usage>
+            <pdf_tag>/Note</pdf_tag>
+            <attributes>ID for cross-referencing from main text</attributes>
+        </structure_type>
+
+        <structure_type name="Reference">
+            <description>Cross-reference or citation</description>
+            <usage>Links to footnotes, endnotes, bibliography entries, figures</usage>
+            <pdf_tag>/Reference</pdf_tag>
+            <attributes>RefID pointing to target element</attributes>
+        </structure_type>
+
+        <structure_type name="Link">
+            <description>Hyperlink</description>
+            <usage>Clickable links to URLs or internal destinations</usage>
+            <pdf_tag>/Link</pdf_tag>
+            <attributes>Href attribute with URL or destination</attributes>
+        </structure_type>
+
+        <structure_type name="Aside">
+            <description>Sidebar or callout content</description>
+            <usage>Content that is tangentially related to main content (sidebars, callout boxes,
+                key points)</usage>
+            <pdf_tag>/Aside</pdf_tag>
+        </structure_type>
+
+        <structure_type name="BlockQuote">
+            <description>Block quotation</description>
+            <usage>Extended quotations set apart from main text</usage>
+            <pdf_tag>/BlockQuote</pdf_tag>
+        </structure_type>
+
+        <structure_type name="Code">
+            <description>Code block or inline code</description>
+            <usage>Programming code, markup, or technical notation</usage>
+            <pdf_tag>/Code</pdf_tag>
+        </structure_type>
+
+        <structure_type name="Formula">
+            <description>Mathematical formula or equation</description>
+            <usage>Mathematical expressions</usage>
+            <pdf_tag>/Formula</pdf_tag>
+            <required_attribute>Alt text with LaTeX or MathML representation</required_attribute>
+        </structure_type>
+
+        <structure_type name="Artifact">
+            <description>Non-content elements that should be ignored by assistive technology</description>
+            <usage>Page numbers, headers, footers, watermarks, decorative elements, background
+                images</usage>
+            <pdf_tag>/Artifact</pdf_tag>
+            <types>
+                <type>Pagination: Page numbers, running headers/footers</type>
+                <type>Layout: Decorative lines, borders, background patterns</type>
+                <type>Page: Watermarks, logos in margins</type>
+            </types>
+        </structure_type>
+    </structure_types>
+
+    <element_mapping_guide>
+        <mapping>
+            <from_element_type>document_title</from_element_type>
+            <to_structure_type>H1</to_structure_type>
+            <reasoning>Document titles are the highest level heading</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>heading</from_element_type>
+            <to_structure_type>H2, H3, H4, H5, or H6</to_structure_type>
+            <reasoning>Map based on hierarchical_level field from elements analyzer</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>paragraph</from_element_type>
+            <to_structure_type>P</to_structure_type>
+            <reasoning>Standard body text</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>footnote</from_element_type>
+            <to_structure_type>Note</to_structure_type>
+            <reasoning>Supplementary notes</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>keyword</from_element_type>
+            <to_structure_type>Aside or P</to_structure_type>
+            <reasoning>If in a highlighted box, use Aside; otherwise P</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>running_head</from_element_type>
+            <to_structure_type>Artifact (Pagination)</to_structure_type>
+            <reasoning>Headers are not main content</reasoning>
+        </mapping>
+
+        <mapping>
+            <from_element_type>page_number</from_element_type>
+            <to_structure_type>Artifact (Pagination)</to_structure_type>
+            <reasoning>Page numbers are navigation aids, not content</reasoning>
+        </mapping>
+    </element_mapping_guide>
+</accessibility_dictionary>

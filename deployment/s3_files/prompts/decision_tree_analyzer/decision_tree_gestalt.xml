@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Decision Tree Analyzer -->
+<gestalt_perception analyzer="decision_tree">
+
+    <prescan>
+        <instruction>Before extracting decision tree structure, perceive the branching pattern:</instruction>
+        <step>Identify the root/entry node - typically at top or left of the diagram.</step>
+        <step>Trace the primary branching structure with your eye.</step>
+        <step>Note decision points (typically diamond shapes or question nodes).</step>
+        <step>Identify terminal/leaf nodes (endpoints of branches).</step>
+        <step>Look for any loops or cross-references between branches.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="continuity">
+            <guidance> Follow branching paths systematically: - Start at the root and trace each branch to its terminus - At each decision point, follow both/all branches - Lines and arrows guide the eye along valid paths - Identify where paths converge or loop back The tree structure emerges from following continuous paths. </guidance>
+        </primary>
+
+        <primary principle="shape_to_function">
+            <guidance> Node shapes indicate function in decision trees: - Diamond/rhombus = decision point (yes/no, condition) - Rectangle = action, process, or outcome - Oval/rounded rectangle = start/end terminal - Circle = connector or reference point Shape conventions may vary - look for consistency within the diagram. </guidance>
+        </primary>
+
+        <primary principle="common_fate">
+            <guidance> Branches flowing in the same direction share characteristics: - "Yes" branches often go one direction, "No" another - Parallel branches at the same level indicate equal alternatives - Converging branches lead to common outcomes - Diverging branches represent mutually exclusive paths </guidance>
+        </primary>
+
+        <secondary principle="proximity">
+            <guidance> Spatial arrangement indicates relationships: - Nodes close together on same branch are sequential - Horizontal alignment often indicates same decision level - Vertical spacing shows depth in the tree </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <tree_structure_detection>
+        <element type="root">Entry point, no incoming arrows, often labeled "Start" or contains initial question.</element>
+        <element type="decision_node">Has multiple outgoing paths based on conditions (Yes/No, values, ranges).</element>
+        <element type="action_node">Single path through, represents a step or process.</element>
+        <element type="terminal">No outgoing paths, represents final outcome or conclusion.</element>
+        <element type="connector">Links to another part of the tree, often circular with reference label.</element>
+    </tree_structure_detection>
+
+    <branch_labeling>
+        <instruction>Identify how branches are labeled:</instruction>
+        <label type="boolean">Yes/No, True/False on decision branches.</label>
+        <label type="value">Specific values or ranges (e.g., ">50", "A", "Red").</label>
+        <label type="condition">Descriptive conditions on the branch line.</label>
+        <label type="implicit">No label - meaning inferred from context or position.</label>
+    </branch_labeling>
+
+    <path_tracing>
+        <instruction>Trace all paths through the tree:</instruction>
+        <step>Start at root node.</step>
+        <step>At each decision, record the condition and follow each branch.</step>
+        <step>Continue until reaching a terminal node.</step>
+        <step>Record the complete path: root → decisions → outcome.</step>
+        <step>Repeat for all possible paths.</step>
+        <step>Note any loops or cross-references.</step>
+    </path_tracing>
+
+    <validation>
+        <instruction>After extraction, verify decision tree perception accuracy:</instruction>
+        <check>Did you correctly identify the root using visual entry point cues?</check>
+        <check>Are decision nodes correctly identified by shape conventions?</check>
+        <check>Did you trace all branches using continuity?</check>
+        <check>Are branch labels correctly associated with their paths?</check>
+        <check>Are all terminal outcomes captured?</check>
+        <check>Did you identify any loops or cross-references?</check>
+    </validation>
+
+</gestalt_perception>

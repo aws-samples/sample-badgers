@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Full Text Analyzer -->
+<gestalt_perception analyzer="full_text">
+
+    <prescan>
+        <instruction>Before extracting text, perceive the document's visual text structure:</instruction>
+        <step>Scan the entire page to identify text regions vs. non-text elements.</step>
+        <step>Identify the visual hierarchy: what text is largest/boldest (headings) vs. body text?</step>
+        <step>Note column structure: single column, multi-column, or mixed layout.</step>
+        <step>Identify reading flow direction and natural reading path.</step>
+        <step>Distinguish primary text content from marginalia, footnotes, headers/footers.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="visual_hierarchy">
+            <guidance> Use visual weight to determine text hierarchy: - Largest, boldest text = primary headings (H1) - Progressively smaller/lighter = subheadings (H2, H3, etc.) - Consistent body text size = paragraphs - Smallest text = footnotes, captions, marginalia Visual prominence directly maps to semantic importance. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Spatial proximity defines text groupings: - Text blocks with minimal spacing = same paragraph - Larger gaps = paragraph breaks - Significant whitespace = section breaks - Text immediately below headings belongs to that section </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Consistent styling indicates text function: - Same font/size/weight = same text type - Italic text often = emphasis, titles, or foreign words - Different font family may indicate quotes or special content - Consistent indentation = list items or block quotes </guidance>
+        </primary>
+
+        <secondary principle="continuity">
+            <guidance> Follow natural reading flow: - LTR: left to right, top to bottom - Multi-column: complete each column before moving to next - Hyphenated words continue on next line - Text flows around images/figures </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <reading_order_detection>
+        <pattern type="single_column">Top to bottom, straightforward.</pattern>
+        <pattern type="two_column">Left column top-to-bottom, then right column.</pattern>
+        <pattern type="newspaper">May have varying column widths; follow visual flow.</pattern>
+        <pattern type="mixed">Main text in one area, sidebars separate; identify primary flow.</pattern>
+        <pattern type="wrapped">Text wraps around figures; follow the wrap path.</pattern>
+    </reading_order_detection>
+
+    <text_region_classification>
+        <region type="heading">Larger, bolder, often isolated with whitespace.</region>
+        <region type="body">Consistent size, flows in paragraphs.</region>
+        <region type="caption">Smaller, near figures/tables, often italic.</region>
+        <region type="footnote">Smallest, at page bottom, with reference markers.</region>
+        <region type="header_footer">Repeated at page top/bottom, metadata.</region>
+        <region type="marginalia">In margins, annotations or references.</region>
+        <region type="list">Indented, with bullets/numbers, consistent item spacing.</region>
+        <region type="blockquote">Indented block, often different styling.</region>
+    </text_region_classification>
+
+    <validation>
+        <instruction>After extraction, verify text perception accuracy:</instruction>
+        <check>Does extracted heading hierarchy match visual size/weight hierarchy?</check>
+        <check>Are paragraph breaks placed where visual spacing indicates breaks?</check>
+        <check>Is reading order correct based on column structure and visual flow?</check>
+        <check>Are text regions (body, captions, footnotes) correctly classified by visual styling?</check>
+        <check>Does the extracted structure honor the visual organization of the page?</check>
+    </validation>
+
+</gestalt_perception>

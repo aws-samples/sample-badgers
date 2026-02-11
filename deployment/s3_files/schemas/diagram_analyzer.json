@@ -1,0 +1,43 @@
+[
+    {
+        "name": "analyze_diagram_tool",
+        "description": "Specialized tool for analyzing conceptual diagrams that visually explain processes, systems, or ideas. ONLY use for: flowcharts, process diagrams, system architecture diagrams, network diagrams, organizational charts, mind maps, workflow diagrams, and other visual representations that explain concepts or show relationships between elements. NOT for: charts with data, tables, layouts, decorative graphics, photographs, or plain text. If no conceptual diagram is found, returns that no diagram content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image. Use this OR image_data, not both."
+                },
+                "image_data": {
+                    "type": "string",
+                    "description": "Base64-encoded image data. Use this OR image_path, not both. Preferred when image is already in memory."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                }
+            },
+            "required": [
+                "session_id"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "Analysis result from Diagram Analyzer"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the analysis completed successfully"
+                }
+            }
+        }
+    }
+]

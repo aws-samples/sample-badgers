@@ -1,0 +1,126 @@
+<response_format>
+    <unified_document session_id="{SESSION_ID}"
+                      page="{PAGE_NUMBER}"
+                      >
+        <metadata>
+            <source_image>{SOURCE_IMAGE_PATH}</source_image>
+            <correlation_timestamp>{TIMESTAMP}</correlation_timestamp>
+            <analyzers_executed>
+                <analyzer name="full_text"
+                          s3_uri="{FULL_TEXT_URI}"
+                          />
+                <analyzer name="{OTHER_ANALYZER}"
+                          s3_uri="{OTHER_URI}"
+                          />
+                <!-- Include all analyzers that were correlated -->
+            </analyzers_executed>
+        </metadata>
+
+        <content_spine>
+            <!-- Preserve ALL full_text elements exactly as they appear, with enrichments added -->
+
+            <element id="elem_001"
+                     type="{TYPE}"
+                     order="1"
+                     >
+                <text>{ORIGINAL_TEXT}</text>
+                <enrichments>
+                    <!-- Add enrichments only if relationships exist -->
+                </enrichments>
+            </element>
+
+            <!-- Example: Text element that references a figure -->
+            <element id="elem_007"
+                     type="paragraph"
+                     order="7"
+                     >
+                <text>...as shown in Figure 3.1...</text>
+                <enrichments>
+                    <cross_reference type="figure_callout"
+                                     target="diag_001"
+                                     >
+                        <citation_text>Figure 3.1</citation_text>
+                        <relationship>text_references_figure</relationship>
+                        <evidence>Text explicitly cites "Figure 3.1"</evidence>
+                    </cross_reference>
+                </enrichments>
+            </element>
+
+            <!-- Example: Figure element with embedded diagram structure -->
+            <element id="elem_010"
+                     type="figure"
+                     order="10"
+                     >
+                <caption>{CAPTION_TEXT}</caption>
+                <enrichments>
+                    <diagram ref="diag_001"
+                             type="{DIAGRAM_TYPE}"
+                             >
+                        <!-- Include FULL diagram structure from diagram_analyzer -->
+                        <!-- Do not summarize or truncate -->
+                    </diagram>
+                    <grounded_to_text>
+                        <ref element="elem_007"
+                             relationship="referenced_by"
+                             >
+                            <evidence>Text at elem_007 explicitly cites "Figure 3.1"</evidence>
+                        </ref>
+                        <ref element="elem_005,elem_006"
+                             relationship="illustrates"
+                             >
+                            <evidence>Figure illustrates the process described in paragraphs elem_005-006</evidence>
+                        </ref>
+                    </grounded_to_text>
+                </enrichments>
+            </element>
+
+            <!-- Example: Table element with embedded table structure -->
+            <element id="elem_015"
+                     type="table"
+                     order="15"
+                     >
+                <caption>{TABLE_CAPTION}</caption>
+                <enrichments>
+                    <table ref="tbl_001">
+                        <!-- Include FULL table structure from table_analyzer -->
+                    </table>
+                    <grounded_to_text>
+                        <ref element="elem_014"
+                             relationship="referenced_by"
+                             >
+                            <evidence>Text at elem_014 says "see Table 2 below"</evidence>
+                        </ref>
+                    </grounded_to_text>
+                </enrichments>
+            </element>
+        </content_spine>
+
+        <cross_reference_index>
+            <by_diagram>
+                <diagram ref="diag_001"
+                         grounded_to="elem_010"
+                         referenced_by="elem_007"
+                         illustrates="elem_005,elem_006"
+                         />
+            </by_diagram>
+            <by_table>
+                <table ref="tbl_001"
+                       grounded_to="elem_015"
+                       referenced_by="elem_014"
+                       />
+            </by_table>
+            <!-- Add by_chart if charts were correlated -->
+        </cross_reference_index>
+
+        <raw_outputs>
+            <output analyzer="full_text"
+                    s3_uri="{FULL_TEXT_URI}"
+                    />
+            <output analyzer="{OTHER_ANALYZER}"
+                    s3_uri="{OTHER_URI}"
+                    />
+        </raw_outputs>
+
+        <summary>{2-4 sentence description: what analyzers were correlated, how many elements in spine, key relationships found}</summary>
+    </unified_document>
+</response_format>

@@ -1,0 +1,49 @@
+<!-- ===================================================================
+SECTION 3: ELEMENT TYPES
+=================================================================== -->
+<element_types>
+    <description>PDF/UA structure element types for accessibility tagging</description>
+
+    <category name="headings">
+        <element type="H1">First-level heading (document title or main heading)</element>
+        <element type="H2">Second-level heading (major section)</element>
+        <element type="H3">Third-level heading (subsection)</element>
+        <element type="H4">Fourth-level heading</element>
+        <element type="H5">Fifth-level heading</element>
+        <element type="H6">Sixth-level heading</element>
+    </category>
+
+    <category name="paragraphs_and_text">
+        <element type="P">Paragraph of body text</element>
+        <element type="Span">Inline text with specific formatting</element>
+        <element type="Quote">Block quotation</element>
+        <element type="BlockQuote">Extended quotation set apart from main text</element>
+    </category>
+
+    <category name="lists">
+        <element type="L">List container (encompasses all list items)</element>
+        <element type="LI">Individual list item</element>
+    </category>
+
+    <category name="tables">
+        <element type="Table">Table container (entire table including headers)</element>
+        <element type="Caption">Table or figure caption</element>
+    </category>
+
+    <category name="figures_and_media">
+        <element type="Figure">Image, diagram, chart, photograph, or illustration</element>
+        <element type="Formula">Mathematical formula or equation</element>
+    </category>
+
+    <category name="links_and_references">
+        <element type="Link">Hyperlink</element>
+        <element type="Note">Footnote or endnote</element>
+        <element type="BibEntry">Bibliographic entry</element>
+    </category>
+
+    <category name="special">
+        <element type="TOC">Table of contents</element>
+        <element type="TOCI">Table of contents item</element>
+        <element type="Artifact">Decorative or non-content element (page numbers, headers, footers, watermarks)</element>
+    </category>
+</element_types>

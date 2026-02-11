@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Metadata Generic Analyzer -->
+<gestalt_perception analyzer="metadata_generic">
+
+    <prescan>
+        <instruction>Before extracting metadata, scan for metadata locations:</instruction>
+        <step>Check page margins (top, bottom, left, right) for metadata elements.</step>
+        <step>Look for header/footer regions with repeated information.</step>
+        <step>Identify title blocks, colophons, or information panels.</step>
+        <step>Note any rotated text (common for ISBNs, barcodes in margins).</step>
+        <step>Distinguish metadata from main content by position and styling.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="position_based_scanning">
+            <guidance> Metadata has predictable locations: - TOP: Title, author, date, document ID, running headers - BOTTOM: Page numbers, footnote references, copyright, running footers - LEFT MARGIN: Annotations, reference numbers, rotated text - RIGHT MARGIN: Annotations, ISBNs (often rotated), barcodes - CORNERS: Page numbers, document codes Scan these zones specifically for metadata content. </guidance>
+        </primary>
+
+        <primary principle="figure_ground">
+            <guidance> Separate metadata from main content: - METADATA: Smaller text in margins, headers, footers, distinct styling - MAIN CONTENT: Body text, figures, tables in the primary content area Metadata is typically visually subordinate to main content. </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Metadata styling is consistent and distinct: - Same font/size across all page numbers - Consistent header/footer formatting - Repeated patterns indicate metadata (e.g., "Page X of Y") - Different styling from body text signals metadata function </guidance>
+        </primary>
+
+        <secondary principle="proximity">
+            <guidance> Metadata elements cluster in specific zones: - Title + author + date often grouped together - Publisher info + ISBN + copyright clustered - Running headers separate from body text by whitespace </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <metadata_location_map>
+        <zone location="top_center">Title, subtitle, chapter heading.</zone>
+        <zone location="top_left">Author, date, document ID.</zone>
+        <zone location="top_right">Page number, version, date.</zone>
+        <zone location="bottom_center">Page number, copyright.</zone>
+        <zone location="bottom_left">Footnotes, references.</zone>
+        <zone location="bottom_right">Page number, document code.</zone>
+        <zone location="left_margin">Annotations, line numbers, rotated ISBN.</zone>
+        <zone location="right_margin">Annotations, barcodes, rotated text.</zone>
+    </metadata_location_map>
+
+    <metadata_type_detection>
+        <type name="identifier">ISBN, ISSN, DOI, document numbers - often alphanumeric codes.</type>
+        <type name="attribution">Author, editor, publisher, institution names.</type>
+        <type name="temporal">Date, year, edition, version numbers.</type>
+        <type name="structural">Page numbers, chapter numbers, section markers.</type>
+        <type name="legal">Copyright, permissions, disclaimers.</type>
+        <type name="reference">Citations, footnote markers, cross-references.</type>
+    </metadata_type_detection>
+
+    <rotated_text_detection>
+        <instruction>Check for rotated text, especially in margins:</instruction>
+        <orientation type="90_ccw">Text reading bottom-to-top (common for spine text, ISBNs).</orientation>
+        <orientation type="90_cw">Text reading top-to-bottom.</orientation>
+        <orientation type="180">Upside-down text (rare, usually errors).</orientation>
+    </rotated_text_detection>
+
+    <validation>
+        <instruction>After extraction, verify metadata perception accuracy:</instruction>
+        <check>Did you scan all margin zones for metadata?</check>
+        <check>Is metadata correctly distinguished from main content?</check>
+        <check>Are repeated metadata elements (headers/footers) consistently captured?</check>
+        <check>Did you check for and capture rotated text?</check>
+        <check>Are metadata types correctly classified?</check>
+    </validation>
+
+</gestalt_perception>

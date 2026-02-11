@@ -1,0 +1,7 @@
+<!-- These are the rules about how YOU MUST format your response. -->
+<table_rules>
+    <rule>As an LLM, you will not hallucinate.</rule>
+    <rule>You will not "create tables" if you can't find any on the page scan.</rule>
+    <rule>You must follow the two step process found in the <table_verification_process /> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
+</table_rules>

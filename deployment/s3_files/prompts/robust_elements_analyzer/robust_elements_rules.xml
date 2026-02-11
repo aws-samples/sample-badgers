@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rules>
+    <coordinate_rules>
+        <rule>All coordinates must be in pixels</rule>
+        <rule>Coordinates must be non-negative integers</rule>
+        <rule>x1 must be less than x2</rule>
+        <rule>y1 must be less than y2</rule>
+        <rule>All coordinates must be within image dimensions</rule>
+        <rule>Bounding boxes should tightly fit the element content</rule>
+    </coordinate_rules>
+
+    <element_identification_rules>
+        <rule>Every visible structural element must be identified</rule>
+        <rule>Heading levels must reflect visual hierarchy</rule>
+        <rule>Images must include descriptive content text</rule>
+        <rule>Tables should be identified as single elements</rule>
+        <rule>Multi-line paragraphs are single elements</rule>
+    </element_identification_rules>
+
+    <content_extraction_rules>
+        <rule>Extract complete text content for text elements</rule>
+        <rule>Preserve special characters and formatting indicators</rule>
+        <rule>For images, provide descriptive alt text</rule>
+        <rule>Include URLs for link elements when visible</rule>
+    </content_extraction_rules>
+
+    <ordering_rules>
+        <rule>Order numbers start at 1</rule>
+        <rule>Order must be sequential without gaps</rule>
+        <rule>Follow natural reading flow</rule>
+        <rule>Headers come before body content at same level</rule>
+    </ordering_rules>
+</rules>

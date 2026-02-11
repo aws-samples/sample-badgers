@@ -1,0 +1,29 @@
+<layout_dictionary>
+    <!-- Descriptions of various layout concepts. -->
+    <layout_concepts>
+        <concept type="Grid System">Understanding how information could be designed along a grid system for organization.</concept>
+        <concept type="Typography">Understanding typographic design systems to inform visual hierarchy.</concept>
+        <concept type="White Space">Understanding how white space can be used to break up concepts or group elements together.</concept>
+        <concept type="Hierarchy">Understanding the importance of how text sizing and graphics determine the relationship between other elements.</concept>
+        <concept type="Balance">Understanding the distribution of element weights to create an organized document.</concept>
+        <concept type="Alignment">Understanding that elements can align along rows or columns.</concept>
+        <concept type="Repetition">Understanding that consistency is important in layout design.</concept>
+        <concept type="Proximity">Understanding related items are grouped together.</concept>
+        <concept type="Color Theory">Understanding color relationships effectively.</concept>
+        <concept type="Readability">Understanding what makes reading and understanding text easy.</concept>
+        <concept type="Legibility">Understanding that handwriting may need to be scrutinized to discern what it is saying.</concept>
+        <concept type="Leading">Understanding what the spacing between lines of text could mean in context of visual hierarchy.</concept>
+        <concept type="Widow and Orphan">Understanding that there could be elements that don't seemingly belong.</concept>
+        <concept type="Text Direction">Understanding that some language writing systems write and design content from right to left or from left to right.</concept>
+        <concept type="Page Orientation">Understanding that portrait orientation refers to a page layout where the height is greater than the width, typically used for documents and photos of people. Landscape orientation, on the other hand, has the width greater than the height and is often employed for wide images or spreadsheets with many columns.</concept>
+    </layout_concepts>
+
+    <!-- Descriptions of various layout zones. "Layout zones" contain "elements" -->
+    <layout_zones>
+        <zone type="zone_header">The topmost area of a page layout, typically containing elements such as titles, subtitles, author names, logos, or other identifying information, varying based on the content type (e.g., book, paper, magazine, poster). If a page has only one element on it or only a list of elements, that does not count as a zone_header.</zone>
+        <zone type="zone_footer">The bottom area of a page layout, typically containing elements such as page numbers, copyright information, footnotes, or other supplementary details, varying based on the content type (e.g., book, paper, magazine, poster).</zone>
+        <zone type="zone_column">Vertical divisions of content, often used for multi-column layouts. Usually more than one on a page and in some kind of order.</zone>
+        <zone type="zone_main_page_content">The main content of the page. Usually contains sections, paragraphs, what a user is typically reading to learn from the content. Does not include header, footer, or metadata content.</zone>
+        <zone type="zone_rails">Usually found to the left or right of the main content on the page. Often contains call-outs, summaries, or even completely unrelated content. Specify as right or left rail.</zone>
+    </layout_zones>
+</layout_dictionary>

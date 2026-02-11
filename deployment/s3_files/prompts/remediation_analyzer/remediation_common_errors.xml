@@ -1,0 +1,54 @@
+<!-- ===================================================================
+SECTION 7: COMMON ERRORS
+=================================================================== -->
+
+<common_errors>
+    <error id="1">
+        <name>Overextended Bounding Box</name>
+        <symptom>Bounding box includes adjacent elements or excessive whitespace</symptom>
+        <cause>Not carefully tracing the actual content boundaries</cause>
+        <fix>Use grid lines to identify exactly where content starts and ends</fix>
+    </error>
+
+    <error id="2">
+        <name>Overlapping Elements</name>
+        <symptom>Two elements have overlapping coordinate ranges when they shouldn't</symptom>
+        <cause>Not checking for gaps between elements</cause>
+        <fix>Verify that adjacent elements have clear boundaries between them</fix>
+    </error>
+
+    <error id="3">
+        <name>Invalid Cell References</name>
+        <symptom>Lowercase letters, spaces, or out-of-range values</symptom>
+        <cause>Formatting errors</cause>
+        <fix>Always use UPPERCASE letters, no spaces, valid row numbers (1-{rows})</fix>
+    </error>
+
+    <error id="4">
+        <name>Missing Elements</name>
+        <symptom>Important content not identified</symptom>
+        <cause>Not thoroughly scanning the entire page</cause>
+        <fix>Systematically scan from top to bottom, left to right</fix>
+    </error>
+
+    <error id="5">
+        <name>Wrong Heading Levels</name>
+        <symptom>Heading hierarchy skips levels or is based only on visual size</symptom>
+        <cause>Using visual appearance instead of document structure</cause>
+        <fix>Assign heading levels based on logical hierarchy, not font size</fix>
+    </error>
+
+    <error id="6">
+        <name>Missing Alt Text</name>
+        <symptom>Figure elements without alt_text field</symptom>
+        <cause>Forgetting accessibility requirements</cause>
+        <fix>ALWAYS provide descriptive alt_text for every Figure element</fix>
+    </error>
+
+    <error id="7">
+        <name>Skipping Analysis</name>
+        <symptom>JSON output without preceding &lt;analysis&gt; block</symptom>
+        <cause>Rushing to output without systematic boundary tracing</cause>
+        <fix>ALWAYS complete the full 5-step analysis before outputting JSON</fix>
+    </error>
+</common_errors>

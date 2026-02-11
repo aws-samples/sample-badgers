@@ -1,0 +1,117 @@
+{
+    "tool": {
+        "name": "analyze_robust_elements_tool",
+        "description": "Specialized tool for extracting structural elements from document images with precise bounding box coordinates. ONLY use for: document structure analysis with coordinate requirements, layout element identification with positioning, page component extraction with spatial data. Returns JSON with elements array containing order, type, level, content, and bbox (x1, y1, x2, y2) for each element. NOT for: simple element extraction without coordinates, content analysis, text extraction, metadata extraction. If no structural elements are found, returns that no document elements were detected.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing document for structural elements analysis with coordinates. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "robust_elements_analyzer",
+        "description": "Analyzes document structure and extracts elements with precise bounding box coordinates",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "robust_elements_job_role.xml",
+            "robust_elements_context.xml",
+            "robust_elements_dictionary.xml",
+            "robust_elements_tasks_extraction.xml",
+            "robust_elements_rules.xml",
+            "robust_elements_format.xml",
+            "robust_elements_help.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "document elements with coordinates",
+        "expected_output_tokens": 3500,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "json"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.084262+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "bbox_accuracy",
+                    "text": "Were bounding box coordinates accurate?",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_classification",
+                    "text": "Were elements correctly classified by type?",
+                    "type": "likert"
+                },
+                {
+                    "id": "coordinate_precision",
+                    "text": "Were coordinate values precise and consistent?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

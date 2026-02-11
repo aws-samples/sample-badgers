@@ -1,0 +1,94 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+
+<response_format>
+    <response extraction_type="educational_transcript">
+        <metadata>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_TRANSCRIPTS_DETECTED}</element_count>
+        </metadata>
+        <!-- If element_count is 0, omit <elements> section entirely -->
+        <!-- Include one <element> per educational transcript found -->
+        <elements>
+            <element type="educational_transcript">
+                <type>Educational Transcript</type>
+                <summary>
+                    <institution_name>{NAME_OF_EDUCATIONAL_INSTITUTION}</institution_name>
+                    <student_name>{STUDENT_NAME}</student_name>
+                    <student_id>{STUDENT_IDENTIFICATION_NUMBER}</student_id>
+                    <transcript_type>{OFFICIAL_OR_UNOFFICIAL}</transcript_type>
+                    <educational_level>{K12_HIGHSCHOOL_UNDERGRADUATE_GRADUATE_PROFESSIONAL_ETC}</educational_level>
+                    <date_range>{START_DATE_TO_END_DATE_OF_ACADEMIC_RECORD}</date_range>
+                </summary>
+                <content>
+                    <institution_details>
+                        <full_name>{COMPLETE_INSTITUTION_NAME}</full_name>
+                        <address>{INSTITUTIONAL_ADDRESS_IF_PRESENT}</address>
+                        <contact_info>{PHONE_EMAIL_WEBSITE_IF_PRESENT}</contact_info>
+                    </institution_details>
+                    <student_information>
+                        <name>{FULL_STUDENT_NAME}</name>
+                        <id_number>{STUDENT_ID_OR_IDENTIFICATION_NUMBER}</id_number>
+                        <date_of_birth>{DOB_IF_PRESENT}</date_of_birth>
+                        <enrollment_dates>
+                            <start_date>{ENROLLMENT_START_DATE}</start_date>
+                            <end_date>{ENROLLMENT_END_DATE_OR_CURRENT}</end_date>
+                        </enrollment_dates>
+                    </student_information>
+                    <academic_record>
+                        <term>
+                            <term_name>{SEMESTER_QUARTER_YEAR_DESIGNATION}</term_name>
+                            <term_dates>{START_AND_END_DATES_IF_PRESENT}</term_dates>
+                            <courses>
+                                <course>
+                                    <course_code>{COURSE_CODE_OR_NUMBER}</course_code>
+                                    <course_title>{FULL_COURSE_TITLE}</course_title>
+                                    <credits>{CREDIT_HOURS_OR_UNITS}</credits>
+                                    <grade>{LETTER_GRADE_NUMERICAL_SCORE_OR_PASS_FAIL}</grade>
+                                    <grade_points>{QUALITY_POINTS_IF_APPLICABLE}</grade_points>
+                                </course>
+                            </courses>
+                            <term_summary>
+                                <credits_attempted>{CREDITS_ATTEMPTED_THIS_TERM}</credits_attempted>
+                                <credits_earned>{CREDITS_EARNED_THIS_TERM}</credits_earned>
+                                <term_gpa>{GPA_FOR_THIS_TERM_IF_SHOWN}</term_gpa>
+                            </term_summary>
+                        </term>
+                    </academic_record>
+                    <cumulative_summary>
+                        <total_credits_attempted>{TOTAL_CREDITS_ATTEMPTED}</total_credits_attempted>
+                        <total_credits_earned>{TOTAL_CREDITS_EARNED}</total_credits_earned>
+                        <cumulative_gpa>{OVERALL_GPA_OR_GRADE_AVERAGE}</cumulative_gpa>
+                        <class_rank>{CLASS_RANK_IF_PRESENT}</class_rank>
+                        <honors_distinctions>{HONORS_AWARDS_DISTINCTIONS}</honors_distinctions>
+                    </cumulative_summary>
+                    <degrees_credentials>
+                        <degree>
+                            <degree_type>{DEGREE_OR_CREDENTIAL_TYPE}</degree_type>
+                            <major_program>{MAJOR_FIELD_OF_STUDY}</major_program>
+                            <minor_concentration>{MINOR_OR_CONCENTRATION_IF_APPLICABLE}</minor_concentration>
+                            <conferral_date>{DATE_DEGREE_CONFERRED}</conferral_date>
+                            <honors>{GRADUATION_HONORS_IF_APPLICABLE}</honors>
+                        </degree>
+                    </degrees_credentials>
+                    <grading_scale>
+                        <scale_description>{EXPLANATION_OF_GRADING_SYSTEM}</scale_description>
+                        <grade_values>{GRADE_TO_POINT_CONVERSIONS_IF_SHOWN}</grade_values>
+                    </grading_scale>
+                    <authentication>
+                        <official_status>{OFFICIAL_OR_UNOFFICIAL_DESIGNATION}</official_status>
+                        <issue_date>{DATE_TRANSCRIPT_ISSUED}</issue_date>
+                        <registrar_signature>{PRESENCE_OF_SIGNATURE_YES_NO}</registrar_signature>
+                        <official_seal>{PRESENCE_OF_SEAL_YES_NO}</official_seal>
+                        <security_features>{WATERMARKS_SECURITY_PAPER_ETC}</security_features>
+                    </authentication>
+                    <additional_notes>
+                        <transfer_credits>{TRANSFER_CREDIT_INFORMATION_IF_PRESENT}</transfer_credits>
+                        <academic_standing>{PROBATION_SUSPENSION_GOOD_STANDING_ETC}</academic_standing>
+                        <special_notations>{ANY_SPECIAL_NOTES_OR_ANNOTATIONS}</special_notations>
+                    </additional_notes>
+                </content>
+            </element>
+        </elements>
+    </response>
+</response_format>

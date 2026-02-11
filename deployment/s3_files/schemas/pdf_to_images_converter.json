@@ -1,0 +1,43 @@
+[
+    {
+        "name": "pdf_to_images_converter",
+        "description": "Convert PDF documents to optimized images for AI analysis. Returns S3 paths to pre-encoded base64 image files (one per page) that can be passed directly to analyzer tools via image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pdf_path": {
+                    "type": "string",
+                    "description": "S3 URL (s3://bucket/key) or absolute file path to the PDF document to process."
+                },
+                "max_image_size_mb": {
+                    "type": "number",
+                    "description": "Maximum size limit for each generated image in megabytes. Default: 4.0"
+                },
+                "dpi": {
+                    "type": "integer",
+                    "description": "Resolution in dots per inch for PDF to image conversion. Default: 128"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for authentication."
+                }
+            },
+            "required": [
+                "pdf_path"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "JSON object with: images (array of S3 paths like s3://bucket/temp/session/page_001.b64), page_count (number of pages), session_id (unique identifier). Pass these S3 paths to analyzer tools via image_path."
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the conversion completed successfully"
+                }
+            }
+        }
+    }
+]

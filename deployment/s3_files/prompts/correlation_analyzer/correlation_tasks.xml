@@ -1,0 +1,19 @@
+<tasks>
+    <task>Review the full_text analyzer output — this is your content spine. Note all element IDs and types.</task>
+    <task>Review each additional analyzer output (diagram, table, chart, etc.). Note their element IDs and content.</task>
+    <task>For each full_text element, determine if any enrichments from other analyzers should attach: <sub_task>Does this text reference a figure? (e.g., "see Figure 3", "as shown in Table 1")</sub_task>
+        <sub_task>Does this text describe content that a figure illustrates?</sub_task>
+        <sub_task>Is this element a figure caption that should link to a diagram/table/chart?</sub_task>
+    </task>
+    <task>For each figure/diagram/table/chart, establish grounding: <sub_task>Which text elements reference it? (referenced_by)</sub_task>
+        <sub_task>Which text elements does it illustrate? (illustrates)</sub_task>
+        <sub_task>What is the evidence for each relationship?</sub_task>
+    </task>
+    <task>Build the unified_document: <sub_task>Start with metadata (source_image, analyzers_executed with S3 URIs)</sub_task>
+        <sub_task>Create content_spine with all full_text elements in order</sub_task>
+        <sub_task>Attach enrichments inside each element where relationships exist</sub_task>
+        <sub_task>Build cross_reference_index</sub_task>
+        <sub_task>Include raw_outputs section</sub_task>
+    </task>
+    <task>Write a 2-4 sentence summary of what was correlated and key relationships found.</task>
+</tasks>

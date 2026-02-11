@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Code Block Analyzer -->
+<gestalt_perception analyzer="code_block">
+
+    <prescan>
+        <instruction>Before extracting code, identify code regions visually:</instruction>
+        <step>Scan for monospace font regions - code typically uses fixed-width fonts.</step>
+        <step>Look for syntax highlighting (colored text indicating language elements).</step>
+        <step>Identify bordered or shaded containers that frame code blocks.</step>
+        <step>Note line numbers if present along the left margin.</step>
+        <step>Distinguish code from surrounding prose text.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="figure_ground">
+            <guidance> Separate code from surrounding content: - FIGURE: The code itself (extract this) - GROUND: Container borders, background shading, line number gutters Code blocks are often visually distinguished from prose through: - Different background color (often gray or dark) - Bordered containers - Distinct font family (monospace vs. proportional) </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Visual consistency indicates code structure: - Consistent indentation = code block hierarchy - Same color = same syntax category (keywords, strings, comments) - Monospace font throughout = single code block - Font change = transition between code and prose </guidance>
+        </primary>
+
+        <primary principle="alignment">
+            <guidance> Indentation reveals code structure: - Left-aligned code = top-level statements - Indented code = nested blocks (functions, loops, conditionals) - Consistent indentation depth = same nesting level - Alignment of similar elements (e.g., assignment operators) </guidance>
+        </primary>
+
+        <secondary principle="proximity">
+            <guidance> Spacing indicates code organization: - Blank lines separate logical sections - Tight spacing within related statements - Comments near code they describe </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <code_region_detection>
+        <cue type="font">Monospace/fixed-width font (Courier, Consolas, Monaco, etc.).</cue>
+        <cue type="background">Different background color from surrounding text.</cue>
+        <cue type="border">Bordered container or box around code.</cue>
+        <cue type="line_numbers">Numbered lines along left margin.</cue>
+        <cue type="syntax_highlighting">Colored text indicating language syntax.</cue>
+        <cue type="indentation">Structured indentation pattern.</cue>
+    </code_region_detection>
+
+    <syntax_color_patterns>
+        <pattern type="keywords">Often blue or purple (if, for, while, def, class).</pattern>
+        <pattern type="strings">Often green or red (quoted text).</pattern>
+        <pattern type="comments">Often gray or green (// or # prefixed).</pattern>
+        <pattern type="numbers">Often different color from identifiers.</pattern>
+        <pattern type="functions">Often yellow or distinct from variables.</pattern>
+        <note>Color schemes vary - use patterns within the document for consistency.</note>
+    </syntax_color_patterns>
+
+    <language_identification_cues>
+        <cue language="python">def, class, import, indentation-based blocks, # comments.</cue>
+        <cue language="javascript">function, const/let/var, =>, {}, // comments.</cue>
+        <cue language="java">public class, void, System.out, semicolons, // comments.</cue>
+        <cue language="html">Tags with &lt; &gt;, attributes, DOCTYPE.</cue>
+        <cue language="css">Selectors, {property: value;} patterns.</cue>
+        <cue language="sql">SELECT, FROM, WHERE, uppercase keywords.</cue>
+        <cue language="bash">#!/bin/bash, $variables, pipe |, # comments.</cue>
+    </language_identification_cues>
+
+    <validation>
+        <instruction>After extraction, verify code perception accuracy:</instruction>
+        <check>Did you correctly identify code regions using figure/ground separation?</check>
+        <check>Is indentation structure preserved accurately?</check>
+        <check>Are code blocks correctly bounded (not merged with prose)?</check>
+        <check>Is the programming language correctly identified from visual cues?</check>
+        <check>Are inline code snippets distinguished from block code?</check>
+    </validation>
+
+</gestalt_perception>

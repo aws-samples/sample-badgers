@@ -1,0 +1,50 @@
+<!-- These are the specialized analysis tools available in the system -->
+<available_tools>
+    <!-- Tool for analyzing conceptual diagrams and process flows -->
+    <tool>
+        <name>analyze_diagram_tool</name>
+        <specialization>Conceptual Diagrams</specialization>
+        <content_types>
+            <content_type>Flowcharts</content_type>
+            <content_type>Process diagrams</content_type>
+            <content_type>System architecture</content_type>
+            <content_type>Network diagrams</content_type>
+            <content_type>Organizational charts</content_type>
+            <content_type>Mind maps</content_type>
+            <content_type>Workflow diagrams</content_type>
+        </content_types>
+        <indicators>Connected shapes, arrows, process flows, hierarchical structures</indicators>
+    </tool>
+
+    <!-- Tool for analyzing structured data in tables -->
+    <tool>
+        <name>analyze_table_tool</name>
+        <specialization>Tabular Data</specialization>
+        <content_types>
+            <content_type>Data tables</content_type>
+            <content_type>Spreadsheets</content_type>
+            <content_type>Comparison charts</content_type>
+            <content_type>Statistical tables</content_type>
+            <content_type>Financial tables</content_type>
+            <content_type>Schedules</content_type>
+            <content_type>Grid-organized lists</content_type>
+        </content_types>
+        <indicators>Rows and columns, structured data, grid layouts, headers</indicators>
+    </tool>
+
+    <!-- Tool for analyzing handwritten text and annotations -->
+    <tool>
+        <name>analyze_handwriting_tool</name>
+        <specialization>Handwritten Content</specialization>
+        <content_types>
+            <content_type>Handwritten notes</content_type>
+            <content_type>Annotations</content_type>
+            <content_type>Margin notes</content_type>
+            <content_type>Cursive writing</content_type>
+            <content_type>Personal notes</content_type>
+            <content_type>Signatures</content_type>
+            <content_type>Journal entries</content_type>
+        </content_types>
+        <indicators>Hand-drawn text, cursive script, informal writing, annotations</indicators>
+    </tool>
+</available_tools>

@@ -1,0 +1,19 @@
+<!-- Outlines the steps for identifying and extracting code blocks -->
+<tasks>
+    <task>Perform the first pass identification of potential code block structures: <sub_task>Identify the programming language or format type.</sub_task>
+        <sub_task>Locate distinct code blocks and their boundaries.</sub_task>
+        <sub_task>Identify syntax patterns and recurring elements.</sub_task>
+    </task>
+    <task>For each identified potential code block, perform the second pass analysis: <sub_task>Analyze code structure including hierarchy and nesting patterns.</sub_task>
+        <sub_task>Document syntax rules and conventions used.</sub_task>
+        <sub_task>Note special characters and escape sequences.</sub_task>
+        <sub_task>Identify variable and value patterns.</sub_task>
+    </task>
+    <task>Analyze formatting characteristics: <sub_task>Identify indentation patterns.</sub_task>
+        <sub_task>Document whitespace usage.</sub_task>
+        <sub_task>Note comment styles and placement.</sub_task>
+    </task>
+    <task>Analyze the context surrounding each potential code block to ensure accurate classification.</task>
+    <task>For verified code blocks, ensure you capture the complete content with preserved formatting.</task>
+    <task>If no structures meet the criteria for a code block after verification, respond ONLY with the not_found_response as specified.</task>
+</tasks>

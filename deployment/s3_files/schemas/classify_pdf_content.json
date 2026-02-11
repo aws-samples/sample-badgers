@@ -1,0 +1,43 @@
+[
+    {
+        "name": "classify_pdf_content_tool",
+        "description": "Classify content types in PDF page images using vision LLM. Analyzes images to determine what type of content they contain (diagrams, tables, handwriting, charts, etc.) and recommends appropriate analysis tools for each page. Returns structured classification results with confidence scores and tool recommendations.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_paths": {
+                    "type": "string",
+                    "description": "JSON string containing array of image file paths or base64-encoded images to classify."
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID from pdf_to_images_converter for organizing results in S3."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication."
+                },
+                "config_path": {
+                    "type": "string",
+                    "description": "Path to analyzer configuration file. Default: ./config/analyzer_config.json"
+                }
+            },
+            "required": [
+                "image_paths"
+            ]
+        },
+        "outputSchema": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string",
+                    "description": "JSON string with classification results: page numbers, content types, confidence scores, and recommended analyzer tools"
+                },
+                "success": {
+                    "type": "boolean",
+                    "description": "Whether the classification completed successfully"
+                }
+            }
+        }
+    }
+]

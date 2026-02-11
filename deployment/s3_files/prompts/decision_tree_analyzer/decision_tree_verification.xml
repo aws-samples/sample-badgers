@@ -1,0 +1,78 @@
+<!-- Two-step decision tree verification process: 1) Identify potential decision trees, 2) Verify
+against strict criteria -->
+<decision_tree_verification_process>
+    <!-- Take a deep breath and think about your findings. -->
+    <pass_1_identification>
+        <step>Scan within the image for separately defined/delimited decision-making elements,
+            flowcharts, or logical pathway structures.</step>
+        <step>Look for visual indicators of decision trees such as: diamond-shaped decision nodes,
+            rectangular process boxes, arrows indicating flow, branching pathways, and conditional
+            logic.</step>
+        <step>Identify potential entry points (starting conditions) and endpoints (outcomes or final
+            steps).</step>
+        <step>Mark all potential decision tree areas and keep your findings in your mind.</step>
+        <step>Look for text that suggests decision-making processes such as: "if", "then", "else",
+            "choose", "decide", "assess", "evaluate", conditional questions, and branching
+            scenarios.</step>
+        <step>Note any visual elements that suggest logical flow: arrows, connecting lines,
+            branching structures, sequential numbering, and hierarchical organization.</step>
+    </pass_1_identification>
+
+    <!-- Take a deep breath and think about your findings. -->
+    <pass_2_verification>
+        <decision_tree_criteria>
+            <criterion>Contains clear decision points with conditional branching (if/then logic)</criterion>
+            <criterion>Has logical pathways connecting different elements</criterion>
+            <criterion>Demonstrates decision-making process rather than just information display</criterion>
+            <criterion>Shows multiple possible outcomes based on different conditions</criterion>
+            <criterion>Contains at least one decision node and one outcome/process node</criterion>
+            <criterion>Has clear directional flow indicated by arrows, lines, or logical sequence</criterion>
+        </decision_tree_criteria>
+
+        <pathway_verification>
+            <step>Verify that pathways connect logically from decision points to outcomes or next
+                steps.</step>
+            <step>Confirm that branching occurs based on conditions, responses, or criteria.</step>
+            <step>Check for "choose your own adventure" elements where multiple valid paths exist.</step>
+            <step>Identify any loop-back structures or recursive decision points.</step>
+            <step>Verify that all pathways lead to logical conclusions or further decision points.</step>
+        </pathway_verification>
+
+        <context_check>
+            <step>Analyze text immediately before and after the potential decision tree to
+                understand context and purpose. Don't return that text, just keep it in your mind.</step>
+            <step>Verify the structure represents decision-making rather than just organizational
+                relationships or static information.</step>
+            <step>Reject if the structure is merely a hierarchical organization chart, network
+                diagram, or informational display.</step>
+            <step>Confirm the presence of conditional logic and decision-making elements.</step>
+            <step>Reject if part of a larger text section, reference list, or non-decision making
+                diagram.</step>
+        </context_check>
+
+        <complexity_assessment>
+            <step>Evaluate whether the decision tree represents simple binary choices or complex
+                multi-path scenarios.</step>
+            <step>Identify probabilistic elements if present (probability values, likelihood
+                assessments).</step>
+            <step>Note cross-references to external figures, procedures, or additional decision
+                trees.</step>
+            <step>Assess whether multiple valid endpoints exist for different scenarios.</step>
+            <step>Document any user-dependent or context-dependent pathway variations.</step>
+        </complexity_assessment>
+    </pass_2_verification>
+
+    <!-- Use your two pass verification findings for this next step. -->
+    <full_decision_tree_capture>
+        <step>If a decision tree is verified, capture all nodes, pathways, and logical connections
+            according to the format provided within the <response_format /> XML tags.</step>
+        <step>Map complete pathways from entry points to all possible endpoints.</step>
+        <step>Document all conditional branching and the criteria that determine pathway selection.</step>
+        <step>Capture any loop-back structures or recursive elements.</step>
+        <step>Include cross-references to external figures, tables, or procedures.</step>
+        <step>Analyze and document the overall decision-making logic and "choose your own adventure"
+            elements.</step>
+        <step>Ensure all nodes are properly categorized as decision, process, outcome, or reference
+            nodes.</step>
+    </full_decision_tree_capture>
+</decision_tree_verification_process>

@@ -1,0 +1,7 @@
+<rules>
+    1. You are to scan the entire page for metadata, identifying elements based on the definitions provided to you in the <metadata_element_dictionary></metadata_element_dictionary> tags.
+    2. You must remember that Authors, Contributors, and Organizational information near the "title" of a document is more than likely all related as metadata.
+    3. DO NOT output abstracts, citations, references, or footnotes as metadata.
+    4. NEVER leave out or omit anything for brevity purposes.
+    5. You will pause, take a deep breath, and double check your work before responding.
+</rules>

@@ -1,0 +1,61 @@
+<!-- This file defines the two-step verification process for LaTeX formula detection -->
+<latex_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for
+            analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- First pass: Identification of potential LaTeX formulas -->
+    <pass_1_identification>
+        <!-- Scan only the target image -->
+        <step>Scan ONLY within the target image for potential LaTeX formula structures.</step>
+        <!-- Early exit if no formulas found -->
+        <step>If no potential formulas are found, immediately skip to the final_verification step.</step>
+        <!-- Mark potential formulas -->
+        <step>Mark all potential LaTeX formula areas in the target image and save it in your mind.</step>
+        <!-- Confirmation to avoid example image analysis -->
+        <step>Confirm that you have not considered any example images in this process.</step>
+    </pass_1_identification>
+
+    <!-- Second pass: Verification of identified potential formulas -->
+    <pass_2_verification>
+        <!-- Criteria for LaTeX formula verification -->
+        <latex_criteria>
+            <criterion>Contains LaTeX-specific commands (e.g., \frac, \sum, \int)</criterion>
+            <criterion>Uses mathematical symbols or Greek letters</criterion>
+            <criterion>Structured with proper LaTeX syntax (e.g., proper use of {}, ^, _)</criterion>
+            <criterion>Represents a complete mathematical expression or equation</criterion>
+        </latex_criteria>
+        <!-- Context checking for each potential formula -->
+        <context_check>
+            <step>Analyze text immediately before and after the potential LaTeX formula in the
+                target image, to help you. Don't return that text, just keep it in your mind.</step>
+            <step>Check for equation numbers or labels associated with the formula in the target
+                image.</step>
+            <step>Reject if part of a larger text section without clear mathematical content.</step>
+        </context_check>
+        <!-- Additional checks to prevent example image analysis -->
+        <additional_checks>
+            <step>For each potential formula, explicitly confirm it exists in the target image, not
+                in any example.</step>
+            <step>If you realize a formula is from an example, immediately discard it.</step>
+        </additional_checks>
+    </pass_2_verification>
+
+    <!-- Capture verified LaTeX formulas -->
+    <full_latex_capture>
+        <step>If a LaTeX formula is verified in the target image, capture all related LaTeX code
+            within the formula element according to the format provided.</step>
+        <step>If no formulas were found or verified, prepare to report that no formulas were
+            detected.</step>
+    </full_latex_capture>
+
+    <!-- Final verification to ensure accuracy -->
+    <final_verification>
+        <step>Review each captured formula and confirm its presence in the target image.</step>
+        <step>If any doubt exists about a formula's source, discard it.</step>
+        <step>Confirm one last time that you have only analyzed the target image and have not
+            included any information from the example images.</step>
+    </final_verification>
+</latex_verification_process>

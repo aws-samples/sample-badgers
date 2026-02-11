@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Elements Analyzer -->
+<gestalt_perception analyzer="elements">
+
+    <prescan>
+        <instruction>Before identifying individual elements, perform a holistic visual scan:</instruction>
+        <step>View the entire page. What draws your eye first? This is the dominant element.</step>
+        <step>Identify major zones: header area, main content, sidebars, footer.</step>
+        <step>Note what clusters together spatially - these are likely semantic groups.</step>
+        <step>Distinguish foreground content (text, images, data) from background (watermarks, decorative borders, page artifacts).</step>
+        <step>Observe visual hierarchy through size, weight, and contrast differences.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="figure_ground">
+            <guidance> Separate meaningful content from artifacts before element identification. Background colors, watermarks, page borders, and decorative elements are GROUND - note but don't extract as primary content. Text, images, tables, diagrams, and data are FIGURE - these are your extraction targets. </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance> Elements close together belong to the same logical unit. A caption directly below an image belongs WITH that image. Tightly spaced list items form a single list element. Headers immediately above content blocks are paired with that content. </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Use visual consistency to classify element types: - All text in the same large bold font = headings of same level - All text in small italic = captions or footnotes - Repeated visual styling = same element category When uncertain about element type, look for visually similar elements you've already classified. </guidance>
+        </primary>
+
+    </principles_emphasis>
+
+    <element_detection_cues>
+        <cue>Headings: larger, bolder, often isolated with whitespace above/below.</cue>
+        <cue>Body text: consistent size, regular weight, flows in paragraphs or columns.</cue>
+        <cue>Captions: smaller, often italic, positioned near figures/tables.</cue>
+        <cue>Footnotes: smallest text, typically at page bottom, may have reference markers.</cue>
+        <cue>Lists: indented, with bullets/numbers, consistent item spacing.</cue>
+        <cue>Tables: grid alignment, header row often visually distinct.</cue>
+        <cue>Figures: bounded regions containing images, charts, or diagrams.</cue>
+    </element_detection_cues>
+
+    <validation>
+        <instruction>After extraction, verify your element identification honors visual perception:</instruction>
+        <check>Did you correctly separate figure (content) from ground (artifacts)?</check>
+        <check>Are spatially proximate elements grouped appropriately?</check>
+        <check>Are visually similar elements classified consistently?</check>
+        <check>Does your element hierarchy match the visual hierarchy you observed?</check>
+        <check>Did you capture relationships between adjacent elements (caption-figure, header-content)?</check>
+    </validation>
+
+</gestalt_perception>

@@ -1,0 +1,27 @@
+<!-- These are the specific usage rules for each analysis tool (referenced in tasks and
+available_tools sections) -->
+<tool_usage_rules>
+    <!-- Rules for the diagram analysis tool (see <available_tools/> for content_types and
+    <quick_reference/> for summary) -->
+    <tool name="analyze_diagram_tool">
+        <use_only_for>Conceptual diagrams that explain processes, systems, or relationships</use_only_for>
+        <do_not_use_for>Data charts, tables, decorative graphics, photographs, plain text</do_not_use_for>
+        <confidence_indicators>Clear shapes, connecting lines, process flows, hierarchical structures (use with confidence_scoring_guidelines from <classification_rules />)</confidence_indicators>
+    </tool>
+
+    <!-- Rules for the table analysis tool (see <available_tools/> for content_types and
+    <quick_reference/> for summary) -->
+    <tool name="analyze_table_tool">
+        <use_only_for>Structured data organized in rows and columns</use_only_for>
+        <do_not_use_for>Diagrams, flowcharts, handwriting, decorative layouts</do_not_use_for>
+        <confidence_indicators>Grid structure, headers, data cells, tabular organization (use with confidence_scoring_guidelines from <classification_rules />)</confidence_indicators>
+    </tool>
+
+    <!-- Rules for the handwriting analysis tool (see <available_tools/> for content_types and
+    <quick_reference/> for summary) -->
+    <tool name="analyze_handwriting_tool">
+        <use_only_for>Text written by hand in any form</use_only_for>
+        <do_not_use_for>Printed text, typed text, diagrams, tables</do_not_use_for>
+        <confidence_indicators>Irregular letter formation, cursive elements, pen/pencil marks (use with confidence_scoring_guidelines from <classification_rules />)</confidence_indicators>
+    </tool>
+</tool_usage_rules>

@@ -1,0 +1,19 @@
+<!-- Specifies the rules for war map extraction and response formatting -->
+<war_map_rules>
+    <rule>NEVER analyze any example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or fabricate military information not present in the
+        map.</rule>
+    <rule>You will not invent unit positions, movements, or tactical details if they cannot be seen
+        on the map.</rule>
+    <rule>You must follow the verification process found in the <war_map_verification_process /> XML
+        tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
+    <rule>Extract EVERYTHING visible - be exhaustive rather than selective.</rule>
+    <rule>When uncertain about a symbol's meaning, describe it visually and offer possible
+        interpretations.</rule>
+    <rule>Preserve all text exactly as written, including abbreviations and foreign language terms.</rule>
+    <rule>Note color coding and explain its apparent significance based on map conventions.</rule>
+    <rule>Identify the apparent historical period and conflict based on visual evidence.</rule>
+    <rule>Distinguish between confirmed information and reasonable inferences.</rule>
+</war_map_rules>

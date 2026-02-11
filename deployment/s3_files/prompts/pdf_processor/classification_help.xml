@@ -1,0 +1,96 @@
+<!-- This provides guidance and help for difficult classification scenarios -->
+<classification_help>
+    <!-- Help with identifying what type of content you're looking at -->
+    <guidance_section title="Content Type Identification">
+        <guidance>When content type is unclear, focus on the primary visual elements and their organization patterns.</guidance>
+        <guidance>Look for structural indicators: shapes and connections suggest diagrams, grids suggest tables, irregular text suggests handwriting.</guidance>
+        <guidance>Consider the document context - technical documents often contain diagrams, financial documents contain tables.</guidance>
+    </guidance_section>
+
+    <!-- Help with assigning appropriate confidence levels (see <classification_rules/>
+    confidence_scoring_guidelines for official ranges) -->
+    <guidance_section title="Confidence Scoring">
+        <guidance>High confidence (0.8-1.0): Content clearly matches tool specialization with no ambiguity. Look for confidence_indicators from <tool_usage_rules /> being clearly present.</guidance>
+        <guidance>Medium confidence (0.6-0.79): Content likely matches but has some unclear or mixed elements. Use when some but not all indicators from <available_tools /> are present.</guidance>
+        <guidance>Low confidence (0.4-0.59): Content might match but significant uncertainty exists due to quality or mixed content. Consider edge_case_handling from <classification_rules /> .</guidance>
+        <guidance>Very low confidence (0.0-0.39): Content does not match tool capabilities or is unsuitable for analysis. Use no_tools_format from <response_format /> or follow fallback_strategy from <classification_rules />.</guidance>
+    </guidance_section>
+
+    <!-- Help with deciding when to recommend multiple tools (see <response_format/>
+    multiple_tools_format and <classification_rules/> for guidance) -->
+    <guidance_section title="Multiple Tool Scenarios">
+        <guidance>Recommend multiple tools only when page contains distinct, separable content types that would benefit from different analysis approaches. Use multiple_tools_format from <response_format /> .</guidance>
+        <guidance>Prioritize the dominant content type but include secondary tools if they add significant value. Assign priority field as specified in <response_format /> requirements.</guidance>
+        <guidance>Avoid recommending tools for minor or decorative elements that don't contribute to the main content analysis. Focus on tools from <available_tools /> that match substantial content areas.</guidance>
+    </guidance_section>
+
+    <!-- Help with handling difficult or problematic content -->
+    <guidance_section title="Edge Case Handling">
+        <guidance>For poor image quality: Lower confidence scores and note quality issues in reasoning.</guidance>
+        <guidance>For no clear match: Recommend the closest matching tool with low confidence and detailed reasoning about limitations.</guidance>
+        <guidance>For empty or minimal content: Return no tool recommendations with appropriate explanation.</guidance>
+        <guidance>For mixed content: Focus on the most prominent content type and note secondary elements.</guidance>
+    </guidance_section>
+
+    <!-- Help with prioritizing and selecting the best tools -->
+    <guidance_section title="Tool Selection Priorities">
+        <guidance>Prefer highly specialized tools over general-purpose ones when content clearly matches.</guidance>
+        <guidance>Consider tool capabilities and limitations when making recommendations.</guidance>
+        <guidance>Ensure recommendations align with the automated processing pipeline requirements.</guidance>
+        <guidance>Provide actionable reasoning that helps downstream processing understand the classification decision.</guidance>
+    </guidance_section>
+
+    <!-- Simple decision flowchart for complete classification process -->
+    <decision_flowchart>
+        <flowchart_title>Classification Decision Process</flowchart_title>
+
+        <!-- Step 1: Visual Pattern Recognition -->
+        <step number="1"
+              title="Identify Visual Pattern"
+              >
+            <if condition="Shapes + arrows + connections">→ DIAGRAM (analyze_diagram_tool)</if>
+            <if condition="Grid + rows + columns + headers">→ TABLE (analyze_table_tool)</if>
+            <if condition="Irregular text + handwriting">→ HANDWRITING (analyze_handwriting_tool)</if>
+            <if condition="Multiple distinct regions">→ Go to Step 3 (Multiple Tools)</if>
+            <if condition="Unclear/poor quality/no match">→ Go to Step 4 (Edge Cases)</if>
+        </step>
+
+        <!-- Step 2: Single Tool Confidence Assessment -->
+        <step number="2"
+              title="Assess Confidence for Single Tool"
+              >
+            <confidence_check>
+                <high range="0.8-1.0">Strong indicators present → Use single_tool_format from <response_format /></high>
+                <medium range="0.6-0.79">Some indicators present → Use single_tool_format with medium confidence</medium>
+                <low range="0.4-0.59">Weak indicators → Use single_tool_format with low confidence</low>
+                <very_low range="0.0-0.39">No clear indicators → Go to Step 4 (Edge Cases)</very_low>
+            </confidence_check>
+        </step>
+
+        <!-- Step 3: Multiple Tools Assessment -->
+        <step number="3"
+              title="Multiple Tools Decision"
+              >
+            <if condition="Distinct separable regions (top/bottom, left/right)"> → Analyze each region separately using Step 2 → Use multiple_tools_format from <response_format /> with priority ordering </if>
+            <if condition="Overlapping or unclear separation"> → Focus on dominant content type → Return to Step 1 for dominant pattern </if>
+        </step>
+
+        <!-- Step 4: Edge Cases -->
+        <step number="4"
+              title="Handle Edge Cases"
+              >
+            <case type="Poor image quality">Lower confidence scores, use closest matching tool</case>
+            <case type="No clear content match">Follow fallback_strategy from <classification_rules /></case>
+            <case type="Empty or minimal content">Use no_tools_format from <response_format /></case>
+        </step>
+
+        <!-- Quick Reference Summary -->
+        <quick_decision_summary>
+            <pattern>Shapes+arrows → analyze_diagram_tool</pattern>
+            <pattern>Grid+headers → analyze_table_tool</pattern>
+            <pattern>Irregular text → analyze_handwriting_tool</pattern>
+            <pattern>Multiple regions → multiple_tools_format</pattern>
+            <pattern>No match/unclear → no_tools_format or fallback</pattern>
+        </quick_decision_summary>
+    </decision_flowchart>
+</classification_help>

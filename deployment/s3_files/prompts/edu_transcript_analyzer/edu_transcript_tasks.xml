@@ -1,0 +1,20 @@
+<tasks>
+    <task>PASS 1 - Scan for potential educational transcripts by looking for institutional headers, logos, or names of schools, colleges, or universities.</task>
+    <task>PASS 1 - Identify student identifying information such as names, student ID numbers, or dates of birth in header sections.</task>
+    <task>PASS 1 - Look for structured tables or lists containing course information organized by terms, semesters, or academic years.</task>
+    <task>PASS 1 - Identify grade columns, credit hour listings, and cumulative performance calculations (GPA, grade averages, etc.).</task>
+    <task>PASS 1 - Search for registrar signatures, official seals, issue dates, or statements of authenticity.</task>
+    <task>PASS 1 - Mark all potential transcript areas mentally before proceeding to verification.</task>
+    <task>PASS 2 - For each potential element, verify it contains cumulative academic records spanning multiple courses or terms, not just a single course or semester.</task>
+    <task>PASS 2 - Verify the document includes institutional identification and is presented as an official or unofficial record from that institution.</task>
+    <task>PASS 2 - Analyze surrounding context to confirm this is a transcript and not a report card, grade sheet, or course schedule.</task>
+    <task>PASS 2 - Reject structures that are actually diplomas, certificates, enrollment letters, or academic planning documents without comprehensive course history.</task>
+    <task>PASS 2 - Confirm the presence of grading information and credit/unit measurements that indicate completed coursework.</task>
+    <task>For verified transcripts, extract institutional information including school name, address, and identifying details.</task>
+    <task>For verified transcripts, extract student information including name, ID number, and enrollment dates.</task>
+    <task>For verified transcripts, extract course details including course codes, titles, terms, credits, and grades for each listed course.</task>
+    <task>For verified transcripts, extract cumulative performance metrics such as GPA, class rank, or overall grades if present.</task>
+    <task>For verified transcripts, extract degree or credential information including conferral dates, honors, and distinctions if applicable.</task>
+    <task>For verified transcripts, note whether the document is marked as official or unofficial and identify any authentication features.</task>
+    <task>If no structures meet the strict criteria of comprehensive academic transcripts after verification, respond ONLY with not_found response.</task>
+</tasks>

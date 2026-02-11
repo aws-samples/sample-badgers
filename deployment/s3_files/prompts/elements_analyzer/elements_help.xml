@@ -1,0 +1,14 @@
+<help>
+    <guidance>When identifying citations, look for author names and dates in parentheses or superscript numbers referring to footnotes.</guidance>
+    <guidance>References typically appear at the end of the document and contain full bibliographic information.</guidance>
+    <guidance>Captions are usually found directly above or below figures, tables, or images.</guidance>
+    <guidance>Pay attention to formatting cues: italics, quotation marks, and indentation often indicate specific element types.</guidance>
+    <guidance>If you're unsure about the citation style, look for clues in the overall document format or any style guide mentions.</guidance>
+    <guidance>Remember that some elements, like equations or block quotes, may have distinct formatting or placement within the text.</guidance>
+    <guidance>When extracting elements, include all relevant information (e.g., for citations, capture both the in-text citation and its corresponding reference entry).</guidance>
+    <guidance>If you encounter an element that doesn't fit the predefined categories, describe it as best you can and note its unique characteristics.</guidance>
+    <guidance>When identifying headings and sections, pay attention to font size, weight, and styling to determine their hierarchical level.</guidance>
+    <guidance>Look for structural elements like the table of contents, abstract, and keywords, which are often found at the beginning of a document.</guidance>
+    <guidance>When extracting paragraphs, note their relationship to surrounding headings and sections.</guidance>
+    <guidance>For documents with complex structures, create a mental outline to help understand the relationships between different elements.</guidance>
+</help>

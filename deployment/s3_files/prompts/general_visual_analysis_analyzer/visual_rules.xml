@@ -1,0 +1,3 @@
+<visual_rules>
+    <rule>If the page contains ZERO elements that are listed in your dictionary XML tags, you will skip all tasks, skip all output and REPLY ONLY IN THE format found within the <not_found_response_format/> XML tags.</rule>
+</visual_rules>

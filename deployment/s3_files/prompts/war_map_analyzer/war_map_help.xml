@@ -1,0 +1,85 @@
+<!-- Provides guidance on identifying and extracting war map information -->
+<war_map_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any example images
+            provided earlier.</item>
+        <item>Absence of war map content is a valid outcome. Do not force identification if no
+            military cartographic content is present.</item>
+        <item>Be exhaustive - extract EVERYTHING visible on the map.</item>
+        <item>When uncertain about symbology, describe what you see and provide possible
+            interpretations.</item>
+        <item>Distinguish between what is explicitly shown and what you are inferring.</item>
+    </critical_instructions>
+
+    <war_map_definition>
+        <item>A war or battle map is a cartographic representation of military operations,
+            positions, or terrain for military purposes.</item>
+        <item>War maps typically show troop positions, movements, fortifications, and tactically
+            significant terrain.</item>
+        <item>They may depict a single engagement, a campaign, or strategic overview of a theater of
+            operations.</item>
+        <item>War maps use specialized symbology to represent military units, movements, and
+            installations.</item>
+        <item>They often include temporal elements showing the progression of military operations.</item>
+    </war_map_definition>
+
+    <common_symbology>
+        <symbol_category name="unit_symbols">
+            <item>Rectangles often represent military units, with internal symbols indicating type.</item>
+            <item>X symbols typically indicate infantry; diagonal lines may indicate cavalry.</item>
+            <item>Dots or circles often represent artillery positions.</item>
+            <item>Size indicators (I, II, III, X, XX, XXX) show unit echelon from company to army
+                group.</item>
+            <item>NATO symbology uses standardized shapes: rectangle (unit), X (infantry), oval
+                (armor).</item>
+        </symbol_category>
+
+        <symbol_category name="movement_symbols">
+            <item>Solid arrows typically indicate main attacks or advances.</item>
+            <item>Dashed arrows often show planned or secondary movements.</item>
+            <item>Curved arrows may indicate flanking or encirclement.</item>
+            <item>Arrow thickness may indicate force strength.</item>
+            <item>Multiple arrow heads may show sequential movements.</item>
+        </symbol_category>
+
+        <symbol_category name="defensive_symbols">
+            <item>Zigzag lines often represent trenches or defensive lines.</item>
+            <item>Crossed lines may indicate obstacles or fortified zones.</item>
+            <item>Star shapes often represent forts or strongpoints.</item>
+            <item>Hatched areas may indicate minefields or restricted zones.</item>
+        </symbol_category>
+
+        <symbol_category name="terrain_symbols">
+            <item>Contour lines show elevation; closer lines mean steeper terrain.</item>
+            <item>Blue typically represents water features.</item>
+            <item>Green often indicates vegetation or forests.</item>
+            <item>Brown may show elevation or unpaved roads.</item>
+            <item>Black lines typically show roads, railways, or boundaries.</item>
+        </symbol_category>
+    </common_symbology>
+
+    <color_conventions>
+        <convention>Red often represents enemy forces or danger areas.</convention>
+        <convention>Blue frequently indicates friendly forces (in Western maps).</convention>
+        <convention>Black is commonly used for text, roads, and boundaries.</convention>
+        <convention>Green typically shows vegetation or sometimes friendly forces.</convention>
+        <convention>Yellow may indicate caution areas or specific unit types.</convention>
+        <convention>Historical maps may use different conventions - analyze the legend.</convention>
+    </color_conventions>
+
+    <not_war_maps>
+        <item>Tourist or road maps without military content are NOT war maps.</item>
+        <item>Political maps showing only boundaries are NOT war maps.</item>
+        <item>Topographic maps without military annotations are NOT war maps.</item>
+        <item>City plans without military context are NOT war maps.</item>
+        <item>Fantasy or fictional battle maps should be noted as such but can still be analyzed.</item>
+    </not_war_maps>
+
+    <historical_context_clues>
+        <item>Uniform styles and equipment depicted can indicate era.</item>
+        <item>Unit designations and organization suggest specific armies and periods.</item>
+        <item>Place names and boundaries help identify the conflict.</item>
+        <item>Cartographic style and printing technique indicate approximate age.</item>
+        <item>Language used provides clues about origin and perspective.</item>
+    </historical_context_clues>
+</war_map_help>

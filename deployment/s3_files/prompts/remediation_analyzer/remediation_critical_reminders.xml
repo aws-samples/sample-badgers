@@ -1,0 +1,15 @@
+<!-- ===================================================================
+SECTION 8: CRITICAL REMINDERS
+=================================================================== -->
+
+<critical_reminders>
+    <reminder>You MUST output &lt;analysis&gt; block FIRST, then JSON array</reminder>
+    <reminder>Use the visible grid overlay to determine precise cell coordinates</reminder>
+    <reminder>VALIDATE coordinates against visual proportions in your analysis</reminder>
+    <reminder>Include ALL elements on the page, including artifacts like page numbers</reminder>
+    <reminder>ALWAYS provide alt_text for Figure elements</reminder>
+    <reminder>Ensure reading order is logical for screen reader navigation</reminder>
+    <reminder>Use UPPERCASE letters for column labels (A, B, ... Z, AA, AB, ...)</reminder>
+    <reminder>Bounding boxes should be TIGHT - don't include extra whitespace</reminder>
+    <reminder>When no elements are found, return an empty array: []</reminder>
+</critical_reminders>

@@ -1,0 +1,30 @@
+<!-- Two-step table verification process: 1) Identify potential tables, 2) Verify against strict
+criteria -->
+<table_verification_process>
+    <!-- Take a deep breath and think about your findings. -->
+    <pass_1_identification>
+        <step>Scan within the image for separately defined/delimited table styled elements.</step>
+    </pass_1_identification>
+
+    <!-- Take a deep breath and think about your findings. -->
+    <pass_2_verification>
+        <table_criteria>
+            <criterion>Minimum 3 rows and 2 columns of data</criterion>
+            <criterion>Cells contain single data points or short phrases</criterion>
+            <criterion>Clear header row present</criterion>
+            <criterion>Consistent data type within columns</criterion>
+        </table_criteria>
+        <context_check>
+            <step>Analyze text immediately before and after the potential table, to help you. Don't
+                return that text, just keep it in your mind.</step>
+
+            <step>Reject if part of a larger text section like references or appendix</step>
+        </context_check>
+    </pass_2_verification>
+
+    <!-- Use your two pass verification findings for this next step. -->
+    <full_table_capture>
+        <step>If a table is verified, capture all related rows and columns within the table element
+            according to the format provided to you within the <response_format /> XML tags.</step>
+    </full_table_capture>
+</table_verification_process>

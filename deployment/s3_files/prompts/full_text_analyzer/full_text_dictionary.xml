@@ -1,0 +1,47 @@
+<full_text_dictionary>
+    <element type="header">
+        <description>Text at the top of the page, often containing titles, section names, or page numbers. Not to be confused with heading elements (h1-h6).</description>
+    </element>
+    <element type="footer">
+        <description>Text at the bottom of the page, often containing page numbers, copyright, or additional information.</description>
+    </element>
+    <element type="h1">
+        <description>Primary heading or document title. The most prominent heading on the page.</description>
+    </element>
+    <element type="h2">
+        <description>Section heading. Major divisions within the document.</description>
+    </element>
+    <element type="h3">
+        <description>Subsection heading. Divisions within sections.</description>
+    </element>
+    <element type="h4">
+        <description>Minor heading. Further subdivisions within subsections.</description>
+    </element>
+    <element type="paragraph">
+        <description>Body text content, typically arranged in paragraphs. The primary readable content of the document.</description>
+    </element>
+    <element type="sidebar">
+        <description>Text content positioned to the side of the main body, often containing supplementary information, tips, or related content.</description>
+    </element>
+    <element type="footnote">
+        <description>Explanatory notes placed at the bottom of the page, referenced from the main text. Use the ref attribute to link to the source element.</description>
+    </element>
+    <element type="caption">
+        <description>Text accompanying images, tables, or figures, providing additional context or explanation. Use the ref attribute to link to the associated figure.</description>
+    </element>
+    <element type="figure">
+        <description>Visual content such as images, charts, diagrams, or flowcharts. Include caption for visible text and alt_text for accessibility description.</description>
+    </element>
+    <element type="table_content">
+        <description>Textual content within tables, including headers and cell data.</description>
+    </element>
+    <element type="pull_quote">
+        <description>A notable excerpt from the main text, often displayed prominently on the page.</description>
+    </element>
+    <element type="list">
+        <description>Bulleted or numbered list content. Preserve list structure in the text.</description>
+    </element>
+    <element type="artifact">
+        <description>Decorative or non-meaningful content that should be ignored by screen readers (e.g., background images, decorative lines, watermarks).</description>
+    </element>
+</full_text_dictionary>

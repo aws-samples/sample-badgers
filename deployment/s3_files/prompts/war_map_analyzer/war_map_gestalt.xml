@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for War Map Analyzer -->
+<gestalt_perception analyzer="war_map">
+
+    <prescan>
+        <instruction>Before extracting map elements, perceive the tactical picture:</instruction>
+        <step>View the entire map to understand the geographic scope and scale.</step>
+        <step>Identify the legend/key - this defines symbol meanings.</step>
+        <step>Note the primary opposing forces and their general positions.</step>
+        <step>Identify terrain features that influence tactical interpretation.</step>
+        <step>Observe movement arrows and their directions to understand the action flow.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="holistic_tactical_view">
+            <guidance> Understand the overall tactical situation before details: - What is the geographic area depicted? - What time period/phase of operations? - Who are the opposing forces? - What is the general disposition of forces? This context informs interpretation of individual symbols. </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Symbol consistency indicates force identification: - Same symbol shape = same unit type - Same color = same side/force - Same size = same echelon level Use the legend to establish symbol-meaning mappings, then apply consistently. </guidance>
+        </primary>
+
+        <primary principle="common_fate">
+            <guidance> Movement arrows indicate operational flow: - Arrows pointing same direction = coordinated movement - Converging arrows = concentration of forces - Diverging arrows = dispersal or envelopment - Opposing arrows = engagement or confrontation </guidance>
+        </primary>
+
+        <secondary principle="figure_ground">
+            <guidance> Separate tactical information from base map: - FIGURE: Unit symbols, movement arrows, defensive positions, objectives - GROUND: Terrain, roads, rivers, place names (context, not primary data) Extract tactical overlay; use geographic base for context. </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <visual_hierarchy_detection>
+        <level name="primary">Main unit positions, major movements, key objectives.</level>
+        <level name="secondary">Supporting units, secondary movements, defensive lines.</level>
+        <level name="tertiary">Supply routes, communication lines, reserves.</level>
+        <level name="context">Terrain features, place names, scale indicators.</level>
+    </visual_hierarchy_detection>
+
+    <symbol_interpretation>
+        <category name="unit_symbols">
+            <symbol type="rectangle">Infantry unit (size indicates echelon).</symbol>
+            <symbol type="oval">Armored/cavalry unit.</symbol>
+            <symbol type="x_marks">Unit size indicators (X=brigade, XX=division, XXX=corps).</symbol>
+        </category>
+        <category name="movement">
+            <symbol type="solid_arrow">Planned or executed movement.</symbol>
+            <symbol type="dashed_arrow">Proposed or alternative movement.</symbol>
+            <symbol type="curved_arrow">Flanking or envelopment maneuver.</symbol>
+        </category>
+        <category name="defensive">
+            <symbol type="teeth_line">Defensive line (teeth toward enemy).</symbol>
+            <symbol type="dashed_line">Planned or secondary defensive position.</symbol>
+        </category>
+        <note>Conventions vary by era and military tradition - use legend as primary reference.</note>
+    </symbol_interpretation>
+
+    <color_conventions>
+        <convention>Blue often = friendly forces (NATO convention).</convention>
+        <convention>Red often = enemy/opposing forces.</convention>
+        <convention>Green may = allied or neutral forces.</convention>
+        <convention>Black often = boundaries, roads, neutral features.</convention>
+        <note>Historical maps may use different conventions - check legend.</note>
+    </color_conventions>
+
+    <validation>
+        <instruction>After extraction, verify map perception accuracy:</instruction>
+        <check>Did you establish the overall tactical context before detail extraction?</check>
+        <check>Are symbols consistently interpreted using similarity and legend reference?</check>
+        <check>Are movement flows correctly captured using common fate?</check>
+        <check>Is tactical information (figure) correctly separated from base map (ground)?</check>
+        <check>Does the extracted data tell a coherent tactical story?</check>
+    </validation>
+
+</gestalt_perception>

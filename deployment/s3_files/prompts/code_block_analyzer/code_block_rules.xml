@@ -1,0 +1,14 @@
+<!-- Specifies the rules for code block extraction and response formatting -->
+<code_block_rules>
+    <rule>NEVER analyze any of the example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or create false code blocks.</rule>
+    <rule>You will not "create code" if you can't find any on the target page scan.</rule>
+    <rule>You must follow the two step process found in the <code_block_verification_process /> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
+    <rule>Preserve original code formatting including indentation and whitespace.</rule>
+    <rule>Maintain line numbers if present in the original.</rule>
+    <rule>Include syntax highlighting indicators where applicable.</rule>
+    <rule>Do not modify, correct, or "fix" any code - extract it exactly as shown.</rule>
+    <rule>If you detect that you have analyzed or included content from any example images, immediately stop and report this error.</rule>
+</code_block_rules>

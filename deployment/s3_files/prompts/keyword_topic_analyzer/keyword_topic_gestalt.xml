@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gestalt Perception for Keyword/Topic Analyzer -->
+<gestalt_perception analyzer="keyword_topic">
+
+    <prescan>
+        <instruction>Before extracting keywords, perceive the document's visual emphasis:</instruction>
+        <step>Identify headings and titles - these often contain primary topics.</step>
+        <step>Note visually emphasized text (bold, larger, colored) - often key terms.</step>
+        <step>Observe the document structure to understand topic hierarchy.</step>
+        <step>Identify repeated terms or concepts across the document.</step>
+        <step>Note any highlighted, underlined, or otherwise marked text.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="visual_prominence">
+            <guidance> Visually prominent text often indicates key topics: - Headings (largest, boldest) = primary topics - Subheadings = secondary topics - Bold text within paragraphs = emphasized terms - Colored or highlighted text = key concepts Visual weight correlates with topical importance. </guidance>
+        </primary>
+
+        <primary principle="similarity">
+            <guidance> Repeated visual patterns indicate topic structure: - Same heading level = same topic importance - Consistent formatting = same category of information - Repeated terms = central concepts Use visual consistency to identify topic hierarchy. </guidance>
+        </primary>
+
+        <primary principle="hierarchy">
+            <guidance> Document structure reveals topic organization: - Title → main topic - H1 headings → major subtopics - H2/H3 → supporting topics - Body text → detailed content Extract keywords at each hierarchy level. </guidance>
+        </primary>
+
+        <secondary principle="proximity">
+            <guidance> Spatially grouped content shares topical relevance: - Terms near headings relate to that section's topic - Clustered keywords form concept groups - Section boundaries indicate topic transitions </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <keyword_source_priority>
+        <priority level="1">Document title and main headings.</priority>
+        <priority level="2">Subheadings and section titles.</priority>
+        <priority level="3">Bold, italic, or emphasized text in body.</priority>
+        <priority level="4">Repeated terms throughout the document.</priority>
+        <priority level="5">Technical terms, proper nouns, domain-specific vocabulary.</priority>
+    </keyword_source_priority>
+
+    <visual_emphasis_cues>
+        <cue type="size">Larger text = more important topic.</cue>
+        <cue type="weight">Bold text = emphasized term.</cue>
+        <cue type="style">Italic often = titles, foreign terms, or emphasis.</cue>
+        <cue type="color">Colored text = highlighted concept or link.</cue>
+        <cue type="position">Top/prominent position = primary topic.</cue>
+        <cue type="isolation">Standalone terms with whitespace = key concepts.</cue>
+    </visual_emphasis_cues>
+
+    <validation>
+        <instruction>After extraction, verify keyword perception accuracy:</instruction>
+        <check>Do extracted keywords reflect visually prominent terms?</check>
+        <check>Does keyword hierarchy match visual heading hierarchy?</check>
+        <check>Are emphasized terms (bold, colored) captured as keywords?</check>
+        <check>Do keywords accurately represent the document's main topics?</check>
+        <check>Are source locations correctly identified for grounding?</check>
+    </validation>
+
+</gestalt_perception>

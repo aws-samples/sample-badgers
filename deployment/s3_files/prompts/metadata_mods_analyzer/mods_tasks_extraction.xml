@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mods_tasks_extraction>
+    <task_overview>
+        Extract bibliographic metadata from the document image and structure it according to MODS
+        3.8 schema for standalone documents.
+    </task_overview>
+
+    <extraction_tasks>
+        <task priority="1">
+            <element>titleInfo</element>
+            <description>Extract the main title and subtitle of the document</description>
+            <look_for>
+                <item>Document title (usually prominent at the top)</item>
+                <item>Subtitle or secondary title</item>
+                <item>Alternative titles if present</item>
+            </look_for>
+            <notes>Title is mandatory. If no clear title exists, use a descriptive title in
+                brackets.</notes>
+        </task>
+
+        <task priority="2">
+            <element>name</element>
+            <description>Identify authors, creators, and contributing organizations</description>
+            <look_for>
+                <item>Individual author names (personal names)</item>
+                <item>Corporate authors (organizations, institutions)</item>
+                <item>Editors, contributors, or other roles</item>
+                <item>Publisher information</item>
+            </look_for>
+            <notes>Include role information (author, editor, publisher, creator). Use
+                type="personal" or type="corporate" appropriately.</notes>
+        </task>
+
+        <task priority="3">
+            <element>typeOfResource and genre</element>
+            <description>Classify the document type</description>
+            <look_for>
+                <item>Document format indicators (text, mixed material)</item>
+                <item>Genre clues (report, guideline, article, white paper, technical document)</item>
+            </look_for>
+            <notes>typeOfResource is typically "text". Genre should be specific to document type.</notes>
+        </task>
+
+        <task priority="4">
+            <element>originInfo</element>
+            <description>Extract publication information</description>
+            <look_for>
+                <item>Publisher name</item>
+                <item>Publication date (year, month, full date)</item>
+                <item>Place of publication (city, country)</item>
+                <item>Edition information if present</item>
+            </look_for>
+            <notes>Use encoding="w3cdtf" for dates in YYYY-MM-DD format.</notes>
+        </task>
+
+        <task priority="5">
+            <element>physicalDescription</element>
+            <description>Describe the physical/digital characteristics</description>
+            <look_for>
+                <item>Format (typically application/pdf for digital documents)</item>
+                <item>Page count or extent</item>
+                <item>File size if visible</item>
+            </look_for>
+            <notes>Use internetMediaType for digital formats. Include extent in human-readable form.</notes>
+        </task>
+
+        <task priority="6">
+            <element>abstract</element>
+            <description>Extract document summary or abstract</description>
+            <look_for>
+                <item>Abstract section</item>
+                <item>Executive summary</item>
+                <item>Introduction or overview text</item>
+                <item>Document description</item>
+            </look_for>
+            <notes>Include the full abstract text if available. If not, create a brief descriptive
+                summary.</notes>
+        </task>
+
+        <task priority="7">
+            <element>subject</element>
+            <description>Identify topics and keywords</description>
+            <look_for>
+                <item>Explicit keywords or subject headings</item>
+                <item>Main topics discussed in the document</item>
+                <item>Domain-specific terminology</item>
+                <item>Geographic subjects if relevant</item>
+            </look_for>
+            <notes>Use multiple subject elements for different topics. Include authority attribute
+                if using controlled vocabularies (lcsh, mesh, etc.).</notes>
+        </task>
+
+        <task priority="8">
+            <element>identifier</element>
+            <description>Extract persistent identifiers</description>
+            <look_for>
+                <item>DOI (Digital Object Identifier)</item>
+                <item>URLs or URIs</item>
+                <item>ISBN (for books)</item>
+                <item>Other standard identifiers</item>
+            </look_for>
+            <notes>Use type attribute to specify identifier type (doi, uri, isbn, etc.).</notes>
+        </task>
+
+        <task priority="9">
+            <element>language</element>
+            <description>Identify the language of the document</description>
+            <look_for>
+                <item>Language indicators in the document</item>
+                <item>Text language (default to English if unclear)</item>
+            </look_for>
+            <notes>Use ISO 639-2b three-letter codes (eng, spa, fra, etc.).</notes>
+        </task>
+
+        <task priority="10">
+            <element>note</element>
+            <description>Capture additional relevant information</description>
+            <look_for>
+                <item>Version numbers</item>
+                <item>Update dates</item>
+                <item>Disclaimers or copyright notices</item>
+                <item>Any other contextual information</item>
+            </look_for>
+            <notes>Use type attribute to categorize notes (version, citation, etc.).</notes>
+        </task>
+
+        <task priority="11">
+            <element>recordInfo</element>
+            <description>Document metadata about the MODS record itself</description>
+            <include>
+                <item>recordCreationDate - Current date in YYYY-MM-DD format</item>
+                <item>recordContentSource - Source of the metadata</item>
+                <item>languageOfCataloging - Language used for cataloging (typically eng)</item>
+            </include>
+            <notes>This documents when and how the MODS record was created.</notes>
+        </task>
+    </extraction_tasks>
+
+    <extraction_guidelines>
+        <guideline>Extract information in the order it appears in the document</guideline>
+        <guideline>Be conservative - only include information you can verify from the document</guideline>
+        <guideline>Use placeholder values like "Unknown" for required elements when information is
+            not available</guideline>
+        <guideline>For standalone documents, do NOT create relatedItem type="host" structures</guideline>
+        <guideline>Do NOT include part elements with volume/issue/page numbers for standalone
+            documents</guideline>
+        <guideline>If uncertain about information, include it in a note element with appropriate
+            context</guideline>
+        <guideline>Maintain consistent formatting and follow MODS 3.8 schema requirements</guideline>
+    </extraction_guidelines>
+</mods_tasks_extraction>

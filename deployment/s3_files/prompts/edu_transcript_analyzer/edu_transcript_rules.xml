@@ -1,0 +1,14 @@
+<educational_transcripts_rules>
+    <rule>As an LLM, you will not hallucinate.</rule>
+    <rule>You will not "create educational transcripts" if you can't find any on the page scan.</rule>
+    <rule>You must follow the two step verification process: first identify potential transcript elements, then verify against strict criteria.</rule>
+    <rule>You must respond using ONLY the format within the <response_format/> XML tags.</rule>
+    <rule>If no structures meet the criteria after verification, respond ONLY with the not_found response.</rule>
+    <rule>Do not force identification where none exist - absence is a valid outcome.</rule>
+    <rule>Only extract course information that is explicitly visible on the transcript; never infer or generate course names, grades, or credits.</rule>
+    <rule>Distinguish between official transcripts (with institutional seals, registrar signatures, or official markings) and unofficial documents (student copies, drafts, or printouts).</rule>
+    <rule>Do not confuse report cards, progress reports, grade sheets, or course schedules with official transcripts.</rule>
+    <rule>Extract grading scales and GPA calculations exactly as shown; do not convert or normalize unless the transcript itself provides conversion tables.</rule>
+    <rule>Recognize that transcripts may be incomplete, in-progress, or partial records; document what is present without assuming missing information.</rule>
+    <rule>Verify that the document contains cumulative academic records over time, not just a single term or course listing.</rule>
+</educational_transcripts_rules>

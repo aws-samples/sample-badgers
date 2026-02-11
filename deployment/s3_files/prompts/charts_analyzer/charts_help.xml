@@ -1,0 +1,99 @@
+<!-- This file provides guidance on identifying and extracting charts and graphs -->
+<charts_graphs_help>
+    <!-- Critical instructions for charts and graphs detection -->
+    <critical_instructions>
+        <item>Analyze ONLY the final target image provided for analysis. NEVER analyze any of the
+            example images provided earlier.</item>
+        <item>Absence of charts or graphs is a valid and expected outcome. Do not force
+            identification if no charts or graphs are present.</item>
+        <item>When in doubt, do NOT classify an element as a chart or graph. Accuracy is more
+            important than comprehensiveness.</item>
+        <item>NEVER classify regular images or simple illustrations as charts or graphs, unless they
+            represent data in a structured, visual format.</item>
+        <item>Charts and graphs must contain visual elements that convey numerical or statistical
+            information.</item>
+    </critical_instructions>
+
+    <!-- Definition of what constitutes a chart or graph -->
+    <charts_graphs_definition>
+        <item>A chart or graph is a visual representation of data or statistical information.</item>
+        <item>Charts and graphs typically use axes, data points, bars, lines, or areas to represent
+            numerical relationships.</item>
+        <item>Charts and graphs should have clear labels, scales, and often a legend explaining the
+            data representation.</item>
+        <item>Text in charts and graphs is typically used for labels, titles, and data values.</item>
+    </charts_graphs_definition>
+
+    <!-- Chart categories and types - use appropriate output structure -->
+    <chart_categories>
+        <category name="cartesian">
+            <description>Charts with X and Y axes</description>
+            <types>bar chart, line graph, scatter plot, area chart, histogram, box plot,
+                candlestick, waterfall</types>
+            <output_structure>Use x_axis, y_axis, and data_series with x/y points</output_structure>
+        </category>
+        <category name="proportional">
+            <description>Charts showing parts of a whole</description>
+            <types>pie chart, donut chart, treemap, sunburst, waffle chart</types>
+            <output_structure>Use segments with label, value, percentage - NO x/y axes</output_structure>
+        </category>
+        <category name="flow">
+            <description>Charts showing movement or relationships between entities</description>
+            <types>sankey diagram, alluvial diagram, chord diagram, network graph</types>
+            <output_structure>Use nodes (with position: left/middle/right) and flows (source,
+                target, value)</output_structure>
+        </category>
+        <category name="composite">
+            <description>Multi-panel figures with multiple sub-charts</description>
+            <types>grid of charts, faceted plots, small multiples, subplot arrangements</types>
+            <output_structure>Use layout description and sub_charts array with panel_id (a), (b),
+                etc.</output_structure>
+        </category>
+        <category name="matrix">
+            <description>Grid-based data visualizations</description>
+            <types>heatmap, correlation matrix, confusion matrix, calendar heatmap</types>
+            <output_structure>Use row_labels, column_labels, cells with row/column/value, and
+                color_scale</output_structure>
+        </category>
+        <category name="radar">
+            <description>Multi-axis charts radiating from center</description>
+            <types>radar chart, spider chart, polar chart</types>
+            <output_structure>Use axes list and data_series with axis/amount pairs</output_structure>
+        </category>
+    </chart_categories>
+
+    <!-- Figure reference extraction -->
+    <figure_reference_guidance>
+        <item>ALWAYS capture the figure caption exactly as written (e.g., "Figure 5. Cost overruns
+            for...")</item>
+        <item>Extract the figure identifier (e.g., "Figure 5", "Figure 6(A)", "Fig. 3")</item>
+        <item>Look for text on the page that references this figure (e.g., "as shown in Figure 5",
+            "see Fig. 3")</item>
+        <item>The caption often appears directly below or above the chart</item>
+        <item>For multi-panel figures, note sub-labels like (a), (b), (A), (B) in both the figure
+            and caption</item>
+    </figure_reference_guidance>
+
+    <!-- Examples of what are not considered charts or graphs -->
+    <not_charts_graphs>
+        <item>Photographs or realistic illustrations without data representation are NOT charts or
+            graphs.</item>
+        <item>Simple sketches or doodles without clear data content are NOT charts or graphs.</item>
+        <item>Tables of text or data without graphical representation are NOT charts or graphs.</item>
+        <item>Decorative graphics or borders are NOT charts or graphs.</item>
+        <item>Diagrams or flowcharts that don't primarily represent numerical data are NOT
+            considered charts or graphs.</item>
+    </not_charts_graphs>
+
+    <!-- Decision process for identifying charts and graphs -->
+    <decision_process>
+        <item>Follow the two-step verification process defined in the
+            charts_graphs_verification_process.xml file.</item>
+        <item>In the first pass, identify all potential chart-like or graph-like structures.</item>
+        <item>In the second pass, rigorously verify each potential chart or graph against the
+            defined criteria.</item>
+        <item>Consider the context around each potential chart or graph to avoid misclassification.</item>
+        <item>For verified charts and graphs, ensure you capture the key elements, data
+            representation, and overall structure.</item>
+    </decision_process>
+</charts_graphs_help>

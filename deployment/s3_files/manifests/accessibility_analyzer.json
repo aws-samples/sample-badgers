@@ -1,0 +1,130 @@
+{
+    "tool": {
+        "name": "analyze_accessibility_tool",
+        "description": "Transforms element extraction results into complete PDF structure trees for accessibility compliance (PDF/UA, WCAG 2.1 AA). Generates semantic tagging (H1-H6, P, Figure, Table, List), establishes reading order, identifies artifacts, creates cross-references, and builds hierarchical structure for screen reader optimization and assistive technology support.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image or XML file containing element extraction results. Supports common image formats (PNG, JPG, etc.) or XML output from elements_analyzer."
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "accessibility_analyzer",
+        "description": "Transforms element extraction results into complete PDF structure trees for accessibility compliance",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "accessibility_context.xml",
+            "accessibility_dictionary.xml",
+            "accessibility_rules.xml",
+            "accessibility_tasks.xml",
+            "accessibility_format.xml",
+            "accessibility_help.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 0,
+        "analysis_text": "accessibility structure tree",
+        "expected_output_tokens": 5000,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "standards": [
+            "PDF/UA (ISO 14289-1)",
+            "WCAG 2.1 Level AA"
+        ],
+        "capabilities": [
+            "Structure tree generation",
+            "Semantic tagging (H1-H6, P, Figure, Table, List, etc.)",
+            "Reading order establishment",
+            "Artifact identification",
+            "Cross-reference creation (footnotes, citations, figures)",
+            "Alternative text generation",
+            "Hierarchical structure building",
+            "Content reference mapping (MCR)"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.077711+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "tag_structure_accuracy",
+                    "text": "Were semantic tags (H1-H6, P, etc.) correctly assigned?",
+                    "type": "likert"
+                },
+                {
+                    "id": "reading_order",
+                    "text": "Was the reading order correctly established?",
+                    "type": "likert"
+                },
+                {
+                    "id": "artifact_identification",
+                    "text": "Were decorative/artifact elements correctly identified?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

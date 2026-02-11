@@ -1,0 +1,21 @@
+<keyword_topic_analyzer_rules>
+    <rule>NEVER analyze any of the example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>DO NOT simply extract phrases from the document - instead MAP content to ESTABLISHED
+        INDUSTRY KEYWORDS that exist in the broader market</rule>
+    <rule>Think like a SEMRUSH keyword researcher - what terms do people ACTUALLY search for in this
+        industry?</rule>
+    <rule>Keywords should be real market search terms, not document-derived phrases</rule>
+    <rule>Consider what a potential reader would type into Google to find this type of content</rule>
+    <rule>Use your knowledge of industry terminology, common search patterns, and market demand</rule>
+    <rule>Topics should reflect industry categories and market segments, not just document themes</rule>
+    <rule>Prioritize keywords by market value (search volume, competition level, commercial intent)</rule>
+    <rule>Identify keyword opportunities based on content fit AND market demand</rule>
+    <rule>Consider trending industry terms, established jargon, and competitor keyword strategies</rule>
+    <rule>Include question-based keywords that reflect how people actually search (how to, what is,
+        best way to)</rule>
+    <rule>Format output to be compatible with SEO tools like SEMRUSH for further analysis</rule>
+    <rule>Indicate content fit for each keyword: strong fit (content addresses well), partial fit
+        (could rank with optimization), opportunity (content could expand to cover)</rule>
+    <rule>Focus on ACTIONABLE keyword targeting - what should this content rank for?</rule>
+</keyword_topic_analyzer_rules>

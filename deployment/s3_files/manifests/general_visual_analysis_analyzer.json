@@ -1,0 +1,119 @@
+{
+    "tool": {
+        "name": "analyze_general_visual_analysis_tool",
+        "description": "Specialized tool for analyzing generic visual elements in documents to identify and describe various types of visual content. ONLY use for: general visual elements, graphics, images, visual layouts, illustrations, photographs, visual designs, artistic elements, and other visual content that doesn't fit into specialized categories like charts, diagrams, or tables. NOT for: charts/graphs (use charts tool), flowcharts/diagrams (use diagram tool), tables (use table tool), or handwriting (use handwriting tool). If no general visual elements are found, returns that no visual content was detected and suggests checking with user for appropriate tool selection.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing general visual elements to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "general_visual_analysis_analyzer",
+        "description": "Analyzes generic visual elements in documents to identify and describe visual content",
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "general_visual_analysis_gestalt.xml",
+            "visual_job_role.xml",
+            "visual_context.xml",
+            "visual_rules.xml",
+            "visual_tasks_extraction.xml",
+            "visual_format.xml",
+            "visual_help.xml",
+            "visual_dictionary.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 2,
+        "analysis_text": "general visual content",
+        "expected_output_tokens": 4000,
+        "model_selections": {
+            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2025-12-22T23:50:59.082183+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "visual_description_accuracy",
+                    "text": "Was the visual content accurately described?",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_categorization",
+                    "text": "Were visual elements correctly categorized?",
+                    "type": "likert"
+                },
+                {
+                    "id": "detail_capture",
+                    "text": "Were important visual details captured?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,146 @@
+<!-- Example conversation demonstrating war map analysis -->
+<conversation_example>
+    <example_note>This is an example of the expected analysis format. Do NOT analyze this example -
+        it is for reference only.</example_note>
+
+    <example_response>
+        <war_map_extraction>
+            <confirm_no_example_analysis>I confirm I did NOT analyze any example images. I only
+                analyzed the target image.</confirm_no_example_analysis>
+            <map_identified>YES</map_identified>
+
+            <map_metadata>
+                <title>Battle of Gettysburg - Pickett's Charge, July 3, 1863</title>
+                <date>Published 1876</date>
+                <scale>1 inch = 400 yards</scale>
+                <orientation>North arrow pointing to top of map</orientation>
+                <source>U.S. War Department</source>
+                <historical_context>
+                    <conflict>American Civil War</conflict>
+                    <battle_campaign>Battle of Gettysburg, Gettysburg Campaign</battle_campaign>
+                    <approximate_date>July 3, 1863, approximately 3:00 PM</approximate_date>
+                </historical_context>
+            </map_metadata>
+
+            <legend>
+                <symbol_definition>
+                    <symbol>Solid blue rectangle</symbol>
+                    <meaning>Union infantry regiment</meaning>
+                </symbol_definition>
+                <symbol_definition>
+                    <symbol>Solid red rectangle</symbol>
+                    <meaning>Confederate infantry regiment</meaning>
+                </symbol_definition>
+                <symbol_definition>
+                    <symbol>Red arrow</symbol>
+                    <meaning>Confederate attack direction</meaning>
+                </symbol_definition>
+                <symbol_definition>
+                    <symbol>Zigzag line</symbol>
+                    <meaning>Stone wall defensive position</meaning>
+                </symbol_definition>
+            </legend>
+
+            <military_forces>
+                <force affiliation="Confederate States">
+                    <unit>
+                        <designation>Pickett's Division</designation>
+                        <type>Infantry</type>
+                        <position>Seminary Ridge, western portion of map</position>
+                        <symbol_used>Three red rectangles in line formation</symbol_used>
+                    </unit>
+                    <unit>
+                        <designation>Pettigrew's Division</designation>
+                        <type>Infantry</type>
+                        <position>Seminary Ridge, north of Pickett</position>
+                        <symbol_used>Red rectangles with "Pettigrew" label</symbol_used>
+                    </unit>
+                </force>
+                <force affiliation="United States">
+                    <unit>
+                        <designation>II Corps (Hancock)</designation>
+                        <type>Infantry</type>
+                        <position>Cemetery Ridge, behind stone wall</position>
+                        <symbol_used>Blue rectangles along defensive line</symbol_used>
+                    </unit>
+                </force>
+            </military_forces>
+
+            <movements>
+                <movement>
+                    <type>Main assault</type>
+                    <direction>West to East, from Seminary Ridge toward Cemetery Ridge</direction>
+                    <associated_unit>Pickett's Division</associated_unit>
+                    <visual_indicator>Large red arrow, solid line</visual_indicator>
+                    <temporal_phase>Main assault phase</temporal_phase>
+                </movement>
+                <movement>
+                    <type>Supporting attack</type>
+                    <direction>Northwest to Southeast, converging on "The Angle"</direction>
+                    <associated_unit>Pettigrew's Division</associated_unit>
+                    <visual_indicator>Red arrow, slightly thinner</visual_indicator>
+                    <temporal_phase>Simultaneous with main assault</temporal_phase>
+                </movement>
+            </movements>
+
+            <defensive_elements>
+                <fortification>
+                    <type>Stone wall</type>
+                    <location>Along Cemetery Ridge, running north-south</location>
+                    <description>Low stone wall providing cover for Union defenders, with "The
+                        Angle" salient marked</description>
+                </fortification>
+            </defensive_elements>
+
+            <terrain>
+                <feature>
+                    <type>Ridge</type>
+                    <name>Seminary Ridge</name>
+                    <location>Western portion of map</location>
+                    <tactical_significance>Confederate staging area, provides concealment for
+                        forming troops</tactical_significance>
+                </feature>
+                <feature>
+                    <type>Ridge</type>
+                    <name>Cemetery Ridge</name>
+                    <location>Eastern portion of map</location>
+                    <tactical_significance>Union defensive position, higher ground with clear fields
+                        of fire</tactical_significance>
+                </feature>
+                <feature>
+                    <type>Open field</type>
+                    <name>Unlabeled</name>
+                    <location>Between the two ridges</location>
+                    <tactical_significance>Approximately 1 mile of open ground Confederate forces
+                        must cross under fire</tactical_significance>
+                </feature>
+            </terrain>
+
+            <place_names>
+                <place>
+                    <name>The Angle</name>
+                    <type>Tactical feature</type>
+                    <location>Salient in stone wall, center of Union line</location>
+                </place>
+                <place>
+                    <name>Codori Farm</name>
+                    <type>Farm/building</type>
+                    <location>Midway between ridges</location>
+                </place>
+            </place_names>
+
+            <tactical_summary>
+                <situation>Map depicts the climactic Confederate infantry assault known as Pickett's
+                    Charge, showing approximately 12,500 Confederate soldiers advancing across open
+                    ground against fortified Union positions.</situation>
+                <key_features>The map emphasizes the exposed nature of the Confederate advance, the
+                    converging attack vectors, and the strong Union defensive position behind the
+                    stone wall.</key_features>
+                <apparent_objective>The map illustrates the tactical situation that led to the
+                    Confederate defeat, showing why the assault failed due to the long approach over
+                    open terrain against prepared defenses.</apparent_objective>
+            </tactical_summary>
+
+        </war_map_extraction>
+    </example_response>
+</conversation_example>

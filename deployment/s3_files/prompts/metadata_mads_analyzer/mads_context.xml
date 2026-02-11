@@ -1,0 +1,12 @@
+<context>
+    <item>MADS 2.1 is an XML schema developed by the Library of Congress for authority metadata description.</item>
+    <item>It's used to describe entities such as people, organizations, events, terms, and geographic locations that can be involved in creating or publishing creative works.</item>
+    <item>MADS 2.1 is designed to complement the Metadata Object Description Schema (MODS) and can carry data from MARC 21 authority records.</item>
+    <item>Version 2.1 (released in 2016) added elements to align with MADS RDF, including personInfo, organizationInfo, familyInfo, fieldOfEndeavor, locale, and workInfo.</item>
+    <item>Authority data is crucial for maintaining consistent references to entities across collections and enabling precise identification and retrieval.</item>
+    <item>Your task is to analyze the provided content and create a valid MADS 2.1 representation for any authority entities identified.</item>
+    <item>Focus on extracting the core required elements while including additional metadata when available.</item>
+    <item>The resulting MADS 2.1 XML should be well-formed and adhere to the MADS schema specifications.</item>
+    <item>When identifying authority entities, consider their roles, relationships, and any variant forms of their names or terms.</item>
+    <item>Pay attention to hierarchical relationships and appropriate classification of authority types.</item>
+</context>

@@ -1,0 +1,88 @@
+<mads_dictionary>
+    <element type="madsCollection">
+        <description>Root element for a collection of MADS records.</description>
+    </element>
+    <element type="mads">
+        <description>Root element for a single MADS record.</description>
+        <attributes>
+            <attribute>ID - Unique identifier for the MADS record</attribute>
+            <attribute>version - Version of MADS schema (2.1)</attribute>
+        </attributes>
+    </element>
+    <element type="authority">
+        <description>Container for the authoritative form of the entity being described.</description>
+        <attributes>
+            <attribute>ID - Identifier for this authority</attribute>
+            <attribute>geographicSubdivision - How geographic subdivisions are applied</attribute>
+        </attributes>
+        <sub_elements>
+            <sub_element>name - Personal, corporate, or family name</sub_element>
+            <sub_element>titleInfo - Title information</sub_element>
+            <sub_element>topic - Topical term</sub_element>
+            <sub_element>temporal - Temporal term</sub_element>
+            <sub_element>genre - Genre term</sub_element>
+            <sub_element>geographic - Geographic name</sub_element>
+            <sub_element>hierarchicalGeographic - Hierarchical geographic name</sub_element>
+            <sub_element>occupation - Occupation term</sub_element>
+        </sub_elements>
+    </element>
+    <element type="name">
+        <description>Personal, corporate, or family name.</description>
+        <attributes>
+            <attribute>type - Type of name (personal, corporate, conference, family)</attribute>
+            <attribute>authority - Authority source for the name</attribute>
+        </attributes>
+        <sub_elements>
+            <sub_element>namePart - Part of the name (given, family, date, etc.)</sub_element>
+            <sub_element>displayForm - Display form of the name</sub_element>
+            <sub_element>affiliation - Affiliation associated with the name</sub_element>
+            <sub_element>role - Role of the entity</sub_element>
+            <sub_element>description - Description of the name</sub_element>
+        </sub_elements>
+    </element>
+    <element type="personInfo">
+        <description>Information specific to a person (added in MADS 2.1).</description>
+        <sub_elements>
+            <sub_element>fieldOfEndeavor - Person's field of expertise or activity</sub_element>
+            <sub_element>birthDate - Person's birth date</sub_element>
+            <sub_element>deathDate - Person's death date</sub_element>
+            <sub_element>birthPlace - Person's birth place</sub_element>
+            <sub_element>deathPlace - Person's death place</sub_element>
+        </sub_elements>
+    </element>
+    <element type="organizationInfo">
+        <description>Information specific to an organization (added in MADS 2.1).</description>
+        <sub_elements>
+            <sub_element>fieldOfEndeavor - Organization's field of activity</sub_element>
+            <sub_element>foundationDate - Organization's foundation date</sub_element>
+            <sub_element>terminationDate - Organization's termination date</sub_element>
+            <sub_element>foundationPlace - Organization's foundation place</sub_element>
+            <sub_element>terminationPlace - Organization's termination place</sub_element>
+        </sub_elements>
+    </element>
+    <element type="variant">
+        <description>Alternative form of the authority entry.</description>
+        <attributes>
+            <attribute>type - Type of variant (acronym, abbreviation, translation, etc.)</attribute>
+            <attribute>hidden - Whether the variant should be hidden from display</attribute>
+        </attributes>
+    </element>
+    <element type="related">
+        <description>Related authority entry.</description>
+        <attributes>
+            <attribute>type - Type of relationship (broader, narrower, equivalent, etc.)</attribute>
+            <attribute>otherType - Custom relationship type if not in enumerated list</attribute>
+        </attributes>
+    </element>
+    <element type="recordInfo">
+        <description>Metadata about the MADS record itself.</description>
+        <sub_elements>
+            <sub_element>recordContentSource - Source of the record</sub_element>
+            <sub_element>recordCreationDate - Creation date of the record</sub_element>
+            <sub_element>recordChangeDate - Date of last modification</sub_element>
+            <sub_element>recordIdentifier - Identifier for the record</sub_element>
+            <sub_element>languageOfCataloging - Language used in cataloging</sub_element>
+            <sub_element>descriptionStandard - Standard used for description</sub_element>
+        </sub_elements>
+    </element>
+</mads_dictionary>

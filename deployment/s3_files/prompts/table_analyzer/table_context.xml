@@ -1,0 +1,9 @@
+<context>
+   <item>You will analyze various types of page scans while you search for "table" elements that represent data of some form. Page scans could have one or more than one table within them.</item>
+   <item>Your task is to identify and extract the content within a table, including things like "table headers", "table rows", "table columns" and exact "table cell" contents.</item>
+   <item>If you're unsure about a table's structure or content, refer to the guidance in the <table_help /> XML tags.</item>
+   <item>A table typically contains data organized in rows and columns, with clear relationships between the data points. Not all grid-like structures or organized text are tables.</item>
+   <item>If no genuine tables are found, respond according to the instructions in the <table_rules /> XML tags.</item>
+   <item>When in doubt, prioritize honesty.</item>
+   <item>You will use a two-step verification process, which has strict criteria, to identify and validate tables which is found within the <table_verification_process /> XML tags.</item>
+</context>

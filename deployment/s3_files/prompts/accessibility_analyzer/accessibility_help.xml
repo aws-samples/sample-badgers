@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<accessibility_help>
+    <common_scenarios>
+        <scenario name="Academic Paper">
+            <typical_structure>
+                <element>Running header (Artifact)</element>
+                <element>Journal logo (Figure or Artifact depending on placement)</element>
+                <element>Article type label (H2)</element>
+                <element>Document title (H1)</element>
+                <element>Authors with affiliation superscripts (P with References)</element>
+                <element>Affiliation footnotes (Note elements)</element>
+                <element>Keywords section (Aside)</element>
+                <element>Abstract (Sect with H2 "Abstract")</element>
+                <element>Introduction section (Sect with H2)</element>
+                <element>Methods, Results, Discussion sections (Sect with H2)</element>
+                <element>Figures with captions (Figure + Caption)</element>
+                <element>Tables (Table structure)</element>
+                <element>References section (Sect with H2, list of citations)</element>
+                <element>Footer with copyright, DOI, page number (Artifact or P with roles)</element>
+            </typical_structure>
+        </scenario>
+
+        <scenario name="Clinical Guideline">
+            <typical_structure>
+                <element>Running header (Artifact)</element>
+                <element>Organization logo (Figure)</element>
+                <element>Document title (H1)</element>
+                <element>Authors/Committee (P)</element>
+                <element>Keywords (Aside)</element>
+                <element>Introduction (Sect with H2)</element>
+                <element>Diagnosis section (Sect with H2)</element>
+                <element>Management sections with subsections (Sect with H2, nested Sect with H3)</element>
+                <element>Treatment algorithms (Figure with detailed alt text)</element>
+                <element>Recommendations (List or numbered paragraphs)</element>
+                <element>References (Sect with H2)</element>
+                <element>Footer information (Artifact or P with roles)</element>
+            </typical_structure>
+        </scenario>
+
+        <scenario name="Multi-Column Layout">
+            <reading_order>
+                <step>Read left column from top to bottom</step>
+                <step>Then read right column from top to bottom</step>
+                <step>Exception: If content explicitly flows across columns (newspaper style),
+                    follow that flow</step>
+                <step>Footnotes at bottom should be placed after main content, not in visual
+                    position</step>
+            </reading_order>
+        </scenario>
+    </common_scenarios>
+
+    <troubleshooting>
+        <issue name="Skipped Heading Levels">
+            <problem>Input shows H1 followed by H3 with no H2</problem>
+            <solution>
+                <option>If the H3 is truly a subsection, insert a logical H2 or adjust levels</option>
+                <option>If the "H3" is actually decorative or a label, consider making it a P or
+                    Aside</option>
+                <option>Consult the visual context to determine true hierarchy</option>
+            </solution>
+        </issue>
+
+        <issue name="Ambiguous Element Type">
+            <problem>Element could be content or artifact (e.g., logo, repeated text)</problem>
+            <solution>
+                <guideline>If it appears once and is part of document identity → Content (Figure)</guideline>
+                <guideline>If it repeats on every page in margins → Artifact</guideline>
+                <guideline>If it provides information users need → Content</guideline>
+                <guideline>If it's purely decorative → Artifact</guideline>
+            </solution>
+        </issue>
+
+        <issue name="Complex Tables">
+            <problem>Table structure is unclear from element extraction</problem>
+            <solution>
+                <step>Look for patterns in element order and position</step>
+                <step>First row typically contains headers (TH)</step>
+                <step>Subsequent rows contain data (TD)</step>
+                <step>If uncertain, create basic table structure and note in comments</step>
+            </solution>
+        </issue>
+
+        <issue name="Footnote Matching">
+            <problem>Matching footnote markers to footnote content</problem>
+            <solution>
+                <step>Look for superscript numbers/symbols in paragraph content</step>
+                <step>Match to footnote elements with same number/symbol</step>
+                <step>Create unique IDs (Note1, Note2, etc.)</step>
+                <step>Add Reference elements at marker locations with matching RefIDs</step>
+            </solution>
+        </issue>
+
+        <issue name="Missing Alt Text Information">
+            <problem>Input doesn't describe images, only identifies them</problem>
+            <solution>
+                <step>Use context clues from surrounding text</step>
+                <step>If caption is present, use it as basis for alt text</step>
+                <step>If figure is referenced in text ("Figure 1 shows..."), use that description</step>
+                <step>For logos: use organization name</step>
+                <step>For charts: describe type and general content ("Bar chart comparing treatment
+                    outcomes")</step>
+                <step>Keep concise but meaningful</step>
+            </solution>
+        </issue>
+    </troubleshooting>
+
+    <best_practices>
+        <practice>
+            <title>Start with Structure</title>
+            <description>Map out the document hierarchy before creating detailed elements.
+                Understand the big picture first.</description>
+        </practice>
+
+        <practice>
+            <title>Think Like a Screen Reader User</title>
+            <description>Imagine navigating the document without seeing it. Does the structure make
+                sense? Can you skip to sections? Is the reading order logical?</description>
+        </practice>
+
+        <practice>
+            <title>Be Consistent</title>
+            <description>Use consistent naming for IDs (Note1, Note2, Fig1, Fig2). Use consistent
+                structure for similar elements.</description>
+        </practice>
+
+        <practice>
+            <title>Provide Context in Comments</title>
+            <description>Add XML comments to explain non-obvious decisions, especially for complex
+                structures or ambiguous elements.</description>
+        </practice>
+
+        <practice>
+            <title>Validate Cross-References</title>
+            <description>Double-check that every RefID points to an existing ID. Missing references
+                break navigation.</description>
+        </practice>
+
+        <practice>
+            <title>Don't Over-Structure</title>
+            <description>Not every visual grouping needs a Sect. Use sections for meaningful
+                semantic divisions, not just visual layout.</description>
+        </practice>
+
+        <practice>
+            <title>Meaningful Alt Text</title>
+            <description>Alt text should convey the same information as the image. For decorative
+                images, mark as Artifact instead.</description>
+        </practice>
+    </best_practices>
+
+    <quality_indicators>
+        <good_sign>Every input element is accounted for</good_sign>
+        <good_sign>Reading order makes sense when read linearly</good_sign>
+        <good_sign>Heading hierarchy is logical and complete</good_sign>
+        <good_sign>Cross-references are complete and valid</good_sign>
+        <good_sign>Alt text is descriptive and meaningful</good_sign>
+        <good_sign>Artifacts are properly identified</good_sign>
+        <good_sign>Structure enables navigation (by headings, sections)</good_sign>
+
+        <warning_sign>Large number of elements marked as artifacts (may be over-marking)</warning_sign>
+        <warning_sign>Skipped heading levels</warning_sign>
+        <warning_sign>Very flat structure (no sections or nesting)</warning_sign>
+        <warning_sign>Generic alt text ("image", "figure", "logo")</warning_sign>
+        <warning_sign>Missing cross-references for obvious footnotes/citations</warning_sign>
+        <warning_sign>Reading order jumps around illogically</warning_sign>
+    </quality_indicators>
+
+    <examples_of_excellence>
+        <example name="Well-Structured Section">
+            <code><![CDATA[
+<Sect>
+    <H2>
+        <Content>MANAGEMENT OF ADVANCED DISEASE</Content>
+        <MCR PageRef="1" ContentRef="Obj17"/>
+    </H2>
+
+    <Sect>
+        <H3>
+            <Content>Binet stage A and B with active disease or Binet stage C</Content>
+            <MCR PageRef="1" ContentRef="Obj18"/>
+        </H3>
+
+        <P>
+            <Content>The treatment algorithms for first-line (Figure 1) and relapsed therapy (Figure 2) have been updated.</Content>
+            <MCR PageRef="1" ContentRef="Obj19"/>
+            <Reference Type="Figure" RefID="Fig1">Figure 1</Reference>
+            <Reference Type="Figure" RefID="Fig2">Figure 2</Reference>
+        </P>
+
+        <Sect>
+            <H4>
+                <Content>First-line treatment</Content>
+                <MCR PageRef="1" ContentRef="Obj20"/>
+            </H4>
+
+            <P>
+                <Content>Different treatment strategies are available...</Content>
+                <MCR PageRef="1" ContentRef="Obj21"/>
+            </P>
+        </Sect>
+    </Sect>
+</Sect>
+            ]]></code>
+            <why_excellent>
+                <reason>Clear hierarchy: H2 → H3 → H4</reason>
+                <reason>Proper nesting: subsections within sections</reason>
+                <reason>Cross-references to figures</reason>
+                <reason>Content references for all elements</reason>
+            </why_excellent>
+        </example>
+
+        <example name="Proper Footnote Handling">
+            <code><![CDATA[
+<P Role="Authors">
+    <Content>B. Eichhorst</Content>
+    <Reference Type="Footnote" RefID="Affil1">¹</Reference>
+    <Content>, P. Ghia</Content>
+    <Reference Type="Footnote" RefID="Affil2">²</Reference>
+    <Reference Type="Footnote" RefID="Affil3">³</Reference>
+    <MCR PageRef="1" ContentRef="Obj4"/>
+</P>
+
+<Note Type="Footnote" ID="Affil1">
+    <Label>¹</Label>
+    <Content>Department I for Internal Medicine, University of Cologne, Germany</Content>
+    <MCR PageRef="1" ContentRef="Obj5"/>
+</Note>
+
+<Note Type="Footnote" ID="Affil2">
+    <Label>²</Label>
+    <Content>Medical School, Università Vita-Salute San Raffaele, Milan</Content>
+    <MCR PageRef="1" ContentRef="Obj6"/>
+</Note>
+            ]]></code>
+            <why_excellent>
+                <reason>Unique IDs for each affiliation</reason>
+                <reason>References link markers to notes</reason>
+                <reason>Labels match reference markers</reason>
+                <reason>Enables screen reader to jump from marker to note and back</reason>
+            </why_excellent>
+        </example>
+    </examples_of_excellence>
+</accessibility_help>

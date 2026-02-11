@@ -1,0 +1,19 @@
+<!-- Your tasks to complete. For these tasks, use every bit of information given to you. -->
+<tasks>
+   <task>Take a deep breath and proceed task by task using the information provided to you in your system_prompt and in this prompt.</task>
+
+   <task>Carefully analyze the given page and identify its type based on the definitions provided in the <page_types/>
+ XML tags in the system prompt. Look for key structural elements and content patterns that distinguish different page types.</task>
+
+   <task>If the page contains prominent metadata elements that are crucial for determining the page type (e.g., a title on a cover page or author information on an introductory page), take note of these. However, focus only on metadata that directly contributes to identifying the page type. DO NOT INCLUDE the metadata into your response.</task>
+
+   <task>Pay special attention to the unique elements of the identified page type. For example, if it's a Table of Contents, focus on extracting the hierarchical structure and page numbers. If it's a Standard Page, label the page type as such.</task>
+
+   <task>Double-check that you've included the page number, writing direction, and language information for the page, as these are common to all page types.</task>
+
+   <task>Review your extracted information and ensure it accurately represents the content and structure of the page, without adding or inferring information not present in the original.</task>
+
+   <task>Once you've identified the page type, respond in the format provided to you in the <response_format/> XML tags.</task>
+
+   <task>Take a final deep breath and think of all the information you've been provided. Ensure you are accurate, following all rules, and have not omitted any crucial information that defines the page type.</task>
+</tasks>

@@ -1,0 +1,62 @@
+<!-- Provides guidance on identifying and extracting code blocks -->
+<code_block_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Absence of code blocks is a valid and expected outcome. Do not force identification if no code blocks are present.</item>
+        <item>When in doubt, do NOT classify an element as a code block. Accuracy is more important than comprehensiveness.</item>
+        <item>NEVER classify regular prose or formatted text as code blocks unless they contain actual programming syntax.</item>
+        <item>Code blocks must contain recognizable programming constructs, configuration syntax, or command-line instructions.</item>
+    </critical_instructions>
+
+    <code_block_definition>
+        <item>A code block is a section of text containing programming code, configuration data, or technical commands.</item>
+        <item>Code blocks typically appear in monospace fonts with distinctive formatting.</item>
+        <item>Code blocks often have syntax highlighting, line numbers, or bordered containers.</item>
+        <item>Code blocks contain recognizable programming constructs: keywords, operators, brackets, semicolons, etc.</item>
+        <item>Code blocks may include comments denoted by language-specific syntax (// # /* -- etc.).</item>
+    </code_block_definition>
+
+    <language_identification>
+        <item>Python: indentation-based, def/class keywords, colons, no semicolons.</item>
+        <item>JavaScript/TypeScript: curly braces, function/const/let keywords, semicolons optional.</item>
+        <item>Java/C#: curly braces, class/public/private keywords, semicolons required.</item>
+        <item>HTML/XML: angle brackets, tag structure, attributes in quotes.</item>
+        <item>JSON: curly braces and brackets, key-value pairs with colons, quoted strings.</item>
+        <item>YAML: indentation-based, key-value with colons, dashes for lists.</item>
+        <item>SQL: SELECT/FROM/WHERE keywords, table and column references.</item>
+        <item>Shell/Bash: $ prompts, pipe operators, command flags with dashes.</item>
+        <item>CSS: selectors, curly braces, property: value pairs with semicolons.</item>
+    </language_identification>
+
+    <not_code_blocks>
+        <item>Regular paragraphs of text are NOT code blocks, even if formatted differently.</item>
+        <item>Tables of data without programming syntax are NOT code blocks.</item>
+        <item>Mathematical formulas or equations are NOT code blocks.</item>
+        <item>Pseudocode without specific language syntax may or may not be a code block - use judgment.</item>
+        <item>File paths or URLs alone are NOT code blocks.</item>
+        <item>Keyboard shortcuts or menu paths are NOT code blocks.</item>
+    </not_code_blocks>
+
+    <verification_process>
+        <pass_1_identification>
+            <step>Look for monospace font or distinctive code formatting.</step>
+            <step>Identify bordered containers or shaded backgrounds typical of code.</step>
+            <step>Look for line numbers in the margin.</step>
+            <step>Identify syntax highlighting (colored keywords, strings, comments).</step>
+        </pass_1_identification>
+        <pass_2_analysis>
+            <step>Verify presence of programming language constructs.</step>
+            <step>Identify the specific language based on syntax patterns.</step>
+            <step>Confirm the content is executable or parseable code, not prose.</step>
+            <step>Document the code structure and key elements.</step>
+        </pass_2_analysis>
+    </verification_process>
+
+    <decision_process>
+        <item>Follow the two-step verification process.</item>
+        <item>In the first pass, identify all potential code-like structures.</item>
+        <item>In the second pass, verify each potential code block contains actual programming syntax.</item>
+        <item>Consider the document context to avoid misclassification.</item>
+        <item>For verified code blocks, preserve exact formatting and content.</item>
+    </decision_process>
+</code_block_help>

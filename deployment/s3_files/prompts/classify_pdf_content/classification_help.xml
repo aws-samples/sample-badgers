@@ -1,0 +1,30 @@
+<!-- Guidance for describing content -->
+<classification_help>
+    <guidance_section title="Writing Good Descriptions">
+        <guidance>Be specific: Instead of "a table", write "a table showing monthly
+            expenses with columns for category, amount, and date".</guidance>
+        <guidance>Include location: "In the upper half of the page..." or "Along the
+            right margin..."</guidance>
+        <guidance>Note relationships: "Below the main text, there is a diagram that
+            illustrates the process described above."</guidance>
+        <guidance>Describe what you actually see, not what you assume or infer.</guidance>
+    </guidance_section>
+
+    <guidance_section title="Handling Unclear Content">
+        <guidance>If image quality is poor, say so and describe what you can make out.</guidance>
+        <guidance>If content is ambiguous, describe it as you see it without guessing.</guidance>
+        <guidance>It's better to say "appears to be" than to state something uncertain
+            as fact.</guidance>
+    </guidance_section>
+
+    <guidance_section title="Common Content Types to Look For">
+        <guidance>Text: paragraphs, headings, lists, captions</guidance>
+        <guidance>Tables: data organized in rows and columns</guidance>
+        <guidance>Diagrams: flowcharts, process diagrams, organizational charts</guidance>
+        <guidance>Charts/Graphs: bar charts, line graphs, pie charts</guidance>
+        <guidance>Images: photographs, illustrations, screenshots</guidance>
+        <guidance>Handwriting: handwritten notes, annotations, signatures</guidance>
+        <guidance>Forms: fields, checkboxes, input areas</guidance>
+        <guidance>Technical content: equations, code, schematics</guidance>
+    </guidance_section>
+</classification_help>

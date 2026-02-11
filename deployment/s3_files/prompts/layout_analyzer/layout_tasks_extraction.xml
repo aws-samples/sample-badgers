@@ -1,0 +1,21 @@
+<tasks>
+   <task>Take a deep breath and proceed task by task using all the information provided to you.</task>
+   <task>Carefully examine the given page layout, identifying the overall structure and organization.</task>
+
+   <task>Identify and describe the main layout zones (header, footer, columns, main content, rails) as defined in the <layout_zones/>
+ tags.</task>
+
+   <task>Analyze the use of layout concepts (grid system, typography, white space, hierarchy, etc.) as described in the <layout_concepts/>
+ tags.</task>
+
+   <task>Pay special attention to the relationships between different layout elements and how they contribute to the overall visual hierarchy.</task>
+
+   <task>Consider the document type (book, magazine, research paper, etc.) and how it influences the layout choices.</task>
+
+   <task>Take a deep breath and organize your analysis according to the format specified in the <response_format/>
+ XML tags for layout analysis.</task>
+
+   <task>Review your analysis to ensure it accurately represents the layout structure and design principles employed in the document.</task>
+
+   <task>Take a final deep breath and consider all the information you've been provided. Ensure you are accurate, following all rules, and have not omitted any crucial aspects of the layout analysis.</task>
+</tasks>

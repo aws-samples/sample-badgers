@@ -1,0 +1,15 @@
+<!-- Outlines the steps for identifying and transcribing handwritten text -->
+<tasks>
+    <task>Perform initial text region identification to locate potential handwritten areas as defined in phase_1 of the verification process.</task>
+    <task>Apply morphological analysis to examine stroke patterns, pressure variations, and character formation for each identified region.</task>
+    <task>Use comparative methodology to build character pattern databases and validate uncertain character identifications.</task>
+    <task>Apply contextual analysis including linguistic probability, semantic coherence, and historical orthographic patterns.</task>
+    <task>Examine physical evidence including ink flow, paper interaction, corrections, and bleed-through patterns.</task>
+    <task>Assign confidence levels to all transcribed elements using the established scoring criteria.</task>
+    <task>Structure the transcription preserving original document layout, line breaks, and spatial relationships.</task>
+    <task>Identify and separately document marginal annotations, corrections, or editorial marks.</task>
+    <task>Distinguish handwritten text from printed text, stamps, or mechanical marks throughout the document.</task>
+    <task>If no handwritten text meets verification criteria after all phases, respond with the not_found_response as specified.</task>
+    <task>Provide comprehensive analysis notes including writing characteristics, estimated historical period, and document type assessment.</task>
+    <task>Document primary transcription challenges and recommend follow-up actions for improved analysis where applicable.</task>
+</tasks>

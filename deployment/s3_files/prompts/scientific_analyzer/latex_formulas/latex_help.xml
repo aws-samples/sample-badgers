@@ -1,0 +1,34 @@
+<!-- Provides guidance on identifying and extracting LaTeX formulas -->
+<latex_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Absence of LaTeX formulas is a valid and expected outcome. Do not force identification if no formulas are present.</item>
+        <item>When in doubt, do NOT classify an element as a LaTeX formula. Accuracy is more important than comprehensiveness.</item>
+        <item>NEVER classify regular text or non-mathematical symbols as LaTeX formulas, even if they contain numbers or simple operators.</item>
+        <item>LaTeX formulas must contain mathematical notation, symbols, or complex expressions beyond basic arithmetic.</item>
+    </critical_instructions>
+
+    <latex_formula_definition>
+        <item>A LaTeX formula is a mathematical or scientific expression written using LaTeX syntax.</item>
+        <item>LaTeX formulas can be inline (within text) or display (on separate lines).</item>
+        <item>LaTeX formulas often contain Greek letters, mathematical symbols, and specialized notation.</item>
+        <item>Formulas may include fractions, integrals, summations, matrices, and other complex mathematical structures.</item>
+        <item>LaTeX code typically includes commands that start with a backslash (\) and may use curly braces {} for grouping.</item>
+    </latex_formula_definition>
+
+    <not_latex_formulas>
+        <item>Simple arithmetic expressions without LaTeX syntax are NOT LaTeX formulas.</item>
+        <item>Text containing isolated mathematical symbols or numbers is NOT a LaTeX formula.</item>
+        <item>Chemical formulas or equations without LaTeX syntax are NOT LaTeX formulas.</item>
+        <item>Citations or reference numbers are NOT LaTeX formulas.</item>
+        <item>Any content that lacks specific LaTeX syntax or commands is NOT a LaTeX formula.</item>
+    </not_latex_formulas>
+
+    <decision_process>
+        <item>Follow the two-step verification process defined in the latex_verification_process.xml file.</item>
+        <item>In the first pass, identify all potential LaTeX formula structures.</item>
+        <item>In the second pass, rigorously verify each potential formula against the defined criteria.</item>
+        <item>Consider the context around each potential formula to avoid misclassification.</item>
+        <item>For verified formulas, ensure you capture the full LaTeX code, including all commands and syntax.</item>
+    </decision_process>
+</latex_help>

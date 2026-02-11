@@ -1,0 +1,100 @@
+{
+    "ingestion": {
+        "characters_per_token": 4.5,
+        "avg_characters_per_word": 5,
+        "avg_words_per_page": 500,
+        "avg_pages_per_document": 15,
+        "avg_tokens_per_image": 1600
+    },
+    "presets": {
+        "default": {
+            "name": "Default",
+            "description": "General purpose defaults",
+            "recommended_model": "Claude Sonnet 4.5",
+            "words_per_page": 500,
+            "pages_per_document": 15,
+            "tokens_per_image": 1600,
+            "output_ratio": 0.5
+        },
+        "insurance_claims": {
+            "name": "Insurance Claims",
+            "description": "High-volume claim forms, structured extraction",
+            "recommended_model": "Claude Haiku 4.5",
+            "words_per_page": 350,
+            "pages_per_document": 5,
+            "tokens_per_image": 1200,
+            "output_ratio": 0.3
+        },
+        "legal_contracts": {
+            "name": "Legal Contracts",
+            "description": "Complex contracts requiring nuanced interpretation",
+            "recommended_model": "Claude Sonnet 4.5",
+            "words_per_page": 450,
+            "pages_per_document": 25,
+            "tokens_per_image": 1600,
+            "output_ratio": 0.4
+        },
+        "medical_records": {
+            "name": "Medical Records",
+            "description": "Clinical notes, lab results, imaging reports",
+            "recommended_model": "Claude Sonnet 4.5",
+            "words_per_page": 400,
+            "pages_per_document": 20,
+            "tokens_per_image": 2000,
+            "output_ratio": 0.5
+        },
+        "financial_documents": {
+            "name": "Financial Documents",
+            "description": "Statements, trading docs, audit materials",
+            "recommended_model": "Claude Sonnet 4.5",
+            "words_per_page": 300,
+            "pages_per_document": 10,
+            "tokens_per_image": 1800,
+            "output_ratio": 0.4
+        },
+        "invoices_receipts": {
+            "name": "Invoices & Receipts",
+            "description": "High-volume transactional documents",
+            "recommended_model": "Claude Haiku 4.5",
+            "words_per_page": 200,
+            "pages_per_document": 2,
+            "tokens_per_image": 1000,
+            "output_ratio": 0.25
+        },
+        "engineering_diagrams": {
+            "name": "Engineering Diagrams",
+            "description": "Technical drawings, schematics, architecture diagrams",
+            "recommended_model": "Claude Sonnet 4.5",
+            "words_per_page": 100,
+            "pages_per_document": 8,
+            "tokens_per_image": 2500,
+            "output_ratio": 0.6
+        },
+        "regulatory_filings": {
+            "name": "Regulatory Filings",
+            "description": "SEC filings, compliance documents, government forms",
+            "recommended_model": "Amazon Nova Premier",
+            "words_per_page": 550,
+            "pages_per_document": 50,
+            "tokens_per_image": 1600,
+            "output_ratio": 0.35
+        }
+    },
+    "models": {
+        "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
+            "name": "Claude Sonnet 4.5",
+            "input_cost_per_million": 3.00,
+            "output_cost_per_million": 15.00
+        },
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0": {
+            "name": "Claude Haiku 4.5",
+            "input_cost_per_million": 1.00,
+            "output_cost_per_million": 5.00
+        },
+        "us.amazon.nova-premier-v1:0": {
+            "name": "Amazon Nova Premier",
+            "input_cost_per_million": 2.50,
+            "output_cost_per_million": 12.50
+        }
+    }
+}
