@@ -1,9 +1,0 @@
-<not_found_response_format>
-    <response>
-        <not_found>
-            <element type="[TASK TYPE]">
-                <message>Task of type [TASK TYPE] did not find any elements.</message>
-            </element>
-        </not_found>
-    </response>
-</not_found_response_format>

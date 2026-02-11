@@ -2,6 +2,7 @@
 layer/
 *.zip
 layer_arn.txt
+poppler_layer_arn.txt
 
 # Python
 __pycache__/

@@ -18,7 +18,6 @@ BADGERS uses four types of Lambda functions:
 | 🔍 **Vision Analyzers**  | Analyze images using Bedrock vision models  | `full_text_analyzer`, `table_analyzer`, etc. |
 | 🐳 **Container Lambdas** | ML-based processing requiring large deps    | `image_enhancer`, `remediation_analyzer`     |
 | 🔧 **Utilities**         | Transform or prepare data                   | `pdf_to_images_converter`                    |
-| 📊 **Aggregators**       | Combine results from multiple analyses      | `aggregate_analysis_results`                 |
 | 🔗 **Correlators**       | Correlate outputs across analyzers per page | `correlation_analyzer`                       |
 
 ---
