@@ -2,7 +2,7 @@
 name = "BADGERS"
 version = "1.2.0"
 description = "BADGERS (Broad Agentic Document Generative Extraction & Recognition System) transforms document processing through vision-enabled AI and deep layout analysis. Unlike traditional text extraction tools, BADGERS understands document structure and meaning by recognizing visual hierarchies, reading patterns, and contextual relationships between elements. The system currently processes 21 distinct document elements including text extraction, handwriting recognition, mathematical equations, complex tables, diagrams, and accessibility compliance features. Built on Amazon Bedrock with vision-enabled LLMs, it maintains semantic connections and document hierarchy throughout extraction, delivering structured outputs that preserve original organization and meaning. BADGERS automates document processing workflows while improving accuracy and completeness, enabling organizations to focus on using information rather than extracting it. The system accelerates research, compliance, content management, and accessibility remediation across diverse document types from simple forms to complex scientific papers."
-authors = [{ name = "rbpotter-aws", email = "" }]
+authors = [{ name = "rbpotter-aws" }]
 readme = "README.md"
 requires-python = ">=3.12.0"
 classifiers = [
