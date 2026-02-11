@@ -53,11 +53,6 @@ if [ $? -eq 0 ]; then
     echo "   ARN: $LAYER_ARN"
     echo ""
 
-    # Save ARN to file for easy reference
-    echo "$LAYER_ARN" > layer_arn.txt
-    echo "💾 Layer ARN saved to: layer_arn.txt"
-    echo ""
-
     echo "🎯 Use this layer in your functions:"
     echo ""
     echo "aws lambda update-function-configuration \\"

@@ -54,11 +54,6 @@ if [ $? -eq 0 ]; then
     echo "   ARN: $LAYER_ARN"
     echo ""
 
-    # Save ARN to file for easy reference
-    echo "$LAYER_ARN" > poppler_layer_arn.txt
-    echo "💾 Layer ARN saved to: poppler_layer_arn.txt"
-    echo ""
-
     # List all versions
     echo "📚 All versions of this layer:"
     aws lambda list-layer-versions \
