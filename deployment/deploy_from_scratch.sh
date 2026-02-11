@@ -152,6 +152,14 @@ main() {
     log_info "Using deployment ID: $DEPLOYMENT_ID"
     _CDK_CONTEXT="-c deployment_id=$DEPLOYMENT_ID"
 
+    # Step 0: Ensure virtual environment exists and is activated
+    if [ ! -d "$CDK_DIR/.venv" ]; then
+        log_info "Creating virtual environment..."
+        uv venv "$CDK_DIR/.venv" || handle_error "Create virtual environment"
+        log_success "Virtual environment created"
+    fi
+    source "$CDK_DIR/.venv/bin/activate"
+
     # Step 1: Install Python dependencies
     log_info "Step 1/11: Installing Python dependencies..."
     $_PIP_CMD -r requirements.txt || handle_error "Install dependencies"

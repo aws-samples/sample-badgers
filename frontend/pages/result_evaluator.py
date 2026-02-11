@@ -38,13 +38,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Paths
-DEPLOYMENT_ROOT = Path(__file__).parent.parent.parent / "deployment"
-MANIFESTS_DIR = DEPLOYMENT_ROOT / "s3_files" / "manifests"
-
 # Config from environment
 S3_OUTPUT_BUCKET = os.getenv("S3_OUTPUT_BUCKET", "")
+S3_CONFIG_BUCKET = os.getenv("S3_CONFIG_BUCKET", "")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+CUSTOM_ANALYZERS_PREFIX = "custom-analyzers"
 
 
 class S3Client:
@@ -147,10 +145,78 @@ class S3Client:
             logger.warning("Error saving evaluation: %s", e)
             raise
 
-    def get_evaluation(self, session_id: str, result_filename: str) -> Optional[dict]:
-        """Get most recent evaluation if it exists."""
+    def save_session_evaluation(
+        self, session_id: str, result_filename: str, analyzer: str, evaluation: dict
+    ) -> str:
+        """Save/append evaluation into a single session-level evaluation file."""
+        timestamp = datetime.utcnow().strftime("%Y-%m-%d-%I-%M-%p")
+        eval_key = f"{session_id}/evaluations/session_evaluation.json"
+
+        # Try to load existing session evaluation file
+        existing: dict = {
+            "evaluations": [],
+            "last_updated": "",
+            "last_updated_readable": "",
+        }
         try:
-            # List all evaluations for this result file
+            response = self.s3.get_object(Bucket=self.bucket, Key=eval_key)
+            existing = json.loads(response["Body"].read().decode("utf-8"))
+            if "evaluations" not in existing:
+                existing["evaluations"] = []
+        except Exception:
+            pass  # File doesn't exist yet, start fresh
+
+        # Build entry for this result
+        entry = {
+            "result_file": result_filename,
+            "analyzer": analyzer,
+            "responses": evaluation,
+            "evaluated_at": datetime.utcnow().isoformat(),
+            "evaluated_at_readable": timestamp,
+        }
+
+        # Update or append: replace if same result_file already exists
+        found = False
+        for i, ev in enumerate(existing["evaluations"]):
+            if ev.get("result_file") == result_filename:
+                existing["evaluations"][i] = entry
+                found = True
+                break
+        if not found:
+            existing["evaluations"].append(entry)
+
+        existing["last_updated"] = datetime.utcnow().isoformat()
+        existing["last_updated_readable"] = timestamp
+
+        self.s3.put_object(
+            Bucket=self.bucket,
+            Key=eval_key,
+            Body=json.dumps(existing, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+        logger.info(
+            "Saved session evaluation to %s (%d results)",
+            eval_key,
+            len(existing["evaluations"]),
+        )
+        return f"s3://{self.bucket}/{eval_key}"
+
+    def get_evaluation(self, session_id: str, result_filename: str) -> Optional[dict]:
+        """Get most recent evaluation if it exists. Checks session file first, then per-file evals."""
+        try:
+            # Check session-level evaluation file first
+            session_key = f"{session_id}/evaluations/session_evaluation.json"
+            try:
+                response = self.s3.get_object(Bucket=self.bucket, Key=session_key)
+                session_data = json.loads(response["Body"].read().decode("utf-8"))
+                for ev in session_data.get("evaluations", []):
+                    if ev.get("result_file") == result_filename:
+                        matched_eval: dict = ev
+                        return matched_eval
+            except Exception:
+                pass
+
+            # Fallback: check per-file evaluations
             prefix = f"{session_id}/evaluations/{result_filename}_eval_"
             response = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=prefix)
 
@@ -199,22 +265,41 @@ class S3Client:
 
 
 def load_manifest_evaluation(analyzer_name: str) -> Optional[dict]:
-    """Load evaluation config from analyzer manifest."""
-    manifest_path = MANIFESTS_DIR / f"{analyzer_name}.json"
-    logger.info("Looking for manifest: %s", manifest_path)
-    if not manifest_path.exists():
-        logger.warning("Manifest not found: %s", manifest_path)
+    """Load evaluation config from analyzer manifest in S3."""
+    if not S3_CONFIG_BUCKET:
+        logger.warning("S3_CONFIG_BUCKET not set, cannot load manifest evaluation")
         return None
 
-    try:
-        with open(manifest_path, encoding="utf-8") as f:
-            manifest: dict = json.load(f)
-        eval_config: Optional[dict] = manifest.get("evaluation")
-        logger.info("Loaded evaluation config: %s", eval_config is not None)
-        return eval_config
-    except Exception as e:
-        logger.error("Error loading manifest: %s", e)
-        return None
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+
+    # Try base manifests first, then custom-analyzers
+    keys_to_try = [
+        f"manifests/{analyzer_name}.json",
+        f"{CUSTOM_ANALYZERS_PREFIX}/manifests/{analyzer_name}.json",
+    ]
+
+    for key in keys_to_try:
+        try:
+            response = s3.get_object(Bucket=S3_CONFIG_BUCKET, Key=key)
+            manifest: dict = json.loads(response["Body"].read().decode("utf-8"))
+            eval_config: Optional[dict] = manifest.get("evaluation")
+            logger.info(
+                "Loaded evaluation config from s3://%s/%s: %s",
+                S3_CONFIG_BUCKET,
+                key,
+                eval_config is not None,
+            )
+            return eval_config
+        except s3.exceptions.NoSuchKey:
+            continue
+        except Exception as e:
+            logger.error(
+                "Error loading manifest from s3://%s/%s: %s", S3_CONFIG_BUCKET, key, e
+            )
+            continue
+
+    logger.warning("No manifest found for analyzer: %s", analyzer_name)
+    return None
 
 
 def format_session_metadata(metadata: Optional[dict]) -> str:
@@ -275,7 +360,13 @@ def create_ui():
             gr.Markdown("S3_OUTPUT_BUCKET not set in .env file")
         return demo_evaluator
 
-    s3_client = S3Client(S3_OUTPUT_BUCKET, AWS_REGION)
+    # Lazy-init: don't create boto3 client at import time (credential chain is slow)
+    s3_client_holder = [None]
+
+    def get_s3_client():
+        if s3_client_holder[0] is None:
+            s3_client_holder[0] = S3Client(S3_OUTPUT_BUCKET, AWS_REGION)
+        return s3_client_holder[0]
 
     with gr.Blocks(title="Result Evaluator") as demo_evaluator:
         # State
@@ -293,9 +384,9 @@ def create_ui():
         with gr.Row(elem_classes=["content-panel"]):
             with gr.Column(scale=3):
                 session_dropdown = gr.Dropdown(
-                    choices=s3_client.list_sessions(),
+                    choices=[],
                     label="Select Session",
-                    info="Sessions from S3 output bucket",
+                    info="Sessions from S3 output bucket (click Refresh to load)",
                 )
             with gr.Column(scale=2):
                 load_session_btn = gr.Button(
@@ -387,8 +478,9 @@ def create_ui():
 
                 gr.Markdown("---")
 
-                # Tool-specific questions group (dynamic)
-                with gr.Group():
+                # Tool-specific questions group (dynamic, hidden when no eval config)
+                tool_specific_group = gr.Group(visible=False)
+                with tool_specific_group:
                     gr.Markdown("#### Tool-Specific Questions")
                     tool_q1 = gr.Radio(
                         choices=[
@@ -447,11 +539,12 @@ def create_ui():
                     gr.update(),
                     gr.update(),
                     "",
+                    gr.update(visible=False),
                 )
 
-            results = s3_client.list_results(session_id)
+            results = get_s3_client().list_results(session_id)
             # Fetch session metadata
-            metadata = s3_client.get_session_metadata(session_id)
+            metadata = get_s3_client().get_session_metadata(session_id)
             metadata_display = format_session_metadata(metadata)
 
             if not results:
@@ -471,6 +564,7 @@ def create_ui():
                     gr.update(),
                     gr.update(),
                     "",
+                    gr.update(visible=False),
                 )
 
             return load_result_at_index(session_id, results, 0, metadata_display)
@@ -494,10 +588,11 @@ def create_ui():
                     gr.update(),
                     gr.update(),
                     "",
+                    gr.update(visible=False),
                 )
 
             result = results[index]
-            content = s3_client.get_result_content(result["key"])
+            content = get_s3_client().get_result_content(result["key"])
             analyzer = result["analyzer"]
 
             # Load evaluation config
@@ -507,7 +602,9 @@ def create_ui():
             )
 
             # Load existing evaluation
-            existing_eval = s3_client.get_evaluation(session_id, result["filename"])
+            existing_eval = get_s3_client().get_evaluation(
+                session_id, result["filename"]
+            )
 
             # Pre-fill from existing evaluation
             overall_val = None
@@ -528,7 +625,8 @@ def create_ui():
                 tool_q2_val = responses.get("tool_q2")
                 tool_q3_val = responses.get("tool_q3")
 
-            # Prepare tool-specific questions
+            # Prepare tool-specific questions — hide section if no eval config
+            has_tool_questions = False
             tool_q1_update = gr.update(label="(Not applicable)", value=None)
             tool_q2_update = gr.update(label="(Not applicable)", value=None)
             tool_q3_update = gr.update(label="(Not applicable)", value=None)
@@ -536,6 +634,8 @@ def create_ui():
             if eval_config and "questions" in eval_config:
                 tool_specific = eval_config["questions"].get("tool_specific", [])
                 logger.info("Tool-specific questions found: %d", len(tool_specific))
+                if tool_specific:
+                    has_tool_questions = True
                 if len(tool_specific) > 0:
                     tool_q1_update = gr.update(
                         label=tool_specific[0]["text"],
@@ -553,6 +653,8 @@ def create_ui():
                     )
             else:
                 logger.warning("No eval_config or questions for analyzer: %s", analyzer)
+
+            tool_group_update = gr.update(visible=has_tool_questions)
 
             progress = f"<center style='font-size:2.5em;font-weight:700'>{index + 1}/{len(results)}</center>"
             info = f"**File:** {result['filename']} **Analyzer:** {analyzer}"
@@ -574,43 +676,94 @@ def create_ui():
                 tool_q2_update,
                 tool_q3_update,
                 progress,
+                tool_group_update,
             )
 
-        def go_previous(session_id, results, index):
-            """Navigate to previous result."""
+        def _save_current_to_session(
+            session_id, results, index, overall, element, context, issues, tq1, tq2, tq3
+        ):
+            """Save current evaluation into the session-level file."""
+            if not session_id or not results or index >= len(results):
+                return
+            # Only save if at least one field has been filled in
+            if overall is None and element is None and context is None:
+                return
+            result = results[index]
+            responses = {
+                "overall_accuracy": overall,
+                "element_identification": element,
+                "contextual_understanding": context,
+                "issues_noted": issues,
+                "tool_q1": tq1,
+                "tool_q2": tq2,
+                "tool_q3": tq3,
+            }
+            try:
+                get_s3_client().save_session_evaluation(
+                    session_id, result["filename"], result["analyzer"], responses
+                )
+            except Exception as e:
+                logger.warning("Auto-save failed: %s", e)
+
+        def go_previous(
+            session_id, results, index, overall, element, context, issues, tq1, tq2, tq3
+        ):
+            """Auto-save current evaluation, then navigate to previous result."""
+            _save_current_to_session(
+                session_id,
+                results,
+                index,
+                overall,
+                element,
+                context,
+                issues,
+                tq1,
+                tq2,
+                tq3,
+            )
             new_index = max(0, index - 1)
             return load_result_at_index(session_id, results, new_index)
 
-        def go_next(session_id, results, index):
-            """Navigate to next result."""
+        def go_next(
+            session_id, results, index, overall, element, context, issues, tq1, tq2, tq3
+        ):
+            """Auto-save current evaluation, then navigate to next result."""
+            _save_current_to_session(
+                session_id,
+                results,
+                index,
+                overall,
+                element,
+                context,
+                issues,
+                tq1,
+                tq2,
+                tq3,
+            )
             new_index = min(len(results) - 1, index + 1)
             return load_result_at_index(session_id, results, new_index)
 
         def save_evaluation(
             session_id, results, index, overall, element, context, issues, tq1, tq2, tq3
         ):
-            """Save the current evaluation."""
+            """Save the current evaluation to the session file."""
             if not session_id or not results or index >= len(results):
                 return "❌ No result selected"
 
             result = results[index]
-            evaluation = {
-                "result_file": result["filename"],
-                "analyzer": result["analyzer"],
-                "responses": {
-                    "overall_accuracy": overall,
-                    "element_identification": element,
-                    "contextual_understanding": context,
-                    "issues_noted": issues,
-                    "tool_q1": tq1,
-                    "tool_q2": tq2,
-                    "tool_q3": tq3,
-                },
+            responses = {
+                "overall_accuracy": overall,
+                "element_identification": element,
+                "contextual_understanding": context,
+                "issues_noted": issues,
+                "tool_q1": tq1,
+                "tool_q2": tq2,
+                "tool_q3": tq3,
             }
 
             try:
-                uri = s3_client.save_evaluation(
-                    session_id, result["filename"], evaluation
+                uri = get_s3_client().save_session_evaluation(
+                    session_id, result["filename"], result["analyzer"], responses
                 )
                 return f"✅ Saved to `{uri}`"
             except Exception as e:
@@ -618,7 +771,7 @@ def create_ui():
 
         def refresh_sessions():
             """Refresh session list."""
-            return gr.update(choices=s3_client.list_sessions())
+            return gr.update(choices=get_s3_client().list_sessions())
 
         # Wire events
         outputs = [
@@ -637,6 +790,7 @@ def create_ui():
             tool_q2,
             tool_q3,
             progress_text,
+            tool_specific_group,
         ]
 
         load_session_btn.click(
@@ -645,15 +799,28 @@ def create_ui():
             outputs=outputs,
         )
 
+        nav_inputs = [
+            current_session,
+            current_results,
+            current_index,
+            overall_accuracy,
+            element_identification,
+            contextual_understanding,
+            issues_noted,
+            tool_q1,
+            tool_q2,
+            tool_q3,
+        ]
+
         prev_btn.click(
             go_previous,
-            inputs=[current_session, current_results, current_index],
+            inputs=nav_inputs,
             outputs=outputs,
         )
 
         next_btn.click(
             go_next,
-            inputs=[current_session, current_results, current_index],
+            inputs=nav_inputs,
             outputs=outputs,
         )
 
@@ -675,6 +842,9 @@ def create_ui():
         )
 
         refresh_btn.click(refresh_sessions, outputs=[session_dropdown])
+
+        # Lazy-load sessions after UI renders (non-blocking)
+        demo_evaluator.load(refresh_sessions, outputs=[session_dropdown])
 
     return demo_evaluator
 

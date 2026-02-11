@@ -82,6 +82,7 @@ def get_config_bucket() -> str:
 
 # Available models
 AVAILABLE_MODELS = {
+    "Claude Opus 4.6": "global.anthropic.claude-opus-4-6-v1",
     "Claude Sonnet 4.5": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
     "Claude Haiku 4.5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     "Amazon Nova Premier": "us.amazon.nova-premier-v1:0",
@@ -261,65 +262,20 @@ def load_user_prompt(analyzer_name: str, display_name: str, description: str) ->
 def generate_prompts_with_llm(
     description: str, analyzer_name: str, display_name: str
 ) -> dict[str, Any]:
-    """Use Bedrock to generate analyzer prompts from user description."""
+    """Use Bedrock to generate analyzer prompts from user description.
+
+    Delegates to per-prompt-type generation with few-shot examples.
+    """
+    from pages.wizard_prompt_gen.prompt_generator import generate_all_prompts
+
     logger.info("Generating prompts for analyzer: %s", analyzer_name)
     logger.info("Description: %s...", description[:100])
 
-    bedrock = boto3.client("bedrock-runtime", region_name="us-west-2")
-
-    system_prompt = load_system_prompt()
-    user_prompt = load_user_prompt(analyzer_name, display_name, description)
-
-    response = bedrock.converse(
-        modelId="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        messages=[{"role": "user", "content": [{"text": user_prompt}]}],
-        system=[{"text": system_prompt}],
-        inferenceConfig={"maxTokens": 4000, "temperature": 0.3},
+    return generate_all_prompts(
+        description=description,
+        analyzer_name=analyzer_name,
+        display_name=display_name,
     )
-
-    result_text = response["output"]["message"]["content"][0]["text"]
-    logger.info("LLM response received, length: %d", len(result_text))
-
-    # Parse JSON from response
-    try:
-        import re
-
-        text = result_text.strip()
-
-        # Strip XML tags that might wrap the JSON (e.g., <response_format>...</response_format>)
-        xml_tag_pattern = r"<(\w+)>\s*([\s\S]*?)\s*</\1>"
-        xml_match = re.search(xml_tag_pattern, text)
-        if xml_match:
-            text = xml_match.group(2).strip()
-
-        # Handle markdown code blocks if present
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-
-        # Try to find JSON object if there's extra text
-        if not text.startswith("{"):
-            json_match = re.search(r"\{[\s\S]*\}", text)
-            if json_match:
-                text = json_match.group(0)
-
-        parsed: dict[str, Any] = json.loads(text)
-        logger.info(
-            "Successfully parsed LLM response with keys: %s", list(parsed.keys())
-        )
-        return parsed
-    except json.JSONDecodeError as e:
-        logger.warning("Failed to parse LLM response as JSON: %s", e)
-        logger.warning("Raw response: %s...", result_text[:500])
-        # Return placeholder if parsing fails
-        return {
-            "job_role": f"<job_role><role>You are a '{display_name} Specialist'.</role></job_role>",
-            "rules": f"<{analyzer_name}_rules><rule>Analyze the provided content carefully.</rule></{analyzer_name}_rules>",
-            "context": f"<context>This analyzer processes {description}</context>",
-            "tasks": "<tasks><task>Extract and analyze relevant content.</task></tasks>",
-            "format": "<format>Return structured analysis results.</format>",
-        }
 
 
 def generate_manifest(state: WizardState) -> dict:
@@ -848,7 +804,7 @@ def create_wizard():
             # Show loading state FIRST
             yield (
                 current_state,
-                "⏳ Generating prompts with AI... (this may take 10-20 seconds)",
+                "⏳ Step 1/2 — Generating prompts with AI... (this may take up to 5 minutes)",
                 gr.update(),
                 gr.update(),
                 gr.update(),
@@ -884,12 +840,28 @@ def create_wizard():
                     full_description, new_state.analyzer_name, display_name
                 )
 
-                new_state.generated_gestalt = generated.get("gestalt", "")
-                new_state.generated_role = generated.get("job_role", "")
-                new_state.generated_rules = generated.get("rules", "")
-                new_state.generated_context = generated.get("context", "")
-                new_state.generated_tasks = generated.get("tasks", "")
-                new_state.generated_format = generated.get("format", "")
+                prompt_fields = [
+                    ("gestalt", "gestalt", "generated_gestalt"),
+                    ("job_role", "job role", "generated_role"),
+                    ("rules", "rules", "generated_rules"),
+                    ("context", "context", "generated_context"),
+                    ("tasks", "tasks", "generated_tasks"),
+                    ("format", "format", "generated_format"),
+                ]
+                total = len(prompt_fields)
+                for i, (key, label, attr) in enumerate(prompt_fields, 1):
+                    setattr(new_state, attr, generated.get(key, ""))
+                    yield (
+                        current_state,
+                        f"⏳ Step 2/2 — Parsing prompts ({i}/{total}): {label}",
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(),
+                        gr.update(selected=0),
+                    )
 
                 logger.info("Generated role length: %d", len(new_state.generated_role))
 

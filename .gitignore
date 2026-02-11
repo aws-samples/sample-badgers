@@ -72,3 +72,10 @@ venv/
 env/
 ENV/
 __pycache__
+
+# Custom analyzers - keep directory structure only
+deployment/custom_analyzers/*
+!deployment/custom_analyzers/.gitkeep
+
+# Hidden dot-directories (repo-wide)
+.**/
