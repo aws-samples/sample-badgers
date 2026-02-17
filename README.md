@@ -166,10 +166,6 @@ cd deployment
 └── pyproject.toml
 ```
 
-## 📄 License
-
-MIT
-
 ---
 
 ## 🔍 Technical Deep Dive
