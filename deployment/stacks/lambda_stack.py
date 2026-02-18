@@ -107,7 +107,7 @@ class LambdaAnalyzerStack(Stack):
         self.pillow_layer = lambda_.LayerVersion.from_layer_version_arn(
             self,
             "PillowLayer",
-            "arn:aws:lambda:us-west-2:770693421928:layer:Klayers-p312-pillow:2",
+            f"arn:aws:lambda:{Stack.of(self).region}:770693421928:layer:Klayers-p312-pillow:2",
         )
 
         # Poppler layer for PDF conversion
