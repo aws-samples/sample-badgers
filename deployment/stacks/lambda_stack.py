@@ -317,7 +317,11 @@ class LambdaAnalyzerStack(Stack):
             logger.info("Created container function: %s", func_name)
 
     def _create_ecr_container_function(self, func_name: str) -> lambda_.Function:
-        """Create a Lambda function from a pre-built ECR image."""
+        """Create a Lambda function from a pre-built ECR image.
+
+        Container functions can still use Lambda layers - the foundation layer
+        is attached to provide shared Python libraries at /opt/python/.
+        """
         schema_path = Path(f"./s3_files/schemas/{func_name}.json")
         description = self.get_tool_description(schema_path, func_name)
 
@@ -343,6 +347,11 @@ class LambdaAnalyzerStack(Stack):
                 }
             )
 
+        # Container functions get the foundation layer for shared Python libraries
+        # The container itself contains large binary dependencies (pymupdf, pikepdf, etc.)
+        # The foundation layer (pure Python, small) is mounted at /opt/python/
+        layers = [self.foundation_layer]
+
         function = lambda_.Function(
             self,
             f"ContainerFunction-{func_name}",
@@ -354,6 +363,7 @@ class LambdaAnalyzerStack(Stack):
             handler=lambda_.Handler.FROM_IMAGE,
             runtime=lambda_.Runtime.FROM_IMAGE,
             role=self.execution_role,
+            layers=layers,
             timeout=Duration.seconds(300),
             memory_size=2048,
             reserved_concurrent_executions=5,

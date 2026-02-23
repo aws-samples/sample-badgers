@@ -1,0 +1,8 @@
+{
+  "pdf_path": "s3://your-bucket/sample.pdf",
+  "correlation_uri": "s3://your-bucket/sample_correlation.xml",
+  "session_id": "test-local-001",
+  "title": "Test Document",
+  "lang": "en-US",
+  "dpi": 150
+}
