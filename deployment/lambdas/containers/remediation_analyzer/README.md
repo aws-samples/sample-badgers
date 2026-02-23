@@ -33,6 +33,17 @@ This version maintains full backward compatibility with the original Lambda hand
    - Clean serialization to JSON
    - Comprehensive tag validation
 
+## Deployment Architecture
+
+This function uses a **container-based Lambda** deployment with dependencies split across two layers:
+
+1. **Docker Container**: Large binary dependencies (pymupdf, pikepdf, system libraries)
+2. **Lambda Layer**: Foundation library (pure Python, shared across functions)
+
+The container image is built from [Dockerfile](Dockerfile) and pushed to ECR. The foundation layer is attached at deployment time, making the foundation library available at `/opt/python/foundation/`.
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Architecture
 
 ```
@@ -89,35 +100,45 @@ This version maintains full backward compatibility with the original Lambda hand
 ## File Inventory
 
 ```
-remediation_analyzer_NEW/
+deployment/lambdas/containers/remediation_analyzer/
 ├── lambda_handler.py              # Entry point, orchestration, S3 I/O
 ├── pdf_accessibility_tagger.py    # Structure tree builder, auditor, overlay engine (v2.0)
 ├── pdf_accessibility_auditor.py   # Pre/post compliance checks (v2.0)
 ├── pdf_accessibility_models.py    # Data models and constants (v2.0)
 ├── cell_grid_resolver.py          # Grid-based vision bbox resolution (v2.0)
+├── Dockerfile                     # Container image definition
 ├── requirements.txt               # Python dependencies
-└── README.md                      # This file
+├── build.sh                       # Build and deployment script
+├── README.md                      # This file
+└── DEPLOYMENT.md                  # Detailed deployment guide
 ```
 
 ## Installation
 
-### Lambda Deployment
+### Lambda Deployment (Container-based)
 
-1. **Package with foundation library**:
-   ```bash
-   # Assumes BADGERS foundation library is available
-   cd /path/to/sample-badgers
-   cp -r remediation_analyzer_NEW remediation_analyzer
-   # Deploy according to your Lambda deployment process
-   ```
+This function is deployed as a **container-based Lambda** function. For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-2. **Dependencies**:
-   - Foundation library (BedrockClient, AnalyzerFoundation, etc.)
-   - boto3/botocore (provided by Lambda runtime)
-   - pymupdf>=1.24.0
-   - pikepdf>=8.0.0
-   - lxml>=5.0.0
-   - Pillow>=10.0.0
+**Quick Start**:
+```bash
+cd deployment/lambdas/containers/remediation_analyzer
+
+# Build and push to ECR
+./build.sh --push --region us-west-2
+
+# Deploy via CDK (from project root)
+cd ../../../..
+cdk deploy
+```
+
+**Dependencies**:
+- **Foundation library**: Provided via Lambda Layer at `/opt/python/foundation/` (deployed separately by CDK)
+- **Container dependencies** (in requirements.txt):
+  - boto3/botocore (provided by Lambda runtime)
+  - pymupdf>=1.24.0
+  - pikepdf>=8.0.0
+  - lxml>=5.0.0
+  - Pillow>=10.0.0
 
 ### Local Development
 
@@ -129,8 +150,11 @@ remediation_analyzer_NEW/
 2. **Ensure foundation library is in Python path**:
    ```python
    import sys
+   # For local development, add foundation to path
    sys.path.insert(0, "/path/to/badgers/foundation")
    ```
+
+   **Note**: In Lambda, the foundation library is automatically available at `/opt/python/foundation/` via the attached Lambda Layer. No path modification is needed in deployed code.
 
 ## API
 
@@ -228,13 +252,13 @@ with PDFAccessibilityTagger("input.pdf") as tagger:
 
 ### Migration from Original
 
-The replacement is **drop-in compatible** with the original:
+The v2.0 replacement is **API-compatible** with the original:
 
-1. Replace the `remediation_analyzer/` directory with `remediation_analyzer_NEW/`
-2. Rename to `remediation_analyzer/`
-3. No code changes required in calling code
-4. All Lambda events work identically
-5. Response format unchanged
+1. **Deployment changes**: Now uses container-based Lambda + Layer architecture (see [DEPLOYMENT.md](DEPLOYMENT.md))
+2. **No code changes** required in calling code
+3. **Lambda events** work identically
+4. **Response format** unchanged
+5. **Foundation dependency**: Now provided via Lambda Layer instead of bundled in package
 
 ## Testing
 
@@ -307,8 +331,10 @@ The core innovation for accurate bbox detection on image-only PDFs:
 ### Common Issues
 
 1. **ImportError: No module named 'foundation'**
-   - Ensure the BADGERS foundation library is in the Python path
-   - For Lambda: Include foundation/ in the deployment package
+   - **For Lambda**: Verify the foundation Lambda Layer is attached to the function
+   - Check that the layer is compatible with Python 3.12 runtime
+   - Foundation should be available at `/opt/python/foundation/` in the Lambda environment
+   - **For local development**: Ensure foundation is in your Python path (see Local Development section)
 
 2. **Vision model timeouts**
    - Check AWS region and Bedrock model availability
