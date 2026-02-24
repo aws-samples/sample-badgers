@@ -27,7 +27,7 @@
 
 VoiceOver on macOS reading the remediated PDF structure tree, including figure alt text descriptions:
 
-<video src="remediation-screen-reader-mac-02-24-2026.mov" width="320" height="240" controls></video>
+[<video src="remediation-screen-reader-mac-02-24-2026.mov" width="320" height="240" controls></video>](https://github.com/user-attachments/assets/8d9c14a4-5c68-4ae8-a148-7147a32c6eae)
 
 *Adobe Acrobat Accessibility Checker confirms 29 passed checks, 0 failures, including character encoding for CJK text. The only items flagged are "Logical Reading Order" and "Color contrast" which always require manual review. See the [full Acrobat accessibility report](1_test_chinese_book_20260224_161932.pdf.accreport.html).*
 
