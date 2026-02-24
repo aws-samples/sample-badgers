@@ -1,27 +1,44 @@
-# PDF/UA Remediation Analyzer (v2.1)
+# PDF/UA Remediation Analyzer (v2.2)
 
-**Correlation-guided PDF accessibility remediation with cell grid vision resolution and CJK support.**
+**Correlation-guided PDF accessibility remediation with cell grid vision resolution, CJK support, and diagnostic visualization.**
 
-## What's New in v2.1
+## What's New in v2.2
+
+### Diagnostic Visualizer
+- New `diagnostic_visualizer.py` module captures the full pipeline output at the page level: correlation analyzer output, grid resolver output, and a color-coded bbox overlay image showing all detected elements.
+- Controlled via the `ENABLE_DIAGNOSTICS` environment variable (`true`/`1`/`yes` to enable).
+- Saves per-page JSON diagnostics and overlay PNGs to S3 (`{analyzer_name}/diagnostics/{session_id}/{pdf_stem}/`) and/or local disk.
+- Each element record merges identity (from correlation) with position (from resolver), including pixel bboxes, resolution tier classification, and summary stats by type and tier.
+
+### Cell Grid Resolver v3 (Corner-Point + Hierarchical Refinement)
+- Corner-point sub-positions: model returns TL/BR cell + sub-position (top/middle/bottom × left/center/right) for ~9× effective resolution over the v2 cell-union approach.
+- Resolved anchors: already-located elements (from PyMuPDF text search) are included in the prompt as spatial landmarks to help the model orient.
+- Hierarchical refinement: low-confidence or oversized results trigger a second pass on a cropped region with a finer grid (~11× vertical resolution gain).
+- Auto grid sizing based on page dimensions.
+- TrueType font for grid labels when available (covers Lambda AL2023, Ubuntu, macOS).
+
+### Build Script
+- New `build.sh` for building, pushing to ECR, and updating the Lambda function. Supports `--build-only`, `--push`, and `--update-lambda` modes with `--region` and `--profile` options.
+
+## Previous Changes (v2.1)
 
 ### Credential Threading
-- `aws_profile` and `aws_region` are now properly threaded from the Lambda handler through to `BedrockClient` and the cell grid resolver. Previously these were silently dropped, causing the resolver to fall back to default/ambient credentials.
+- `aws_profile` and `aws_region` properly threaded from Lambda handler through to `BedrockClient` and cell grid resolver.
 
 ### Pre-Processed Image Support (`page_b64_uris`)
-- The pipeline now accepts pre-processed base64 image files from S3 via the `page_b64_uris` event parameter. When provided, these are used directly instead of re-rendering the PDF page, avoiding redundant processing and ensuring images are already sized for the Bedrock API.
-- Falls back to rendering from the PDF + `ImageProcessor.optimize_image()` compression when no b64 URI is available for a page.
+- Pipeline accepts pre-processed base64 image files from S3 via the `page_b64_uris` event parameter, avoiding redundant rendering.
 
 ### Cell Grid Resolver Image Sizing
-- The grid overlay image is now resized to max 2048px and compressed as JPEG with iterative quality reduction to stay under Bedrock's 5MB base64 limit. Previously the gridded image was sent as full-resolution RGBA PNG, which exceeded the limit on most documents.
+- Grid overlay image resized to max 2048px and compressed as JPEG with iterative quality reduction to stay under Bedrock's 5MB base64 limit.
 
 ### Cross-Region Model ID
-- Default model ID updated to `us.anthropic.claude-sonnet-4-6` (cross-region inference profile), matching the image enhancer's pattern.
+- Default model ID updated to `us.anthropic.claude-sonnet-4-6` (cross-region inference profile).
 
 ### CJK Font Encoding Fix
-- Invisible text overlays now use a Type0 composite font with Identity-H encoding and a ToUnicode CMap. This allows screen readers and PDF validators to correctly resolve Chinese, Japanese, Korean, and all other Unicode characters. Previously, Helvetica with WinAnsiEncoding was used, which silently corrupted non-Latin text.
+- Invisible text overlays use a Type0 composite font with Identity-H encoding and a ToUnicode CMap for correct CJK and Unicode character resolution.
 
 ### Dockerfile Fix
-- Removed `yum install` for system mupdf packages (no longer needed — PyMuPDF ships as a self-contained wheel, and the base image moved from AL2 to AL2023 which uses `dnf`).
+- Removed `yum install` for system mupdf packages (PyMuPDF ships self-contained; base image moved from AL2 to AL2023 which uses `dnf`).
 
 ## Screen Reader Verification
 
@@ -59,13 +76,17 @@ VoiceOver on macOS reading the remediated PDF structure tree, including figure a
    │              │                       │
    │         unresolved?                  │
    │              │                       │
-   │   2. Cell Grid Resolver              │
-   │      (one vision call per page)      │
+   │   2. Cell Grid Resolver v3           │
+   │      (corner-point + refinement,     │
+   │       one vision call per page)      │
    │              │                       │
    │         still failed?                │
    │              │                       │
    │   3. Fallback stacked strips         │
    │      (no-cost last resort)           │
+   │                                      │
+   │   ──► Diagnostic Visualizer          │
+   │       (optional, per-page overlays)  │
    └──────────────┬───────────────────────┘
                   │
                   ▼
@@ -110,6 +131,16 @@ VoiceOver on macOS reading the remediated PDF structure tree, including figure a
 | `lang`            | No       | `"en-US"`               | BCP-47 language code                                                              |
 | `dpi`             | No       | `150`                   | Rendering resolution for fallback path                                            |
 
+### Environment Variables
+
+| Variable             | Default                | Description                                         |
+| -------------------- | ---------------------- | --------------------------------------------------- |
+| `ENABLE_DIAGNOSTICS` | (disabled)             | Set to `true`/`1`/`yes` to enable diagnostic output |
+| `OUTPUT_BUCKET`      | —                      | S3 bucket for tagged PDF and diagnostics output     |
+| `ANALYZER_NAME`      | `remediation_analyzer` | Analyzer name for S3 path prefix                    |
+| `CONFIG_BUCKET`      | —                      | S3 bucket for analyzer configuration                |
+| `LOGGING_LEVEL`      | `INFO`                 | Python logging level                                |
+
 ## Compliance Checks
 
 | Check             | Severity | Validates                           |
@@ -131,9 +162,11 @@ remediation_analyzer/
 ├── pdf_accessibility_tagger.py    # Structure tree builder, overlay engine
 ├── pdf_accessibility_auditor.py   # Pre/post compliance checks
 ├── pdf_accessibility_models.py    # Data models and constants
-├── cell_grid_resolver.py          # Grid-based vision bbox resolution
+├── cell_grid_resolver.py          # Grid-based vision bbox resolution (v3 corner-point)
+├── diagnostic_visualizer.py       # Per-page diagnostic JSON + bbox overlay images
 ├── Dockerfile                     # Container image definition
 ├── requirements.txt               # Python dependencies
+├── build.sh                       # Build, push to ECR, update Lambda
 ├── DEPLOYMENT.md                  # Deployment guide
-└── README.md                      # This file
+└── REMEDIATION_README.md          # This file
 ```

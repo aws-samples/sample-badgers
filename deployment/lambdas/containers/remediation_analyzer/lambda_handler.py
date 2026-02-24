@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from pdf_accessibility_tagger import PDFAccessibilityTagger, AccessibilityReport
 from cell_grid_resolver import resolve_elements_via_grid
+from diagnostic_visualizer import capture_page_diagnostics
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -75,6 +76,7 @@ def lambda_handler(event, context):
             aws_profile=body.get("aws_profile"),
             correlation_uri=correlation_uri,
             page_b64_uris=page_b64_uris,
+            session_id=session_id,
         )
 
         output_bucket = os.environ.get("OUTPUT_BUCKET")
@@ -135,6 +137,7 @@ def process_pdf(
     aws_profile: Optional[str] = None,
     correlation_uri: Optional[str] = None,
     page_b64_uris: Optional[dict[str, str]] = None,
+    session_id: str = "",
 ) -> dict[str, Any]:
     """Full PDF remediation pipeline.
 
@@ -279,9 +282,26 @@ def process_pdf(
                     len(figure_elements),
                 )
                 grid_resolved = resolve_elements_via_grid(
-                    image_data, grid_candidates, analyzer, aws_profile
+                    image_data,
+                    grid_candidates,
+                    analyzer,
+                    aws_profile,
+                    resolved_anchors=text_resolved,
                 )
                 text_resolved.extend(grid_resolved)
+
+            # Capture diagnostics (if enabled via ENABLE_DIAGNOSTICS env var)
+            capture_page_diagnostics(
+                page_image_data=image_data,
+                page_number=page_num + 1,  # 1-indexed
+                correlation_elements=corr_elements,
+                resolved_elements=text_resolved,
+                grid_cols=10,
+                grid_rows=14,
+                gridded_image=None,
+                pdf_path=pdf_path,
+                session_id=session_id,
+            )
 
             elements = text_resolved
         else:

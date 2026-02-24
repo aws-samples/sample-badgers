@@ -6,7 +6,7 @@ set -e
 # Disable AWS CLI pager (avoids getting stuck in less/more)
 export AWS_PAGER=""
 
-DEPLOYMENT_ID="${1:-89a27522}"
+DEPLOYMENT_ID="${1:?Usage: $0 <deployment_id>}"
 REGION="${AWS_REGION:-us-west-2}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ROLE_NAME="lambda-analyzer-role-${DEPLOYMENT_ID}"
@@ -85,7 +85,7 @@ echo "=== Done ==="
 set -e
 export AWS_PAGER=""
 
-DEPLOYMENT_ID="${1:-89a27522}"
+DEPLOYMENT_ID="${1:?Usage: $0 <deployment_id>}"
 REGION="${AWS_REGION:-us-west-2}"
 FUNCTION_NAME="badgers_remediation_analyzer"
 
