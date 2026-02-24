@@ -375,6 +375,7 @@ class PDFAccessibilityTagger:
         mcid = mcid_start
         mcid_map: Dict[int, TagRegion] = {}
         ops: List[Tuple[list, Operator]] = []
+        raw_segments: List[bytes] = []
 
         for region in regions:
             text = region.text_content or region.alt_text or ""
@@ -397,19 +398,36 @@ class PDFAccessibilityTagger:
             ops.append(([Name("/F1"), font_size], Operator("Tf")))
             ops.append(([3], Operator("Tr")))
             ops.append(([x0, y0], Operator("Td")))
-            ops.append(([String(text)], Operator("Tj")))
-            ops.append(([], Operator("ET")))
 
+            # Encode text as UTF-16BE hex string for Identity-H CIDFont
+            utf16_bytes = text.encode("utf-16-be")
+            hex_str = utf16_bytes.hex().upper()
+            # pikepdf String() can't produce hex-encoded CID strings,
+            # so we flush current ops, inject raw hex Tj, then continue.
+            raw_segments.append(pikepdf.unparse_content_stream(ops))
+            ops.clear()
+            raw_segments.append(f"<{hex_str}> Tj\n".encode("ascii"))
+
+            ops.append(([], Operator("ET")))
             ops.append(([], Operator("EMC")))
             mcid += 1
 
-        if not ops:
+        if not ops and not raw_segments:
             return b"", mcid_map, mcid
 
-        return pikepdf.unparse_content_stream(ops), mcid_map, mcid
+        # Flush any remaining ops
+        if ops:
+            raw_segments.append(pikepdf.unparse_content_stream(ops))
+
+        return b"".join(raw_segments), mcid_map, mcid
 
     def _ensure_font_resource(self, page_num: int) -> None:
-        """Ensure page has a /F1 font resource for invisible text overlays."""
+        """Ensure page has a /F1 font resource for invisible text overlays.
+
+        Uses a Type0 composite font with Identity-H encoding and a ToUnicode
+        CMap so that CJK and other non-Latin characters are properly mapped
+        to Unicode for screen readers and text extraction.
+        """
         page = self.pdf.pages[page_num]
         resources = page.get("/Resources")
         if resources is None:
@@ -422,12 +440,57 @@ class PDFAccessibilityTagger:
             resources["/Font"] = fonts
 
         if "/F1" not in fonts:
+            # Build ToUnicode CMap — Identity mapping (CID == Unicode codepoint)
+            to_unicode_cmap = (
+                "/CIDInit /ProcSet findresource begin\n"
+                "12 dict begin\n"
+                "begincmap\n"
+                "/CIDSystemInfo\n"
+                "<< /Registry (Adobe)\n"
+                "/Ordering (UCS)\n"
+                "/Supplement 0\n"
+                ">> def\n"
+                "/CMapName /Adobe-Identity-UCS def\n"
+                "/CMapType 2 def\n"
+                "1 begincodespacerange\n"
+                "<0000> <FFFF>\n"
+                "endcodespacerange\n"
+                "1 beginbfrange\n"
+                "<0000> <FFFF> <0000>\n"
+                "endbfrange\n"
+                "endcmap\n"
+                "CMapName currentdict /CMap defineresource pop\n"
+                "end\n"
+                "end\n"
+            )
+            to_unicode_stream = self.pdf.make_stream(to_unicode_cmap.encode("ascii"))
+
+            # CIDFont descriptor (no embedded font — text is invisible)
+            cid_font = Dictionary(
+                {
+                    "/Type": Name("/Font"),
+                    "/Subtype": Name("/CIDFontType2"),
+                    "/BaseFont": Name("/Arial"),
+                    "/CIDSystemInfo": Dictionary(
+                        {
+                            "/Registry": String("Adobe"),
+                            "/Ordering": String("Identity"),
+                            "/Supplement": 0,
+                        }
+                    ),
+                    "/DW": 1000,
+                }
+            )
+
+            # Type0 composite font
             font_dict = Dictionary(
                 {
                     "/Type": Name("/Font"),
-                    "/Subtype": Name("/Type1"),
-                    "/BaseFont": Name("/Helvetica"),
-                    "/Encoding": Name("/WinAnsiEncoding"),
+                    "/Subtype": Name("/Type0"),
+                    "/BaseFont": Name("/Arial"),
+                    "/Encoding": Name("/Identity-H"),
+                    "/DescendantFonts": Array([self.pdf.make_indirect(cid_font)]),
+                    "/ToUnicode": to_unicode_stream,
                 }
             )
             fonts["/F1"] = self.pdf.make_indirect(font_dict)

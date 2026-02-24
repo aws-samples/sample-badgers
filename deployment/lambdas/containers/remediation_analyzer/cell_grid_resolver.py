@@ -1,16 +1,22 @@
 """
-Cell Grid Resolver — Vision-model bbox detection using labeled cell grids.
+Cell Grid Resolver v3 — Vision-model bbox detection using labeled cell grids.
 
 Instead of asking a vision model for raw normalized coordinates (which are
 imprecise), this module:
   1. Overlays a labeled cell grid (A1, B2, ...) on the page image
   2. Sends the gridded image + element descriptions to the vision model
-  3. Asks which cells each element occupies
+  3. Asks which cells each element occupies (with corner-point sub-positions)
   4. Converts cell references back to normalized bboxes
 
-This approach exploits the fact that vision models are excellent at
-reading grid labels and associating content with spatial references,
-but poor at estimating raw pixel coordinates.
+v3 Enhancements (corner-point + hierarchical refinement):
+  - Corner-point system: model returns TL/BR cell + sub-position (top/middle/bottom
+    × left/center/right) for ~9× effective resolution over cell-union approach.
+  - Resolved anchors: already-located elements are included in the prompt as
+    spatial landmarks to help the model orient.
+  - Hierarchical refinement: low-confidence or oversized results trigger a second
+    pass on a cropped region with a finer grid (~11× vertical resolution gain).
+  - Font legibility: uses TrueType font for grid labels when available.
+  - Backward compatible: still parses legacy "cells" array responses.
 
 Adapted from the cell-grid detection pattern in unclear_region_detector.py.
 """
@@ -23,9 +29,46 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Font loading (legibility improvement)
+# ---------------------------------------------------------------------------
+
+_font_cache: Optional[ImageFont.FreeTypeFont] = None
+_font_loaded: bool = False
+
+# Search paths for TrueType fonts — covers Lambda (AL2023), Ubuntu, macOS
+_FONT_SEARCH_PATHS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    "/usr/share/fonts/google-noto/NotoSans-Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
+
+
+def _get_label_font(size: int = 13) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load a readable TrueType font for grid labels, with fallback."""
+    global _font_cache, _font_loaded
+    if _font_loaded:
+        return _font_cache if _font_cache else ImageFont.load_default()
+
+    _font_loaded = True
+    for path in _FONT_SEARCH_PATHS:
+        if os.path.exists(path):
+            try:
+                _font_cache = ImageFont.truetype(path, size)
+                logger.info("Grid label font: %s @ %dpt", path, size)
+                return _font_cache
+            except Exception:
+                continue
+
+    logger.info("No TrueType font found, using PIL default bitmap font")
+    return ImageFont.load_default()
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +135,8 @@ def add_cell_grid_overlay(
     col_letters = [chr(ord("A") + i) for i in range(cols)]
     cell_map: dict[str, dict] = {}
 
+    font = _get_label_font(size=13)
+
     for row in range(rows):
         for col in range(cols):
             cell_name = f"{col_letters[col]}{row + 1}"
@@ -109,10 +154,10 @@ def add_cell_grid_overlay(
             # Cell border
             draw.rectangle([x0, y0, x1, y1], outline=line_color, width=1)
 
-            # Cell label (small, top-left corner of cell)
+            # Cell label (readable font, top-left corner of cell)
             label_x = x0 + 2
             label_y = y0 + 1
-            text_bbox = draw.textbbox((label_x, label_y), cell_name)
+            text_bbox = draw.textbbox((label_x, label_y), cell_name, font=font)
             draw.rectangle(
                 [
                     text_bbox[0] - 1,
@@ -122,10 +167,21 @@ def add_cell_grid_overlay(
                 ],
                 fill=label_bg,
             )
-            draw.text((label_x, label_y), cell_name, fill=label_color)
+            draw.text((label_x, label_y), cell_name, fill=label_color, font=font)
 
     result = Image.alpha_composite(img, overlay).convert("RGB")
     return result, cell_map
+
+
+# ---------------------------------------------------------------------------
+# Bbox conversion: corner-point + legacy cell-union
+# ---------------------------------------------------------------------------
+
+# Sub-position offsets within a cell (0.0 = start edge, 1.0 = end edge)
+_SUB_POS = {
+    "left": 0.0, "center": 0.5, "right": 1.0,
+    "top": 0.0, "middle": 0.5, "bottom": 1.0,
+}
 
 
 def cells_to_bbox(
@@ -134,6 +190,7 @@ def cells_to_bbox(
 ) -> Optional[dict[str, float]]:
     """
     Convert a list of cell names to a normalized bounding box.
+    Legacy path — used when model returns flat cell lists.
 
     Returns:
         {"x0": float, "y0": float, "x1": float, "y1": float} or None.
@@ -158,11 +215,95 @@ def cells_to_bbox(
     return {"x0": min_x0, "y0": min_y0, "x1": max_x1, "y1": max_y1}
 
 
-def _image_to_base64(img: Image.Image, fmt: str = "PNG") -> str:
-    """Convert PIL Image to base64 string."""
-    buf = BytesIO()
-    img.save(buf, format=fmt)
-    return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+def corners_to_bbox(
+    top_left: dict,
+    bottom_right: dict,
+    cell_map: dict[str, dict],
+) -> Optional[dict[str, float]]:
+    """
+    Convert corner-point references to a tight normalized bounding box.
+
+    Each corner dict has:
+        {"cell": "B3", "v": "top|middle|bottom", "h": "left|center|right"}
+
+    Sub-positions interpolate within the cell:
+        "left"/"top" = cell start edge
+        "center"/"middle" = cell midpoint
+        "right"/"bottom" = cell end edge
+    """
+    tl_cell = top_left.get("cell", "").upper().strip()
+    br_cell = bottom_right.get("cell", "").upper().strip()
+
+    if tl_cell not in cell_map or br_cell not in cell_map:
+        # Fall back to legacy cell-union if corner cells are invalid
+        fallback_cells = [c for c in [tl_cell, br_cell] if c in cell_map]
+        return cells_to_bbox(fallback_cells, cell_map) if fallback_cells else None
+
+    tl_norm = cell_map[tl_cell]["normalized"]  # (x0, y0, x1, y1)
+    br_norm = cell_map[br_cell]["normalized"]
+
+    # Interpolate within each cell using sub-position
+    h_frac_tl = _SUB_POS.get(top_left.get("h", "left"), 0.0)
+    v_frac_tl = _SUB_POS.get(top_left.get("v", "top"), 0.0)
+    h_frac_br = _SUB_POS.get(bottom_right.get("h", "right"), 1.0)
+    v_frac_br = _SUB_POS.get(bottom_right.get("v", "bottom"), 1.0)
+
+    tl_w = tl_norm[2] - tl_norm[0]
+    tl_h = tl_norm[3] - tl_norm[1]
+    br_w = br_norm[2] - br_norm[0]
+    br_h = br_norm[3] - br_norm[1]
+
+    x0 = tl_norm[0] + h_frac_tl * tl_w
+    y0 = tl_norm[1] + v_frac_tl * tl_h
+    x1 = br_norm[0] + h_frac_br * br_w
+    y1 = br_norm[1] + v_frac_br * br_h
+
+    # Sanity: ensure x0<x1 and y0<y1
+    if x0 >= x1 or y0 >= y1:
+        return cells_to_bbox([tl_cell, br_cell], cell_map)
+
+    return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
+
+
+def _image_to_base64(img: Image.Image, max_b64_bytes: int = 4_500_000) -> str:
+    """Convert PIL Image to base64 string, ensuring it fits under Bedrock's 5MB limit.
+
+    Resizes and compresses as JPEG if needed. The max_b64_bytes default
+    leaves headroom below the 5,242,880 byte API limit.
+    """
+    MAX_DIM = 2048
+
+    # Convert RGBA to RGB for JPEG compatibility
+    if img.mode in ("RGBA", "P"):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode == "P":
+            img = img.convert("RGBA")
+        background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+        img = background
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # Resize if dimensions exceed max
+    if max(img.size) > MAX_DIM:
+        img.thumbnail((MAX_DIM, MAX_DIM), Image.Resampling.LANCZOS)
+        logger.info("Resized gridded image to %s", img.size)
+
+    # Encode as JPEG, reduce quality if still too large
+    for quality in (85, 70, 55, 40):
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        b64_str = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+        if len(b64_str) <= max_b64_bytes:
+            logger.info(
+                "Gridded image encoded: %d bytes b64 at quality=%d",
+                len(b64_str),
+                quality,
+            )
+            return b64_str
+
+    # Last resort — already at lowest quality
+    logger.warning("Gridded image still %d bytes after max compression", len(b64_str))
+    return b64_str
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +406,69 @@ def _auto_grid_size(width: int, height: int) -> tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
+# Anchor context builder
+# ---------------------------------------------------------------------------
+
+
+def _build_anchor_context(
+    resolved_anchors: list[dict[str, Any]],
+    cols: int,
+    rows: int,
+) -> str:
+    """Build spatial anchor descriptions from already-resolved elements.
+
+    Converts resolved element bboxes to approximate grid cell references
+    so the model can use them as spatial landmarks.
+
+    Args:
+        resolved_anchors: Elements with known bboxes (from PyMuPDF text search).
+        cols: Grid column count.
+        rows: Grid row count.
+
+    Returns:
+        XML-formatted anchor descriptions, or empty string if no usable anchors.
+    """
+    if not resolved_anchors:
+        return ""
+
+    anchor_lines = []
+    for anchor in resolved_anchors:
+        if anchor.get("source") == "fallback_stacked":
+            continue  # Don't use low-confidence anchors
+        bbox = anchor.get("bbox", {})
+        if not bbox:
+            continue
+        text = anchor.get("content", "") or anchor.get("text", "")
+        if not text:
+            continue
+
+        display = text[:80] + "..." if len(text) > 80 else text
+
+        # Convert normalized PDF coords (bottom-left origin) to image coords (top-left)
+        img_y0 = 1.0 - bbox.get("y1", 0)
+        img_y1 = 1.0 - bbox.get("y0", 0)
+
+        # Map to approximate grid cells for reference
+        anchor_col = chr(ord("A") + min(cols - 1, int(bbox.get("x0", 0) * cols)))
+        anchor_row_start = max(1, int(img_y0 * rows) + 1)
+        anchor_row_end = max(1, int(img_y1 * rows) + 1)
+
+        anchor_lines.append(
+            f'        <anchor type="{anchor.get("type", "P")}" '
+            f'region="{anchor_col}{anchor_row_start}-{anchor_col}{anchor_row_end}">'
+            f'"{display}"</anchor>'
+        )
+
+    if not anchor_lines:
+        return ""
+
+    # Cap at 15 anchors to avoid prompt bloat
+    anchor_lines = anchor_lines[:15]
+    logger.info("Including %d spatial anchors in grid prompt", len(anchor_lines))
+    return "\n".join(anchor_lines)
+
+
+# ---------------------------------------------------------------------------
 # Core resolver
 # ---------------------------------------------------------------------------
 
@@ -276,6 +480,7 @@ def resolve_elements_via_grid(
     _aws_profile: Optional[str] = None,
     cols: Optional[int] = None,
     rows: Optional[int] = None,
+    resolved_anchors: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """
     Resolve bounding boxes for elements using a cell-grid vision approach.
@@ -292,14 +497,17 @@ def resolve_elements_via_grid(
             - "alt_text": description (for figure elements)
             - "order": reading order index
         analyzer: Initialized analyzer with .bedrock_client and .config.
-        aws_profile: AWS profile (reserved).
+        _aws_profile: AWS profile (reserved).
         cols: Grid columns override (auto-sized if None).
         rows: Grid rows override (auto-sized if None).
+        resolved_anchors: Already-resolved elements with known bboxes.
+            Used as spatial reference points in the prompt to help the
+            model locate unresolved elements relative to known positions.
 
     Returns:
         List of resolved element dicts in the same format as
         _resolve_text_bboxes / _resolve_figure_bboxes output, with
-        source="cell_grid_resolver".
+        source="cell_grid_*" or "cell_grid_refined_*".
     """
     if not unresolved_elements:
         return []
@@ -321,6 +529,86 @@ def resolve_elements_via_grid(
         height,
     )
 
+    # ── Pass 1: Coarse grid on full page ──
+    resolved = _grid_resolve_pass(
+        img, unresolved_elements, analyzer, _aws_profile,
+        cols, rows, resolved_anchors,
+    )
+
+    # ── Pass 2: Hierarchical refinement for low-confidence results ──
+    refine_candidates = []
+    keep = []
+
+    for elem in resolved:
+        source = elem.get("source", "")
+        if source == "fallback_stacked":
+            refine_candidates.append(elem)
+        elif _should_refine(elem, cols, rows):
+            refine_candidates.append(elem)
+        else:
+            keep.append(elem)
+
+    if refine_candidates and len(refine_candidates) <= 10:
+        logger.info(
+            "Hierarchical refinement: %d elements eligible for pass 2",
+            len(refine_candidates),
+        )
+        refined = _hierarchical_refine(
+            img, image_data, refine_candidates, analyzer, _aws_profile,
+            cols, rows,
+        )
+        keep.extend(refined)
+    elif refine_candidates:
+        # Too many to refine individually — keep pass 1 results
+        logger.info(
+            "Skipping hierarchical refinement: %d candidates exceeds limit",
+            len(refine_candidates),
+        )
+        keep.extend(refine_candidates)
+
+    return keep
+
+
+def _should_refine(elem: dict, cols: int, rows: int) -> bool:
+    """Determine if an element should go through hierarchical refinement.
+
+    Criteria:
+      - Confidence is not "high"
+      - Bbox is suspiciously tall (> 1.5× a single cell height)
+    """
+    source = elem.get("source", "")
+    if "high" in source:
+        return False
+
+    bbox = elem.get("bbox", {})
+    if not bbox:
+        return True
+
+    # Check if bbox height exceeds 1.5× cell height in normalized coords
+    cell_h_norm = 1.0 / rows
+    bbox_h = abs(bbox.get("y1", 0) - bbox.get("y0", 0))
+    if bbox_h > cell_h_norm * 1.5:
+        return True
+
+    return False
+
+
+def _grid_resolve_pass(
+    img: Image.Image,
+    elements: list[dict[str, Any]],
+    analyzer: Any,
+    aws_profile: Optional[str],
+    cols: int,
+    rows: int,
+    resolved_anchors: Optional[list[dict[str, Any]]] = None,
+) -> list[dict[str, Any]]:
+    """Execute a single grid resolution pass.
+
+    This is the core grid → vision model → bbox pipeline, extracted
+    so it can be called for both pass 1 (full page) and pass 2 (crop).
+    """
+    width, height = img.size
+
     # Create gridded image
     gridded, cell_map = add_cell_grid_overlay(img, cols=cols, rows=rows)
     gridded_b64 = _image_to_base64(gridded)
@@ -328,7 +616,7 @@ def resolve_elements_via_grid(
     # Build element descriptions for the prompt
     col_letters = [chr(ord("A") + i) for i in range(cols)]
     element_lines = []
-    for elem in unresolved_elements:
+    for elem in elements:
         elem_id = elem.get("id", f"order_{elem.get('order', '?')}")
         elem_type = elem.get("type", "unknown")
 
@@ -350,17 +638,22 @@ def resolve_elements_via_grid(
 
     element_descriptions = "\n".join(element_lines)
 
+    # Build spatial anchor context from already-resolved elements
+    anchor_context = _build_anchor_context(
+        resolved_anchors or [], cols, rows
+    )
+
     # Build prompt
     try:
         prompt_template = _load_prompt_template()
     except FileNotFoundError:
-        # Inline fallback if XML file not deployed
         prompt_template = _inline_prompt_template()
 
     prompt = prompt_template.format(
         col_letters=", ".join(col_letters),
         rows=rows,
         element_descriptions=element_descriptions,
+        anchor_context=anchor_context,
     )
 
     # Call vision model
@@ -372,7 +665,7 @@ def resolve_elements_via_grid(
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": "image/jpeg",
                         "data": gridded_b64,
                     },
                 },
@@ -383,14 +676,13 @@ def resolve_elements_via_grid(
 
     try:
         bedrock_client = analyzer.bedrock_client
-        model_id = analyzer.config.get(
-            "model_id", "us.anthropic.claude-sonnet-4-20250514-v1:0"
-        )
+        model_id = analyzer.config.get("model_id", "us.anthropic.claude-sonnet-4-6")
 
         system_prompt = (
             "You are a precise document element locator. Given a page image with a "
-            "labeled cell grid overlay and a list of content elements, report which "
-            "grid cells each element occupies. Return ONLY a JSON array."
+            "labeled cell grid overlay and a list of content elements, report the "
+            "grid cell and sub-position of each element's top-left and bottom-right "
+            "corners. Return ONLY a JSON array."
         )
 
         payload = bedrock_client.create_anthropic_payload(
@@ -403,6 +695,7 @@ def resolve_elements_via_grid(
         response = bedrock_client.invoke_model(
             model_id=model_id,
             payload=payload,
+            profile_name=aws_profile,
         )
 
         # Extract text
@@ -414,38 +707,50 @@ def resolve_elements_via_grid(
 
         if not result_text:
             logger.warning("Empty response from cell grid resolver")
-            return _fallback_stacked(unresolved_elements)
+            return _fallback_stacked(elements)
 
         # Parse response
         grid_results = _parse_grid_response(result_text)
 
     except Exception as e:
         logger.error("Cell grid resolver vision call failed: %s", e)
-        return _fallback_stacked(unresolved_elements)
+        return _fallback_stacked(elements)
 
-    # Build lookup: element_id → cell list
-    cell_lookup: dict[str, tuple[list[str], str]] = {}
+    # Build lookup: element_id → corner pair or cell list
+    cell_lookup: dict[str, tuple[Any, str]] = {}
     for item in grid_results:
         item_id = item.get("id", "")
-        item_cells = item.get("cells", [])
         confidence = item.get("confidence", "medium")
-        if item_id and item_cells:
-            cell_lookup[item_id] = (item_cells, confidence)
 
-    # Convert cell references to bboxes and build resolved elements
+        # Prefer corner-point format; fall back to legacy cells array
+        if item.get("top_left") and item.get("bottom_right"):
+            cell_lookup[item_id] = (
+                {"top_left": item["top_left"], "bottom_right": item["bottom_right"]},
+                confidence,
+            )
+        elif item.get("cells"):
+            cell_lookup[item_id] = ({"cells": item["cells"]}, confidence)
+
+    # Convert cell/corner references to bboxes and build resolved elements
     resolved = []
     resolved_count = 0
     fallback_count = 0
 
-    for elem in unresolved_elements:
+    for elem in elements:
         elem_id = elem.get("id", f"order_{elem.get('order', '?')}")
         elem_type = elem.get("type", "P")
         text = elem.get("text", "") or elem.get("content", "")
 
         cell_info = cell_lookup.get(elem_id)
         if cell_info:
-            cells, confidence = cell_info
-            bbox = cells_to_bbox(cells, cell_map)
+            geo, confidence = cell_info
+
+            # Corner-point path (preferred)
+            if "top_left" in geo:
+                bbox = corners_to_bbox(geo["top_left"], geo["bottom_right"], cell_map)
+            else:
+                # Legacy cell-list path
+                bbox = cells_to_bbox(geo["cells"], cell_map)
 
             if bbox:
                 # Convert from top-left origin (image coords) to
@@ -470,13 +775,13 @@ def resolve_elements_via_grid(
                 )
                 resolved_count += 1
                 logger.debug(
-                    "Grid-resolved %s → cells=%s bbox=(%.3f,%.3f)-(%.3f,%.3f)",
+                    "Grid-resolved %s → bbox=(%.3f,%.3f)-(%.3f,%.3f) [%s]",
                     elem_id,
-                    cells,
                     pdf_bbox["x0"],
                     pdf_bbox["y0"],
                     pdf_bbox["x1"],
                     pdf_bbox["y1"],
+                    confidence,
                 )
                 continue
 
@@ -498,10 +803,152 @@ def resolve_elements_via_grid(
     logger.info(
         "Cell grid resolver: %d/%d resolved via grid, %d fell back",
         resolved_count,
-        len(unresolved_elements),
+        len(elements),
         fallback_count,
     )
     return resolved
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical refinement (pass 2)
+# ---------------------------------------------------------------------------
+
+# Fine grid size for refinement pass
+_REFINE_COLS = 10
+_REFINE_ROWS = 10
+_REFINE_PAD_FACTOR = 0.4  # 40% padding around the coarse bbox
+
+
+def _hierarchical_refine(
+    full_img: Image.Image,
+    full_image_data: bytes,
+    candidates: list[dict[str, Any]],
+    analyzer: Any,
+    aws_profile: Optional[str],
+    coarse_cols: int,
+    coarse_rows: int,
+) -> list[dict[str, Any]]:
+    """Refine element bboxes by re-running grid resolution on cropped regions.
+
+    Groups nearby candidates, crops the full image to their combined bounding
+    region (with padding for context), then runs a fine grid pass on the crop.
+    Converts results back to full-page coordinates.
+
+    Args:
+        full_img: Full page PIL Image.
+        full_image_data: Full page image bytes (for fallback).
+        candidates: Elements to refine (from pass 1).
+        analyzer: Initialized analyzer.
+        aws_profile: AWS profile.
+        coarse_cols: Pass 1 grid columns (for logging).
+        coarse_rows: Pass 1 grid rows (for logging).
+
+    Returns:
+        Refined element dicts with updated bboxes.
+    """
+    width, height = full_img.size
+
+    # Compute the combined bounding region of all candidates (in image coords)
+    # Bboxes are in PDF coords (bottom-left origin) — convert to image (top-left)
+    min_x = float("inf")
+    min_y = float("inf")
+    max_x = float("-inf")
+    max_y = float("-inf")
+
+    for elem in candidates:
+        bbox = elem.get("bbox", {})
+        if not bbox:
+            continue
+        # PDF → image coordinate conversion
+        img_x0 = bbox.get("x0", 0) * width
+        img_y0 = (1.0 - bbox.get("y1", 0)) * height
+        img_x1 = bbox.get("x1", 1) * width
+        img_y1 = (1.0 - bbox.get("y0", 1)) * height
+        min_x = min(min_x, img_x0)
+        min_y = min(min_y, img_y0)
+        max_x = max(max_x, img_x1)
+        max_y = max(max_y, img_y1)
+
+    if min_x >= max_x or min_y >= max_y:
+        logger.warning("Could not compute refinement region, returning pass 1 results")
+        return candidates
+
+    # Add padding for context
+    region_w = max_x - min_x
+    region_h = max_y - min_y
+    pad_x = int(region_w * _REFINE_PAD_FACTOR)
+    pad_y = int(region_h * _REFINE_PAD_FACTOR)
+
+    crop_x0 = max(0, int(min_x) - pad_x)
+    crop_y0 = max(0, int(min_y) - pad_y)
+    crop_x1 = min(width, int(max_x) + pad_x)
+    crop_y1 = min(height, int(max_y) + pad_y)
+
+    crop_w = crop_x1 - crop_x0
+    crop_h = crop_y1 - crop_y0
+
+    if crop_w < 50 or crop_h < 50:
+        logger.warning("Refinement crop too small (%dx%d), skipping", crop_w, crop_h)
+        return candidates
+
+    crop_img = full_img.crop((crop_x0, crop_y0, crop_x1, crop_y1))
+
+    fine_cw = crop_w / _REFINE_COLS
+    fine_ch = crop_h / _REFINE_ROWS
+    coarse_ch = height / coarse_rows
+
+    logger.info(
+        "Hierarchical refinement: crop=(%d,%d)-(%d,%d) %dx%d, "
+        "fine grid %dx%d, cell=%dx%dpx (%.0f× finer vertical)",
+        crop_x0, crop_y0, crop_x1, crop_y1, crop_w, crop_h,
+        _REFINE_COLS, _REFINE_ROWS,
+        int(fine_cw), int(fine_ch),
+        coarse_ch / fine_ch if fine_ch > 0 else 0,
+    )
+
+    # Run pass 2 on the crop
+    refined_local = _grid_resolve_pass(
+        crop_img, candidates, analyzer, aws_profile,
+        _REFINE_COLS, _REFINE_ROWS,
+        resolved_anchors=None,  # No anchors in crop context
+    )
+
+    # Convert crop-local bboxes back to full-page coordinates
+    refined = []
+    for elem in refined_local:
+        bbox = elem.get("bbox", {})
+        if not bbox or elem.get("source") == "fallback_stacked":
+            refined.append(elem)
+            continue
+
+        # The bbox is in PDF coords relative to the CROP.
+        # Convert: crop-PDF → crop-image → full-image → full-PDF
+
+        # Step 1: crop-PDF → crop-image (normalized, top-left origin)
+        crop_img_x0 = bbox["x0"]
+        crop_img_y0 = 1.0 - bbox["y1"]
+        crop_img_x1 = bbox["x1"]
+        crop_img_y1 = 1.0 - bbox["y0"]
+
+        # Step 2: crop-image (normalized) → full-image (pixels)
+        full_px_x0 = crop_x0 + crop_img_x0 * crop_w
+        full_px_y0 = crop_y0 + crop_img_y0 * crop_h
+        full_px_x1 = crop_x0 + crop_img_x1 * crop_w
+        full_px_y1 = crop_y0 + crop_img_y1 * crop_h
+
+        # Step 3: full-image (pixels) → full-PDF (normalized, bottom-left origin)
+        full_pdf_bbox = {
+            "x0": full_px_x0 / width,
+            "y0": 1.0 - (full_px_y1 / height),
+            "x1": full_px_x1 / width,
+            "y1": 1.0 - (full_px_y0 / height),
+        }
+
+        elem["bbox"] = full_pdf_bbox
+        elem["source"] = elem.get("source", "").replace("cell_grid_", "cell_grid_refined_")
+        refined.append(elem)
+
+    return refined
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +957,12 @@ def resolve_elements_via_grid(
 
 
 def _parse_grid_response(response_text: str) -> list[dict]:
-    """Parse JSON array from model response, handling markdown wrappers."""
+    """Parse JSON array from model response, handling markdown wrappers.
+
+    Supports both corner-point format and legacy cells format:
+        Corner-point: {"id": "...", "top_left": {...}, "bottom_right": {...}, "confidence": "high"}
+        Legacy:       {"id": "...", "cells": ["B3", "C3"], "confidence": "high"}
+    """
     import re
 
     # Strip analysis/thinking wrappers
@@ -584,32 +1036,53 @@ def _inline_prompt_template() -> str:
     return """
     <role>
         <n>Document Element Locator</n>
-        <expertise>Precisely mapping content elements to labeled cell grid positions</expertise>
+        <expertise>Precisely mapping content elements to labeled cell grid positions
+            using corner-point references for tight bounding boxes</expertise>
     </role>
 
     <task>Given this document image with a labeled cell grid overlay, locate each listed
-        content element and report which grid cells it occupies.</task>
+        content element by reporting the grid cell and sub-position of its top-left and
+        bottom-right corners.</task>
 
     <grid_structure>
         <columns>{col_letters}</columns>
         <rows>1 through {rows}</rows>
         <cell_format>ColumnRow (e.g., A1, B3, L14)</cell_format>
-        <origin>Cell A1 is the top-left corner</origin>
+        <origin>Cell A1 is the top-left corner of the page</origin>
     </grid_structure>
+
+    <known_element_positions>
+        The following elements have already been located precisely.
+        Use them as spatial reference points to help locate the remaining elements.
+{anchor_context}
+    </known_element_positions>
 
     <elements_to_locate>
 {element_descriptions}
     </elements_to_locate>
 
     <instructions>
-        For EACH element, identify the grid cells where it appears.
-        Be TIGHT — only include cells that genuinely overlap the element.
-        Every element MUST get a cells array.
+        For EACH element, report TWO corner positions:
+          - top_left: the cell containing the element's top-left corner
+          - bottom_right: the cell containing the element's bottom-right corner
+
+        For each corner, also report its approximate position WITHIN the cell:
+          - "v": "top", "middle", or "bottom" (vertical third)
+          - "h": "left", "center", or "right" (horizontal third)
+
+        Be PRECISE — the sub-positions let you place boundaries between cell edges.
+        Use the known element positions above as spatial landmarks.
+        Every element MUST get a top_left and bottom_right.
         If you cannot find an element, use your best estimate.
     </instructions>
 
     <output_format>
         JSON array only, no other text:
-        [{{"id": "element_id", "cells": ["B3", "C3"], "confidence": "high"}}]
+        [{{
+            "id": "element_id",
+            "top_left": {{"cell": "B3", "v": "top", "h": "left"}},
+            "bottom_right": {{"cell": "D5", "v": "bottom", "h": "right"}},
+            "confidence": "high"
+        }}]
     </output_format>
 """

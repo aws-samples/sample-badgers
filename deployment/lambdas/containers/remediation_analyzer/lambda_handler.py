@@ -4,6 +4,7 @@ PDF Accessibility Remediation Lambda Handler
 Full pipeline: PDF -> analyze pages -> apply PDF/UA tags -> output tagged PDF
 """
 
+import base64
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from typing import Any, Optional
 
 from pdf_accessibility_tagger import PDFAccessibilityTagger, AccessibilityReport
 from cell_grid_resolver import resolve_elements_via_grid
+from diagnostic_visualizer import capture_page_diagnostics
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -53,6 +55,7 @@ def lambda_handler(event, context):
         lang = body.get("lang", "en-US")
         render_dpi = body.get("dpi", 150)
         correlation_uri = body.get("correlation_uri")
+        page_b64_uris = body.get("page_b64_uris", {})
 
         logger.info("Processing request for session: %s", session_id)
         logger.info("PDF path: %s", pdf_path)
@@ -72,6 +75,8 @@ def lambda_handler(event, context):
             render_dpi=render_dpi,
             aws_profile=body.get("aws_profile"),
             correlation_uri=correlation_uri,
+            page_b64_uris=page_b64_uris,
+            session_id=session_id,
         )
 
         output_bucket = os.environ.get("OUTPUT_BUCKET")
@@ -131,6 +136,8 @@ def process_pdf(
     render_dpi: int,
     aws_profile: Optional[str] = None,
     correlation_uri: Optional[str] = None,
+    page_b64_uris: Optional[dict[str, str]] = None,
+    session_id: str = "",
 ) -> dict[str, Any]:
     """Full PDF remediation pipeline.
 
@@ -138,6 +145,10 @@ def process_pdf(
     for element metadata and resolves coordinates via PyMuPDF text search
     (text elements) and targeted vision model calls (figures only).
     Falls back to full vision model analysis when no correlation data exists.
+
+    When page_b64_uris is provided, uses pre-processed base64 images from S3
+    instead of rendering from the PDF. Falls back to rendering + ImageProcessor
+    optimization if no b64 URI exists for a given page.
     """
     import fitz
     from PIL import Image
@@ -199,31 +210,67 @@ def process_pdf(
                 logger.info(
                     "%d/%d text elements unresolved via text search, "
                     "routing to cell grid resolver",
-                    len(text_unresolved), len(text_elements),
+                    len(text_unresolved),
+                    len(text_elements),
                 )
 
             # Combine unresolved text + ALL figures for a single grid call
             grid_candidates = list(text_unresolved)
             for fig in figure_elements:
-                grid_candidates.append({
-                    "id": fig.get("id", ""),
-                    "type": "figure",
-                    "text": fig.get("caption", ""),
-                    "alt_text": fig.get("alt_text", ""),
-                    "order": fig.get("order", 0),
-                })
+                grid_candidates.append(
+                    {
+                        "id": fig.get("id", ""),
+                        "type": "figure",
+                        "text": fig.get("caption", ""),
+                        "alt_text": fig.get("alt_text", ""),
+                        "order": fig.get("order", 0),
+                    }
+                )
 
             if grid_candidates:
-                # Render page image (needed for grid overlay)
-                zoom = render_dpi / 72.0
-                mat = fitz.Matrix(zoom, zoom)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-                img_path = work_dir / f"page_{page_num}.png"
-                img.save(img_path)
+                # Try pre-processed b64 first, fall back to render + optimize
+                b64_uri = (page_b64_uris or {}).get(str(page_num))
+                if b64_uri:
+                    try:
+                        local_b64 = _download_from_s3(b64_uri)
+                        with open(local_b64, "r", encoding="utf-8") as f:
+                            b64_str = f.read().strip()
+                        image_data = base64.b64decode(b64_str)
+                        logger.info(
+                            "Using pre-processed b64 for page %d (%d bytes)",
+                            page_num,
+                            len(image_data),
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to load b64 for page %d, falling back: %s",
+                            page_num,
+                            e,
+                        )
+                        b64_uri = None  # trigger fallback below
 
-                with open(img_path, "rb") as f:
-                    image_data = f.read()
+                if not b64_uri:
+                    # Render from PDF and optimize via ImageProcessor
+                    zoom = render_dpi / 72.0
+                    mat = fitz.Matrix(zoom, zoom)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)
+                    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+                    img_path = work_dir / f"page_{page_num}.png"
+                    img.save(img_path)
+
+                    with open(img_path, "rb") as f:
+                        raw_data = f.read()
+
+                    if analyzer is None:
+                        analyzer = _initialize_analyzer(aws_profile)
+
+                    image_data = analyzer.image_processor.optimize_image(raw_data)
+                    logger.info(
+                        "Rendered + optimized page %d: %d -> %d bytes",
+                        page_num,
+                        len(raw_data),
+                        len(image_data),
+                    )
 
                 if analyzer is None:
                     analyzer = _initialize_analyzer(aws_profile)
@@ -235,9 +282,26 @@ def process_pdf(
                     len(figure_elements),
                 )
                 grid_resolved = resolve_elements_via_grid(
-                    image_data, grid_candidates, analyzer, aws_profile
+                    image_data,
+                    grid_candidates,
+                    analyzer,
+                    aws_profile,
+                    resolved_anchors=text_resolved,
                 )
                 text_resolved.extend(grid_resolved)
+
+            # Capture diagnostics (if enabled via ENABLE_DIAGNOSTICS env var)
+            capture_page_diagnostics(
+                page_image_data=image_data,
+                page_number=page_num + 1,  # 1-indexed
+                correlation_elements=corr_elements,
+                resolved_elements=text_resolved,
+                grid_cols=10,
+                grid_rows=14,
+                gridded_image=None,
+                pdf_path=pdf_path,
+                session_id=session_id,
+            )
 
             elements = text_resolved
         else:
@@ -277,9 +341,7 @@ def process_pdf(
 
     with PDFAccessibilityTagger(pdf_path) as tagger:
         # Log pre-remediation audit
-        logger.info(
-            "Pre-remediation compliance: %s", tagger.report.pre_level.value
-        )
+        logger.info("Pre-remediation compliance: %s", tagger.report.pre_level.value)
         for check in tagger.report.pre_checks:
             level = "PASS" if check.passed else "FAIL"
             logger.info("  [%s] %s: %s", level, check.name, check.message)
@@ -316,9 +378,7 @@ def process_pdf(
         output_path, report = tagger.save(str(output_pdf), title=title, lang=lang)
 
     # Log post-remediation audit
-    logger.info(
-        "Post-remediation compliance: %s", report.post_level.value
-    )
+    logger.info("Post-remediation compliance: %s", report.post_level.value)
     for check in report.post_checks:
         level = "PASS" if check.passed else "FAIL"
         logger.info("  [%s] %s: %s", level, check.name, check.message)
@@ -514,8 +574,6 @@ def _resolve_figure_bboxes(
     Uses the analyzer's bedrock_client directly with a custom prompt
     rather than the full analysis pipeline.
     """
-    import base64
-
     if not figure_elements:
         return []
 
@@ -630,11 +688,11 @@ def _resolve_figure_bboxes(
         return []
 
 
-def _initialize_analyzer(aws_profile: Optional[str] = None):  # noqa: ARG001
+def _initialize_analyzer(aws_profile: Optional[str] = None):
     """Initialize the analyzer foundation.
 
     Args:
-        aws_profile: AWS profile name (reserved for future use with BedrockClient)
+        aws_profile: AWS profile name for BedrockClient credentials
     """
     from foundation.analyzer_foundation import AnalyzerFoundation
     from foundation.configuration_manager import ConfigurationManager
@@ -694,7 +752,10 @@ def _initialize_analyzer(aws_profile: Optional[str] = None):  # noqa: ARG001
         analyzer.prompt_loader = PromptLoader(config_source="local")
 
     analyzer.image_processor = ImageProcessor()
-    analyzer.bedrock_client = BedrockClient()
+    analyzer.bedrock_client = BedrockClient(
+        aws_region=analyzer.global_settings.get("aws_region", "us-west-2"),
+    )
+    analyzer.aws_profile = aws_profile
     analyzer.message_builder = MessageChainBuilder()
     analyzer.response_processor = ResponseProcessor()
     analyzer._configure_components()
@@ -819,7 +880,9 @@ def _upload_to_s3(
     original_name = Path(original_key).stem
     ext = Path(local_path).suffix or Path(original_key).suffix or ".pdf"
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    output_key = f"{analyzer_name}/results/{session_id}/{original_name}_{timestamp}{ext}"
+    output_key = (
+        f"{analyzer_name}/results/{session_id}/{original_name}_{timestamp}{ext}"
+    )
 
     s3.upload_file(local_path, bucket, output_key)
 

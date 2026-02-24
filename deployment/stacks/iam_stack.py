@@ -65,6 +65,8 @@ class IAMStack(Stack):
                     # Fallback models (inference profiles)
                     "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
                     "arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
+                    # Cell grid resolver (cross-region Sonnet)
+                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
                 ],
             )
         )
@@ -108,6 +110,8 @@ class IAMStack(Stack):
                     # Claude Opus 4.6 foundation model (with and without version suffix)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1:0",
+                    # Claude Sonnet 4 foundation model (cell grid resolver)
+                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
                 ],
             )
         )
@@ -137,6 +141,8 @@ class IAMStack(Stack):
                 resources=[
                     f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/badgers-*",
                     f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/badgers-*:*",
+                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/badgers_*",
+                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/badgers_*:*",
                 ],
             )
         )

@@ -6,8 +6,7 @@
         <approach>Systematic visual scanning, cell-accurate identification for each listed element</approach>
     </role>
 
-    <task>Given a document image with a labeled cell grid overlay, locate each listed content
-        element and report which grid cells it occupies.</task>
+    <task>Given a document image with a labeled cell grid overlay, locate each listed content element and report which grid cells it occupies.</task>
 
     <image>
         <description>Document page with labeled cell grid overlay</description>
@@ -19,13 +18,13 @@
         </grid_structure>
     </image>
 
-    <elements_to_locate>
-{element_descriptions}
-    </elements_to_locate>
+    <elements_to_locate> {element_descriptions} </elements_to_locate>
+
+    <known_element_positions>
+        <description>The following elements have already been located precisely. Positions are normalized image coordinates (0.0 = top/left edge, 1.0 = bottom/right edge). Use them as spatial landmarks to help locate the remaining elements.</description> {anchor_context} </known_element_positions>
 
     <instructions>
-        <objective>For EACH element listed above, identify the grid cells where that element
-            appears in the image.</objective>
+        <objective>For EACH element listed above, identify the grid cells where that element appears in the image.</objective>
 
         <method>
             <step>Read the element's text content or description carefully</step>
@@ -39,8 +38,7 @@
             <constraint>Use 1-4 cells per element for text; more for large figures</constraint>
             <constraint>Cells must be contiguous (adjacent cells forming a rectangle)</constraint>
             <constraint>If an element spans a full row, list all cells in that row range</constraint>
-            <constraint>If you cannot find an element, use your best estimate based on the
-                document layout and reading order</constraint>
+            <constraint>If you cannot find an element, use your best estimate based on the document layout, reading order, and known element positions</constraint>
         </constraints>
 
         <accuracy_guidance>
@@ -53,26 +51,12 @@
 
     <output_format>
         <format>JSON only, no additional text or markdown</format>
-        <schema>
-[
-  {{
-    "id": "element_id_here",
-    "cells": ["B3", "C3", "D3"],
-    "confidence": "high"
-  }},
-  {{
-    "id": "another_id",
-    "cells": ["A7", "B7"],
-    "confidence": "medium"
-  }}
-]
-        </schema>
+        <schema> [ {{ "id": "element_id_here", "cells": ["B3", "C3", "D3"], "confidence": "high" }}, {{ "id": "another_id", "cells": ["A7", "B7"], "confidence": "medium" }} ] </schema>
         <confidence_levels>
             <level name="high">Exact text match found at this location</level>
             <level name="medium">Content matches but position is approximate</level>
             <level name="low">Best guess based on layout context</level>
         </confidence_levels>
-        <note>Return ONLY the JSON array. One entry per element. Every element must appear
-            in the output.</note>
+        <note>Return ONLY the JSON array. One entry per element. Every element must appear in the output.</note>
     </output_format>
 </prompt>

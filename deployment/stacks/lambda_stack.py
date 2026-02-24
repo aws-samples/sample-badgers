@@ -335,6 +335,10 @@ class LambdaAnalyzerStack(Stack):
             "TEMPERATURE": "0.1",
         }
 
+        # Enable diagnostics for remediation analyzer
+        if func_name == "remediation_analyzer":
+            environment["ENABLE_DIAGNOSTICS"] = "true"
+
         # Add inference profile ARNs for cost tracking
         if self.inference_profiles_stack:
             environment.update(
