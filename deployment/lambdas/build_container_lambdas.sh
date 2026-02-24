@@ -47,6 +47,24 @@ for CONTAINER in "${CONTAINERS[@]}"; do
     echo "URI: ${FULL_URI}"
     echo "=========================================="
 
+    # Copy foundation and config modules to container build context
+    echo "Copying foundation and config modules to build context..."
+    if [ -d "./layer/python/foundation" ]; then
+        rm -rf "${CONTAINER_DIR}/foundation"
+        cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
+    else
+        echo "Error: foundation module not found at ./layer/python/foundation"
+        exit 1
+    fi
+
+    if [ -d "./layer/python/config" ]; then
+        rm -rf "${CONTAINER_DIR}/config"
+        cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
+    else
+        echo "Error: config module not found at ./layer/python/config"
+        exit 1
+    fi
+
     # Build for x86_64 (Lambda runtime)
     # --provenance=false prevents OCI attestation manifests that Lambda doesn't support
     docker build \
@@ -54,6 +72,10 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         --provenance=false \
         -t "${FULL_URI}" \
         "${CONTAINER_DIR}"
+
+    # Clean up foundation and config copies
+    rm -rf "${CONTAINER_DIR}/foundation"
+    rm -rf "${CONTAINER_DIR}/config"
 
     # Push to ECR
     echo "Pushing ${FULL_URI}..."
