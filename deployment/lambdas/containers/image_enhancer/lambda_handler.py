@@ -1,8 +1,8 @@
 """
 Image Enhancer Lambda Handler
 
-Enhances historical document images for better vision LLM processing.
-Container-based Lambda to handle OpenCV/NumPy dependencies.
+Agentic image enhancement using Claude Sonnet 4.6 vision model with Strands Agents.
+Container-based Lambda to handle OpenCV/NumPy/Strands dependencies.
 """
 
 import json
@@ -11,14 +11,14 @@ import os
 import tempfile
 import base64
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
+import cv2
+import numpy as np
 import boto3
-from historical_document_enhancer import (
-    HistoricalDocumentEnhancer,
-    DocumentType,
-    EnhancementLevel,
-)
+
+from agentic_enhancer import EnhancementUtilities
+from enhancement_tools import load_image, save_image, image_to_base64
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -26,7 +26,7 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
 def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
-    """Lambda handler for image enhancement."""
+    """Lambda handler for agentic image enhancement."""
     try:
         body = json.loads(event["body"]) if "body" in event else event
 
@@ -34,6 +34,8 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         document_type = body.get("document_type", "auto")
         enhancement_level = body.get("enhancement_level", "moderate")
         session_id = body.get("session_id", "no_session")
+        output_quality = int(body.get("output_quality", 85))
+        skip_upscale = body.get("skip_upscale", True)
 
         if not image_source:
             return _error_response("Missing required: image_path or image_data")
@@ -41,72 +43,83 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         # Load image
         if image_source.startswith("s3://"):
             local_path = _download_from_s3(image_source)
+            # Handle .b64 files (base64 text files stored in S3)
+            if local_path.endswith(".b64"):
+                with open(local_path, "r") as f:
+                    b64_data = f.read().strip()
+                local_path = _save_base64_image(b64_data)
+            image = load_image(local_path)
         elif image_source.startswith("data:") or len(image_source) > 500:
             # Base64 encoded image
             local_path = _save_base64_image(image_source)
+            image = load_image(local_path)
         else:
-            local_path = image_source
+            image = load_image(image_source)
 
-        # Map document type
-        type_map = {
-            "auto": DocumentType.UNKNOWN,
-            "manuscript": DocumentType.MANUSCRIPT,
-            "annotated": DocumentType.ANNOTATED,
-            "sheet_music": DocumentType.SHEET_MUSIC,
-            "diagram": DocumentType.TECHNICAL_DIAGRAM,
-            "printed": DocumentType.PRINTED_HISTORICAL,
-            "mixed": DocumentType.MIXED_MEDIA,
-        }
-        doc_type = type_map.get(document_type.lower(), DocumentType.UNKNOWN)
+        # Optional upscale (backward compatibility)
+        original_shape = image.shape
+        if not skip_upscale:
+            image = _upscale_image(image, target_min_dimension=2000, target_max_dimension=4000)
 
-        # Map enhancement level
-        level_map = {
-            "minimal": EnhancementLevel.MINIMAL,
-            "moderate": EnhancementLevel.MODERATE,
-            "aggressive": EnhancementLevel.AGGRESSIVE,
-        }
-        level = level_map.get(enhancement_level.lower(), EnhancementLevel.MODERATE)
+        # Map parameters to agentic config
+        context_str = _map_document_type_to_context(document_type)
+        max_iterations_override = _map_enhancement_level_to_iterations(enhancement_level)
 
-        # Skip upscale option - preserve original dimensions
-        skip_upscale = body.get("skip_upscale", True)  # Default to skip
+        # Temporarily override MAX_ITERATIONS env var
+        original_max_iterations = os.environ.get("MAX_ITERATIONS")
+        os.environ["MAX_ITERATIONS"] = str(max_iterations_override)
 
-        # Enhance
-        from historical_document_enhancer import EnhancementConfig
+        try:
+            # Run agentic enhancement
+            result = EnhancementUtilities.enhance(
+                image_source=image,
+                context=context_str,
+                save_output=False  # We handle S3 upload here
+            )
+        finally:
+            # Restore original MAX_ITERATIONS
+            if original_max_iterations:
+                os.environ["MAX_ITERATIONS"] = original_max_iterations
 
-        config = EnhancementConfig()
-        if skip_upscale:
-            config.target_min_dimension = 0  # Disable upscaling
-        enhancer = HistoricalDocumentEnhancer(config)
-        result = enhancer.enhance(local_path, document_type=doc_type, level=level)
+        # Get winner image
+        winner_image = result["winner_image"]
 
-        # Save enhanced image as JPEG with quality setting
-        output_quality = int(body.get("output_quality", 85))
+        # Save to temp file
         fd, output_path = tempfile.mkstemp(suffix=".jpg")
         os.close(fd)
-        _save_as_jpeg(result.enhanced_image, output_path, output_quality)
+        save_image(winner_image, output_path, quality=output_quality)
 
-        # Upload to S3 if output bucket configured
+        # Upload to S3 or return base64
         output_bucket = os.environ.get("OUTPUT_BUCKET")
         if output_bucket:
             s3_uri = _upload_to_s3(output_path, output_bucket, session_id, image_source)
-            response_data = {
-                "s3_output_uri": s3_uri,
-                "operations_applied": result.operations_applied,
-                "original_shape": result.original_shape,
-                "final_shape": result.final_shape,
-                "skew_angle": result.skew_angle,
-            }
+            base64_data = None
         else:
-            # Return base64 encoded image
+            s3_uri = None
             with open(output_path, "rb") as f:
-                enhanced_b64 = base64.b64encode(f.read()).decode("utf-8")
-            response_data = {
-                "enhanced_image_base64": enhanced_b64,
-                "operations_applied": result.operations_applied,
-                "original_shape": result.original_shape,
-                "final_shape": result.final_shape,
-                "skew_angle": result.skew_angle,
-            }
+                base64_data = base64.b64encode(f.read()).decode("utf-8")
+
+        # Format response (backward compatible + new fields)
+        response_data = {
+            # Old compatibility fields
+            "s3_output_uri": s3_uri,
+            "enhanced_image_base64": base64_data,
+            "operations_applied": _extract_operations_list(result["history"]),
+            "original_shape": list(original_shape),
+            "final_shape": list(winner_image.shape),
+
+            # New agentic fields
+            "winner": result["winner"],
+            "iterations": len(result["history"]),
+            "reasoning": result.get("final_comparison", {}).get("reasoning", ""),
+            "history": result["history"],
+        }
+
+        # Clean up temp file
+        try:
+            os.unlink(output_path)
+        except:
+            pass
 
         return {
             "statusCode": 200,
@@ -116,6 +129,74 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
         return _error_response(str(e))
+
+
+def _map_document_type_to_context(doc_type: str) -> str:
+    """Map document_type to LLM context string."""
+    mapping = {
+        "manuscript": "18th century handwritten manuscript",
+        "annotated": "historical document with handwritten annotations",
+        "sheet_music": "musical score with performance annotations",
+        "diagram": "technical diagram or chart",
+        "printed": "printed historical document",
+        "mixed": "mixed media document with multiple content types",
+        "auto": "",
+    }
+    return mapping.get(doc_type.lower(), "")
+
+
+def _map_enhancement_level_to_iterations(level: str) -> int:
+    """Map enhancement_level to MAX_ITERATIONS."""
+    mapping = {
+        "minimal": 1,
+        "moderate": 2,
+        "aggressive": 3,
+    }
+    return mapping.get(level.lower(), 2)
+
+
+def _upscale_image(
+    image: np.ndarray,
+    target_min_dimension: int = 2000,
+    target_max_dimension: int = 4000
+) -> np.ndarray:
+    """
+    Pre-process upscaling (backward compatibility).
+    Extracted from old historical_document_enhancer.py.
+    """
+    h, w = image.shape[:2]
+    min_dim = min(h, w)
+    max_dim = max(h, w)
+
+    # Check if upscaling needed
+    if min_dim >= target_min_dimension:
+        logger.info(f"Upscale skipped (already {w}x{h})")
+        return image
+
+    # Calculate scale factor
+    scale = target_min_dimension / min_dim
+
+    # Limit maximum size
+    if max_dim * scale > target_max_dimension:
+        scale = target_max_dimension / max_dim
+
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    # Use INTER_CUBIC for upscaling (better for documents)
+    upscaled = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
+    logger.info(f"Upscaled from {w}x{h} to {new_w}x{new_h}")
+    return upscaled
+
+
+def _extract_operations_list(history: list) -> list:
+    """Extract flat list of operation names from history."""
+    ops = []
+    for iteration in history:
+        for op in iteration.get("operations", []):
+            ops.append(op.get("operation", op.get("op", "unknown")))
+    return list(set(ops))  # Deduplicate
 
 
 def _download_from_s3(s3_uri: str) -> str:
@@ -159,19 +240,6 @@ def _upload_to_s3(local_path: str, bucket: str, session_id: str, original: str) 
 
     s3.upload_file(local_path, bucket, output_key)
     return f"s3://{bucket}/{output_key}"
-
-
-def _save_as_jpeg(image: "np.ndarray", output_path: str, quality: int = 85) -> None:
-    """Save image as JPEG with specified quality."""
-    import cv2
-
-    # Convert RGB to BGR for OpenCV
-    if len(image.shape) == 3:
-        save_img = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    else:
-        save_img = image
-
-    cv2.imwrite(output_path, save_img, [cv2.IMWRITE_JPEG_QUALITY, quality])
 
 
 def _error_response(message: str) -> Dict[str, Any]:

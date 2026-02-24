@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+docs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Notebooks (don't include in container)
+*.ipynb
+.ipynb_checkpoints/
+
+# Build artifacts
+*.zip
+layer/
+
+# Documentation files (not needed in runtime)
+README.md
+DEPLOYMENT.md
+test-event.json
