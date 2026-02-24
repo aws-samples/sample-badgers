@@ -21,6 +21,17 @@
                     "type": "string",
                     "description": "Runtime session ID"
                 },
+                "correlation_uri": {
+                    "type": "string",
+                    "description": "S3 URI to correlation XML from the analysis pipeline. When provided, uses the correlation content spine for element metadata instead of full vision analysis."
+                },
+                "page_b64_uris": {
+                    "type": "object",
+                    "description": "Dict mapping page number (string, 0-indexed) to S3 URI of pre-processed base64 image file. When provided, uses these instead of re-rendering from the PDF.",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "audit_mode": {
                     "type": "boolean",
                     "description": "When true, includes confidence scoring and human review flags"
