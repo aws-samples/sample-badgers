@@ -212,60 +212,78 @@ class WebSocketStreamingClient:
                 logger.info("Sent prompt to WebSocket")
 
                 # Stream responses
-                async for raw_message in websocket:
-                    try:
-                        # Handle bytes vs string
-                        if isinstance(raw_message, bytes):
-                            message_str = raw_message.decode("utf-8")
-                        else:
-                            message_str = str(raw_message)
+                try:
+                    async for raw_message in websocket:
+                        try:
+                            # Handle bytes vs string
+                            if isinstance(raw_message, bytes):
+                                message_str = raw_message.decode("utf-8")
+                            else:
+                                message_str = str(raw_message)
 
-                        # Parse SSE format: "data: {...}\n\n"
-                        if message_str.startswith("data: "):
-                            data = json.loads(message_str[6:])
-                        else:
-                            data = json.loads(message_str)
+                            # Parse SSE format: "data: {...}\n\n"
+                            if message_str.startswith("data: "):
+                                data = json.loads(message_str[6:])
+                            else:
+                                data = json.loads(message_str)
 
-                        logger.debug(
-                            "Received event type: %s, keys: %s",
-                            data.get("type", "n/a"),
-                            list(data.keys())[:5],
-                        )
-                        yield data
-
-                        # Check for completion - be specific about what signals end of stream
-                        # Strands uses: complete=True, force_stop=True, or result with AgentResult
-                        is_complete = data.get("complete") is True
-                        is_force_stop = data.get("force_stop") is True
-                        is_final_result = (
-                            "result" in data and data.get("result") is not None
-                        )
-                        is_error = data.get("type") == "error"
-
-                        if is_error:
-                            logger.error(
-                                "Error event from backend: %s",
-                                safe_json_serialize(data, 500),
+                            logger.debug(
+                                "Received event type: %s, keys: %s",
+                                data.get("type", "n/a"),
+                                list(data.keys())[:5],
                             )
+                            yield data
 
-                        if is_complete or is_force_stop or is_final_result or is_error:
-                            logger.info(
-                                "Stream complete (complete=%s, force_stop=%s, result=%s, error=%s)",
-                                is_complete,
-                                is_force_stop,
-                                is_final_result,
-                                is_error,
+                            # Check for completion - be specific about what signals end of stream
+                            # Strands uses: complete=True, force_stop=True, or result with AgentResult
+                            is_complete = data.get("complete") is True
+                            is_force_stop = data.get("force_stop") is True
+                            is_final_result = (
+                                "result" in data and data.get("result") is not None
                             )
-                            break
+                            is_error = data.get("type") == "error"
 
-                    except json.JSONDecodeError:
-                        logger.warning(
-                            "Non-JSON message (len=%d): %s",
-                            len(message_str),
-                            message_str[:100],
-                        )
-                        yield {"type": "raw", "data": message_str}
+                            if is_error:
+                                logger.error(
+                                    "Error event from backend: %s",
+                                    safe_json_serialize(data, 500),
+                                )
 
+                            if is_complete or is_force_stop or is_final_result or is_error:
+                                logger.info(
+                                    "Stream complete (complete=%s, force_stop=%s, result=%s, error=%s)",
+                                    is_complete,
+                                    is_force_stop,
+                                    is_final_result,
+                                    is_error,
+                                )
+                                break
+
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                "Non-JSON message (len=%d): %s",
+                                len(message_str),
+                                message_str[:100],
+                            )
+                            yield {"type": "raw", "data": message_str}
+
+                except websockets.exceptions.ConnectionClosedError as close_error:
+                    # Server closed connection without proper close frame
+                    # This is expected behavior after final result is sent
+                    logger.info(
+                        "WebSocket closed by server (close_code=%s, close_reason=%s)",
+                        getattr(close_error, 'rcvd_code', None) or getattr(close_error, 'sent_code', None),
+                        getattr(close_error, 'rcvd_reason', None) or getattr(close_error, 'sent_reason', None)
+                    )
+                    # Don't yield error - this is normal completion
+
+        except websockets.exceptions.ConnectionClosedError as close_error:
+            # Connection closed during connection setup or before any messages
+            logger.warning(
+                "WebSocket connection closed unexpectedly: %s",
+                close_error
+            )
+            yield {"type": "error", "message": f"Connection closed: {close_error}"}
         except Exception as e:
             logger.error("WebSocket error: %s", e, exc_info=True)
             yield {"type": "error", "message": str(e)}

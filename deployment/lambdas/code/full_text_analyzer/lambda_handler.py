@@ -199,8 +199,8 @@ def _initialize_analyzer(
     analyzer.logger = logging.getLogger(f"foundation.{analyzer.analyzer_type}")
     analyzer.config = config
     analyzer.global_settings = {
-        "max_tokens": int(os.environ.get("MAX_TOKENS", "8000")),
-        "temperature": float(os.environ.get("TEMPERATURE", "0.1")),
+        "max_tokens": int(os.environ.get("MAX_TOKENS", "16000")),
+        "temperature": float(os.environ.get("TEMPERATURE", "0.3")),
         "max_image_size": int(os.environ.get("MAX_IMAGE_SIZE", "20971520")),
         "max_dimension": int(os.environ.get("MAX_DIMENSION", "2048")),
         "jpeg_quality": int(os.environ.get("JPEG_QUALITY", "85")),

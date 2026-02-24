@@ -1,0 +1,3 @@
+{
+  "body": "{\"image_path\": \"s3://test-bucket/test-images/manuscript.jpg\", \"document_type\": \"manuscript\", \"enhancement_level\": \"moderate\", \"session_id\": \"test_session_001\", \"output_quality\": 85, \"skip_upscale\": true}"
+}
