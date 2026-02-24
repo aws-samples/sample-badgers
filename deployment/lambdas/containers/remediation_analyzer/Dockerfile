@@ -1,13 +1,5 @@
 FROM public.ecr.aws/lambda/python:3.12
 
-# Install system dependencies for PDF processing
-# pymupdf and pikepdf may need additional libraries
-RUN yum install -y \
-    mupdf \
-    mupdf-devel \
-    && yum clean all \
-    && rm -rf /var/cache/yum
-
 # Copy requirements and install Python dependencies
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
