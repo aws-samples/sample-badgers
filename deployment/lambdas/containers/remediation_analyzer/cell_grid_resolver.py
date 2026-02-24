@@ -23,9 +23,19 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
+
+
+def _get_grid_font(cell_height: float) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Return a legible font scaled to ~12-14% of cell height, with fallback."""
+    target_size = max(12, min(20, int(cell_height * 0.13)))
+    try:
+        return ImageFont.load_default(size=target_size)
+    except TypeError:
+        # Pillow < 10.1 doesn't support size= on load_default
+        return ImageFont.load_default()
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +102,8 @@ def add_cell_grid_overlay(
     col_letters = [chr(ord("A") + i) for i in range(cols)]
     cell_map: dict[str, dict] = {}
 
+    font = _get_grid_font(cell_height)
+
     for row in range(rows):
         for col in range(cols):
             cell_name = f"{col_letters[col]}{row + 1}"
@@ -109,10 +121,10 @@ def add_cell_grid_overlay(
             # Cell border
             draw.rectangle([x0, y0, x1, y1], outline=line_color, width=1)
 
-            # Cell label (small, top-left corner of cell)
+            # Cell label (top-left corner of cell)
             label_x = x0 + 2
             label_y = y0 + 1
-            text_bbox = draw.textbbox((label_x, label_y), cell_name)
+            text_bbox = draw.textbbox((label_x, label_y), cell_name, font=font)
             draw.rectangle(
                 [
                     text_bbox[0] - 1,
@@ -122,7 +134,7 @@ def add_cell_grid_overlay(
                 ],
                 fill=label_bg,
             )
-            draw.text((label_x, label_y), cell_name, fill=label_color)
+            draw.text((label_x, label_y), cell_name, fill=label_color, font=font)
 
     result = Image.alpha_composite(img, overlay).convert("RGB")
     return result, cell_map
