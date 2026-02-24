@@ -1,5 +1,57 @@
 # Changelog
 
-## [1.0.0] - 2025-02-10
-Initial Commit
+## [2.2.0] - 2026-02-24
+### Added
+- Cell grid resolver v3 for remediation analyzer with improved table detection
+- Diagnostic visualizer for remediation analyzer output inspection
+- `ENABLE_DIAGNOSTICS` environment variable for remediation analyzer Lambda
+- Claude Opus 4.6 inference profile support
 
+### Changed
+- Remediation analyzer README moved to `REMEDIATION_README.md`
+- Updated README analyzer count from 29 to 25 (accurate Lambda function count)
+- Updated remediation analyzer description to reflect container architecture and new capabilities
+
+### Fixed
+- Increased font size in remediation analyzer for improved analysis
+- CDK IAM policies and manifest schema for remediation analyzer
+- Remediation analyzer credential threading, image sizing, and CJK font encoding
+
+## [2.1.0] - 2026-02-24
+### Added
+- Acrobat accessibility report and screen reader video for remediation analyzer
+- Updated README to v2.1
+
+### Changed
+- Image enhancement tool updates
+
+## [2.0.0] - 2026-02-23
+### Added
+- Remediation analyzer v2.0 with container + layer architecture (moved from code-based to ECR container)
+- PDF accessibility auditor, tagger, and models modules
+- Container build script and Dockerfile for remediation analyzer
+
+### Fixed
+- Remediation analyzer container missing required Python modules and dependencies (#9)
+
+## [1.2.0] - 2026-02-18
+### Fixed
+- Hard coded klayers and Pillow ARN regions now uses `Stack.of(self).region` (#8)
+
+## [1.1.0] - 2026-02-11
+### Changed
+- PDF remediation adjustments
+- Initial codebase clean-up
+
+### Dependencies
+- Bumped Pillow from 11.3.0 to 12.1.1
+
+## [1.0.0] - 2026-02-03
+### Added
+- Initial commit with 25 Lambda analyzer functions (23 code-based + 2 container-based)
+- Strands Agent with AgentCore Runtime and Gateway
+- CDK deployment (10 CloudFormation stacks)
+- Multi-page Gradio frontend with chat, wizard, editor
+- Foundation layer shared across all analyzers
+- Modular XML prompting system
+- Inference profiles for cost tracking

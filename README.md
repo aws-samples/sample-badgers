@@ -1,3 +1,5 @@
+> 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
+
 <sub>🧭 **Navigation:**</sub><br>
 <sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [Frontend](frontend/FRONTEND_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Analyzer Wizard](frontend/ANALYZER_CREATION_WIZARD.md) | [Pricing Calculator](frontend/PRICING_CALCULATOR.md)</sub>
 
@@ -47,7 +49,7 @@ Use cases: research acceleration, compliance automation, content management, acc
             ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
             │   Lambda    │    │   Lambda    │    │   Lambda    │
             │  Analyzer   │    │  Analyzer   │    │  Analyzer   │
-            │ (29 tools)  │    │             │    │             │
+            │ (25 tools)  │    │             │    │             │
             └─────────────┘    └─────────────┘    └─────────────┘
                    │                  │                  │
                    └──────────────────┼──────────────────┘
@@ -60,8 +62,8 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 1. 📄 **User submits a document** with analysis instructions
 2. 🧠 **Strands Agent** (running in AgentCore Runtime) interprets the request
-3. 🔧 **Agent selects tools** from 29 specialized analyzers via MCP Gateway
-4. ⚡ **Lambda analyzers** (29 functions) process document elements using Claude vision models
+3. 🔧 **Agent selects tools** from 25 specialized analyzers via MCP Gateway
+4. ⚡ **Lambda analyzers** (25 functions, including 2 container-based) process document elements using Claude vision models
 5. 📊 **Results aggregate** with preserved structure and semantic relationships
 
 ## 🛠️ Tech Stack
@@ -72,7 +74,7 @@ Use cases: research acceleration, compliance automation, content management, acc
 | 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                   |
 | 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                    |
 | 🧠 Foundation Model | Claude Sonnet 4.5 (via Amazon Bedrock)                             |
-| ⚡ Compute          | AWS Lambda (29 analyzer functions)                                 |
+| ⚡ Compute          | AWS Lambda (25 analyzer functions: 23 code + 2 container)          |
 | 📦 Storage          | Amazon S3 (configs, prompts, outputs)                              |
 | 🔐 Auth             | Amazon Cognito (OAuth 2.0 client credentials)                      |
 | 🏗️ IaC              | AWS CDK (Python)                                                   |
@@ -81,34 +83,34 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 ## 🔬 Analyzers
 
-| Analyzer                             | Purpose                                   |
-| ------------------------------------ | ----------------------------------------- |
-| 📸 `pdf_to_images_converter`          | Convert PDF pages to images               |
-| 🏷️ `classify_pdf_content`             | Classify document content type            |
-| 📝 `full_text_analyzer`               | Extract all text content                  |
-| 📊 `table_analyzer`                   | Extract and structure tables              |
-| 📈 `charts_analyzer`                  | Analyze charts and graphs                 |
-| 🔀 `diagram_analyzer`                 | Process diagrams and flowcharts           |
-| 📐 `layout_analyzer`                  | Document structure analysis               |
-| ♿ `accessibility_analyzer`           | Generate accessibility metadata           |
-| 🏥 `decision_tree_analyzer`           | Medical/clinical document analysis        |
-| 🔬 `scientific_analyzer`              | Scientific paper analysis                 |
-| ✍️ `handwriting_analyzer`             | Handwritten text recognition              |
-| 💻 `code_block_analyzer`              | Extract code snippets                     |
-| 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction               |
-| 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction           |
-| 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction           |
-| 🔑 `keyword_topic_analyzer`           | Extract keywords and topics               |
-| 🔧 `remediation_analyzer`             | Analyze remediation requirements          |
-| 📄 `page_analyzer`                    | Single page content analysis              |
-| 🧱 `elements_analyzer`                | Document element detection                |
-| 🧱 `robust_elements_analyzer`         | Enhanced element detection with fallbacks |
-| 👁️ `general_visual_analysis_analyzer` | General-purpose visual content analysis   |
-| ✏️ `editorial_analyzer`               | Editorial content and markup analysis     |
-| 🗺️ `war_map_analyzer`                 | Historical war map analysis               |
-| 🎓 `edu_transcript_analyzer`          | Educational transcript analysis           |
-| 🔗 `correlation_analyzer`             | Correlate multi-analyzer results per page |
-| 🖼️ `image_enhancer`                   | Image enhancement and preprocessing       |
+| Analyzer                             | Purpose                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| 📸 `pdf_to_images_converter`          | Convert PDF pages to images                                                           |
+| 🏷️ `classify_pdf_content`             | Classify document content type                                                        |
+| 📝 `full_text_analyzer`               | Extract all text content                                                              |
+| 📊 `table_analyzer`                   | Extract and structure tables                                                          |
+| 📈 `charts_analyzer`                  | Analyze charts and graphs                                                             |
+| 🔀 `diagram_analyzer`                 | Process diagrams and flowcharts                                                       |
+| 📐 `layout_analyzer`                  | Document structure analysis                                                           |
+| ♿ `accessibility_analyzer`           | Generate accessibility metadata (part of remediation)                                 |
+| 🏥 `decision_tree_analyzer`           | Medical/clinical document analysis                                                    |
+| 🔬 `scientific_analyzer`              | Scientific paper analysis                                                             |
+| ✍️ `handwriting_analyzer`             | Handwritten text recognition                                                          |
+| 💻 `code_block_analyzer`              | Extract code snippets                                                                 |
+| 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction                                                           |
+| 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction                                                       |
+| 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction                                                       |
+| 🔑 `keyword_topic_analyzer`           | Extract keywords and topics                                                           |
+| 🔧 `remediation_analyzer`             | PDF accessibility remediation (container, cell grid resolver + diagnostic visualizer) |
+| 📄 `page_analyzer`                    | Single page content analysis                                                          |
+| 🧱 `elements_analyzer`                | Document element detection                                                            |
+| 🧱 `robust_elements_analyzer`         | Enhanced element detection with fallbacks                                             |
+| 👁️ `general_visual_analysis_analyzer` | General-purpose visual content analysis                                               |
+| ✏️ `editorial_analyzer`               | Editorial content and markup analysis                                                 |
+| 🗺️ `war_map_analyzer`                 | Historical war map analysis                                                           |
+| 🎓 `edu_transcript_analyzer`          | Educational transcript analysis                                                       |
+| 🔗 `correlation_analyzer`             | Correlate multi-analyzer results per page                                             |
+| 🖼️ `image_enhancer`                   | Image enhancement and preprocessing                                                   |
 
 ## 🚀 Deployment
 
@@ -132,7 +134,7 @@ This deploys 10 CloudFormation stacks:
 2. 🔐 Cognito (OAuth authentication)
 3. 👤 IAM (execution roles)
 4. 🐳 ECR (container registry)
-5. ⚡ Lambda (29 analyzer functions)
+5. ⚡ Lambda (25 analyzer functions)
 6. 🚪 Gateway (MCP endpoint)
 7. 🧠 Memory (session persistence)
 8. 📊 Inference Profiles (cost tracking)
