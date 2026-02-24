@@ -12,9 +12,13 @@ RUN yum install -y \
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 
-# Foundation library provided via Lambda Layer at /opt/python/foundation/
+# Copy foundation module (required for BedrockClient, AnalyzerFoundation, etc.)
+COPY foundation/ ${LAMBDA_TASK_ROOT}/foundation/
 
-# Copy application code (all Python modules)
+# Copy config module (required by foundation)
+COPY config/ ${LAMBDA_TASK_ROOT}/config/
+
+# Copy application code
 COPY pdf_accessibility_models.py ${LAMBDA_TASK_ROOT}/
 COPY pdf_accessibility_auditor.py ${LAMBDA_TASK_ROOT}/
 COPY pdf_accessibility_tagger.py ${LAMBDA_TASK_ROOT}/

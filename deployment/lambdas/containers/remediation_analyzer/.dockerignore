@@ -1,24 +1,19 @@
-# Python
+# Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Distribution / packaging
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual environments
 venv/
@@ -26,21 +21,24 @@ ENV/
 env/
 .venv/
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# Documentation and development files
-README.md
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
 *.md
-docs/
-examples/
-tests/
-test_*.py
+!README.md
+
+# Test files
+test-*.json
 *_test.py
+test_*.py
 
 # Git
 .git/
@@ -49,11 +47,8 @@ test_*.py
 
 # CI/CD
 .github/
-.gitlab-ci.yml
-.travis.yml
 
 # Misc
-.DS_Store
 *.log
 .env
 .env.*

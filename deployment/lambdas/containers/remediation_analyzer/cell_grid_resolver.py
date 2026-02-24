@@ -158,11 +158,45 @@ def cells_to_bbox(
     return {"x0": min_x0, "y0": min_y0, "x1": max_x1, "y1": max_y1}
 
 
-def _image_to_base64(img: Image.Image, fmt: str = "PNG") -> str:
-    """Convert PIL Image to base64 string."""
-    buf = BytesIO()
-    img.save(buf, format=fmt)
-    return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+def _image_to_base64(img: Image.Image, max_b64_bytes: int = 4_500_000) -> str:
+    """Convert PIL Image to base64 string, ensuring it fits under Bedrock's 5MB limit.
+
+    Resizes and compresses as JPEG if needed. The max_b64_bytes default
+    leaves headroom below the 5,242,880 byte API limit.
+    """
+    MAX_DIM = 2048
+
+    # Convert RGBA to RGB for JPEG compatibility
+    if img.mode in ("RGBA", "P"):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode == "P":
+            img = img.convert("RGBA")
+        background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+        img = background
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # Resize if dimensions exceed max
+    if max(img.size) > MAX_DIM:
+        img.thumbnail((MAX_DIM, MAX_DIM), Image.Resampling.LANCZOS)
+        logger.info("Resized gridded image to %s", img.size)
+
+    # Encode as JPEG, reduce quality if still too large
+    for quality in (85, 70, 55, 40):
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        b64_str = base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+        if len(b64_str) <= max_b64_bytes:
+            logger.info(
+                "Gridded image encoded: %d bytes b64 at quality=%d",
+                len(b64_str),
+                quality,
+            )
+            return b64_str
+
+    # Last resort — already at lowest quality
+    logger.warning("Gridded image still %d bytes after max compression", len(b64_str))
+    return b64_str
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +406,7 @@ def resolve_elements_via_grid(
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
+                        "media_type": "image/jpeg",
                         "data": gridded_b64,
                     },
                 },
@@ -383,9 +417,7 @@ def resolve_elements_via_grid(
 
     try:
         bedrock_client = analyzer.bedrock_client
-        model_id = analyzer.config.get(
-            "model_id", "us.anthropic.claude-sonnet-4-20250514-v1:0"
-        )
+        model_id = analyzer.config.get("model_id", "us.anthropic.claude-sonnet-4-6")
 
         system_prompt = (
             "You are a precise document element locator. Given a page image with a "
@@ -403,6 +435,7 @@ def resolve_elements_via_grid(
         response = bedrock_client.invoke_model(
             model_id=model_id,
             payload=payload,
+            profile_name=_aws_profile,
         )
 
         # Extract text
