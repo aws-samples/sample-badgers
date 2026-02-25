@@ -4,11 +4,17 @@ Core analyzer foundation class that orchestrates all foundation components.
 This is the main class that analyzer tools will use to perform analysis operations.
 """
 
+import io
 import logging
+import math
+import os
 import sys
 import time
 from pathlib import Path
 from typing import Union, Optional, Dict, Any, List
+
+import numpy as np
+from PIL import Image, ImageFilter
 
 from .configuration_manager import ConfigurationManager
 from .prompt_loader import PromptLoader
@@ -134,8 +140,22 @@ class AnalyzerFoundation:
             # Step 5: Build message chain
             messages = self._build_message_chain(target_image_b64, example_images)
 
+            # Step 5.5: Dynamic token estimation (if enabled via env var)
+            max_tokens_override = None
+            if os.environ.get("DYNAMIC_TOKENS_ENABLED", "false").lower() == "true":
+                max_tokens_override = self._estimate_token_requirements(
+                    optimized_image_data
+                )
+                self.logger.info(
+                    "Dynamic token estimate: %d (default: %d)",
+                    max_tokens_override,
+                    self.global_settings.get("max_tokens", 8000),
+                )
+
             # Step 6: Invoke Bedrock model
-            response = self._invoke_bedrock_model(system_prompt, messages, aws_profile)
+            response = self._invoke_bedrock_model(
+                system_prompt, messages, aws_profile, max_tokens_override
+            )
 
             # Step 7: Extract thinking content if present
             thinking_content = response.get("thinking")
@@ -455,11 +475,77 @@ class AnalyzerFoundation:
         except Exception as e:
             raise AnalysisError(f"Failed to build message chain: {e}") from e
 
+    def _get_dynamic_tokens_config(self) -> dict:
+        """Load dynamic tokens config from analyzer manifest."""
+        default = {
+            "weights": {
+                "text_ratio": 0.2,
+                "entropy": 0.3,
+                "edge_density": 0.3,
+                "color_std": 0.2,
+            },
+            "thresholds": [
+                {"max_score": 0.20, "max_tokens": 8000},
+                {"max_score": 0.30, "max_tokens": 12000},
+                {"max_score": 0.45, "max_tokens": 16000},
+                {"max_score": 1.00, "max_tokens": 24000},
+            ],
+        }
+        return dict(self.config.get("dynamic_tokens", default))
+
+    def _estimate_token_requirements(self, image_data: bytes) -> int:
+        """Estimate max_tokens from image complexity.
+
+        Uses optimized image bytes from _process_target_image() — no PDF re-conversion.
+        """
+        config = self._get_dynamic_tokens_config()
+        weights = config["weights"]
+        thresholds = config["thresholds"]
+
+        img = Image.open(io.BytesIO(image_data))
+        gray = img.convert("L")
+        pixels = np.array(gray)
+
+        text_ratio = float(np.sum(pixels < 128) / pixels.size)
+
+        hist = gray.histogram()
+        total = sum(hist)
+        probs = [h / total for h in hist if h > 0]
+        entropy = -sum(p * math.log2(p) for p in probs)
+
+        edges = np.array(gray.filter(ImageFilter.FIND_EDGES))
+        edge_density = float(np.mean(edges) / 255.0)
+
+        rgb = np.array(img.convert("RGB"))
+        color_std = float(np.mean(np.std(rgb, axis=(0, 1))))
+
+        score = (
+            text_ratio * weights["text_ratio"]
+            + (entropy / 8.0) * weights["entropy"]
+            + edge_density * weights["edge_density"]
+            + min(color_std / 80.0, 1.0) * weights["color_std"]
+        )
+
+        self.logger.debug(
+            "Complexity score: %.3f (text=%.3f entropy=%.2f edges=%.3f color=%.1f)",
+            score,
+            text_ratio,
+            entropy,
+            edge_density,
+            color_std,
+        )
+
+        for t in sorted(thresholds, key=lambda x: x["max_score"]):
+            if score < t["max_score"]:
+                return int(t["max_tokens"])
+        return int(thresholds[-1]["max_tokens"])
+
     def _invoke_bedrock_model(
         self,
         system_prompt: str,
         messages: List[Dict[str, Any]],
         aws_profile: Optional[str],
+        max_tokens_override: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Invoke the Bedrock model with the prepared payload."""
         try:
@@ -483,11 +569,16 @@ class AnalyzerFoundation:
             if fallback_list:
                 self.logger.debug("Fallback models configured: %s", fallback_list)
 
+            # Use override if provided, otherwise fall back to global_settings
+            max_tokens = max_tokens_override or self.global_settings.get(
+                "max_tokens", 4000
+            )
+
             # Create payload (in Claude format - will be converted if needed)
             payload = self.bedrock_client.create_anthropic_payload(
                 system_prompt,
                 messages,
-                self.global_settings.get("max_tokens", 4000),
+                max_tokens,
                 self.global_settings.get("temperature", 0.1),
             )
 
