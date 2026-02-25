@@ -157,6 +157,24 @@ class AnalyzerFoundation:
                 system_prompt, messages, aws_profile, max_tokens_override
             )
 
+            # Step 6.5: Log token usage vs budget (for calibration)
+            usage = response.get("usage", {})
+            if usage and max_tokens_override:
+                output_tokens = usage.get("outputTokens", 0)
+                input_tokens = usage.get("inputTokens", 0)
+                utilization = (
+                    (output_tokens / max_tokens_override * 100)
+                    if max_tokens_override
+                    else 0
+                )
+                self.logger.info(
+                    "Token usage: input=%d output=%d budget=%d utilization=%.1f%%",
+                    input_tokens,
+                    output_tokens,
+                    max_tokens_override,
+                    utilization,
+                )
+
             # Step 7: Extract thinking content if present
             thinking_content = response.get("thinking")
             if thinking_content:
