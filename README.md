@@ -227,8 +227,9 @@ The `analyze()` method orchestrates:
 1. 🖼️ **Image processing** - Resize/optimize for Claude's vision API
 2. 📜 **Prompt loading** - Combine wrapper + analyzer prompts from S3
 3. 💬 **Message building** - Format for Bedrock Converse API
-4. 🤖 **Model invocation** - Call Claude with retry/fallback logic
-5. ✅ **Response processing** - Extract and validate result
+4. ⚡ **Dynamic token estimation** - Score image complexity and set token budget (when enabled)
+5. 🤖 **Model invocation** - Call Claude with retry/fallback logic
+6. ✅ **Response processing** - Extract and validate result
 
 ### 📜 Prompting System
 
@@ -329,6 +330,34 @@ Global settings (from environment or defaults):
     "aws_region": "us-west-2"
 }
 ```
+
+### ⚡ Dynamic Token Estimation
+
+When enabled, BADGERS estimates the optimal `max_tokens` per image based on visual complexity, reducing cost on simple documents and avoiding truncation on dense ones. The scorer runs on the already-processed image bytes — no extra I/O.
+
+Four metrics are combined into a complexity score: text pixel ratio, grayscale entropy, edge density, and color standard deviation. The score maps to a token budget (8K / 12K / 16K / 24K).
+
+**Enabling:** Toggle "Dynamic Token Estimation" in the Gradio chat UI, or set the Lambda environment variable `DYNAMIC_TOKENS_ENABLED=true`.
+
+**Tuning:** Add a `dynamic_tokens` block to an analyzer manifest to customize weights and thresholds:
+```json
+"dynamic_tokens": {
+    "weights": {
+        "text_ratio": 0.2,
+        "entropy": 0.3,
+        "edge_density": 0.3,
+        "color_std": 0.2
+    },
+    "thresholds": [
+        {"max_score": 0.20, "max_tokens": 8000},
+        {"max_score": 0.30, "max_tokens": 12000},
+        {"max_score": 0.45, "max_tokens": 16000},
+        {"max_score": 1.00, "max_tokens": 24000}
+    ]
+}
+```
+
+**Observability:** When active, logs report the estimated budget, actual token usage, and utilization percentage for calibration.
 
 ### 📊 Inference Profiles for Cost Tracking
 
