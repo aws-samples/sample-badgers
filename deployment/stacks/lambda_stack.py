@@ -317,7 +317,11 @@ class LambdaAnalyzerStack(Stack):
             logger.info("Created container function: %s", func_name)
 
     def _create_ecr_container_function(self, func_name: str) -> lambda_.Function:
-        """Create a Lambda function from a pre-built ECR image."""
+        """Create a Lambda function from a pre-built ECR image.
+
+        Container image functions do NOT support Lambda layers. All dependencies
+        must be included in the container image itself.
+        """
         schema_path = Path(f"./s3_files/schemas/{func_name}.json")
         description = self.get_tool_description(schema_path, func_name)
 
@@ -353,6 +357,8 @@ class LambdaAnalyzerStack(Stack):
                     self.inference_profiles_stack.claude_sonnet_46_profile_arn
                 )
 
+        # Container image functions do NOT support Lambda layers.
+        # All dependencies (including foundation libs) must be baked into the container image.
         function = lambda_.Function(
             self,
             f"ContainerFunction-{func_name}",
