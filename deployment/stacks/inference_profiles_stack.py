@@ -175,32 +175,32 @@ class InferenceProfilesStack(Stack):
     @property
     def claude_sonnet_profile_arn(self) -> str:
         """Get Claude Sonnet profile ARN."""
-        return self.claude_sonnet_cfn.attr_inference_profile_arn
+        return str(self.claude_sonnet_cfn.attr_inference_profile_arn)
 
     @property
     def claude_haiku_profile_arn(self) -> str:
         """Get Claude Haiku profile ARN."""
-        return self.claude_haiku_cfn.attr_inference_profile_arn
+        return str(self.claude_haiku_cfn.attr_inference_profile_arn)
 
     @property
     def nova_premier_profile_arn(self) -> str:
         """Get Nova Premier profile ARN."""
-        return self.nova_premier_cfn.attr_inference_profile_arn
+        return str(self.nova_premier_cfn.attr_inference_profile_arn)
 
     @property
     def claude_opus_46_profile_arn(self) -> str:
         """Get Claude Opus 4.6 profile ARN."""
-        return self.claude_opus_cfn.attr_inference_profile_arn
+        return str(self.claude_opus_cfn.attr_inference_profile_arn)
 
     @property
     def claude_opus_45_profile_arn(self) -> str:
         """Get Claude Opus 4.5 profile ARN."""
-        return self.claude_opus_45_cfn.attr_inference_profile_arn
+        return str(self.claude_opus_45_cfn.attr_inference_profile_arn)
 
     @property
     def claude_sonnet_46_profile_arn(self) -> str:
         """Get Claude Sonnet 4.6 profile ARN."""
-        return self.claude_sonnet_46_cfn.attr_inference_profile_arn
+        return str(self.claude_sonnet_46_cfn.attr_inference_profile_arn)
 
     def grant_invoke_to_role(self, role) -> None:
         """Grant invoke permissions on all profiles to the given role.
