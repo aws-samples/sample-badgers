@@ -181,7 +181,11 @@ class WebSocketStreamingClient:
         return str(presigned_url)
 
     async def stream_invoke(
-        self, prompt: str, session_id: str, audit_mode: bool = False
+        self,
+        prompt: str,
+        session_id: str,
+        audit_mode: bool = False,
+        dynamic_tokens_enabled: bool = False,
     ):
         """Stream events from AgentCore Runtime via WebSocket.
 
@@ -206,6 +210,7 @@ class WebSocketStreamingClient:
                         "session_id": session_id,
                         "actor_id": "gradio_user",
                         "audit_mode": audit_mode,
+                        "dynamic_tokens_enabled": dynamic_tokens_enabled,
                     }
                 )
                 await websocket.send(payload)
@@ -249,7 +254,12 @@ class WebSocketStreamingClient:
                                     safe_json_serialize(data, 500),
                                 )
 
-                            if is_complete or is_force_stop or is_final_result or is_error:
+                            if (
+                                is_complete
+                                or is_force_stop
+                                or is_final_result
+                                or is_error
+                            ):
                                 logger.info(
                                     "Stream complete (complete=%s, force_stop=%s, result=%s, error=%s)",
                                     is_complete,
@@ -272,17 +282,16 @@ class WebSocketStreamingClient:
                     # This is expected behavior after final result is sent
                     logger.info(
                         "WebSocket closed by server (close_code=%s, close_reason=%s)",
-                        getattr(close_error, 'rcvd_code', None) or getattr(close_error, 'sent_code', None),
-                        getattr(close_error, 'rcvd_reason', None) or getattr(close_error, 'sent_reason', None)
+                        getattr(close_error, "rcvd_code", None)
+                        or getattr(close_error, "sent_code", None),
+                        getattr(close_error, "rcvd_reason", None)
+                        or getattr(close_error, "sent_reason", None),
                     )
                     # Don't yield error - this is normal completion
 
         except websockets.exceptions.ConnectionClosedError as close_error:
             # Connection closed during connection setup or before any messages
-            logger.warning(
-                "WebSocket connection closed unexpectedly: %s",
-                close_error
-            )
+            logger.warning("WebSocket connection closed unexpectedly: %s", close_error)
             yield {"type": "error", "message": f"Connection closed: {close_error}"}
         except Exception as e:
             logger.error("WebSocket error: %s", e, exc_info=True)
@@ -761,6 +770,11 @@ def create_ui():
                     value=False,
                     info="",
                 )
+                dynamic_tokens_checkbox = gr.Checkbox(
+                    label="⚡ Dynamic Token Estimation",
+                    value=False,
+                    info="Adjust max_tokens based on image complexity",
+                )
                 with gr.Accordion(
                     "🔧 Available Tools", open=False, elem_classes="badgers_expander"
                 ):
@@ -773,7 +787,9 @@ def create_ui():
                 )
                 new_session_btn = gr.Button("🔄 New Session", variant="secondary")
 
-        async def send_message_streaming(message, history, audit_mode, sid):
+        async def send_message_streaming(
+            message, history, audit_mode, dynamic_tokens, sid
+        ):
             """Send message and stream events."""
             if not client:
                 history.append({"role": "user", "content": message})
@@ -810,7 +826,9 @@ def create_ui():
             accumulated_text = []
 
             try:
-                async for event in client.stream_invoke(message, sid, audit_mode):
+                async for event in client.stream_invoke(
+                    message, sid, audit_mode, dynamic_tokens
+                ):
                     events.append(event)
                     logger.debug("Received event keys: %s", list(event.keys()))
 
@@ -1100,13 +1118,25 @@ def create_ui():
 
         send_btn.click(
             fn=send_message_streaming,
-            inputs=[msg_input, chatbot, audit_mode_checkbox, session_id],
+            inputs=[
+                msg_input,
+                chatbot,
+                audit_mode_checkbox,
+                dynamic_tokens_checkbox,
+                session_id,
+            ],
             outputs=[chatbot, msg_input],
         )
 
         msg_input.submit(
             fn=send_message_streaming,
-            inputs=[msg_input, chatbot, audit_mode_checkbox, session_id],
+            inputs=[
+                msg_input,
+                chatbot,
+                audit_mode_checkbox,
+                dynamic_tokens_checkbox,
+                session_id,
+            ],
             outputs=[chatbot, msg_input],
         )
 

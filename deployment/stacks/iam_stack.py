@@ -1,4 +1,4 @@
-"""IAM Stack for PDF Extractor POC."""
+"""IAM Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,
@@ -109,7 +109,6 @@ class IAMStack(Stack):
                     "arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
                     # Claude Opus 4.6 foundation model (with and without version suffix)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
-                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1:0",
                     # Claude Sonnet 4 foundation model (cell grid resolver)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
                 ],

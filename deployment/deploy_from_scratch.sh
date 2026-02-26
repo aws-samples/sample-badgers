@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Full deployment script for PDF Extractor POC
+# Full deployment script for BADGERS
 # Deploys all CDK stacks from scratch with proper ordering
 #
 # Usage: ./deploy_from_scratch.sh [--websocket-only]

@@ -42,25 +42,27 @@ BADGERS uses four types of Lambda functions:
 
 ### Vision Analyzers
 
-| Variable        | Required | Default     | Description                                      |
-| --------------- | -------- | ----------- | ------------------------------------------------ |
-| `CONFIG_BUCKET` | ✅        | -           | S3 bucket containing analyzer configs            |
-| `OUTPUT_BUCKET` | ✅        | -           | S3 bucket for saving results                     |
-| `ANALYZER_NAME` | ✅        | -           | Analyzer identifier (e.g., `full_text_analyzer`) |
-| `LOGGING_LEVEL` | ❌        | `INFO`      | Log verbosity                                    |
-| `MAX_TOKENS`    | ❌        | `8000`      | Max response tokens from Bedrock                 |
-| `TEMPERATURE`   | ❌        | `0.1`       | Model temperature (lower = more deterministic)   |
-| `AWS_REGION`    | ❌        | `us-west-2` | Region for Bedrock calls                         |
+| Variable                 | Required | Default     | Description                                      |
+| ------------------------ | -------- | ----------- | ------------------------------------------------ |
+| `CONFIG_BUCKET`          | ✅        | -           | S3 bucket containing analyzer configs            |
+| `OUTPUT_BUCKET`          | ✅        | -           | S3 bucket for saving results                     |
+| `ANALYZER_NAME`          | ✅        | -           | Analyzer identifier (e.g., `full_text_analyzer`) |
+| `LOGGING_LEVEL`          | ❌        | `INFO`      | Log verbosity                                    |
+| `MAX_TOKENS`             | ❌        | `8000`      | Max response tokens from Bedrock                 |
+| `TEMPERATURE`            | ❌        | `0.1`       | Model temperature (lower = more deterministic)   |
+| `AWS_REGION`             | ❌        | `us-west-2` | Region for Bedrock calls                         |
+| `DYNAMIC_TOKENS_ENABLED` | ❌        | `false`     | Enable complexity-based dynamic token estimation |
 
 ### Input Parameters
 
-| Parameter     | Required | Description                                      |
-| ------------- | -------- | ------------------------------------------------ |
-| `session_id`  | ✅        | Runtime session ID for tracing and S3 output     |
-| `image_path`  | ✅*       | S3 URL or file path (*or `image_data`)           |
-| `image_data`  | ✅*       | Base64-encoded image (*or `image_path`)          |
-| `aws_profile` | ❌        | Optional AWS profile for local testing           |
-| `audit_mode`  | ❌        | Enable confidence scoring and human review flags |
+| Parameter                | Required | Description                                                          |
+| ------------------------ | -------- | -------------------------------------------------------------------- |
+| `session_id`             | ✅        | Runtime session ID for tracing and S3 output                         |
+| `image_path`             | ✅*       | S3 URL or file path (*or `image_data`)                               |
+| `image_data`             | ✅*       | Base64-encoded image (*or `image_path`)                              |
+| `aws_profile`            | ❌        | Optional AWS profile for local testing                               |
+| `audit_mode`             | ❌        | Enable confidence scoring and human review flags                     |
+| `dynamic_tokens_enabled` | ❌        | Enable dynamic max_tokens based on image complexity (default: false) |
 
 ### Utilities
 

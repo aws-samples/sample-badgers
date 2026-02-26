@@ -25,10 +25,7 @@ MODEL_TO_PROFILE_ENV_MAP = {
     "global.anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
     "us.anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
     "anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
-    # Claude Opus 4.6 variants (with and without :0 suffix)
-    "global.anthropic.claude-opus-4-6-v1:0": "CLAUDE_OPUS_46_PROFILE_ARN",
-    "us.anthropic.claude-opus-4-6-v1:0": "CLAUDE_OPUS_46_PROFILE_ARN",
-    "anthropic.claude-opus-4-6-v1:0": "CLAUDE_OPUS_46_PROFILE_ARN",
+    # Claude Opus 4.6 variants
     "global.anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
     "us.anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
     "anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",

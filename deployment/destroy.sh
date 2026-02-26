@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Destroy all deployed resources for PDF Extractor POC
+# Destroy all deployed resources for BADGERS
 # Destroys stacks in reverse dependency order
 #
 
@@ -25,7 +25,7 @@ STACK_PREFIX="badgers"
 
 echo ""
 echo "=========================================="
-echo "  PDF Extractor POC - DESTROY"
+echo "  BADGERS - DESTROY"
 echo "=========================================="
 echo ""
 log_warn "This will DELETE all deployed resources!"

@@ -49,7 +49,7 @@
         "analysis_text": "war and battle map content",
         "expected_output_tokens": 6000,
         "model_selections": {
-            "primary": "us.anthropic.claude-opus-4-6-v1:0",
+            "primary": "us.anthropic.claude-opus-4-6-v1",
             "fallback_list": [
                 "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
                 "us.anthropic.claude-haiku-4-5-20251001-v1:0",

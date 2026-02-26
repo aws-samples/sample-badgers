@@ -1,4 +1,4 @@
-"""S3 Stack for PDF Extractor POC."""
+"""S3 Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,

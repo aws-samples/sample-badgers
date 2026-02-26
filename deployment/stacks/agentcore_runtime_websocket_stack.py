@@ -1,4 +1,4 @@
-"""AgentCore Runtime WebSocket Stack for PDF Extractor POC.
+"""AgentCore Runtime WebSocket Stack for BADGERS.
 
 Separate runtime stack for WebSocket streaming support.
 """
@@ -75,7 +75,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         self._apply_resource_tags(
             self.runtime,
             "agentcore-runtime-websocket",
-            "AgentCore Runtime for PDF analysis with WebSocket streaming",
+            "AgentCore Runtime for BADGERS with WebSocket streaming",
         )
 
     def _apply_common_tags(self) -> None:
@@ -297,7 +297,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             ),
             protocol_configuration="HTTP",
             role_arn=self.agent_role.role_arn,
-            description="PDF analysis agent runtime with WebSocket streaming",
+            description="BADGERS agent runtime with WebSocket streaming",
             environment_variables={
                 "AWS_DEFAULT_REGION": self.region,
                 "GATEWAY_URL": self.gateway_url,

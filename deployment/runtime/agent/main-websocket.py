@@ -254,7 +254,7 @@ DEFAULT_MODEL_CONFIG = {
     ],
 }
 
-DEFAULT_SYSTEM_PROMPT = """You are an intelligent PDF analysis assistant with access to specialized tools via AgentCore Gateway."""
+DEFAULT_SYSTEM_PROMPT = """You are an intelligent BADGERS assistant with access to specialized tools via AgentCore Gateway."""
 
 
 def load_config_from_s3() -> tuple[str, dict[str, Any]]:

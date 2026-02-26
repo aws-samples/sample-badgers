@@ -21,6 +21,7 @@ CROSS_REGION_PROFILES = {
     "claude_haiku_4_5": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
     "claude_opus_4_6": "global.anthropic.claude-opus-4-6-v1",
     "claude_opus_4_5": "global.anthropic.claude-opus-4-5-20251101-v1:0",
+    "claude_sonnet_4_6": "us.anthropic.claude-sonnet-4-6",
     "nova_premier": "us.amazon.nova-premier-v1:0",
 }
 
@@ -86,6 +87,18 @@ class InferenceProfilesStack(Stack):
             tags=cfn_tags,
         )
 
+        # Claude Sonnet 4.6 - US cross-region profile
+        self.claude_sonnet_46_cfn = CfnApplicationInferenceProfile(
+            self,
+            "ClaudeSonnet46Profile",
+            inference_profile_name=f"badgers-claude-sonnet-46-{deployment_id}",
+            model_source=CfnApplicationInferenceProfile.InferenceProfileModelSourceProperty(
+                copy_from=f"arn:aws:bedrock:{self.region}:{self.account}:inference-profile/{CROSS_REGION_PROFILES['claude_sonnet_4_6']}"
+            ),
+            description="Claude Sonnet 4.6 for BADGERS image enhancement",
+            tags=cfn_tags,
+        )
+
         # Claude Opus 4.6 - Global cross-region profile
         self.claude_opus_cfn = CfnApplicationInferenceProfile(
             self,
@@ -146,6 +159,13 @@ class InferenceProfilesStack(Stack):
             description="Claude Opus 4.5 inference profile ARN",
             export_name=f"{self.stack_name}-ClaudeOpus45ProfileArn",
         )
+        CfnOutput(
+            self,
+            "ClaudeSonnet46ProfileArn",
+            value=self.claude_sonnet_46_cfn.attr_inference_profile_arn,
+            description="Claude Sonnet 4.6 inference profile ARN",
+            export_name=f"{self.stack_name}-ClaudeSonnet46ProfileArn",
+        )
 
     def _apply_common_tags(self) -> None:
         """Apply common deployment tags to all resources in this stack."""
@@ -155,27 +175,32 @@ class InferenceProfilesStack(Stack):
     @property
     def claude_sonnet_profile_arn(self) -> str:
         """Get Claude Sonnet profile ARN."""
-        return self.claude_sonnet_cfn.attr_inference_profile_arn
+        return str(self.claude_sonnet_cfn.attr_inference_profile_arn)
 
     @property
     def claude_haiku_profile_arn(self) -> str:
         """Get Claude Haiku profile ARN."""
-        return self.claude_haiku_cfn.attr_inference_profile_arn
+        return str(self.claude_haiku_cfn.attr_inference_profile_arn)
 
     @property
     def nova_premier_profile_arn(self) -> str:
         """Get Nova Premier profile ARN."""
-        return self.nova_premier_cfn.attr_inference_profile_arn
+        return str(self.nova_premier_cfn.attr_inference_profile_arn)
 
     @property
     def claude_opus_46_profile_arn(self) -> str:
         """Get Claude Opus 4.6 profile ARN."""
-        return self.claude_opus_cfn.attr_inference_profile_arn
+        return str(self.claude_opus_cfn.attr_inference_profile_arn)
 
     @property
     def claude_opus_45_profile_arn(self) -> str:
         """Get Claude Opus 4.5 profile ARN."""
-        return self.claude_opus_45_cfn.attr_inference_profile_arn
+        return str(self.claude_opus_45_cfn.attr_inference_profile_arn)
+
+    @property
+    def claude_sonnet_46_profile_arn(self) -> str:
+        """Get Claude Sonnet 4.6 profile ARN."""
+        return str(self.claude_sonnet_46_cfn.attr_inference_profile_arn)
 
     def grant_invoke_to_role(self, role) -> None:
         """Grant invoke permissions on all profiles to the given role.
