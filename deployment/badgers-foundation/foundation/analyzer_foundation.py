@@ -13,8 +13,7 @@ import time
 from pathlib import Path
 from typing import Union, Optional, Dict, Any, List
 
-import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
 from .configuration_manager import ConfigurationManager
 from .prompt_loader import PromptLoader
@@ -516,6 +515,9 @@ class AnalyzerFoundation:
 
         Uses optimized image bytes from _process_target_image() — no PDF re-conversion.
         """
+        import numpy as np
+        from PIL import ImageFilter
+
         config = self._get_dynamic_tokens_config()
         weights = config["weights"]
         thresholds = config["thresholds"]

@@ -1,4 +1,4 @@
-"""IAM Stack for PDF Extractor POC."""
+"""IAM Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,

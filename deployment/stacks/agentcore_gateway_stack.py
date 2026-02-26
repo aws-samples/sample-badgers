@@ -1,4 +1,4 @@
-"""AgentCore Gateway Stack for PDF Extractor POC."""
+"""AgentCore Gateway Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,
@@ -58,7 +58,7 @@ class AgentCoreGatewayStack(Stack):
         self._apply_resource_tags(
             self.gateway,
             "agentcore-gateway",
-            "MCP Gateway for PDF analysis tools",
+            "MCP Gateway for BADGERS tools",
         )
 
         # Outputs
