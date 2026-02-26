@@ -1,4 +1,4 @@
-"""Cognito Stack for PDF Extractor POC."""
+"""Cognito Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,

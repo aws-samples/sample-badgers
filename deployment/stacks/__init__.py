@@ -1,4 +1,4 @@
-"""CDK stacks for PDF Extractor POC."""
+"""CDK stacks for BADGERS."""
 
 from .s3_stack import S3Stack
 from .iam_stack import IAMStack

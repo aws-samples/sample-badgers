@@ -18,14 +18,14 @@ import numpy as np
 import boto3
 
 from agentic_enhancer import EnhancementUtilities
-from enhancement_tools import load_image, save_image, image_to_base64
+from enhancement_tools import load_image, save_image
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
 logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
-def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
+def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
     """Lambda handler for agentic image enhancement."""
     try:
         body = json.loads(event["body"]) if "body" in event else event
@@ -45,7 +45,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             local_path = _download_from_s3(image_source)
             # Handle .b64 files (base64 text files stored in S3)
             if local_path.endswith(".b64"):
-                with open(local_path, "r") as f:
+                with open(local_path, "r", encoding="utf-8") as f:
                     b64_data = f.read().strip()
                 local_path = _save_base64_image(b64_data)
             image = load_image(local_path)
@@ -59,11 +59,15 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         # Optional upscale (backward compatibility)
         original_shape = image.shape
         if not skip_upscale:
-            image = _upscale_image(image, target_min_dimension=2000, target_max_dimension=4000)
+            image = _upscale_image(
+                image, target_min_dimension=2000, target_max_dimension=4000
+            )
 
         # Map parameters to agentic config
         context_str = _map_document_type_to_context(document_type)
-        max_iterations_override = _map_enhancement_level_to_iterations(enhancement_level)
+        max_iterations_override = _map_enhancement_level_to_iterations(
+            enhancement_level
+        )
 
         # Temporarily override MAX_ITERATIONS env var
         original_max_iterations = os.environ.get("MAX_ITERATIONS")
@@ -74,7 +78,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             result = EnhancementUtilities.enhance(
                 image_source=image,
                 context=context_str,
-                save_output=False  # We handle S3 upload here
+                save_output=False,  # We handle S3 upload here
             )
         finally:
             # Restore original MAX_ITERATIONS
@@ -107,7 +111,6 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
             "operations_applied": _extract_operations_list(result["history"]),
             "original_shape": list(original_shape),
             "final_shape": list(winner_image.shape),
-
             # New agentic fields
             "winner": result["winner"],
             "iterations": len(result["history"]),
@@ -118,7 +121,7 @@ def lambda_handler(event: Dict[str, Any], context) -> Dict[str, Any]:
         # Clean up temp file
         try:
             os.unlink(output_path)
-        except:
+        except Exception:
             pass
 
         return {
@@ -158,7 +161,7 @@ def _map_enhancement_level_to_iterations(level: str) -> int:
 def _upscale_image(
     image: np.ndarray,
     target_min_dimension: int = 2000,
-    target_max_dimension: int = 4000
+    target_max_dimension: int = 4000,
 ) -> np.ndarray:
     """
     Pre-process upscaling (backward compatibility).
@@ -170,7 +173,7 @@ def _upscale_image(
 
     # Check if upscaling needed
     if min_dim >= target_min_dimension:
-        logger.info(f"Upscale skipped (already {w}x{h})")
+        logger.info("Upscale skipped (already %dx%d)", w, h)
         return image
 
     # Calculate scale factor
@@ -186,7 +189,7 @@ def _upscale_image(
     # Use INTER_CUBIC for upscaling (better for documents)
     upscaled = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
 
-    logger.info(f"Upscaled from {w}x{h} to {new_w}x{new_h}")
+    logger.info("Upscaled from %dx%d to %dx%d", w, h, new_w, new_h)
     return upscaled
 
 

@@ -55,6 +55,13 @@ def lambda_handler(event, context):
         if audit_mode:
             logger.info("Audit mode enabled - confidence assessment will be included")
 
+        # Set dynamic token estimation from request
+        if body.get("dynamic_tokens_enabled", False):
+            os.environ["DYNAMIC_TOKENS_ENABLED"] = "true"
+            logger.info("Dynamic token estimation enabled")
+        else:
+            os.environ["DYNAMIC_TOKENS_ENABLED"] = "false"
+
         # Get image data
         image_data = _get_image_data(body)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CDK app for PDF Extractor POC deployment."""
+"""CDK app for BADGERS deployment."""
 
 import os
 import uuid
@@ -67,7 +67,7 @@ s3_stack = S3Stack(
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
-    description="S3 buckets for PDF extractor POC",
+    description="S3 buckets for BADGERS",
 )
 
 # Cognito for AgentCore Gateway authentication
@@ -90,7 +90,7 @@ iam_stack = IAMStack(
     source_bucket=s3_stack.source_bucket,
     output_bucket=s3_stack.output_bucket,
     env=env,
-    description="IAM roles for PDF extractor POC",
+    description="IAM roles for BADGERS",
 )
 
 # ECR repository for AgentCore Runtime container (and container Lambdas)
@@ -124,7 +124,7 @@ lambda_stack = LambdaAnalyzerStack(
     ecr_repository=ecr_stack.repository,
     inference_profiles_stack=inference_profiles_stack,
     env=env,
-    description="Lambda analyzers for PDF extractor POC",
+    description="Lambda analyzers for BADGERS",
 )
 lambda_stack.add_dependency(ecr_stack)
 lambda_stack.add_dependency(inference_profiles_stack)
@@ -150,7 +150,7 @@ memory_stack = AgentCoreMemoryStack(
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
-    description="AgentCore Memory for PDF analysis session persistence",
+    description="AgentCore Memory for BADGERS session persistence",
 )
 
 
@@ -171,7 +171,7 @@ runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     inference_profiles_stack=inference_profiles_stack,
     image_tag="websocket",
     env=env,
-    description="AgentCore Runtime for PDF analysis agent with WebSocket streaming",
+    description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
 )
 runtime_websocket_stack.add_dependency(ecr_stack)
 runtime_websocket_stack.add_dependency(gateway_stack)

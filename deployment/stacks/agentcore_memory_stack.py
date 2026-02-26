@@ -1,4 +1,4 @@
-"""AgentCore Memory Stack for PDF Extractor POC."""
+"""AgentCore Memory Stack for BADGERS."""
 
 from aws_cdk import (
     Stack,
@@ -33,7 +33,7 @@ class AgentCoreMemoryStack(Stack):
             self,
             "badgers-memory",
             name=f"badgers_memory_{deployment_id}",
-            description="Short-term memory for PDF analysis sessions",
+            description="Short-term memory for BADGERS sessions",
             event_expiry_duration=90,  # days
         )
 
@@ -41,7 +41,7 @@ class AgentCoreMemoryStack(Stack):
         self._apply_resource_tags(
             self.memory,
             "agentcore-memory",
-            "Short-term memory for PDF analysis session persistence",
+            "Short-term memory for BADGERS session persistence",
         )
 
         # Outputs
