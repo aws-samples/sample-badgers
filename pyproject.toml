@@ -66,6 +66,7 @@ dependencies = [
     "torchvision>=0.25.0",
     "spandrel>=0.4.1",
     "super-image>=0.2.0",
+    "nbstripout>=0.9.1",
 ]
 
 [project.optional-dependencies]

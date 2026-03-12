@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.3.0] - 2026-03-12
+### Added
+- Dynamic token estimation based on image complexity (#15)
+- Complexity scorer using text ratio, entropy, edge density, color std
+- Token usage vs budget logging for calibration (#15)
+- Dynamic token toggle checkbox in Gradio chat UI
+- Sonnet 4.6 application inference profile for image enhancer
+- Dynamic token estimation docs in README and Lambda Analyzers docs
+
+### Changed
+- Container stack adjustments
+- 21 Lambda handlers updated to support dynamic tokens env var from request payload
+
+### Dependencies
+- Bumped pypdf from 6.7.1 to 6.7.5
+- Bumped gradio from 6.3.0 to 6.7.0
+
 ## [2.2.0] - 2026-02-24
 ### Added
 - Cell grid resolver v3 for remediation analyzer with improved table detection
