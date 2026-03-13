@@ -16,6 +16,7 @@ from typing import Any, Optional
 from pdf_accessibility_tagger import PDFAccessibilityTagger, AccessibilityReport
 from cell_grid_resolver import resolve_elements_via_grid
 from diagnostic_visualizer import capture_page_diagnostics
+from pdf_syntax_repair import repair_pdf as syntax_repair_pdf, RepairResult
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -154,6 +155,29 @@ def process_pdf(
     from PIL import Image
 
     work_dir = Path(tempfile.mkdtemp(prefix="pdf_remediation_"))
+
+    # --- Syntax repair pass (fix corrupt xref, streams, etc.) ---
+    repair_result: RepairResult | None = None
+    if os.environ.get("ENABLE_SYNTAX_REPAIR", "true").lower() == "true":
+        try:
+            repair_result = syntax_repair_pdf(pdf_path, work_dir=work_dir)
+            if repair_result.any_repair_applied:
+                logger.info(
+                    "Syntax repair applied: %s → %s (%+d bytes)",
+                    pdf_path,
+                    repair_result.output_path,
+                    repair_result.size_delta,
+                )
+                pdf_path = repair_result.output_path
+            else:
+                logger.info("Syntax repair: no changes needed")
+        except Exception as e:
+            logger.error("Syntax repair failed: %s", e, exc_info=True)
+            raise RuntimeError(
+                f"PDF syntax repair failed and the file could not be made processable. "
+                f"Accessibility tagging was not attempted. "
+                f"Repair error: {e}"
+            ) from e
 
     doc = fitz.open(pdf_path)
     num_pages = len(doc)
@@ -395,6 +419,13 @@ def process_pdf(
         "pages_processed": num_pages,
         "analysis": all_results,
         "correlation_used": bool(correlation_pages),
+        "syntax_repair": {
+            "applied": repair_result.any_repair_applied if repair_result else False,
+            "pass1_ok": repair_result.pass1_ok if repair_result else False,
+            "pass2_ok": repair_result.pass2_ok if repair_result else False,
+            "size_delta": repair_result.size_delta if repair_result else 0,
+            "logs": repair_result.logs if repair_result else [],
+        },
         "accessibility_report": report.to_dict(),
     }
 
