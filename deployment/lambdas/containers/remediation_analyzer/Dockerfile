@@ -16,6 +16,7 @@ COPY pdf_accessibility_auditor.py ${LAMBDA_TASK_ROOT}/
 COPY pdf_accessibility_tagger.py ${LAMBDA_TASK_ROOT}/
 COPY cell_grid_resolver.py ${LAMBDA_TASK_ROOT}/
 COPY diagnostic_visualizer.py ${LAMBDA_TASK_ROOT}/
+COPY pdf_syntax_repair.py ${LAMBDA_TASK_ROOT}/
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 
 # Set the Lambda handler
