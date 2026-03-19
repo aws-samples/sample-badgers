@@ -179,8 +179,12 @@ def add_cell_grid_overlay(
 
 # Sub-position offsets within a cell (0.0 = start edge, 1.0 = end edge)
 _SUB_POS = {
-    "left": 0.0, "center": 0.5, "right": 1.0,
-    "top": 0.0, "middle": 0.5, "bottom": 1.0,
+    "left": 0.0,
+    "center": 0.5,
+    "right": 1.0,
+    "top": 0.0,
+    "middle": 0.5,
+    "bottom": 1.0,
 }
 
 
@@ -531,8 +535,13 @@ def resolve_elements_via_grid(
 
     # ── Pass 1: Coarse grid on full page ──
     resolved = _grid_resolve_pass(
-        img, unresolved_elements, analyzer, _aws_profile,
-        cols, rows, resolved_anchors,
+        img,
+        unresolved_elements,
+        analyzer,
+        _aws_profile,
+        cols,
+        rows,
+        resolved_anchors,
     )
 
     # ── Pass 2: Hierarchical refinement for low-confidence results ──
@@ -554,8 +563,13 @@ def resolve_elements_via_grid(
             len(refine_candidates),
         )
         refined = _hierarchical_refine(
-            img, image_data, refine_candidates, analyzer, _aws_profile,
-            cols, rows,
+            img,
+            image_data,
+            refine_candidates,
+            analyzer,
+            _aws_profile,
+            cols,
+            rows,
         )
         keep.extend(refined)
     elif refine_candidates:
@@ -639,9 +653,7 @@ def _grid_resolve_pass(
     element_descriptions = "\n".join(element_lines)
 
     # Build spatial anchor context from already-resolved elements
-    anchor_context = _build_anchor_context(
-        resolved_anchors or [], cols, rows
-    )
+    anchor_context = _build_anchor_context(resolved_anchors or [], cols, rows)
 
     # Build prompt
     try:
@@ -685,10 +697,12 @@ def _grid_resolve_pass(
             "corners. Return ONLY a JSON array."
         )
 
+        resolver_max_tokens = analyzer.global_settings.get("resolver_max_tokens", 4000)
+
         payload = bedrock_client.create_anthropic_payload(
             system_prompt=system_prompt,
             messages=messages,
-            max_tokens=4000,
+            max_tokens=resolver_max_tokens,
             temperature=0.1,
         )
 
@@ -900,16 +914,27 @@ def _hierarchical_refine(
     logger.info(
         "Hierarchical refinement: crop=(%d,%d)-(%d,%d) %dx%d, "
         "fine grid %dx%d, cell=%dx%dpx (%.0f× finer vertical)",
-        crop_x0, crop_y0, crop_x1, crop_y1, crop_w, crop_h,
-        _REFINE_COLS, _REFINE_ROWS,
-        int(fine_cw), int(fine_ch),
+        crop_x0,
+        crop_y0,
+        crop_x1,
+        crop_y1,
+        crop_w,
+        crop_h,
+        _REFINE_COLS,
+        _REFINE_ROWS,
+        int(fine_cw),
+        int(fine_ch),
         coarse_ch / fine_ch if fine_ch > 0 else 0,
     )
 
     # Run pass 2 on the crop
     refined_local = _grid_resolve_pass(
-        crop_img, candidates, analyzer, aws_profile,
-        _REFINE_COLS, _REFINE_ROWS,
+        crop_img,
+        candidates,
+        analyzer,
+        aws_profile,
+        _REFINE_COLS,
+        _REFINE_ROWS,
         resolved_anchors=None,  # No anchors in crop context
     )
 
@@ -945,7 +970,9 @@ def _hierarchical_refine(
         }
 
         elem["bbox"] = full_pdf_bbox
-        elem["source"] = elem.get("source", "").replace("cell_grid_", "cell_grid_refined_")
+        elem["source"] = elem.get("source", "").replace(
+            "cell_grid_", "cell_grid_refined_"
+        )
         refined.append(elem)
 
     return refined
