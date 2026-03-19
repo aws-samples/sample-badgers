@@ -73,7 +73,7 @@
         "regulatory_filings": {
             "name": "Regulatory Filings",
             "description": "SEC filings, compliance documents, government forms",
-            "recommended_model": "Amazon Nova Premier",
+            "recommended_model": "Nova Premier",
             "words_per_page": 550,
             "pages_per_document": 50,
             "tokens_per_image": 1600,
@@ -81,6 +81,16 @@
         }
     },
     "models": {
+        "us.anthropic.claude-opus-4-6-v1": {
+            "name": "Claude Opus 4.6",
+            "input_cost_per_million": 5.00,
+            "output_cost_per_million": 25.00
+        },
+        "global.anthropic.claude-sonnet-4-6-v1:0": {
+            "name": "Claude Sonnet 4.6",
+            "input_cost_per_million": 3.00,
+            "output_cost_per_million": 15.00
+        },
         "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
             "name": "Claude Sonnet 4.5",
             "input_cost_per_million": 3.00,
@@ -91,10 +101,147 @@
             "input_cost_per_million": 1.00,
             "output_cost_per_million": 5.00
         },
+        "us.amazon.nova-micro-v1:0": {
+            "name": "Nova Micro",
+            "input_cost_per_million": 0.035,
+            "output_cost_per_million": 0.14
+        },
+        "us.amazon.nova-lite-v1:0": {
+            "name": "Nova Lite",
+            "input_cost_per_million": 0.06,
+            "output_cost_per_million": 0.24
+        },
+        "us.amazon.nova-pro-v1:0": {
+            "name": "Nova Pro",
+            "input_cost_per_million": 0.80,
+            "output_cost_per_million": 3.20
+        },
         "us.amazon.nova-premier-v1:0": {
-            "name": "Amazon Nova Premier",
+            "name": "Nova Premier",
             "input_cost_per_million": 2.50,
             "output_cost_per_million": 12.50
+        },
+        "us.amazon.nova-2-lite-v1:0": {
+            "name": "Nova 2 Lite",
+            "input_cost_per_million": 0.30,
+            "output_cost_per_million": 2.50
+        }
+    },
+    "analyzer_defaults": {
+        "charts_analyzer": {
+            "prompt_tokens": 6372,
+            "expected_output_tokens": 4000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "classify_pdf_content": {
+            "prompt_tokens": 3656,
+            "expected_output_tokens": 500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "code_block_analyzer": {
+            "prompt_tokens": 3889,
+            "expected_output_tokens": 3000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "correlation_analyzer": {
+            "prompt_tokens": 2308,
+            "expected_output_tokens": 20000,
+            "default_model": "Claude Opus 4.6"
+        },
+        "decision_tree_analyzer": {
+            "prompt_tokens": 6762,
+            "expected_output_tokens": 2500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "diagram_analyzer": {
+            "prompt_tokens": 6387,
+            "expected_output_tokens": 3500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "editorial_analyzer": {
+            "prompt_tokens": 950,
+            "expected_output_tokens": 3000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "edu_transcript_analyzer": {
+            "prompt_tokens": 6266,
+            "expected_output_tokens": 5000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "elements_analyzer": {
+            "prompt_tokens": 4296,
+            "expected_output_tokens": 2500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "full_text_analyzer": {
+            "prompt_tokens": 4820,
+            "expected_output_tokens": 6000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "general_visual_analysis": {
+            "prompt_tokens": 3753,
+            "expected_output_tokens": 4000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "handwriting_analyzer": {
+            "prompt_tokens": 6935,
+            "expected_output_tokens": 3000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "keyword_topic_analyzer": {
+            "prompt_tokens": 6332,
+            "expected_output_tokens": 1500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "layout_analyzer": {
+            "prompt_tokens": 3777,
+            "expected_output_tokens": 1500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "metadata_generic_analyzer": {
+            "prompt_tokens": 3208,
+            "expected_output_tokens": 1500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "metadata_mads_analyzer": {
+            "prompt_tokens": 8461,
+            "expected_output_tokens": 2000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "metadata_mods_analyzer": {
+            "prompt_tokens": 5735,
+            "expected_output_tokens": 2000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "page_analyzer": {
+            "prompt_tokens": 1837,
+            "expected_output_tokens": 1000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "pdf_processor": {
+            "prompt_tokens": 7120,
+            "expected_output_tokens": 500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "remediation_analyzer": {
+            "prompt_tokens": 6315,
+            "expected_output_tokens": 6000,
+            "default_model": "Claude Opus 4.6"
+        },
+        "robust_elements_analyzer": {
+            "prompt_tokens": 3014,
+            "expected_output_tokens": 3500,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "table_analyzer": {
+            "prompt_tokens": 6833,
+            "expected_output_tokens": 10000,
+            "default_model": "Claude Sonnet 4.5"
+        },
+        "war_map_analyzer": {
+            "prompt_tokens": 8631,
+            "expected_output_tokens": 6000,
+            "default_model": "Claude Opus 4.6"
         }
     }
 }
