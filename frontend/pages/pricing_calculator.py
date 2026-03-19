@@ -50,72 +50,121 @@ def load_config() -> dict:
 
 
 def load_analyzer_manifests() -> dict:
-    """Load all analyzer manifests from S3 and calculate prompt token counts."""
+    """Load all analyzer manifests from S3 and calculate prompt token counts.
+    Falls back to analyzer_defaults from config when S3 is unavailable."""
     analyzers = {}
 
     config_bucket = os.getenv("S3_CONFIG_BUCKET")
-    if not config_bucket:
-        return analyzers
+    if config_bucket:
+        aws_profile = os.getenv("AWS_PROFILE")
+        session = (
+            boto3.Session(profile_name=aws_profile) if aws_profile else boto3.Session()
+        )
+        s3 = session.client("s3")
 
-    aws_profile = os.getenv("AWS_PROFILE")
-    session = (
-        boto3.Session(profile_name=aws_profile) if aws_profile else boto3.Session()
-    )
-    s3 = session.client("s3")
-
-    try:
-        # List all manifest files
-        response = s3.list_objects_v2(Bucket=config_bucket, Prefix="manifests/")
-        if "Contents" not in response:
-            return analyzers
-
-        for obj in response["Contents"]:
-            key = obj["Key"]
-            if not key.endswith(".json"):
-                continue
-
-            try:
-                manifest_response = s3.get_object(Bucket=config_bucket, Key=key)
-                manifest = json.loads(manifest_response["Body"].read().decode("utf-8"))
-
-                # Skip non-analyzer manifests
-                if "analyzer" not in manifest:
-                    continue
-
-                analyzer = manifest["analyzer"]
-                name = analyzer.get("name", Path(key).stem)
-
-                # Calculate prompt tokens from actual prompt files in S3
-                prompt_tokens = 0
-                prompt_files = analyzer.get("prompt_files", [])
-
-                for pf in prompt_files:
-                    prompt_key = f"prompts/{name}/{pf}"
-                    try:
-                        prompt_response = s3.get_object(
-                            Bucket=config_bucket, Key=prompt_key
-                        )
-                        content = prompt_response["Body"].read().decode("utf-8")
-                        prompt_tokens += int(len(content) / CHARS_PER_TOKEN)
-                    except s3.exceptions.NoSuchKey:
+        try:
+            response = s3.list_objects_v2(Bucket=config_bucket, Prefix="manifests/")
+            if "Contents" in response:
+                for obj in response["Contents"]:
+                    key = obj["Key"]
+                    if not key.endswith(".json"):
                         continue
 
-                analyzers[name] = {
-                    "name": name,
-                    "description": analyzer.get("description", ""),
-                    "analysis_text": analyzer.get("analysis_text", name),
-                    "prompt_tokens": prompt_tokens,
-                    "expected_output_tokens": analyzer.get(
-                        "expected_output_tokens", 2000
-                    ),
-                    "prompt_files": prompt_files,
-                }
-            except (json.JSONDecodeError, KeyError):
-                continue
-    except Exception:
-        return analyzers
+                    try:
+                        manifest_response = s3.get_object(Bucket=config_bucket, Key=key)
+                        manifest = json.loads(
+                            manifest_response["Body"].read().decode("utf-8")
+                        )
+
+                        if "analyzer" not in manifest:
+                            continue
+
+                        analyzer = manifest["analyzer"]
+                        name = analyzer.get("name", Path(key).stem)
+
+                        prompt_tokens = 0
+                        prompt_files = analyzer.get("prompt_files", [])
+
+                        for pf in prompt_files:
+                            prompt_key = f"prompts/{name}/{pf}"
+                            try:
+                                prompt_response = s3.get_object(
+                                    Bucket=config_bucket, Key=prompt_key
+                                )
+                                content = prompt_response["Body"].read().decode("utf-8")
+                                prompt_tokens += int(len(content) / CHARS_PER_TOKEN)
+                            except s3.exceptions.NoSuchKey:
+                                continue
+
+                        # Resolve default model from manifest model_selections
+                        default_model = "Claude Sonnet 4.5"
+                        model_sel = analyzer.get("model_selections", {})
+                        primary = model_sel.get("primary")
+                        if primary:
+                            model_id = (
+                                primary.get("model_id")
+                                if isinstance(primary, dict)
+                                else primary
+                            )
+                            if model_id:
+                                default_model = _resolve_model_display_name(model_id)
+
+                        analyzers[name] = {
+                            "name": name,
+                            "description": analyzer.get("description", ""),
+                            "analysis_text": analyzer.get("analysis_text", name),
+                            "prompt_tokens": prompt_tokens,
+                            "expected_output_tokens": analyzer.get(
+                                "expected_output_tokens", 2000
+                            ),
+                            "prompt_files": prompt_files,
+                            "default_model": default_model,
+                        }
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+        except Exception:
+            pass
+
+    # Fall back to config defaults for any analyzers not loaded from S3
+    if not analyzers:
+        config = load_config()
+        for name, info in config.get("analyzer_defaults", {}).items():
+            analyzers[name] = {
+                "name": name,
+                "description": "",
+                "analysis_text": name,
+                "prompt_tokens": info["prompt_tokens"],
+                "expected_output_tokens": info["expected_output_tokens"],
+                "prompt_files": [],
+                "default_model": info.get("default_model", "Claude Sonnet 4.5"),
+            }
 
     return analyzers
+
+
+def _resolve_model_display_name(model_id: str) -> str:
+    """Map a Bedrock model ID to its display name from config."""
+    config = load_config()
+    for mid, info in config.get("models", {}).items():
+        if mid == model_id or model_id in mid or mid in model_id:
+            return info["name"]
+    # Fallback heuristics
+    ml = model_id.lower()
+    if "opus" in ml and "4-6" in ml:
+        return "Claude Opus 4.6"
+    if "sonnet" in ml and "4-5" in ml:
+        return "Claude Sonnet 4.5"
+    if "haiku" in ml:
+        return "Claude Haiku 4.5"
+    if "nova-premier" in ml:
+        return "Nova Premier"
+    if "nova-pro" in ml:
+        return "Nova Pro"
+    if "nova-lite" in ml:
+        return "Nova Lite"
+    if "nova-micro" in ml:
+        return "Nova Micro"
+    return "Claude Sonnet 4.5"
 
 
 def get_model_choices(config: dict) -> list:
@@ -189,11 +238,11 @@ def calculate_costs(
 def calculate_advanced_costs(
     selected_analyzers: list,
     num_pages: int,
-    input_cost_m: float,
-    output_cost_m: float,
+    model_overrides: dict,
+    config: dict,
     analyzers_data: dict,
 ) -> dict:
-    """Calculate costs based on selected analyzers and actual prompt sizes."""
+    """Calculate costs based on selected analyzers with per-analyzer model pricing."""
     if not selected_analyzers:
         return {
             "total_input_tokens": 0,
@@ -205,48 +254,60 @@ def calculate_advanced_costs(
         }
 
     breakdown = []
-    total_input = 0
-    total_output = 0
+    total_input_cost = 0.0
+    total_output_cost = 0.0
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     for analyzer_name in selected_analyzers:
         if analyzer_name not in analyzers_data:
             continue
 
         analyzer = analyzers_data[analyzer_name]
-        # Per page: prompt_tokens + fixed_image_tokens (input) + expected_output_tokens (output)
         prompt_tokens = analyzer["prompt_tokens"]
         output_tokens = analyzer["expected_output_tokens"]
 
-        # Input = prompt + image tokens per page
         input_per_page = prompt_tokens + FIXED_IMAGE_TOKENS
         output_per_page = output_tokens
 
         analyzer_input = input_per_page * num_pages
         analyzer_output = output_per_page * num_pages
 
-        total_input += analyzer_input
-        total_output += analyzer_output
+        # Get per-analyzer model pricing
+        model_name = model_overrides.get(
+            analyzer_name, analyzer.get("default_model", "Claude Sonnet 4.5")
+        )
+        inp_m, out_m = get_model_pricing(config, model_name)
+
+        a_input_cost = (analyzer_input / 1_000_000) * inp_m
+        a_output_cost = (analyzer_output / 1_000_000) * out_m
+
+        total_input_tokens += analyzer_input
+        total_output_tokens += analyzer_output
+        total_input_cost += a_input_cost
+        total_output_cost += a_output_cost
 
         breakdown.append(
             {
                 "name": analyzer_name,
+                "model": model_name,
                 "prompt_tokens": prompt_tokens,
                 "image_tokens": FIXED_IMAGE_TOKENS,
                 "output_tokens": output_tokens,
                 "total_input": analyzer_input,
                 "total_output": analyzer_output,
+                "input_cost": round(a_input_cost, 6),
+                "output_cost": round(a_output_cost, 6),
+                "total_cost": round(a_input_cost + a_output_cost, 6),
             }
         )
 
-    input_cost = (total_input / 1_000_000) * input_cost_m
-    output_cost = (total_output / 1_000_000) * output_cost_m
-
     return {
-        "total_input_tokens": total_input,
-        "total_output_tokens": total_output,
-        "input_cost": round(input_cost, 4),
-        "output_cost": round(output_cost, 4),
-        "total_cost": round(input_cost + output_cost, 4),
+        "total_input_tokens": total_input_tokens,
+        "total_output_tokens": total_output_tokens,
+        "input_cost": round(total_input_cost, 4),
+        "output_cost": round(total_output_cost, 4),
+        "total_cost": round(total_input_cost + total_output_cost, 4),
         "breakdown": breakdown,
     }
 
@@ -427,7 +488,7 @@ def create_calculator():
             with gr.TabItem("🔬 Advanced Calculator"):
                 gr.Markdown(
                     "Calculate costs based on actual deployed analyzer prompts. "
-                    "Select which analyzers to run per page and see precise token counts."
+                    "Toggle analyzers on/off and set per-analyzer models, matching the Excel pricing sheet."
                 )
                 gr.Markdown(
                     f"*Image tokens fixed at {FIXED_IMAGE_TOKENS} (all images normalized to max 2048px)*"
@@ -435,30 +496,81 @@ def create_calculator():
 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        gr.Markdown("### 🤖 Model Selection")
-                        adv_model_dropdown = gr.Dropdown(
-                            choices=model_choices,
-                            value=model_choices[0],
-                            label="Select Model",
-                        )
                         gr.Markdown("### 📄 Pages to Process")
                         adv_num_pages = gr.Number(
                             label="Number of Pages", value=100, precision=0
                         )
-
-                    with gr.Column(scale=2):
-                        gr.Markdown("### 🔧 Select Analyzers")
-                        gr.Markdown("*Each selected analyzer runs once per page*")
-                        adv_analyzer_select = gr.CheckboxGroup(
-                            choices=analyzer_choices,
-                            value=["full_text_analyzer"],
-                            label="Analyzers to Include",
+                        adv_num_docs = gr.Number(
+                            label="Documents (for per-doc cost)",
+                            value=1,
+                            precision=0,
+                            info="Pages ÷ avg pages/doc for per-document cost",
                         )
+
+                gr.Markdown("---")
+                gr.Markdown("### 🔧 Analyzer Configuration")
+                gr.Markdown(
+                    "*Toggle Include to add/remove analyzers. "
+                    "Change Model to override the default for each analyzer.*"
+                )
+
+                # Build per-analyzer rows with include toggle + model dropdown
+                analyzer_include_checks = {}
+                analyzer_model_dropdowns = {}
+
+                # Default included analyzers (matching Excel "Yes" selections)
+                default_included = {
+                    "charts_analyzer",
+                    "classify_pdf_content",
+                    "correlation_analyzer",
+                    "diagram_analyzer",
+                    "elements_analyzer",
+                    "general_visual_analysis",
+                    "handwriting_analyzer",
+                    "keyword_topic_analyzer",
+                    "pdf_processor",
+                    "robust_elements_analyzer",
+                    "table_analyzer",
+                }
+
+                # Table header
+                with gr.Row():
+                    gr.Markdown("**Include?**", elem_classes=["col-header"])
+                    gr.Markdown("**Analyzer**", elem_classes=["col-header"])
+                    gr.Markdown("**Model**", elem_classes=["col-header"])
+                    gr.Markdown("**Prompt Tokens**", elem_classes=["col-header"])
+                    gr.Markdown("**Max Output Tokens**", elem_classes=["col-header"])
+
+                for aname in analyzer_choices:
+                    adata = analyzers_data.get(aname, {})
+                    default_model = adata.get("default_model", "Claude Sonnet 4.5")
+                    prompt_tok = adata.get("prompt_tokens", 0)
+                    output_tok = adata.get("expected_output_tokens", 0)
+
+                    with gr.Row():
+                        chk = gr.Checkbox(
+                            value=aname in default_included,
+                            label="",
+                            show_label=False,
+                            scale=1,
+                        )
+                        gr.Markdown(f"`{aname}`", scale=2)
+                        mdl = gr.Dropdown(
+                            choices=model_choices,
+                            value=default_model,
+                            label="",
+                            show_label=False,
+                            scale=2,
+                        )
+                        gr.Markdown(f"{prompt_tok:,}", scale=1)
+                        gr.Markdown(f"{output_tok:,}", scale=1)
+
+                    analyzer_include_checks[aname] = chk
+                    analyzer_model_dropdowns[aname] = mdl
 
                 gr.Markdown("---")
 
                 with gr.Row():
-
                     with gr.Column(
                         scale=1, elem_classes=["row-padding", "background-blue"]
                     ):
@@ -481,6 +593,9 @@ def create_calculator():
                             adv_total_cost = gr.Number(
                                 label="Total Cost ($)", interactive=False, precision=4
                             )
+                        adv_analyzers_selected = gr.Number(
+                            label="Analyzers Selected", interactive=False, precision=0
+                        )
                         with gr.Row():
                             adv_calculate_btn = gr.Button(
                                 "🔢 Calculate Cost", variant="primary", size="lg"
@@ -493,13 +608,24 @@ def create_calculator():
                 adv_breakdown = gr.Dataframe(
                     headers=[
                         "Analyzer",
+                        "Model",
                         "Prompt Tokens",
                         "Image Tokens",
                         "Output Tokens",
-                        "Total Input",
-                        "Total Output",
+                        "Input Cost ($)",
+                        "Output Cost ($)",
+                        "Total Cost ($)",
                     ],
-                    datatype=["str", "number", "number", "number", "number", "number"],
+                    datatype=[
+                        "str",
+                        "str",
+                        "number",
+                        "number",
+                        "number",
+                        "number",
+                        "number",
+                        "number",
+                    ],
                     interactive=False,
                 )
                 adv_summary = gr.Markdown("")
@@ -565,40 +691,56 @@ def create_calculator():
                 summary,
             ]
 
-        def run_advanced_calculation(selected_analyzers, num_pages, model_name):
+        def run_advanced_calculation(*args):
+            # args = [num_pages, num_docs, check1, model1, check2, model2, ...]
+            num_pages = int(args[0])
+            num_docs = max(int(args[1]), 1)
+
             cfg = load_config()
-            inp_m, out_m = get_model_pricing(cfg, model_name)
+
+            selected = []
+            model_overrides = {}
+            idx = 2
+            for aname in analyzer_choices:
+                included = args[idx]
+                model_name = args[idx + 1]
+                if included:
+                    selected.append(aname)
+                    model_overrides[aname] = model_name
+                idx += 2
 
             costs = calculate_advanced_costs(
-                selected_analyzers,
-                int(num_pages),
-                inp_m,
-                out_m,
+                selected,
+                num_pages,
+                model_overrides,
+                cfg,
                 analyzers_data,
             )
 
-            # Build breakdown table
             breakdown_data = [
                 [
                     b["name"],
+                    b["model"],
                     b["prompt_tokens"],
                     b["image_tokens"],
                     b["output_tokens"],
-                    b["total_input"],
-                    b["total_output"],
+                    b["input_cost"],
+                    b["output_cost"],
+                    b["total_cost"],
                 ]
                 for b in costs["breakdown"]
             ]
 
-            cost_per_page = (
-                costs["total_cost"] / int(num_pages) if int(num_pages) > 0 else 0
-            )
+            cost_per_page = costs["total_cost"] / num_pages if num_pages > 0 else 0
+            cost_per_doc = costs["total_cost"] / num_docs if num_docs > 0 else 0
             total_tokens = costs["total_input_tokens"] + costs["total_output_tokens"]
 
             summary = (
-                f"**Summary:** {len(selected_analyzers)} analyzers × {int(num_pages):,} pages = "
+                f"**Summary:** {len(selected)} analyzers × {num_pages:,} pages = "
                 f"{total_tokens:,} total tokens. "
-                f"**Cost per page:** ${cost_per_page:.6f}"
+                f"**Cost per page:** ${cost_per_page:.6f} | "
+                f"**Cost per document:** ${cost_per_doc:.4f} | "
+                f"**Total:** ${costs['total_cost']:.4f}"
             )
 
             return [
@@ -607,6 +749,7 @@ def create_calculator():
                 costs["input_cost"],
                 costs["output_cost"],
                 costs["total_cost"],
+                len(selected),
                 breakdown_data,
                 summary,
             ]
@@ -719,42 +862,63 @@ def create_calculator():
         # Wire advanced calculator events
         def reset_advanced():
             """Reset advanced calculator to defaults."""
-            return [
-                ["full_text_analyzer"],  # default analyzer selection
+            results = [
                 100,  # num_pages
-                0,  # total_input
-                0,  # total_output
-                0,  # input_cost
-                0,  # output_cost
-                0,  # total_cost
-                [],  # breakdown
-                "",  # summary
+                1,  # num_docs
             ]
+            for aname in analyzer_choices:
+                adata = analyzers_data.get(aname, {})
+                results.append(aname in default_included)  # checkbox
+                results.append(adata.get("default_model", "Claude Sonnet 4.5"))  # model
+            results.extend(
+                [
+                    0,  # total_input
+                    0,  # total_output
+                    0,  # input_cost
+                    0,  # output_cost
+                    0,  # total_cost
+                    0,  # analyzers_selected
+                    [],  # breakdown
+                    "",  # summary
+                ]
+            )
+            return results
 
-        reset_adv_btn.click(
-            reset_advanced,
-            outputs=[
-                adv_analyzer_select,
-                adv_num_pages,
+        adv_reset_outputs = [adv_num_pages, adv_num_docs]
+        for aname in analyzer_choices:
+            adv_reset_outputs.append(analyzer_include_checks[aname])
+            adv_reset_outputs.append(analyzer_model_dropdowns[aname])
+        adv_reset_outputs.extend(
+            [
                 adv_total_input,
                 adv_total_output,
                 adv_input_cost,
                 adv_output_cost,
                 adv_total_cost,
+                adv_analyzers_selected,
                 adv_breakdown,
                 adv_summary,
-            ],
+            ]
         )
+
+        reset_adv_btn.click(reset_advanced, outputs=adv_reset_outputs)
+
+        # Build inputs list for advanced calculate: [num_pages, num_docs, chk1, mdl1, chk2, mdl2, ...]
+        adv_calc_inputs = [adv_num_pages, adv_num_docs]
+        for aname in analyzer_choices:
+            adv_calc_inputs.append(analyzer_include_checks[aname])
+            adv_calc_inputs.append(analyzer_model_dropdowns[aname])
 
         adv_calculate_btn.click(
             run_advanced_calculation,
-            inputs=[adv_analyzer_select, adv_num_pages, adv_model_dropdown],
+            inputs=adv_calc_inputs,
             outputs=[
                 adv_total_input,
                 adv_total_output,
                 adv_input_cost,
                 adv_output_cost,
                 adv_total_cost,
+                adv_analyzers_selected,
                 adv_breakdown,
                 adv_summary,
             ],
