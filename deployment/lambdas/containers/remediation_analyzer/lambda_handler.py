@@ -625,10 +625,12 @@ def _resolve_figure_bboxes(
             "model_id", "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
         )
 
+        resolver_max_tokens = analyzer.global_settings.get("resolver_max_tokens", 4000)
+
         payload = bedrock_client.create_anthropic_payload(
             system_prompt=system_prompt,
             messages=messages,
-            max_tokens=4000,
+            max_tokens=resolver_max_tokens,
             temperature=0.1,
         )
 
@@ -733,6 +735,7 @@ def _initialize_analyzer(aws_profile: Optional[str] = None):
     analyzer.config = config
     analyzer.global_settings = {
         "max_tokens": int(os.environ.get("MAX_TOKENS", "8000")),
+        "resolver_max_tokens": int(os.environ.get("RESOLVER_MAX_TOKENS", "4000")),
         "temperature": float(os.environ.get("TEMPERATURE", "0.1")),
         "max_image_size": int(os.environ.get("MAX_IMAGE_SIZE", "20971520")),
         "max_dimension": int(os.environ.get("MAX_DIMENSION", "2048")),
