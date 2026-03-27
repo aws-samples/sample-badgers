@@ -1,5 +1,9 @@
 #!/bin/bash
 # Build the image enhancement Lambda layer using Docker
+# NOTE: This layer is currently UNUSED. The active enhancement path is the
+# container-based agentic enhancer at lambdas/containers/image_enhancer/.
+# The enhancement_eligible_functions list in lambda_stack.py is empty.
+# This script is retained for potential future use with non-container Lambdas.
 
 set -e
 
@@ -40,34 +44,10 @@ docker cp "$CONTAINER_ID:/opt/python/." enhancement_build/layer/python/
 docker rm "$CONTAINER_ID"
 
 # Copy enhancement modules
-echo "📋 Copying enhancement modules..."
-mkdir -p enhancement_build/layer/python/enhancement
-cp ../badgers-foundation/enhancement/historical_document_enhancer.py enhancement_build/layer/python/enhancement/
-
-# Create __init__.py for the enhancement package
-cat > enhancement_build/layer/python/enhancement/__init__.py << 'INITEOF'
-"""Image enhancement module for historical/degraded documents."""
-
-from .historical_document_enhancer import (
-    HistoricalDocumentEnhancer,
-    DocumentType,
-    EnhancementLevel,
-    EnhancementConfig,
-    EnhancementResult,
-    enhance_document,
-    prepare_for_vision_llm,
-)
-
-__all__ = [
-    "HistoricalDocumentEnhancer",
-    "DocumentType",
-    "EnhancementLevel",
-    "EnhancementConfig",
-    "EnhancementResult",
-    "enhance_document",
-    "prepare_for_vision_llm",
-]
-INITEOF
+# NOTE: The historical_document_enhancer module is no longer bundled in this layer.
+# Enhancement logic now runs in the container-based agentic enhancer
+# (lambdas/containers/image_enhancer/) which has its own dependencies.
+# This layer only provides OpenCV/numpy/pillow for any Lambda that needs them.
 
 # Create layer info file
 echo "📝 Creating layer info..."
@@ -78,13 +58,13 @@ Python: 3.12
 Architecture: x86_64
 
 Contents:
-- enhancement/ (historical document enhancer)
 - cv2/ (OpenCV headless ~45 MB)
 - numpy/ (~30 MB)
 - PIL/ (Pillow)
 
-Usage:
-  from enhancement import prepare_for_vision_llm, HistoricalDocumentEnhancer
+Note: Enhancement logic runs in the container-based agentic enhancer
+(lambdas/containers/image_enhancer/). This layer only provides shared
+image processing dependencies for any Lambda that needs them.
 
 Version: $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 EOF

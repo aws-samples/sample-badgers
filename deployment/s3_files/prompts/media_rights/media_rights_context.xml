@@ -1,0 +1,93 @@
+<!-- Provides context and guidelines for analyzing media rights contracts -->
+<context>
+    <item>You will be provided with images. The initial images (if any) are examples and should NEVER be analyzed under any circumstances.</item>
+    <item>You will analyze ONLY the final image provided, which will be clearly indicated as the target for analysis.</item>
+    <item>In this final image, search for media rights contract content including licensing terms, financial provisions, rights grants, and party obligations.</item>
+    <item>Your task is to perform exhaustive extraction of ALL contractual provisions, terms, and conditions present in the document.</item>
+
+    <contract_elements_to_identify>
+        <category name="parties_and_recitals">
+            <element>Contracting parties and their legal designations</element>
+            <element>Party roles (licensor/licensee, producer/performer, publisher/producer, owner/distributor, platform/creator)</element>
+            <element>Organizational type and jurisdiction of formation</element>
+            <element>Recitals establishing purpose and background</element>
+            <element>Effective date and execution details</element>
+        </category>
+
+        <category name="rights_grants">
+            <element>Scope of license (exclusive vs. non-exclusive)</element>
+            <element>Specific rights granted (reproduce, distribute, perform, display, make available, synchronize)</element>
+            <element>Licensed media and platforms (theatrical, broadcast, SVOD, AVOD, TVOD, FAST, digital, mobile)</element>
+            <element>Territory and geographic restrictions</element>
+            <element>Sublicensing and assignment rights</element>
+            <element>Reservation of rights clauses</element>
+            <element>Holdback and exclusivity provisions</element>
+            <element>AI and digital likeness rights</element>
+            <element>Merchandising rights</element>
+            <element>Promotional use allowances</element>
+        </category>
+
+        <category name="financial_terms">
+            <element>Fixed fees and license fees</element>
+            <element>Revenue share percentages and calculation methodology</element>
+            <element>Minimum guarantees and advances</element>
+            <element>Residuals and royalty structures</element>
+            <element>Synchronization fees</element>
+            <element>Distribution fees and commission rates</element>
+            <element>Recoupable expenses and approved deductions</element>
+            <element>Per diem, travel, and production allowances</element>
+            <element>Payment schedules and thresholds</element>
+            <element>Most-favored-nations provisions</element>
+            <element>Contingent compensation and net profits definitions</element>
+        </category>
+
+        <category name="term_and_termination">
+            <element>Initial term and commencement date</element>
+            <element>Renewal options and notice requirements</element>
+            <element>Termination triggers (breach, force majeure, incapacity)</element>
+            <element>Cure periods</element>
+            <element>Post-termination obligations (cease exploitation, return materials)</element>
+            <element>Reversion of rights</element>
+            <element>Sell-off periods</element>
+            <element>Survival clauses</element>
+        </category>
+
+        <category name="obligations_and_restrictions">
+            <element>Delivery requirements and specifications</element>
+            <element>Content standards and community guidelines</element>
+            <element>Exclusivity periods and appearance restrictions</element>
+            <element>Morals clauses</element>
+            <element>Approval and consultation rights (marketing, key art, credit)</element>
+            <element>Reporting and accounting obligations</element>
+            <element>Audit rights</element>
+            <element>DMCA and takedown compliance</element>
+            <element>Content moderation provisions</element>
+            <element>Data portability requirements</element>
+        </category>
+
+        <category name="legal_protections">
+            <element>Representations and warranties</element>
+            <element>Indemnification obligations (mutual or one-sided)</element>
+            <element>Limitation of liability and damage caps</element>
+            <element>Insurance requirements</element>
+            <element>Governing law and jurisdiction</element>
+            <element>Dispute resolution (arbitration, mediation, litigation)</element>
+            <element>Force majeure provisions</element>
+            <element>Entire agreement and amendment clauses</element>
+        </category>
+
+        <category name="credit_and_attribution">
+            <element>Screen credit specifications (position, size, card type)</element>
+            <element>Paid advertising credit obligations</element>
+            <element>Music credit requirements in end titles</element>
+            <element>Credit remedy provisions</element>
+            <element>Name and likeness usage rights</element>
+        </category>
+    </contract_elements_to_identify>
+
+    <item>Extract ALL text visible in the contract including article numbers, section references, defined terms, and blank fill-in fields.</item>
+    <item>Pay special attention to defined terms (typically capitalized or in quotes) and track their definitions throughout the document.</item>
+    <item>Note references to exhibits, schedules, or attachments and their described contents.</item>
+    <item>Identify whether provisions are standard boilerplate or appear to be specifically negotiated terms.</item>
+    <item>When blank fields appear (e.g., $___, ___%), note them as unfilled terms requiring negotiation.</item>
+</context>

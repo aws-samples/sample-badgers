@@ -13,6 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import boto3
+from botocore.exceptions import ClientError
 from strands import Agent, tool
 from strands.models import BedrockModel
 
@@ -35,8 +36,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 # Use application inference profile ARN for cost tracking and cross-region routing
 # Falls back to system inference profile ID if not set
 VISION_MODEL = os.environ.get(
-    "CLAUDE_OPUS_46_PROFILE_ARN",
-    "global.anthropic.claude-opus-4-6-v1"
+    "CLAUDE_OPUS_46_PROFILE_ARN", "us.anthropic.claude-opus-4-6-v1"
 )
 MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "2"))
 MAX_IMAGE_DIMENSION = int(os.environ.get("MAX_IMAGE_DIMENSION", "4000"))
@@ -47,7 +47,11 @@ OUTPUT_QUALITY = int(os.environ.get("OUTPUT_QUALITY", "95"))
 # System Prompt
 # ============================================================================
 
-SYSTEM_PROMPT = f"""
+CONFIG_BUCKET = os.environ.get("CONFIG_BUCKET")
+ANALYZER_NAME = os.environ.get("ANALYZER_NAME", "image_enhancer")
+
+# Hardcoded fallback if S3 load fails
+_FALLBACK_SYSTEM_PROMPT = f"""
 You are an expert document image analyst. You enhance document images for
 downstream text extraction by a vision LLM.
 
@@ -74,15 +78,75 @@ Available operations: {', '.join(OPERATIONS.keys())}
 - Use region targeting if only part of the image has issues.
 - For brightness: 0.0=darken, 0.5=no change, 1.0=brighten.
 - Manuscripts need gentle treatment. Sheet music/diagrams: prefer contrast over sharpening.
+- For desaturate: use on tinted/colored backgrounds (blue security paper, yellowed pages).
+  0.0=full color, 1.0=fully grayscale. Often useful BEFORE threshold.
+- For threshold: converts to binary B&W. Effective for stripping watermarks and background
+  patterns. Intensity maps to cutoff (0.0=cutoff 80, keeps more; 1.0=cutoff 240, aggressive).
+  Returns intensity distribution analysis — use the percentile data to refine the cutoff.
+  Try desaturate first if the document has colored backgrounds.
 </operation_guidance>
+
+<watermark_remediation>
+When you detect a watermark (repeated text, institutional seals, colored security paper):
+
+Desaturate-then-Threshold Pipeline:
+1. Apply desaturate at intensity 1.0 — collapses color into brightness. Light-colored
+   watermarks (blue, grey) map to high grey values (180-220), dark text stays low (10-60).
+2. Apply threshold at ~0.3 intensity (cutoff ~128). Read the distribution analysis in the
+   operation result — look for the brightness gap between the dark text cluster (low
+   percentiles) and the light watermark cluster (high percentiles). The threshold cutoff
+   should sit in that gap.
+3. If the result clips text or leaves watermark remnants, reset and adjust the threshold
+   intensity. Lower = keeps more content, higher = more aggressive removal. The percentile
+   data tells you exactly where the populations sit.
+
+This works when there is a clear brightness gap between watermark and content. If the
+watermark is dark (dark red, black), the populations overlap and threshold cannot separate
+them cleanly — fall back to gentle contrast enhancement (0.2-0.4) and let the downstream
+vision LLM read through the watermark.
+</watermark_remediation>
 
 <rules>
 - ALWAYS call compare_with_original after enhance_image.
 - ALWAYS end by calling finish_enhancement.
 - Do NOT enhance images that are already clear and well-oriented.
 - If you reset, try a DIFFERENT approach — don't repeat what failed.
+- For watermarked documents, try the desaturate-then-threshold pipeline first.
+  If the watermark is too dark for clean separation, fall back to gentle contrast.
 </rules>
 """
+
+
+def _load_system_prompt() -> str:
+    """Load system prompt from S3, falling back to hardcoded default."""
+    if not CONFIG_BUCKET:
+        logger.info("No CONFIG_BUCKET set, using fallback system prompt")
+        return _FALLBACK_SYSTEM_PROMPT
+
+    try:
+        s3 = boto3.client("s3")
+        key = f"prompts/{ANALYZER_NAME}/system_prompt.xml"
+        logger.info("Loading system prompt from s3://%s/%s", CONFIG_BUCKET, key)
+        response = s3.get_object(Bucket=CONFIG_BUCKET, Key=key)
+        raw = response["Body"].read().decode("utf-8")
+
+        # Substitute runtime placeholders
+        prompt = raw.replace("{MAX_ITERATIONS}", str(MAX_ITERATIONS))
+        prompt = prompt.replace("{AVAILABLE_OPERATIONS}", ", ".join(OPERATIONS.keys()))
+
+        logger.info("Loaded system prompt from S3 (%d bytes)", len(prompt))
+        return prompt
+
+    except ClientError as e:
+        logger.warning("Failed to load system prompt from S3: %s. Using fallback.", e)
+        return _FALLBACK_SYSTEM_PROMPT
+    except Exception as e:
+        logger.warning("Unexpected error loading system prompt: %s. Using fallback.", e)
+        return _FALLBACK_SYSTEM_PROMPT
+
+
+# Loaded once at module level (cached across warm Lambda invocations)
+SYSTEM_PROMPT = _load_system_prompt()
 
 # ============================================================================
 # Tool Definitions
@@ -140,7 +204,7 @@ def create_tools(state: ImageState):
     @tool(
         name="enhance_image",
         description="Apply targeted image enhancement operations to improve document readability. Operations are applied sequentially.",
-        inputSchema=ENHANCE_INPUT_SCHEMA
+        inputSchema=ENHANCE_INPUT_SCHEMA,
     )
     def enhance_image(operations: list, reasoning: str) -> str:
         """Apply enhancement operations to the current image."""
@@ -148,12 +212,14 @@ def create_tools(state: ImageState):
         enhanced, op_log = execute_operations(state.current, operations)
         state.current = enhanced
 
-        return json.dumps({
-            "status": "success",
-            "operations_applied": len(op_log),
-            "reasoning": reasoning,
-            "note": "Call compare_with_original to evaluate the result.",
-        })
+        return json.dumps(
+            {
+                "status": "success",
+                "operations_applied": len(op_log),
+                "reasoning": reasoning,
+                "note": "Call compare_with_original to evaluate the result.",
+            }
+        )
 
     @tool
     def compare_with_original() -> str:
@@ -171,21 +237,25 @@ def create_tools(state: ImageState):
             if isinstance(orig_metrics[key], (int, float)):
                 deltas[key] = round(curr_metrics[key] - orig_metrics[key], 3)
 
-        state.record_iteration([], {"original": orig_metrics, "enhanced": curr_metrics, "deltas": deltas})
+        state.record_iteration(
+            [], {"original": orig_metrics, "enhanced": curr_metrics, "deltas": deltas}
+        )
 
-        return json.dumps({
-            "original_metrics": orig_metrics,
-            "enhanced_metrics": curr_metrics,
-            "deltas": deltas,
-            "iteration": state.iteration,
-            "note": (
-                "Positive contrast_std delta = more contrast. "
-                "Positive sharpness_laplacian delta = sharper. "
-                "If enhancement helped, call finish_enhancement with winner='enhanced'. "
-                "If it made things worse, call reset_to_original and try different operations, "
-                "or call finish_enhancement with winner='original'."
-            ),
-        })
+        return json.dumps(
+            {
+                "original_metrics": orig_metrics,
+                "enhanced_metrics": curr_metrics,
+                "deltas": deltas,
+                "iteration": state.iteration,
+                "note": (
+                    "Positive contrast_std delta = more contrast. "
+                    "Positive sharpness_laplacian delta = sharper. "
+                    "If enhancement helped, call finish_enhancement with winner='enhanced'. "
+                    "If it made things worse, call reset_to_original and try different operations, "
+                    "or call finish_enhancement with winner='original'."
+                ),
+            }
+        )
 
     @tool
     def reset_to_original(reasoning: str) -> str:
@@ -225,11 +295,14 @@ def create_tools(state: ImageState):
 # Enhancement Utilities
 # ============================================================================
 
+
 class EnhancementUtilities:
     """Orchestrates the Strands-based agentic enhancement loop."""
 
     @staticmethod
-    def _resize_for_llm(image: np.ndarray, max_dim: int = MAX_IMAGE_DIMENSION) -> np.ndarray:
+    def _resize_for_llm(
+        image: np.ndarray, max_dim: int = MAX_IMAGE_DIMENSION
+    ) -> np.ndarray:
         """Resize image for LLM submission if needed."""
         h, w = image.shape[:2]
         if max(h, w) <= max_dim:
@@ -244,6 +317,7 @@ class EnhancementUtilities:
         resized = EnhancementUtilities._resize_for_llm(image)
         b64 = image_to_base64(resized, fmt="jpeg", quality=JPEG_QUALITY)
         import base64 as b64_mod
+
         image_bytes = b64_mod.b64decode(b64)
 
         blocks = [
@@ -298,15 +372,19 @@ class EnhancementUtilities:
             Dict with original, enhanced, winner, history, and metadata.
         """
         image = load_image(image_source)
-        source_name = Path(image_source).stem if isinstance(image_source, (str, Path)) else "image"
+        source_name = (
+            Path(image_source).stem
+            if isinstance(image_source, (str, Path))
+            else "image"
+        )
 
-        logger.info('=' * 60)
+        logger.info("=" * 60)
         logger.info("  STRANDS AGENTIC IMAGE ENHANCEMENT")
         logger.info(f"  Source: {source_name}")
         logger.info(f"  Dimensions: {image.shape[1]}x{image.shape[0]}")
         logger.info(f"  Model: {VISION_MODEL}")
         logger.info(f"  Max iterations: {MAX_ITERATIONS}")
-        logger.info('=' * 60)
+        logger.info("=" * 60)
 
         # Set up state and agent
         state = ImageState(image)
@@ -321,10 +399,15 @@ class EnhancementUtilities:
 
         # Force finish if agent didn't call finish_enhancement
         if not state.finished:
-            logger.warning(f"Agent did not finish after {MAX_ITERATIONS} iterations. Forcing finish with original.")
+            logger.warning(
+                f"Agent did not finish after {MAX_ITERATIONS} iterations. Forcing finish with original."
+            )
             state.finished = True
             state.winner = "original"
-            state.final_comparison = {"winner": "original", "reasoning": "Timeout: Agent exceeded MAX_ITERATIONS without finishing."}
+            state.final_comparison = {
+                "winner": "original",
+                "reasoning": "Timeout: Agent exceeded MAX_ITERATIONS without finishing.",
+            }
 
         # Collect results
         winner = state.winner

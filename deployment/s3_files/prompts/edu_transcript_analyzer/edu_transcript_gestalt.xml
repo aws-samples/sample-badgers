@@ -9,6 +9,7 @@
         <step>Find the main grade/course table structure.</step>
         <step>Note any authentication features (seals, signatures, watermarks).</step>
         <step>Identify summary sections (GPA, totals, degree information).</step>
+        <step>WATERMARK CHECK: Determine if the document has a tiled/repeated background watermark (e.g., institution name repeated across the page). If present, mentally mark all instances as background noise to be filtered out during extraction. The watermark pattern will typically be a single phrase repeated in a grid pattern at a lighter opacity than the foreground text.</step>
     </prescan>
 
     <principles_emphasis>
@@ -26,7 +27,7 @@
         </primary>
 
         <secondary principle="figure_ground">
-            <guidance> Separate transcript data from document features: - FIGURE: Student info, courses, grades, GPA (extract these) - GROUND: Letterhead design, background patterns, decorative borders Authentication features (seals, signatures) are figure but serve verification, not data. </guidance>
+            <guidance> Separate transcript data from document features: - FIGURE: Student info, courses, grades, GPA (extract these) - GROUND: Letterhead design, background patterns, decorative borders, WATERMARK TEXT (repeated institutional names or security text tiled across the page). Authentication features (seals, signatures) are figure but serve verification, not data. CRITICAL: Watermarked transcripts often have the institution name repeated dozens of times across the background. This watermark text will appear interleaved with actual data in OCR output. You must use column alignment, font weight, and spatial positioning to separate watermark text (GROUND) from actual transcript fields (FIGURE). If you see the same phrase (e.g., "UNIVERSITY OF MICHIGAN") appearing repeatedly between data fields, it is watermark text — ignore it during data extraction. </guidance>
         </secondary>
 
     </principles_emphasis>
@@ -65,6 +66,7 @@
         <check>Are document sections correctly identified using proximity?</check>
         <check>Are authentication features noted for verification?</check>
         <check>Does extracted data match the visual organization of the transcript?</check>
+        <check>WATERMARK CONTAMINATION CHECK: Review all extracted fields for fragments of watermark text (e.g., institution name appearing inside course titles, student info, or grade fields). If found, remove the watermark fragments and re-extract the clean data.</check>
     </validation>
 
 </gestalt_perception>

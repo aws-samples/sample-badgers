@@ -1,0 +1,84 @@
+<!-- Provides guidance on identifying and extracting media rights contract information -->
+<media_rights_help>
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any example images provided earlier.</item>
+        <item>Absence of media rights contract content is a valid outcome. Do not force identification if no contract content is present.</item>
+        <item>Be exhaustive — extract EVERY article, section, subsection, and clause visible.</item>
+        <item>Preserve legal language verbatim. Do not paraphrase or simplify.</item>
+        <item>Distinguish between what is explicitly stated and what is implied or standard industry practice.</item>
+    </critical_instructions>
+
+    <contract_type_identification>
+        <type name="content_licensing_agreement">
+            <indicators>References to "Licensed Content," "Licensed Media," territory grants, SVOD/AVOD/TVOD platform enumeration, holdback provisions, and content delivery obligations.</indicators>
+            <typical_parties>Licensor and Licensee</typical_parties>
+            <key_provisions>Grant of rights, territory, licensed media, holdbacks, license fees, revenue share, minimum guarantees, term and renewal.</key_provisions>
+        </type>
+
+        <type name="talent_performance_agreement">
+            <indicators>References to "Performer," "Producer," role descriptions, principal photography periods, SAG-AFTRA, residuals, screen credit, morals clauses, pay-or-play terms.</indicators>
+            <typical_parties>Producer and Performer</typical_parties>
+            <key_provisions>Engagement and services, fixed and contingent compensation, rights grant including likeness, AI/digital protections, credit, exclusivity, morals clause, pay-or-play.</key_provisions>
+        </type>
+
+        <type name="music_synchronization_license">
+            <indicators>References to "Composition," "synchronization," "master recording," "master use license," ASCAP/BMI/SESAC/GMR, sync fees, performance royalties, approved scene descriptions.</indicators>
+            <typical_parties>Music Publisher/Rights Holder and Production Company</typical_parties>
+            <key_provisions>Composition identification, approved use and scene, duration of use, territory, media, sync fee, performance royalties, MFN, no-alteration clause, promotional use allowance.</key_provisions>
+        </type>
+
+        <type name="distribution_agreement">
+            <indicators>References to "Distributor," "Programs," distribution channels, windowing schedules, distribution fees, recoupable expenses, marketing plans, subdistribution, reversion of rights.</indicators>
+            <typical_parties>Content Owner and Distributor</typical_parties>
+            <key_provisions>Appointment and exclusivity, authorized channels, windowing, distribution fee percentage, recoupable expenses, net receipts, marketing approval, delivery requirements, reversion, sell-off period.</key_provisions>
+        </type>
+
+        <type name="digital_rights_ugc_license">
+            <indicators>References to "Platform," "Creator," "Creator Content," user-generated content, ad revenue share, subscription pro-rata, direct monetization, community guidelines, content moderation, DMCA, data portability.</indicators>
+            <typical_parties>Platform Operator and Content Creator</typical_parties>
+            <key_provisions>License to platform (host, store, transcode), promotional license, creator retains ownership, ad revenue share, subscription revenue formula, direct monetization, content standards, moderation and appeal, DMCA compliance, analytics access, data portability, platform amendment rights.</key_provisions>
+        </type>
+    </contract_type_identification>
+
+    <financial_structure_guidance>
+        <guidance>Fixed fee / flat fee: A one-time or installment-based payment for rights granted. Common in content licenses and sync licenses.</guidance>
+        <guidance>Revenue share: A percentage of defined revenue (Net Revenue, Gross Receipts, Net Profits). Pay close attention to the definition of the revenue base and approved deductions — these materially affect the economic value.</guidance>
+        <guidance>Minimum guarantee (MG): A guaranteed minimum payment, typically recoupable against future revenue share. The recoupment mechanic determines whether the MG is an advance or a floor.</guidance>
+        <guidance>Distribution fee: A percentage retained by the distributor from gross receipts before any other deductions. Typically ranges from 15-35%.</guidance>
+        <guidance>Recoupable expenses: Costs the distributor may deduct from revenue before remitting to the content owner. Watch for uncapped expense categories.</guidance>
+        <guidance>Most-favored-nations (MFN): Ensures one party receives terms no less favorable than those given to comparable parties. Common in music sync deals.</guidance>
+        <guidance>Pay-or-play: Producer must pay performer's full compensation regardless of whether services are actually used. A significant financial commitment.</guidance>
+        <guidance>Residuals: Ongoing payments for reuse of content, often governed by guild collective bargaining agreements (SAG-AFTRA, DGA, WGA).</guidance>
+        <guidance>Net Profits / Contingent Compensation: Typically defined with extensive deductions. The definition of "Net Profits" is often the most heavily negotiated provision in talent agreements.</guidance>
+        <guidance>Ad revenue share vs. subscription pro-rata: Digital platforms may use different models. Ad share is based on ad impressions against specific content. Subscription pro-rata allocates a pool based on viewing time ratios.</guidance>
+    </financial_structure_guidance>
+
+    <defined_term_guidance>
+        <guidance>Defined terms are the backbone of contract interpretation. A term defined in Section 1 controls its meaning throughout the entire agreement.</guidance>
+        <guidance>Watch for terms defined parenthetically within a clause (e.g., 'the "Territory"') as well as terms defined in a dedicated definitions article.</guidance>
+        <guidance>Key defined terms to always capture: Licensed Content, Territory, Licensed Media, Term, Net Revenue/Gross Receipts/Net Profits, Production, Composition, Programs, Creator Content, Community Guidelines.</guidance>
+        <guidance>Blank defined terms (e.g., Territory: _____________) indicate terms requiring negotiation. Flag these prominently.</guidance>
+    </defined_term_guidance>
+
+    <windowing_guidance>
+        <guidance>Windowing refers to the sequential release of content across different platforms with exclusivity periods between each window.</guidance>
+        <guidance>Typical window sequence: Theatrical → Premium VOD → SVOD → Free TV/AVOD.</guidance>
+        <guidance>Window durations are measured in days or months post-theatrical release.</guidance>
+        <guidance>Holdbacks prevent the licensor from licensing to competing platforms during specified periods.</guidance>
+    </windowing_guidance>
+
+    <modern_provisions_guidance>
+        <guidance>AI and digital likeness: Increasingly common in talent agreements. Look for consent requirements, per-use authorization, and additional compensation triggers for AI-generated replicas of performance, voice, or likeness.</guidance>
+        <guidance>Content moderation: In digital/UGC agreements, look for the platform's right to remove, restrict, or demonetize content, and whether the creator has appeal rights.</guidance>
+        <guidance>Data portability: The creator's right to download their content and metadata upon termination. Note format requirements and timelines.</guidance>
+        <guidance>Platform amendment rights: Many digital agreements allow the platform to unilaterally update terms with notice. Note the notice period and whether continued use constitutes acceptance.</guidance>
+    </modern_provisions_guidance>
+
+    <not_media_rights_contracts>
+        <item>General commercial contracts without media/entertainment-specific terms are NOT media rights contracts.</item>
+        <item>Employment agreements without performance, likeness, or creative rights provisions are NOT talent agreements.</item>
+        <item>Software licenses or SaaS agreements are NOT media rights contracts.</item>
+        <item>Real estate leases, loan agreements, or insurance policies are NOT media rights contracts.</item>
+        <item>Non-disclosure agreements or confidentiality agreements alone are NOT media rights contracts, though they may accompany one.</item>
+    </not_media_rights_contracts>
+</media_rights_help>

@@ -182,28 +182,19 @@ main() {
     fi
 
     # Build poppler layer
-    if [ -f "build_poppler_layer.sh" ]; then
-        chmod +x build_poppler_layer.sh
-        ./build_poppler_layer.sh || handle_error "Build poppler lambda layer"
+    if [ -f "build_poppler_qdf_layer.sh" ]; then
+        chmod +x build_poppler_qdf_layer.sh
+        ./build_poppler_qdf_layer.sh || handle_error "Build poppler lambda layer"
         log_success "Poppler lambda layer built"
     else
-        log_warn "build_poppler_layer.sh not found, checking for existing poppler-layer.zip"
-        if [ ! -f "poppler-layer.zip" ]; then
+        log_warn "build_poppler_qdf_layer.sh not found, checking for existing poppler-qpdf-layer.zip"
+        if [ ! -f "poppler-qpdf-layer.zip" ]; then
             handle_error "Poppler lambda layer not found"
         fi
     fi
 
-    # Build enhancement layer
-    if [ -f "build_enhancement_layer.sh" ]; then
-        chmod +x build_enhancement_layer.sh
-        ./build_enhancement_layer.sh || handle_error "Build enhancement lambda layer"
-        log_success "Enhancement lambda layer built"
-    else
-        log_warn "build_enhancement_layer.sh not found, checking for existing enhancement-layer.zip"
-        if [ ! -f "enhancement-layer.zip" ]; then
-            handle_error "Enhancement lambda layer not found"
-        fi
-    fi
+    # Enhancement layer skipped — enhancement runs in container Lambda (image_enhancer)
+    log_success "Enhancement layer skipped (runs in container Lambda)"
 
     # Build pdf-processing layer
     if [ -f "build_pdf_processing_layer.sh" ]; then
@@ -273,6 +264,11 @@ main() {
     log_info "Step 8/11: Deploying gateway Stack..."
     $_CDK_CMD deploy ${STACK_PREFIX}-gateway $_CDK_CONTEXT --require-approval never || handle_error "Deploy gateway Stack"
     log_success "gateway Stack deployed"
+
+    # Step 8.25: Deploy X-Ray Transaction Search (account-level prerequisite)
+    log_info "Step 8.25/11: Deploying X-Ray Transaction Search..."
+    $_CDK_CMD deploy ${STACK_PREFIX}-xray $_CDK_CONTEXT --require-approval never || log_warn "X-Ray Transaction Search may already be enabled, continuing..."
+    log_success "X-Ray Transaction Search deployed"
 
     # Step 8.5: Configure Gateway Observability (logging and tracing)
     log_info "Step 8.5/11: Configuring Gateway observability..."

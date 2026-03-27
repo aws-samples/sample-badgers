@@ -272,7 +272,8 @@ def fetch_session_traces(session_id: str) -> str:
     return "\n".join(output)
 
 
-with gr.Blocks() as demo:
+def build():
+    """Create the Agent Observability UI (no Blocks wrapper)."""
     gr.Markdown("# 📊 Agent Observability")
     gr.Markdown(
         "View all traces and spans for a session from CloudWatch `aws/spans` (last 24 hours)"
