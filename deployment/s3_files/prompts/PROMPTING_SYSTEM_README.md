@@ -434,7 +434,7 @@ Each analyzer has a manifest file in `manifests/` with this structure:
         "description": "Analyzer description",
         "enhancement_eligible": true,
         "model_selections": {
-            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "fallback_list": ["us.anthropic.claude-haiku-4-5-20251001-v1:0"]
         },
         "max_retries": 3,

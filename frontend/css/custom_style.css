@@ -2,7 +2,8 @@
    BASE / GLOBAL STYLES
    ========================================================================== */
 
-body, gradio-app {
+body,
+gradio-app {
   background-color: #769DB3 !important;
 }
 
@@ -10,13 +11,14 @@ gradio-app main {
   background-color: #FFF;
   border-radius: 1rem;
   margin: 2rem auto !important;
-  max-width: 80% !important;
   flex-grow: unset !important;
+  padding: 2rem !important;
 }
 
-.gradio-container-6-3-0 {
+.gradio-container-6-3-7 {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
 }
+
 .warning {
   background-color: #fff3cd;
   border: 1px solid #ffc107;
@@ -25,11 +27,15 @@ gradio-app main {
   border-radius: 4px;
   margin: 10px 0 20px 0;
 }
+
 /* ==========================================================================
    TYPOGRAPHY
    ========================================================================== */
 
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
   overflow: hidden;
 }
 
@@ -51,7 +57,7 @@ hr {
   border: medium;
 }
 
-.gradio-container.gradio-container-6-3-0 .contain hr {
+.gradio-container.gradio-container-6-3-7 .contain hr {
   height: 0.1rem !important;
   background-color: #E7E7E7 !important;
   border: medium;
@@ -88,18 +94,19 @@ gradio-app div.nav-holder {
    ========================================================================== */
 
 /* Buttons */
-.gradio-container-6-3-0 button.primary {
+.gradio-container-6-3-7 button.primary {
   background-color: #629EFF !important;
   color: #FFFFFF !important;
 }
 
-.gradio-container.gradio-container-6-3-0 .contain button.secondary {
+.gradio-container.gradio-container-6-3-7 .contain button.secondary {
   background: #5e6a7d !important;
   color: #FFFFFF !important;
 }
 
 /* Inputs */
-input[type="checkbox"], input[type="radio"]  {
+input[type="checkbox"],
+input[type="radio"] {
   background-color: #2d2d2d !important;
 }
 
@@ -262,20 +269,24 @@ div.chat-window {
   height: 350px !important;
 }
 
-footer {visibility: hidden}
+footer {
+  visibility: hidden
+}
 
 
 /* ==== */
 :root {
-  --badgers-base-size: .7rem;
+  --badgers-base-size: .9rem;
 }
 
 h1 {
   font-size: calc(var(--badgers-base-size) * 2) !important;
 }
+
 h2 {
   font-size: calc(var(--badgers-base-size) * 1.5) !important;
 }
+
 h3 {
   font-size: calc(var(--badgers-base-size) * 1.2) !important;
 }
@@ -290,19 +301,30 @@ input[type=select],
 [role="listbox"] {
   font-size: calc(var(--badgers-base-size) * 1) !important;
 }
+
 div.overview {
-  font-size: var(--badgers-base-size)!important;
+  font-size: var(--badgers-base-size) !important;
 }
 
 .chat-window * {
-font-size: calc(var(--badgers-base-size) * 1.1) !important;
+  font-size: calc(var(--badgers-base-size) * 1.1) !important;
 }
 
-body, p.prose{
-  font-size: var(--badgers-base-size)!important;
+.gradio-container.gradio-container-6-7-0 .contain .chat-window * {
+  font-size: calc(var(--badgers-base-size) * .7) !important;
+  line-height: normal;
+  margin-bottom: 0;
+}
+
+.gradio-container.gradio-container-6-7-0 .contain .chat-window .message-content :is(td, th):not(:last-child) {
+  /*white-space: nowrap;*/
+}
+
+body,
+p.prose {
+  font-size: var(--badgers-base-size) !important;
 }
 
 small {
-  font-size: calc(var(--badgers-base-size) * 0.8)!important;
+  font-size: calc(var(--badgers-base-size) * 0.8) !important;
 }
-

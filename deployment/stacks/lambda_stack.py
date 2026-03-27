@@ -111,12 +111,12 @@ class LambdaAnalyzerStack(Stack):
         )
 
         # Poppler layer for PDF conversion
-        poppler_layer_path = Path("./lambdas/poppler-layer.zip")
+        poppler_layer_path = Path("./lambdas/poppler-qpdf-layer.zip")
 
         if not poppler_layer_path.exists():
             raise FileNotFoundError(
                 f"Poppler layer not found at {poppler_layer_path}. "
-                "Run: cd lambdas && ./build_poppler_layer.sh"
+                "Run: cd lambdas && ./build_poppler_qdf_layer.sh"
             )
 
         self.poppler_layer = lambda_.LayerVersion(
@@ -135,32 +135,10 @@ class LambdaAnalyzerStack(Stack):
             "Poppler utilities layer for PDF processing",
         )
 
-        # Enhancement layer for image preprocessing (OpenCV + NumPy)
-        enhancement_layer_path = Path("./lambdas/enhancement-layer.zip")
-
-        if enhancement_layer_path.exists():
-            self.enhancement_layer = lambda_.LayerVersion(
-                self,
-                "EnhancementLayer",
-                code=lambda_.Code.from_asset(str(enhancement_layer_path)),
-                compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-                description="Image enhancement for historical documents (OpenCV, NumPy)",
-                layer_version_name="image-enhancement",
-            )
-
-            # Apply resource-specific tags to enhancement layer
-            self._apply_resource_tags(
-                self.enhancement_layer,
-                "lambda-enhancement-layer",
-                "Image enhancement layer for historical document preprocessing",
-            )
-        else:
-            self.enhancement_layer = None
-            logging.getLogger(__name__).warning(
-                "Enhancement layer not found at %s. "
-                "Run: cd lambdas && ./build_enhancement_layer.sh",
-                enhancement_layer_path,
-            )
+        # Enhancement layer removed — enhancement runs in the container-based
+        # agentic enhancer Lambda (image_enhancer) which bundles its own deps.
+        # The build_enhancement_layer.sh script is retained on disk but not deployed.
+        self.enhancement_layer = None
 
         # PDF processing layer for PDF manipulation/accessibility (pymupdf, pikepdf)
         pdf_processing_layer_path = Path("./lambdas/pdf-processing-layer.zip")
@@ -249,6 +227,8 @@ class LambdaAnalyzerStack(Stack):
         if analyzer_name == "pdf_to_images_converter":
             environment["PATH"] = "/opt/bin:/var/lang/bin:/usr/local/bin:/usr/bin:/bin"
             environment["LD_LIBRARY_PATH"] = "/opt/lib:/var/lang/lib:/lib64:/usr/lib64"
+            environment["FONTCONFIG_PATH"] = "/opt/etc/fonts"
+            environment["FONTCONFIG_CACHE"] = "/tmp/fontconfig-cache"
 
         # Determine layers for this function
         layers = [self.foundation_layer, self.pillow_layer]
@@ -262,16 +242,8 @@ class LambdaAnalyzerStack(Stack):
         if self.pdf_processing_layer and analyzer_name in pdf_processing_functions:
             layers.append(self.pdf_processing_layer)
 
-        # Attach enhancement layer to functions that may need image preprocessing
-        # NOTE: Enhancement layer is large (~259MB unzipped) - combined with foundation
-        # exceeds Lambda's 250MB limit. Enhancement should run in AgentCore runtime instead.
-        enhancement_eligible_functions: list[str] = [
-            # "handwriting_analyzer",
-            # "editorial_analyzer",
-            # "full_text_analyzer",
-        ]
-        if self.enhancement_layer and analyzer_name in enhancement_eligible_functions:
-            layers.append(self.enhancement_layer)
+        # Enhancement layer removed — runs in container Lambda instead.
+        # See lambdas/containers/image_enhancer/
 
         # Create function
         function = lambda_.Function(

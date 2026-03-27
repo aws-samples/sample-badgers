@@ -18,7 +18,7 @@
         </primary>
 
         <primary principle="figure_ground">
-            <guidance> Separate meaningful content from page artifacts: - FIGURE: Text, images, diagrams, tables, charts (classify these) - GROUND: Margins, backgrounds, decorative elements, watermarks Focus classification on figure elements; note ground for context. </guidance>
+            <guidance> Separate meaningful content from page artifacts: - FIGURE: Text, images, diagrams, tables, charts (classify these) - GROUND: Margins, backgrounds, decorative elements, watermarks Focus classification on figure elements; note ground for context. IMPORTANT: When ground elements (watermarks, security paper, colored backgrounds) are prominent enough to interfere with automated extraction, you MUST flag enhancement_recommended as true. The downstream extractors cannot perform figure-ground separation — they see the raw image and will confuse watermark text with content text, often misclassifying content-rich pages as blank or as security/authentication pages. </guidance>
         </primary>
 
         <primary principle="proximity">
@@ -47,7 +47,8 @@
         <condition type="degraded">Poor scan quality, noise, artifacts, low contrast.</condition>
         <condition type="handwritten">Manuscript, annotations, personal writing.</condition>
         <condition type="low_resolution">Pixelation, blur, insufficient detail.</condition>
-        <instruction>Flag content requiring enhancement for better extraction.</instruction>
+        <condition type="watermarked_or_busy">Security paper with colored/tinted background (blue, green, tan), repeating watermark text tiled across the page, institutional seals or logos overlapping content areas, any background pattern that competes visually with foreground text. These pages look "readable" to humans but WILL cause downstream extraction failure — extractors cannot separate content from background noise and will misclassify the page as blank or as a security/authentication page.</condition>
+        <instruction>Flag content requiring enhancement for better extraction. Watermarked/busy pages are the MOST IMPORTANT category to flag — they cause silent extraction failures where the page appears to process successfully but returns no useful content.</instruction>
     </enhancement_detection>
 
     <description_guidance>

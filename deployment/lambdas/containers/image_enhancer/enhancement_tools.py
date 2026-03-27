@@ -618,6 +618,90 @@ def remove_background_stains(image: np.ndarray, intensity: float = 0.5) -> np.nd
 # =============================================================================
 # Maps operation names (used in tool schemas) to their implementations.
 
+
+def desaturate(image: np.ndarray, intensity: float = 1.0) -> np.ndarray:
+    """
+    Reduce color saturation. Useful for removing tinted backgrounds
+    (blue security paper, yellowed pages) to produce cleaner grayscale-like output.
+
+    Args:
+        image: RGB numpy array
+        intensity: 0.0 (full color / no change) to 1.0 (fully desaturated / grayscale)
+
+    Returns:
+        Desaturated image (still RGB, but with reduced saturation)
+    """
+    if intensity <= 0.01:
+        return image
+
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
+    hsv[:, :, 1] *= 1.0 - intensity
+    hsv = np.clip(hsv, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+
+def threshold(image: np.ndarray, intensity: float = 0.5) -> np.ndarray:
+    """
+    Apply binary threshold to convert image to black and white.
+    Effective for removing watermarks, background patterns, and noise
+    that falls below the threshold cutoff.
+
+    The operation also logs an intensity distribution analysis (histogram
+    percentiles) so the LLM can evaluate where content vs noise boundaries
+    lie and refine the cutoff on subsequent iterations.
+
+    Args:
+        image: RGB numpy array
+        intensity: 0.0 (low cutoff ~80, keeps more) to 1.0 (high cutoff ~240, aggressive)
+
+    Returns:
+        Thresholded image (binary black/white, returned as RGB)
+    """
+    # Map intensity to threshold value: 0.0 -> 80, 1.0 -> 240
+    thresh_value = int(80 + intensity * 160)
+
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+    # Compute intensity distribution for LLM feedback
+    percentiles = [5, 10, 25, 50, 75, 90, 95]
+    pct_values = {f"p{p}": int(np.percentile(gray, p)) for p in percentiles}
+    mean_val = int(np.mean(gray))
+    std_val = int(np.std(gray))
+
+    # Estimate what percentage of pixels will be black vs white at this cutoff
+    pct_black = float(np.mean(gray < thresh_value) * 100)
+    pct_white = 100.0 - pct_black
+
+    # Store analysis on the function for retrieval by execute_operations
+    threshold._last_analysis = {  # type: ignore[attr-defined]
+        "cutoff": thresh_value,
+        "mean": mean_val,
+        "std": std_val,
+        "distribution": pct_values,
+        "result_pct_black": round(pct_black, 1),
+        "result_pct_white": round(pct_white, 1),
+        "hint": (
+            f"At cutoff {thresh_value}: {pct_black:.1f}% black, {pct_white:.1f}% white. "
+            f"Median pixel intensity is {pct_values['p50']}. "
+            "Lower intensity = lower cutoff = keeps more content. "
+            "Higher intensity = higher cutoff = more aggressive removal."
+        ),
+    }
+
+    logger.info(
+        "Threshold analysis: cutoff=%d, mean=%d, std=%d, distribution=%s",
+        thresh_value,
+        mean_val,
+        std_val,
+        pct_values,
+    )
+
+    _, binary = cv2.threshold(gray, thresh_value, 255, cv2.THRESH_BINARY)
+
+    # Convert back to RGB
+    return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+
+
 OPERATIONS = {
     "contrast": adjust_contrast,
     "brightness": adjust_brightness,
@@ -629,6 +713,8 @@ OPERATIONS = {
     "auto_crop": auto_crop,
     "invert": invert,
     "remove_stains": remove_background_stains,
+    "desaturate": desaturate,
+    "threshold": threshold,
 }
 
 
@@ -683,12 +769,24 @@ def execute_operations(
             result = _apply_to_region(
                 result, op_func, region=region, intensity=intensity
             )
+            notes = f"Applied {op_name} at intensity {intensity:.2f}"
+
+            # Enrich notes with threshold analysis if available
+            if op_name == "threshold" and hasattr(threshold, "_last_analysis"):
+                analysis = threshold._last_analysis  # type: ignore[attr-defined]
+                notes = (
+                    f"Applied threshold at intensity {intensity:.2f} "
+                    f"(cutoff={analysis['cutoff']}). "
+                    f"{analysis['hint']} "
+                    f"Distribution: {analysis['distribution']}"
+                )
+
             log.append(
                 OperationResult(
                     operation=op_name,
                     parameters={"intensity": intensity},
                     region=region,
-                    notes=f"Applied {op_name} at intensity {intensity:.2f}",
+                    notes=notes,
                 )
             )
             logger.info("Applied: %s (intensity=%.2f)", op_name, intensity)

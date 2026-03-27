@@ -1,7 +1,7 @@
 [
     {
         "name": "enhance_image_tool",
-        "description": "Pre-processes historical or degraded document images to improve quality before analysis. Use BEFORE calling enhancement-eligible analyzers (handwriting, editorial, full_text) when the image shows: faded text, yellowing, noise, low contrast, skew, or other degradation. Returns S3 URI of enhanced image to pass to subsequent analyzers. NOT needed for clean printed documents, tables, charts, or diagrams.",
+        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling analyzers when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent analyzers.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -22,9 +22,10 @@
                         "sheet_music",
                         "diagram",
                         "printed",
-                        "mixed"
+                        "mixed",
+                        "watermarked"
                     ],
-                    "description": "Type of document for optimized enhancement. Default: auto (auto-detect)."
+                    "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. Default: auto (auto-detect)."
                 },
                 "enhancement_level": {
                     "type": "string",

@@ -57,7 +57,7 @@
         "description": "Analyzes document page images to identify structural elements for PDF/UA accessibility tagging",
         "enhancement_eligible": false,
         "model_selections": {
-            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "fallback_list": [
                 "us.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "us.amazon.nova-premier-v1:0"

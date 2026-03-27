@@ -77,21 +77,21 @@ All layer build scripts must be run from the `deployment/lambdas` directory.
 ```bash
 cd lambdas
 ./build_foundation_layer.sh      # Core framework, boto3, pillow
-./build_poppler_layer.sh         # PDF rendering (pdftoppm, pdfinfo)
-./build_enhancement_layer.sh     # OpenCV, numpy for image enhancement
+./build_poppler_qdf_layer.sh         # PDF rendering (pdftoppm, pdfinfo)
 ./build_pdf_processing_layer.sh  # pikepdf, pymupdf for PDF/A tagging
 cd ..
 ```
 
 #### Layer Build Scripts
 
-| Script                          | Output                     | Purpose                                        | Used By                                  |
-| ------------------------------- | -------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| `build_foundation_layer.sh`     | `layer.zip`                | Core analyzer framework, AWS SDK, Pillow       | All Lambda analyzers                     |
-| `build_poppler_layer.sh`        | `poppler-layer.zip`        | Poppler binaries for PDF→image conversion      | `pdf_to_images_converter`                |
-| `build_enhancement_layer.sh`    | `enhancement-layer.zip`    | OpenCV headless, numpy for image preprocessing | `image_enhancer`                         |
-| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation          | `remediation_analyzer`                   |
-| `build_container_lambdas.sh`    | ECR images                 | Container images for complex analyzers         | `image_enhancer`, `remediation_analyzer` |
+| Script                          | Output                     | Purpose                                   | Used By                                  |
+| ------------------------------- | -------------------------- | ----------------------------------------- | ---------------------------------------- |
+| `build_foundation_layer.sh`     | `layer.zip`                | Core analyzer framework, AWS SDK, Pillow  | All Lambda analyzers                     |
+| `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion | `pdf_to_images_converter`                |
+| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation     | `remediation_analyzer`                   |
+| `build_container_lambdas.sh`    | ECR images                 | Container images for complex analyzers    | `image_enhancer`, `remediation_analyzer` |
+
+> **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
 
 #### Container Lambda Build
 
@@ -191,8 +191,8 @@ deployment/
 ├── stacks/                   # 📦 CDK stack definitions
 ├── lambdas/
 │   ├── build_foundation_layer.sh    # Core framework layer
-│   ├── build_poppler_layer.sh       # PDF rendering layer
-│   ├── build_enhancement_layer.sh   # Image enhancement layer
+│   ├── build_poppler_qdf_layer.sh       # PDF rendering layer
+│   ├── build_enhancement_layer.sh   # Image enhancement layer (UNUSED - retained for reference)
 │   ├── build_pdf_processing_layer.sh # PDF manipulation layer
 │   ├── build_container_lambdas.sh   # Container image builder
 │   ├── deploy_foundation_layer.sh   # Manual layer deployment
@@ -272,12 +272,12 @@ BADGERS uses Application Inference Profiles to enable cost allocation and usage 
 
 ### Environment Variable Mapping
 
-| Model ID Pattern                       | Environment Variable         |
-| -------------------------------------- | ---------------------------- |
-| `global.anthropic.claude-sonnet-4-5-*` | `CLAUDE_SONNET_PROFILE_ARN`  |
-| `us.anthropic.claude-haiku-4-5-*`      | `CLAUDE_HAIKU_PROFILE_ARN`   |
-| `*claude-opus-4-6*`                    | `CLAUDE_OPUS_46_PROFILE_ARN` |
-| `us.amazon.nova-premier-v1:0`          | `NOVA_PREMIER_PROFILE_ARN`   |
+| Model ID Pattern                   | Environment Variable         |
+| ---------------------------------- | ---------------------------- |
+| `us.anthropic.claude-sonnet-4-5-*` | `CLAUDE_SONNET_PROFILE_ARN`  |
+| `us.anthropic.claude-haiku-4-5-*`  | `CLAUDE_HAIKU_PROFILE_ARN`   |
+| `*claude-opus-4-6*`                | `CLAUDE_OPUS_46_PROFILE_ARN` |
+| `us.amazon.nova-premier-v1:0`      | `NOVA_PREMIER_PROFILE_ARN`   |
 
 ### Profile Naming
 
@@ -398,12 +398,12 @@ rm -rf layer/ layer.zip
 ./build_foundation_layer.sh
 
 # Poppler layer
-rm -rf poppler_build/ poppler-layer.zip
-./build_poppler_layer.sh
+rm -rf poppler_build/ poppler-qpdf-layer.zip
+./build_poppler_qdf_layer.sh
 
-# Enhancement layer
-rm -rf enhancement_build/ enhancement-layer.zip
-./build_enhancement_layer.sh
+# Enhancement layer — no longer deployed, runs in container Lambda
+# rm -rf enhancement_build/ enhancement-layer.zip
+# ./build_enhancement_layer.sh
 
 # PDF processing layer
 rm -rf pdf_processing_build/ pdf-processing-layer.zip

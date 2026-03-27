@@ -67,6 +67,7 @@ dependencies = [
     "spandrel>=0.4.1",
     "super-image>=0.2.0",
     "nbstripout>=0.9.1",
+    "pandas>=2.3.3",
 ]
 
 [project.optional-dependencies]

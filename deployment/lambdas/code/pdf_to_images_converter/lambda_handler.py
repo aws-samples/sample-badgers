@@ -17,10 +17,23 @@ logger.setLevel(logging.INFO)
 
 # Output bucket from environment (set by Lambda stack)
 OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "")
+import subprocess
+import tempfile
 
 
 def lambda_handler(event, context):
+    import os
+
+    logger.info("/opt/etc/fonts exists: %s", os.path.exists("/opt/etc/fonts"))
+    logger.info("/opt/share/fonts exists: %s", os.path.exists("/opt/share/fonts"))
     """Convert PDF to images and store base64 in S3 temp location."""
+    result = subprocess.run(["/opt/bin/pdftoppm", "-v"], capture_output=True, text=True)
+    logger.info("pdftoppm version: %s %s", result.stdout, result.stderr)
+
+    import shutil
+
+    logger.info("pdf2image will use pdftoppm at: %s", shutil.which("pdftoppm"))
+
     try:
         # Log Gateway context information
         if hasattr(context, "client_context") and context.client_context:
@@ -90,6 +103,32 @@ def lambda_handler(event, context):
         return create_error_response(e)
 
 
+def _decrypt_pdf_if_needed(pdf_data: bytes) -> bytes:
+    logger.info("Starting PDF decryption with qpdf")
+    with (
+        tempfile.NamedTemporaryFile(suffix=".pdf") as infile,
+        tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as outfile,
+    ):
+        infile.write(pdf_data)
+        infile.flush()
+        logger.info("Input PDF size: %d bytes", len(pdf_data))
+        result = subprocess.run(
+            ["/opt/bin/qpdf", "--decrypt", infile.name, outfile.name],
+            capture_output=True,
+            text=True,
+        )
+        logger.info(
+            "qpdf returncode: %d, stdout: %s, stderr: %s",
+            result.returncode,
+            result.stdout,
+            result.stderr,
+        )
+        with open(outfile.name, "rb") as f:
+            decrypted = f.read()
+        logger.info("Decrypted PDF size: %d bytes", len(decrypted))
+        return decrypted
+
+
 def _get_pdf_data(pdf_path: str) -> bytes:
     """Get PDF data from S3 or local path."""
     if pdf_path.startswith("s3://"):
@@ -135,7 +174,47 @@ def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> lis
     from PIL import Image
     import io
 
+    pdf_data = _decrypt_pdf_if_needed(pdf_data)
     # Convert PDF to PIL images
+    # Test if decrypted PDF has text at all
+    text_result = subprocess.run(
+        ["/opt/bin/pdftotext", "-", "-"], input=pdf_data, capture_output=True
+    )
+    logger.info("pdftotext output length: %d bytes", len(text_result.stdout))
+    logger.info("pdftotext stderr: %s", text_result.stderr.decode())
+
+    # Run pdftoppm directly and check stderr
+    import tempfile, os
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        f.write(pdf_data)
+        tmp_pdf = f.name
+    ppm_result = subprocess.run(
+        [
+            "/opt/bin/pdftoppm",
+            "-jpeg",
+            "-r",
+            "128",
+            "-f",
+            "1",
+            "-l",
+            "1",
+            tmp_pdf,
+            "/tmp/debug_page",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    logger.info(
+        "pdftoppm returncode: %d, stderr: %s", ppm_result.returncode, ppm_result.stderr
+    )
+    debug_size = (
+        os.path.getsize("/tmp/debug_page-1.jpg")
+        if os.path.exists("/tmp/debug_page-1.jpg")
+        else 0
+    )
+    logger.info("Direct pdftoppm output size: %d bytes", debug_size)
+    os.unlink(tmp_pdf)
     pil_images = convert_from_bytes(pdf_data, dpi=dpi)
 
     base64_images = []

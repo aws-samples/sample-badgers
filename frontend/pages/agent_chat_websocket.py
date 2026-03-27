@@ -683,23 +683,15 @@ def _build_display_content(
 # =============================================================================
 
 
-def create_ui():
-    """Create the streaming Gradio interface."""
+def build():
+    """Create the streaming Gradio UI (no Blocks wrapper)."""
     logger.info("Creating WebSocket streaming UI")
 
+    # Initialize client without fetching tools — tools load lazily on the Chat tab
     try:
         client = WebSocketStreamingClient()
-        tools = client.get_available_tools()
-
-        if tools and tools[0].get("id") == "error":
-            initial_status = f"❌ {tools[0]['name']}\n\nPlease configure .env file"
-            client = None
-            logger.warning("Client initialization failed - configuration issue")
-        else:
-            sorted_tools = sorted(tools, key=lambda t: t["name"].lower())
-            tools_text = "\n".join([f"- {t['name']}" for t in sorted_tools])
-            initial_status = f"**Available Tools ({len(tools)}):**\n{tools_text}"
-            logger.info("Client initialized successfully with %d tools", len(tools))
+        initial_status = "🔄 *Tools will load when you open this tab...*"
+        logger.info("Client initialized (tools deferred)")
     except Exception as e:
         initial_status = f"❌ Error: {e}\n\nPlease configure .env file"
         client = None
@@ -711,465 +703,448 @@ def create_ui():
         """Generate session info text."""
         return f"Session: {sid}\nMode: WebSocket Streaming"
 
-    with gr.Blocks(title="AgentCore Runtime UI (Streaming)") as blocks_demo:
-        # State for session ID
-        session_id = gr.State(value=initial_session_id)
-        gr.Markdown("# 🤖 AgentCore Runtime UI (WebSocket Streaming)")
-        gr.Markdown("Real-time visibility into agent thinking, tool calls, and results")
+    session_id = gr.State(value=initial_session_id)
+    gr.Markdown("# 🤖 AgentCore Runtime UI (WebSocket Streaming)")
+    gr.Markdown("Real-time visibility into agent thinking, tool calls, and results")
 
-        with gr.Row():
-            with gr.Column(scale=3):
-                chatbot = gr.Chatbot(
-                    label="Conversation",
-                    height=600,
-                    buttons=["copy"],
-                    allow_tags=True,
-                    autoscroll=True,
-                    render_markdown=True,
-                    group_consecutive_messages=True,
-                    # Auto-extract <think>...</think> into collapsible sections
-                    reasoning_tags=[("<think>", "</think>")],
-                    avatar_images=(
-                        "./images/user.png",
-                        "./images/assistant.png",
-                    ),
-                    elem_classes="chat-window",
+    with gr.Row():
+        with gr.Column(scale=3):
+            chatbot = gr.Chatbot(
+                label="Conversation",
+                height=600,
+                buttons=["copy"],
+                allow_tags=True,
+                autoscroll=True,
+                render_markdown=True,
+                group_consecutive_messages=True,
+                # Auto-extract <think>...</think> into collapsible sections
+                reasoning_tags=[("<think>", "</think>")],
+                avatar_images=(
+                    "./images/user.png",
+                    "./images/assistant.png",
+                ),
+                elem_classes="chat-window",
+            )
+
+            msg_input = gr.Textbox(
+                label="Message",
+                placeholder="Ask your agent something... (Press Enter to send)",
+            )
+            with gr.Row(elem_classes="chat-buttons-row"):
+                gr.HTML("<div style=''></div>")
+                clear_btn = gr.Button(
+                    "Clear", variant="secondary", scale=0, min_width=100
+                )
+                send_btn = gr.Button("Send", variant="primary", scale=0, min_width=100)
+
+            with gr.Row(elem_classes="download-buttons-row"):
+                download_last_btn = gr.DownloadButton(
+                    "📥 Download Last Response",
+                    variant="secondary",
+                    size="sm",
+                    scale=1,
+                )
+                download_full_btn = gr.DownloadButton(
+                    "📥 Download Full Chat",
+                    variant="secondary",
+                    size="sm",
+                    scale=1,
                 )
 
-                msg_input = gr.Textbox(
-                    label="Message",
-                    placeholder="Ask your agent something... (Press Enter to send)",
-                )
-                with gr.Row(elem_classes="chat-buttons-row"):
-                    gr.HTML("<div style=''></div>")
-                    clear_btn = gr.Button(
-                        "Clear", variant="secondary", scale=0, min_width=100
-                    )
-                    send_btn = gr.Button(
-                        "Send", variant="primary", scale=0, min_width=100
-                    )
+        with gr.Column(scale=1):
+            gr.Text("Enable confidence scoring and human review flags")
+            audit_mode_checkbox = gr.Checkbox(
+                label="🔍 Audit Mode",
+                value=False,
+                info="",
+            )
+            dynamic_tokens_checkbox = gr.Checkbox(
+                label="⚡ Dynamic Token Estimation",
+                value=False,
+                info="Adjust max_tokens based on image complexity",
+            )
+            with gr.Accordion(
+                "🔧 Available Tools", open=False, elem_classes="badgers_expander"
+            ):
+                tools_display = gr.Markdown(initial_status)
+                refresh_tools_btn = gr.Button("🔄 Refresh Tools", size="sm")
+            session_display = gr.Textbox(
+                label="Session Info",
+                value=get_session_info(initial_session_id),
+                interactive=False,
+            )
+            new_session_btn = gr.Button("🔄 New Session", variant="secondary")
 
-                with gr.Row(elem_classes="download-buttons-row"):
-                    download_last_btn = gr.DownloadButton(
-                        "📥 Download Last Response",
-                        variant="secondary",
-                        size="sm",
-                        scale=1,
-                    )
-                    download_full_btn = gr.DownloadButton(
-                        "📥 Download Full Chat",
-                        variant="secondary",
-                        size="sm",
-                        scale=1,
-                    )
-
-            with gr.Column(scale=1):
-                gr.Text("Enable confidence scoring and human review flags")
-                audit_mode_checkbox = gr.Checkbox(
-                    label="🔍 Audit Mode",
-                    value=False,
-                    info="",
-                )
-                dynamic_tokens_checkbox = gr.Checkbox(
-                    label="⚡ Dynamic Token Estimation",
-                    value=False,
-                    info="Adjust max_tokens based on image complexity",
-                )
-                with gr.Accordion(
-                    "🔧 Available Tools", open=False, elem_classes="badgers_expander"
-                ):
-                    tools_display = gr.Markdown(initial_status)
-                    refresh_tools_btn = gr.Button("🔄 Refresh Tools", size="sm")
-                session_display = gr.Textbox(
-                    label="Session Info",
-                    value=get_session_info(initial_session_id),
-                    interactive=False,
-                )
-                new_session_btn = gr.Button("🔄 New Session", variant="secondary")
-
-        async def send_message_streaming(
-            message, history, audit_mode, dynamic_tokens, sid
-        ):
-            """Send message and stream events."""
-            if not client:
-                history.append({"role": "user", "content": message})
-                history.append(
-                    {
-                        "role": "assistant",
-                        "content": "❌ Client not configured. Check .env file.",
-                    }
-                )
-                yield history, "*Error: Client not configured*"
-                return
-
-            if not message.strip():
-                yield history, ""
-                return
-
-            # Add user message
+    async def send_message_streaming(message, history, audit_mode, dynamic_tokens, sid):
+        """Send message and stream events."""
+        if not client:
             history.append({"role": "user", "content": message})
-            get_chat_logger(sid).info("USER: %s", message)
-
-            # Add placeholder for assistant
             history.append(
                 {
                     "role": "assistant",
-                    "content": "🔄 *Connecting to agent...*",
+                    "content": "❌ Client not configured. Check .env file.",
                 }
             )
-            yield history, "*Connecting...*"
+            yield history, "*Error: Client not configured*"
+            return
 
-            # Collect events and stream updates - separate reasoning from text
-            events = []
-            event_display_parts = []
-            accumulated_reasoning = []
-            accumulated_text = []
+        if not message.strip():
+            yield history, ""
+            return
 
-            try:
-                async for event in client.stream_invoke(
-                    message, sid, audit_mode, dynamic_tokens
-                ):
-                    events.append(event)
-                    logger.debug("Received event keys: %s", list(event.keys()))
+        # Add user message
+        history.append({"role": "user", "content": message})
+        get_chat_logger(sid).info("USER: %s", message)
 
-                    # Extract reasoning and text from events
-                    try:
-                        # Check for reasoning in various formats
-                        reasoning_text = None
-                        response_text = None
+        # Add placeholder for assistant
+        history.append(
+            {
+                "role": "assistant",
+                "content": "🔄 *Connecting to agent...*",
+            }
+        )
+        yield history, "*Connecting...*"
 
-                        # Priority 1: nested in event.contentBlockDelta.delta (streaming chunks)
-                        if "event" in event:
-                            raw_event = event.get("event", {})
-                            if isinstance(raw_event, dict):
-                                delta = raw_event.get("contentBlockDelta", {}).get(
-                                    "delta", {}
-                                )
-                                if isinstance(delta, dict):
-                                    # Reasoning content
-                                    if "reasoningContent" in delta:
-                                        rc = delta["reasoningContent"]
-                                        if isinstance(rc, dict):
-                                            reasoning_text = rc.get("text", "")
-                                        else:
-                                            reasoning_text = str(rc)
-                                    # Text content
-                                    elif "text" in delta:
-                                        response_text = str(delta["text"])
+        # Collect events and stream updates - separate reasoning from text
+        events = []
+        event_display_parts = []
+        accumulated_reasoning = []
+        accumulated_text = []
 
-                        # SKIP data events - they duplicate contentBlockDelta
-                        # Priority 3: reasoningText at top level (only if not already captured)
-                        elif "reasoningText" in event and not reasoning_text:
-                            rt = event["reasoningText"]
-                            if isinstance(rt, dict):
-                                reasoning_text = rt.get("text", "")
-                            else:
-                                reasoning_text = str(rt)
+        try:
+            async for event in client.stream_invoke(
+                message, sid, audit_mode, dynamic_tokens
+            ):
+                events.append(event)
+                logger.debug("Received event keys: %s", list(event.keys()))
 
-                        # Accumulate reasoning
-                        if reasoning_text:
-                            accumulated_reasoning.append(reasoning_text)
-                            logger.debug(
-                                "Accumulated reasoning (len=%d)", len(reasoning_text)
+                # Extract reasoning and text from events
+                try:
+                    # Check for reasoning in various formats
+                    reasoning_text = None
+                    response_text = None
+
+                    # Priority 1: nested in event.contentBlockDelta.delta (streaming chunks)
+                    if "event" in event:
+                        raw_event = event.get("event", {})
+                        if isinstance(raw_event, dict):
+                            delta = raw_event.get("contentBlockDelta", {}).get(
+                                "delta", {}
                             )
+                            if isinstance(delta, dict):
+                                # Reasoning content
+                                if "reasoningContent" in delta:
+                                    rc = delta["reasoningContent"]
+                                    if isinstance(rc, dict):
+                                        reasoning_text = rc.get("text", "")
+                                    else:
+                                        reasoning_text = str(rc)
+                                # Text content
+                                elif "text" in delta:
+                                    response_text = str(delta["text"])
 
-                        # Accumulate text (but filter out reasoning markers)
-                        if response_text and not response_text.startswith("🧠"):
-                            accumulated_text.append(response_text)
-                            logger.debug(
-                                "Accumulated text (len=%d): %s...",
-                                len(response_text),
-                                response_text[:30],
-                            )
+                    # SKIP data events - they duplicate contentBlockDelta
+                    # Priority 3: reasoningText at top level (only if not already captured)
+                    elif "reasoningText" in event and not reasoning_text:
+                        rt = event["reasoningText"]
+                        if isinstance(rt, dict):
+                            reasoning_text = rt.get("text", "")
+                        else:
+                            reasoning_text = str(rt)
 
-                        # Format for event log
-                        formatted = format_event_for_display(event)
-                        if formatted:
-                            event_display_parts.append(str(formatted))
-
-                    except (TypeError, ValueError) as fmt_err:
-                        logger.warning("Event format error: %s", fmt_err)
-                        event_display_parts.append("📡 (unserializable event)")
-
-                    # Update the assistant message with separated content
-                    if accumulated_reasoning or accumulated_text:
-                        history[-1] = {
-                            "role": "assistant",
-                            "content": _build_display_content(
-                                accumulated_reasoning, accumulated_text, is_final=False
-                            ),
-                        }
-                    elif event.get("complete") or "result" in event:
-                        # Final response
-                        final = build_streaming_response(events)
-                        history[-1] = {
-                            "role": "assistant",
-                            "content": final,
-                        }
-                    elif event.get("type") == "error" or "error" in event:
-                        error_msg = event.get("message") or event.get(
-                            "error", "Unknown error"
+                    # Accumulate reasoning
+                    if reasoning_text:
+                        accumulated_reasoning.append(reasoning_text)
+                        logger.debug(
+                            "Accumulated reasoning (len=%d)", len(reasoning_text)
                         )
-                        history[-1] = {
-                            "role": "assistant",
-                            "content": f"❌ {error_msg}",
-                        }
-                    else:
-                        # Show progress indicator
-                        status = "Processing"
-                        if event.get("init_event_loop"):
-                            status = "Initializing"
-                        elif event.get("start_event_loop") or event.get("start"):
-                            status = "Thinking"
-                        elif "current_tool_use" in event:
-                            tool_name = event["current_tool_use"].get("name", "tool")
-                            status = f"Using {tool_name}"
-                        elif event.get("reasoning") or "reasoningText" in event:
-                            status = "Reasoning"
 
-                        history[-1] = {
-                            "role": "assistant",
-                            "content": f"🔄 *{status}...*",
-                        }
+                    # Accumulate text (but filter out reasoning markers)
+                    if response_text and not response_text.startswith("🧠"):
+                        accumulated_text.append(response_text)
+                        logger.debug(
+                            "Accumulated text (len=%d): %s...",
+                            len(response_text),
+                            response_text[:30],
+                        )
 
-                    yield history, ""
+                    # Format for event log
+                    formatted = format_event_for_display(event)
+                    if formatted:
+                        event_display_parts.append(str(formatted))
 
-                # Final update - use Gradio's native reasoning tags
-                final_parts = []
-                if accumulated_reasoning:
-                    reasoning_content = "".join(
-                        str(r) for r in accumulated_reasoning if r
+                except (TypeError, ValueError) as fmt_err:
+                    logger.warning("Event format error: %s", fmt_err)
+                    event_display_parts.append("📡 (unserializable event)")
+
+                # Update the assistant message with separated content
+                if accumulated_reasoning or accumulated_text:
+                    history[-1] = {
+                        "role": "assistant",
+                        "content": _build_display_content(
+                            accumulated_reasoning, accumulated_text, is_final=False
+                        ),
+                    }
+                elif event.get("complete") or "result" in event:
+                    # Final response
+                    final = build_streaming_response(events)
+                    history[-1] = {
+                        "role": "assistant",
+                        "content": final,
+                    }
+                elif event.get("type") == "error" or "error" in event:
+                    error_msg = event.get("message") or event.get(
+                        "error", "Unknown error"
                     )
-                    # Sanitize markdown in final reasoning
-                    reasoning_content = _sanitize_reasoning_markdown(reasoning_content)
-                    final_parts.append(f"<think>{reasoning_content}</think>")
-
-                # Get final response text
-                if accumulated_text:
-                    final_parts.append("".join(str(t) for t in accumulated_text if t))
+                    history[-1] = {
+                        "role": "assistant",
+                        "content": f"❌ {error_msg}",
+                    }
                 else:
-                    # Fall back to build_streaming_response
-                    final_response = build_streaming_response(events)
-                    if final_response and final_response != "No response received":
-                        final_parts.append(final_response)
+                    # Show progress indicator
+                    status = "Processing"
+                    if event.get("init_event_loop"):
+                        status = "Initializing"
+                    elif event.get("start_event_loop") or event.get("start"):
+                        status = "Thinking"
+                    elif "current_tool_use" in event:
+                        tool_name = event["current_tool_use"].get("name", "tool")
+                        status = f"Using {tool_name}"
+                    elif event.get("reasoning") or "reasoningText" in event:
+                        status = "Reasoning"
 
-                final_content = (
-                    "".join(final_parts) if final_parts else "No response received"
-                )
-                history[-1] = {
-                    "role": "assistant",
-                    "content": final_content,
-                }
-                # Log the final assistant response (strip think tags for readability)
-                import re
+                    history[-1] = {
+                        "role": "assistant",
+                        "content": f"🔄 *{status}...*",
+                    }
 
-                clean_response = re.sub(
-                    r"<think>.*?</think>", "", final_content, flags=re.DOTALL
-                ).strip()
-                get_chat_logger(sid).info(
-                    "ASSISTANT: %s",
-                    (
-                        clean_response[:2000]
-                        if len(clean_response) > 2000
-                        else clean_response
-                    ),
-                )
                 yield history, ""
 
-            except Exception as e:
-                logger.error("Streaming error: %s", e, exc_info=True)
-                history[-1] = {"role": "assistant", "content": f"❌ Error: {e}"}
-                yield history, ""
+            # Final update - use Gradio's native reasoning tags
+            final_parts = []
+            if accumulated_reasoning:
+                reasoning_content = "".join(str(r) for r in accumulated_reasoning if r)
+                # Sanitize markdown in final reasoning
+                reasoning_content = _sanitize_reasoning_markdown(reasoning_content)
+                final_parts.append(f"<think>{reasoning_content}</think>")
 
-        def clear_chat():
-            return [], ""
+            # Get final response text
+            if accumulated_text:
+                final_parts.append("".join(str(t) for t in accumulated_text if t))
+            else:
+                # Fall back to build_streaming_response
+                final_response = build_streaming_response(events)
+                if final_response and final_response != "No response received":
+                    final_parts.append(final_response)
 
-        def start_new_session():
-            """Generate a new session ID and update display."""
-            new_sid = f"ws-session-{uuid.uuid4()}"
-            logger.info("Started new session: %s", new_sid)
-            return new_sid, get_session_info(new_sid), []
-
-        def refresh_tools():
-            """Refresh the tools list from the gateway."""
-            if not client:
-                return "❌ Client not configured. Check .env file."
-            try:
-                tools = client.get_available_tools()
-                if tools and tools[0].get("id") == "error":
-                    return f"❌ {tools[0]['name']}"
-                sorted_tools = sorted(tools, key=lambda t: t["name"].lower())
-                tools_text = "\n".join([f"- {t['name']}" for t in sorted_tools])
-                logger.info("Refreshed tools list: %d tools", len(tools))
-                return f"**Available Tools ({len(tools)}):**\n{tools_text}"
-            except Exception as e:
-                logger.error("Error refreshing tools: %s", e)
-                return f"❌ Error refreshing tools: {e}"
-
-        def download_last_response(history, sid):
-            """Download the last agent response as a markdown file."""
+            final_content = (
+                "".join(final_parts) if final_parts else "No response received"
+            )
+            history[-1] = {
+                "role": "assistant",
+                "content": final_content,
+            }
+            # Log the final assistant response (strip think tags for readability)
             import re
-            from datetime import datetime
 
-            # Create responses directory
-            responses_dir = Path(__file__).parent.parent / "logs" / "responses"
-            responses_dir.mkdir(parents=True, exist_ok=True)
+            clean_response = re.sub(
+                r"<think>.*?</think>", "", final_content, flags=re.DOTALL
+            ).strip()
+            get_chat_logger(sid).info(
+                "ASSISTANT: %s",
+                (
+                    clean_response[:2000]
+                    if len(clean_response) > 2000
+                    else clean_response
+                ),
+            )
+            yield history, ""
 
-            if not history:
-                # Return a temporary file with error message
-                temp_path = responses_dir / "no_response.txt"
-                temp_path.write_text("No messages in chat history.")
-                return str(temp_path)
+        except Exception as e:
+            logger.error("Streaming error: %s", e, exc_info=True)
+            history[-1] = {"role": "assistant", "content": f"❌ Error: {e}"}
+            yield history, ""
 
-            # Find the last assistant message
-            last_assistant_msg = None
-            for msg in reversed(history):
-                if msg.get("role") == "assistant":
-                    last_assistant_msg = msg
-                    break
+    def clear_chat():
+        return [], ""
 
-            if not last_assistant_msg:
-                temp_path = responses_dir / "no_response.txt"
-                temp_path.write_text("No agent responses found in chat history.")
-                return str(temp_path)
+    def start_new_session():
+        """Generate a new session ID and update display."""
+        new_sid = f"ws-session-{uuid.uuid4()}"
+        logger.info("Started new session: %s", new_sid)
+        return new_sid, get_session_info(new_sid), []
 
-            content = last_assistant_msg.get("content", "")
+    def refresh_tools():
+        """Refresh the tools list from the gateway."""
+        if not client:
+            return "❌ Client not configured. Check .env file."
+        try:
+            tools = client.get_available_tools()
+            if tools and tools[0].get("id") == "error":
+                return f"❌ {tools[0]['name']}"
+            sorted_tools = sorted(tools, key=lambda t: t["name"].lower())
+            tools_text = "\n".join([f"- {t['name']}" for t in sorted_tools])
+            logger.info("Refreshed tools list: %d tools", len(tools))
+            return f"**Available Tools ({len(tools)}):**\n{tools_text}"
+        except Exception as e:
+            logger.error("Error refreshing tools: %s", e)
+            return f"❌ Error refreshing tools: {e}"
+
+    def download_last_response(history, sid):
+        """Download the last agent response as a markdown file."""
+        import re
+        from datetime import datetime
+
+        # Create responses directory
+        responses_dir = Path(__file__).parent.parent / "logs" / "responses"
+        responses_dir.mkdir(parents=True, exist_ok=True)
+
+        if not history:
+            # Return a temporary file with error message
+            temp_path = responses_dir / "no_response.txt"
+            temp_path.write_text("No messages in chat history.")
+            return str(temp_path)
+
+        # Find the last assistant message
+        last_assistant_msg = None
+        for msg in reversed(history):
+            if msg.get("role") == "assistant":
+                last_assistant_msg = msg
+                break
+
+        if not last_assistant_msg:
+            temp_path = responses_dir / "no_response.txt"
+            temp_path.write_text("No agent responses found in chat history.")
+            return str(temp_path)
+
+        content = last_assistant_msg.get("content", "")
+        # Handle content as list or string
+        if isinstance(content, list):
+            content = "\n".join(str(item) for item in content)
+        else:
+            content = str(content)
+
+        # Create filename with timestamp — validate sid to prevent path traversal
+        safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = "agent_response_" + safe_sid + "_" + timestamp + ".md"
+        filepath = responses_dir / filename
+
+        # Format content for download
+        output = f"# Agent Response\n\n"
+        output += f"**Session:** {sid}\n"
+        output += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        output += "---\n\n"
+        output += content
+
+        filepath.write_text(output, encoding="utf-8")
+        logger.info("Downloaded last response to: %s", filepath)
+        return str(filepath)
+
+    def download_full_chat(history, sid):
+        """Download the full chat history as a markdown file."""
+        from datetime import datetime
+
+        # Create responses directory
+        responses_dir = Path(__file__).parent.parent / "logs" / "responses"
+        responses_dir.mkdir(parents=True, exist_ok=True)
+
+        if not history:
+            temp_path = responses_dir / "empty_chat.txt"
+            temp_path.write_text("No messages in chat history.")
+            return str(temp_path)
+
+        # Create filename with timestamp — validate sid to prevent path traversal
+        import re as _re
+
+        safe_sid = _re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = "full_chat_" + safe_sid + "_" + timestamp + ".md"
+        filepath = responses_dir / filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = "chat_history_" + safe_sid + "_" + timestamp + ".md"
+        filepath = Path("/tmp") / filename
+
+        # Format full conversation
+        output = f"# Chat History\n\n"
+        output += f"**Session:** {sid}\n"
+        output += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        output += f"**Messages:** {len(history)}\n\n"
+        output += "---\n\n"
+
+        for i, msg in enumerate(history, 1):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+
             # Handle content as list or string
             if isinstance(content, list):
                 content = "\n".join(str(item) for item in content)
             else:
                 content = str(content)
 
-            # Create filename with timestamp — validate sid to prevent path traversal
-            safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = "agent_response_" + safe_sid + "_" + timestamp + ".md"
-            filepath = responses_dir / filename
+            if role == "user":
+                output += f"## 👤 User (Message {i})\n\n"
+            elif role == "assistant":
+                output += f"## 🤖 Assistant (Message {i})\n\n"
+            else:
+                output += f"## {role.title()} (Message {i})\n\n"
 
-            # Format content for download
-            output = f"# Agent Response\n\n"
-            output += f"**Session:** {sid}\n"
-            output += (
-                f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            )
-            output += "---\n\n"
-            output += content
-
-            filepath.write_text(output, encoding="utf-8")
-            logger.info("Downloaded last response to: %s", filepath)
-            return str(filepath)
-
-        def download_full_chat(history, sid):
-            """Download the full chat history as a markdown file."""
-            from datetime import datetime
-
-            # Create responses directory
-            responses_dir = Path(__file__).parent.parent / "logs" / "responses"
-            responses_dir.mkdir(parents=True, exist_ok=True)
-
-            if not history:
-                temp_path = responses_dir / "empty_chat.txt"
-                temp_path.write_text("No messages in chat history.")
-                return str(temp_path)
-
-            # Create filename with timestamp — validate sid to prevent path traversal
-            import re as _re
-
-            safe_sid = _re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = "full_chat_" + safe_sid + "_" + timestamp + ".md"
-            filepath = responses_dir / filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = "chat_history_" + safe_sid + "_" + timestamp + ".md"
-            filepath = Path("/tmp") / filename
-
-            # Format full conversation
-            output = f"# Chat History\n\n"
-            output += f"**Session:** {sid}\n"
-            output += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            output += f"**Messages:** {len(history)}\n\n"
+            output += content + "\n\n"
             output += "---\n\n"
 
-            for i, msg in enumerate(history, 1):
-                role = msg.get("role", "unknown")
-                content = msg.get("content", "")
+        filepath.write_text(output, encoding="utf-8")
+        logger.info("Downloaded full chat history to: %s", filepath)
+        return str(filepath)
 
-                # Handle content as list or string
-                if isinstance(content, list):
-                    content = "\n".join(str(item) for item in content)
-                else:
-                    content = str(content)
+    refresh_tools_btn.click(fn=refresh_tools, outputs=[tools_display])
 
-                if role == "user":
-                    output += f"## 👤 User (Message {i})\n\n"
-                elif role == "assistant":
-                    output += f"## 🤖 Assistant (Message {i})\n\n"
-                else:
-                    output += f"## {role.title()} (Message {i})\n\n"
+    # Lazy-load tools when the page first renders
+    # One-shot timer to lazy-load tools on first render (replaces blocks_demo.load)
+    timer = gr.Timer(value=0.5, active=True)
+    timer.tick(
+        fn=lambda: (refresh_tools(), gr.update(active=False)),
+        outputs=[tools_display, timer],
+    )
 
-                output += content + "\n\n"
-                output += "---\n\n"
+    send_btn.click(
+        fn=send_message_streaming,
+        inputs=[
+            msg_input,
+            chatbot,
+            audit_mode_checkbox,
+            dynamic_tokens_checkbox,
+            session_id,
+        ],
+        outputs=[chatbot, msg_input],
+    )
 
-            filepath.write_text(output, encoding="utf-8")
-            logger.info("Downloaded full chat history to: %s", filepath)
-            return str(filepath)
+    msg_input.submit(
+        fn=send_message_streaming,
+        inputs=[
+            msg_input,
+            chatbot,
+            audit_mode_checkbox,
+            dynamic_tokens_checkbox,
+            session_id,
+        ],
+        outputs=[chatbot, msg_input],
+    )
 
-        refresh_tools_btn.click(fn=refresh_tools, outputs=[tools_display])
+    clear_btn.click(fn=clear_chat, outputs=[chatbot, msg_input])
 
-        send_btn.click(
-            fn=send_message_streaming,
-            inputs=[
-                msg_input,
-                chatbot,
-                audit_mode_checkbox,
-                dynamic_tokens_checkbox,
-                session_id,
-            ],
-            outputs=[chatbot, msg_input],
-        )
+    new_session_btn.click(
+        fn=start_new_session,
+        outputs=[session_id, session_display, chatbot],
+    )
 
-        msg_input.submit(
-            fn=send_message_streaming,
-            inputs=[
-                msg_input,
-                chatbot,
-                audit_mode_checkbox,
-                dynamic_tokens_checkbox,
-                session_id,
-            ],
-            outputs=[chatbot, msg_input],
-        )
+    download_last_btn.click(
+        fn=download_last_response,
+        inputs=[chatbot, session_id],
+        outputs=[download_last_btn],
+    )
 
-        clear_btn.click(fn=clear_chat, outputs=[chatbot, msg_input])
-
-        new_session_btn.click(
-            fn=start_new_session,
-            outputs=[session_id, session_display, chatbot],
-        )
-
-        download_last_btn.click(
-            fn=download_last_response,
-            inputs=[chatbot, session_id],
-            outputs=[download_last_btn],
-        )
-
-        download_full_btn.click(
-            fn=download_full_chat,
-            inputs=[chatbot, session_id],
-            outputs=[download_full_btn],
-        )
-
-    return blocks_demo
-
-
-demo = create_ui()
-
-if __name__ == "__main__":
-    logger.info("Starting WebSocket streaming UI on http://localhost:7861")
-    demo.launch(
-        server_name="127.0.0.1",
-        server_port=7861,
-        share=False,
-        theme=gr.themes.Soft(),
-        app_kwargs={"title": "AgentCore Runtime UI (Streaming)"},
+    download_full_btn.click(
+        fn=download_full_chat,
+        inputs=[chatbot, session_id],
+        outputs=[download_full_btn],
     )

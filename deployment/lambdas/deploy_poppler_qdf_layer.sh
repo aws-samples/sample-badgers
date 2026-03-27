@@ -3,17 +3,17 @@
 
 set -e
 
-LAYER_NAME="poppler-utils"
-DESCRIPTION="Poppler utilities for PDF processing (pdftoppm, pdfinfo, pdftotext, pdfimages)"
+LAYER_NAME="poppler-qdf-utils"
+DESCRIPTION="Poppler utilities for PDF processing (pdftoppm, pdfinfo, pdftotext, pdfimages) and qdf"
 COMPATIBLE_RUNTIMES="python3.12"
 REGION="${AWS_REGION:-us-west-2}"
-LAYER_FILE="poppler-layer.zip"
+LAYER_FILE="poppler-qpdf-layer.zip"
 
 echo "☁️  Deploying Poppler Lambda Layer..."
 
 # Check if layer zip exists
 if [ ! -f "$LAYER_FILE" ]; then
-    echo "❌ $LAYER_FILE not found. Run ./build_poppler_layer.sh first."
+    echo "❌ $LAYER_FILE not found. Run ./build_poppler_qdf_layer.sh first."
     exit 1
 fi
 
