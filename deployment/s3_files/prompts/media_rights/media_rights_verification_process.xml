@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file defines the verification process for media rights contract detection and analysis -->
+<media_rights_verification_process>
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- First pass: Identification of contract content -->
+    <pass_1_identification>
+        <step>Scan ONLY the target image for media rights contract content.</step>
+        <step>Look for key indicators: contract title, party identification blocks, article/section numbering, legal language (hereby, herein, hereof, whereas), rights grant language, financial terms, signature blocks.</step>
+        <step>If no contract content is found, proceed to final_verification to report no media rights contract detected.</step>
+        <step>If potential contract content is found, classify the contract type based on title, parties, and key provisions.</step>
+        <step>Confirm that you have not considered any example images in this process.</step>
+    </pass_1_identification>
+
+    <!-- Second pass: Detailed extraction -->
+    <pass_2_extraction>
+        <!-- Criteria for media rights contract verification -->
+        <contract_criteria>
+            <criterion>Contains identification of two or more contracting parties with defined roles (licensor/licensee, producer/performer, publisher/producer, owner/distributor, platform/creator).</criterion>
+            <criterion>Includes a grant of rights or license provision transferring or licensing intellectual property, distribution, or exploitation rights.</criterion>
+            <criterion>Contains financial terms (fees, revenue shares, royalties, compensation structures).</criterion>
+            <criterion>Includes term/duration provisions and/or termination mechanics.</criterion>
+            <criterion>Contains media-specific or entertainment-specific terminology (Licensed Content, Territory, Licensed Media, Production, Composition, Programs, Creator Content, SVOD, AVOD, residuals, sync fee, distribution fee).</criterion>
+            <criterion>Includes representations, warranties, or indemnification provisions.</criterion>
+            <criterion>Contains signature blocks or execution provisions.</criterion>
+        </contract_criteria>
+
+        <!-- At least THREE criteria should be met for classification as a media rights contract -->
+        <minimum_criteria>At least THREE of the above criteria must be present to classify as a media rights contract.</minimum_criteria>
+
+        <!-- Extraction priorities -->
+        <extraction_priorities>
+            <priority level="1">Contract type identification and document title</priority>
+            <priority level="2">Party identification and defined roles</priority>
+            <priority level="3">Defined terms and their definitions</priority>
+            <priority level="4">Grant of rights (scope, territory, media, exclusivity)</priority>
+            <priority level="5">Financial terms (fees, revenue shares, MG, residuals)</priority>
+            <priority level="6">Term, renewal, and termination provisions</priority>
+            <priority level="7">Holdbacks, windowing, and exclusivity restrictions</priority>
+            <priority level="8">Obligations and restrictions (delivery, approval, morals, content standards)</priority>
+            <priority level="9">Credit and attribution provisions</priority>
+            <priority level="10">Representations, warranties, and indemnification</priority>
+            <priority level="11">Legal boilerplate (governing law, dispute resolution, force majeure)</priority>
+            <priority level="12">AI/digital likeness and modern provisions</priority>
+            <priority level="13">Exhibit references and signature blocks</priority>
+            <priority level="14">Unfilled terms and blank fields</priority>
+        </extraction_priorities>
+    </pass_2_extraction>
+
+    <!-- Exhaustive capture -->
+    <exhaustive_capture>
+        <step>For verified media rights contracts, extract ALL visible provisions following the extraction priorities.</step>
+        <step>Do not skip provisions because they appear to be standard boilerplate — capture everything. Boilerplate provisions can contain material variations.</step>
+        <step>When text is partially visible or cut off at page boundaries, extract what is readable and indicate truncation.</step>
+        <step>For blank fill-in fields, capture the surrounding context and flag the blank as requiring negotiation.</step>
+        <step>Preserve all article numbers, section numbers, and cross-references exactly as written.</step>
+        <step>Note any handwritten annotations, stamps, or markings visible on the document.</step>
+    </exhaustive_capture>
+
+    <!-- Contract type analysis -->
+    <contract_type_analysis>
+        <step>Based on the title, parties, and key provisions, classify the contract type: content licensing, talent agreement, sync license, distribution agreement, or digital rights/UGC license.</step>
+        <step>If the contract is a hybrid or does not fit neatly into one category, note the primary type and identify which provisions cross into other categories.</step>
+        <step>Identify whether this appears to be a template (blank fields present), a partially executed agreement, or a fully executed agreement.</step>
+        <step>Note the apparent sophistication level: simple form agreement vs. heavily negotiated bespoke contract.</step>
+    </contract_type_analysis>
+
+    <!-- Defined term tracking -->
+    <defined_term_tracking>
+        <step>On first pass, identify all defined terms (capitalized terms introduced with quotation marks or parenthetical definitions).</step>
+        <step>Extract each defined term and its full definition verbatim.</step>
+        <step>Track where defined terms are used throughout the document to ensure consistent extraction.</step>
+        <step>Flag any defined terms that reference exhibits or external documents for their full definition.</step>
+    </defined_term_tracking>
+
+    <!-- Final verification -->
+    <final_verification>
+        <step>Review your extraction for completeness — have you captured all visible articles, sections, and subsections?</step>
+        <step>Verify that all information comes from the target image only.</step>
+        <step>Ensure all defined terms are captured with their definitions.</step>
+        <step>Confirm all blank fill-in fields are flagged as requiring negotiation.</step>
+        <step>Verify that cross-references between sections are preserved.</step>
+        <step>Ensure financial terms are captured with exact figures or blank indicators.</step>
+        <step>If no media rights contract content was found, prepare the appropriate not_found response.</step>
+    </final_verification>
+
+    <!-- Not found response -->
+    <not_found_response>
+        <format>
+            <media_rights_extraction>
+                <confirm_no_example_analysis>I confirm I did NOT analyze any example images.</confirm_no_example_analysis>
+                <contract_identified>NO</contract_identified>
+                <explanation>No media rights contract content was detected in the target image. The image appears to contain: {BRIEF_DESCRIPTION_OF_WHAT_IS_ACTUALLY_IN_THE_IMAGE}</explanation>
+                <recommendation>Consider using a different analyzer tool appropriate for the content type.</recommendation>
+            </media_rights_extraction>
+        </format>
+    </not_found_response>
+</media_rights_verification_process>

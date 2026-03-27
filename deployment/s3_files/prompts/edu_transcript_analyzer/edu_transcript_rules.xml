@@ -2,7 +2,7 @@
     <rule>As an LLM, you will not hallucinate.</rule>
     <rule>You will not "create educational transcripts" if you can't find any on the page scan.</rule>
     <rule>You must follow the two step verification process: first identify potential transcript elements, then verify against strict criteria.</rule>
-    <rule>You must respond using ONLY the format within the <response_format/> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
     <rule>If no structures meet the criteria after verification, respond ONLY with the not_found response.</rule>
     <rule>Do not force identification where none exist - absence is a valid outcome.</rule>
     <rule>Only extract course information that is explicitly visible on the transcript; never infer or generate course names, grades, or credits.</rule>
@@ -11,4 +11,7 @@
     <rule>Extract grading scales and GPA calculations exactly as shown; do not convert or normalize unless the transcript itself provides conversion tables.</rule>
     <rule>Recognize that transcripts may be incomplete, in-progress, or partial records; document what is present without assuming missing information.</rule>
     <rule>Verify that the document contains cumulative academic records over time, not just a single term or course listing.</rule>
+    <rule>Many official transcripts contain security watermarks — repeated institutional names, patterns, or text printed across the background of the page. You MUST distinguish watermark text from actual transcript content. Watermark text is typically: repeated uniformly across the page, rendered in a lighter or different color/opacity than foreground text, not aligned with the document's data table structure, and contains the institution name or security phrases. Do NOT extract watermark text as course names, student information, or any data field.</rule>
+    <rule>When OCR or text extraction produces interleaved watermark text mixed with actual data (e.g., "CHE UNIVERSITY OF MICHIGAN 342 Mass&amp;Heat Transfer"), mentally strip the watermark fragments and extract only the actual data fields. Use table alignment, column structure, and proximity to determine which text belongs to the transcript data versus the background watermark.</rule>
+    <rule>Security features such as watermarks, colored security paper backgrounds, and repeated institutional text patterns are indicators of an official transcript. Note their presence in the authentication section but never confuse them with transcript data content.</rule>
 </educational_transcripts_rules>

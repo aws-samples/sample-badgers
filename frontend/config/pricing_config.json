@@ -86,12 +86,12 @@
             "input_cost_per_million": 5.00,
             "output_cost_per_million": 25.00
         },
-        "global.anthropic.claude-sonnet-4-6-v1:0": {
+        "us.anthropic.claude-sonnet-4-6-v1:0": {
             "name": "Claude Sonnet 4.6",
             "input_cost_per_million": 3.00,
             "output_cost_per_million": 15.00
         },
-        "global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
+        "us.anthropic.claude-sonnet-4-5-20250929-v1:0": {
             "name": "Claude Sonnet 4.5",
             "input_cost_per_million": 3.00,
             "output_cost_per_million": 15.00

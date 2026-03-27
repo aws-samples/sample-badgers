@@ -60,13 +60,13 @@ class IAMStack(Stack):
                     "bedrock:InvokeModelWithResponseStream",
                 ],
                 resources=[
-                    # Primary model (global inference profile)
-                    "arn:aws:bedrock:*:*:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    # Primary model (regional inference profile)
+                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
                     # Fallback models (inference profiles)
                     "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
                     "arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
-                    # Claude Opus 4.6 (global inference profile for vision)
-                    "arn:aws:bedrock:*:*:inference-profile/global.anthropic.claude-opus-4-6-v1",
+                    # Claude Opus 4.6 (regional inference profile for vision)
+                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-opus-4-6-v1",
                     # Cell grid resolver (cross-region Sonnet)
                     "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
                 ],
@@ -103,7 +103,7 @@ class IAMStack(Stack):
                     "bedrock:InvokeModelWithResponseStream",
                 ],
                 resources=[
-                    # Claude Sonnet 4.5 foundation model (global profile routes here)
+                    # Claude Sonnet 4.5 foundation model (regional profile routes here)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
                     # Claude Haiku 4.5 foundation model
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -114,6 +114,22 @@ class IAMStack(Stack):
                     # Claude Sonnet 4 foundation model (cell grid resolver)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
                 ],
+            )
+        )
+
+        # AWS Marketplace permissions - required for automatic model subscription
+        # When Bedrock models are first invoked, AWS automatically subscribes the
+        # account via Marketplace. Without these permissions, the first invocation
+        # fails with AccessDeniedException. See: github.com/aws-samples/sample-badgers/issues/33
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="MarketplaceModelSubscription",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "aws-marketplace:ViewSubscriptions",
+                    "aws-marketplace:Subscribe",
+                ],
+                resources=["*"],
             )
         )
 

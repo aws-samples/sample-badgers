@@ -18,15 +18,12 @@ print("BEDROCK_CLIENT MODULE LOADING - TOP OF FILE")
 # Model ID to inference profile ARN mapping via environment variables
 MODEL_TO_PROFILE_ENV_MAP = {
     # Claude Sonnet 4.5 variants
-    "global.anthropic.claude-sonnet-4-5-20250929-v1:0": "CLAUDE_SONNET_PROFILE_ARN",
     "us.anthropic.claude-sonnet-4-5-20250929-v1:0": "CLAUDE_SONNET_PROFILE_ARN",
     "anthropic.claude-sonnet-4-5-20250929-v1:0": "CLAUDE_SONNET_PROFILE_ARN",
     # Claude Haiku 4.5 variants (note: date is 20251001)
-    "global.anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
     "us.anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
     "anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
     # Claude Opus 4.6 variants
-    "global.anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
     "us.anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
     "anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
     # Nova Premier variants
