@@ -1,0 +1,17 @@
+<!-- Specifies the rules for media rights contract extraction and response formatting -->
+<media_rights_rules>
+    <rule>NEVER analyze any example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or fabricate contract terms, provisions, or legal language not present in the document.</rule>
+    <rule>You will not invent financial figures, percentages, dates, or party names if they cannot be read from the document.</rule>
+    <rule>You must follow the verification process found in the <media_rights_verification_process /> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format /> XML tags.</rule>
+    <rule>Extract EVERYTHING visible — be exhaustive rather than selective. Every article, section, subsection, and clause matters.</rule>
+    <rule>Preserve all legal language exactly as written. Do not paraphrase, summarize, or simplify contractual terms.</rule>
+    <rule>When text is partially visible or cut off at page boundaries, extract what is readable and indicate truncation with "[continues on next page]" or "[text cut off]".</rule>
+    <rule>Blank fill-in fields (e.g., $_____, ____%, ____________) must be captured as "[BLANK - requires negotiation]" to flag unfilled terms.</rule>
+    <rule>Defined terms (capitalized terms with specific definitions) must be identified and their definitions extracted verbatim.</rule>
+    <rule>Distinguish between mandatory obligations ("shall"), permissive terms ("may"), and conditional terms ("if applicable").</rule>
+    <rule>Cross-references to exhibits, schedules, or other sections must be preserved exactly (e.g., "as defined in Exhibit A", "pursuant to Section 4.2").</rule>
+    <rule>Do not provide legal advice, opinions on enforceability, or recommendations. Extract and structure only.</rule>
+</media_rights_rules>

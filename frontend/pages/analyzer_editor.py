@@ -66,7 +66,7 @@ def get_config_bucket() -> str:
 
 # Available models
 AVAILABLE_MODELS = {
-    "global.anthropic.claude-sonnet-4-5-20250929-v1:0": "Claude Sonnet 4.5",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0": "Claude Sonnet 4.5",
     "us.anthropic.claude-haiku-4-5-20251001-v1:0": "Claude Haiku 4.5",
     "us.amazon.nova-premier-v1:0": "Amazon Nova Premier",
 }
@@ -352,280 +352,287 @@ def save_analyzer(
     return "\n".join(results)
 
 
-def create_editor():
-    """Create the Gradio editor interface."""
-
-    # Get available analyzers
+def _build_analyzer_choices() -> list[str]:
+    """Build dropdown choices from S3 analyzers (called on-demand, not at import)."""
     analyzers = get_wizard_managed_analyzers()
-
-    # Build dropdown choices with type labels
-    analyzer_choices = []
+    choices = []
     for name, data in analyzers.items():
         source = data.get("source", "custom")
         label = f"{name} (Base)" if source == "base" else f"{name} (Custom)"
-        analyzer_choices.append(label)
+        choices.append(label)
+    return choices
 
-    with gr.Blocks(title="Analyzer Editor") as demo:
-        # State for current analyzer
-        current_analyzer = gr.State("")
-        current_source = gr.State("custom")
 
-        gr.Markdown("# ✏️ Analyzer Editor")
-        gr.Markdown(
-            "Edit analyzers. Base analyzers are read-only by default. Custom analyzers are always editable."
+def build():
+    """Create the Analyzer Editor UI (no Blocks wrapper)."""
+
+    # NOTE: Analyzer list is loaded on-demand (not at import time) to avoid
+    # blocking Gradio startup with sequential S3 calls.
+
+    # State for current analyzer
+    current_analyzer = gr.State("")
+    current_source = gr.State("custom")
+
+    gr.Markdown("# ✏️ Analyzer Editor")
+    gr.Markdown(
+        "Edit analyzers. Base analyzers are read-only by default. Custom analyzers are always editable."
+    )
+
+    with gr.Row():
+        analyzer_dropdown = gr.Dropdown(
+            choices=[],
+            label="Select Analyzer",
+            info="Click 'Refresh List' to load analyzers from S3",
+        )
+        refresh_btn = gr.Button("🔄 Refresh List", variant="secondary")
+        load_btn = gr.Button("Load", variant="primary")
+
+    analyzer_info = gr.Markdown("")
+
+    # Edit toggle for base analyzers (hidden by default)
+    with gr.Row(visible=False) as edit_toggle_row:
+        enable_edit_toggle = gr.Checkbox(
+            label="Enable editing (Base analyzer)",
+            value=False,
+            info="⚠️ Warning: Changes to base analyzers may be overwritten on deployment updates",
         )
 
-        if not analyzer_choices:
-            gr.Markdown(
-                "⚠️ **No analyzers found.** Create one using the Analyzer Wizard first."
+    with gr.Tabs() as tabs:
+        # Settings tab
+        with gr.Tab("⚙️ Settings"):
+            description_input = gr.Textbox(
+                label="Description",
+                lines=3,
+                info="Tool description shown to users",
             )
-            return demo
 
-        with gr.Row():
-            analyzer_dropdown = gr.Dropdown(
-                choices=analyzer_choices,
-                label="Select Analyzer",
-                info="Base = shipped with deployment, Custom = created via wizard",
-            )
-            load_btn = gr.Button("Load", variant="primary")
+            gr.Markdown("### Model Selection")
+            with gr.Row():
+                primary_model = gr.Dropdown(
+                    choices=MODEL_NAMES,
+                    label="Primary Model",
+                )
+                fallback_1 = gr.Dropdown(
+                    choices=MODEL_NAMES,
+                    label="Fallback Model 1",
+                )
+                fallback_2 = gr.Dropdown(
+                    choices=MODEL_NAMES,
+                    label="Fallback Model 2",
+                )
 
-        analyzer_info = gr.Markdown("")
-
-        # Edit toggle for base analyzers (hidden by default)
-        with gr.Row(visible=False) as edit_toggle_row:
-            enable_edit_toggle = gr.Checkbox(
-                label="Enable editing (Base analyzer)",
+            gr.Markdown("### Enhancement Options")
+            enhancement_eligible = gr.Checkbox(
+                label="Enhancement Eligible",
                 value=False,
-                info="⚠️ Warning: Changes to base analyzers may be overwritten on deployment updates",
+                info="Enable image enhancement for degraded/historical documents before analysis",
             )
 
-        with gr.Tabs() as tabs:
-            # Settings tab
-            with gr.Tab("⚙️ Settings"):
-                description_input = gr.Textbox(
-                    label="Description",
-                    lines=3,
-                    info="Tool description shown to users",
+        # Prompts tab
+        with gr.Tab("📝 Prompts"):
+            with gr.Accordion("Gestalt Perception", open=True):
+                gr.Markdown(
+                    "*Visual perception guidance - how to see before extracting*"
                 )
+                gestalt_editor = gr.Code(label="gestalt.xml", language="html", lines=15)
 
-                gr.Markdown("### Model Selection")
-                with gr.Row():
-                    primary_model = gr.Dropdown(
-                        choices=MODEL_NAMES,
-                        label="Primary Model",
-                    )
-                    fallback_1 = gr.Dropdown(
-                        choices=MODEL_NAMES,
-                        label="Fallback Model 1",
-                    )
-                    fallback_2 = gr.Dropdown(
-                        choices=MODEL_NAMES,
-                        label="Fallback Model 2",
-                    )
+            with gr.Accordion("Job Role", open=True):
+                role_editor = gr.Code(label="job_role.xml", language="html", lines=12)
 
-                gr.Markdown("### Enhancement Options")
-                enhancement_eligible = gr.Checkbox(
-                    label="Enhancement Eligible",
-                    value=False,
-                    info="Enable image enhancement for degraded/historical documents before analysis",
-                )
+            with gr.Accordion("Rules", open=True):
+                rules_editor = gr.Code(label="rules.xml", language="html", lines=10)
 
-            # Prompts tab
-            with gr.Tab("📝 Prompts"):
-                with gr.Accordion("Gestalt Perception", open=True):
-                    gr.Markdown(
-                        "*Visual perception guidance - how to see before extracting*"
-                    )
-                    gestalt_editor = gr.Code(
-                        label="gestalt.xml", language="html", lines=15
-                    )
+            with gr.Accordion("Context", open=False):
+                context_editor = gr.Code(label="context.xml", language="html", lines=8)
 
-                with gr.Accordion("Job Role", open=True):
-                    role_editor = gr.Code(
-                        label="job_role.xml", language="html", lines=12
-                    )
+            with gr.Accordion("Tasks", open=False):
+                tasks_editor = gr.Code(label="tasks.xml", language="html", lines=8)
 
-                with gr.Accordion("Rules", open=True):
-                    rules_editor = gr.Code(label="rules.xml", language="html", lines=10)
+            with gr.Accordion("Format", open=False):
+                format_editor = gr.Code(label="format.xml", language="html", lines=8)
 
-                with gr.Accordion("Context", open=False):
-                    context_editor = gr.Code(
-                        label="context.xml", language="html", lines=8
-                    )
+    gr.Markdown("---")
 
-                with gr.Accordion("Tasks", open=False):
-                    tasks_editor = gr.Code(label="tasks.xml", language="html", lines=8)
+    with gr.Row():
+        gr.Markdown("")
+        clear_btn = gr.Button("🗑️ Clear Form", variant="secondary", scale=1)
+        save_btn = gr.Button("💾 Save Changes", variant="primary", scale=1)
 
-                with gr.Accordion("Format", open=False):
-                    format_editor = gr.Code(
-                        label="format.xml", language="html", lines=8
-                    )
+    save_output = gr.Textbox(label="Status", lines=10, interactive=False)
 
-        gr.Markdown("---")
-
-        with gr.Row():
-            gr.Markdown("")
-            clear_btn = gr.Button("🗑️ Clear Form", variant="secondary", scale=1)
-            save_btn = gr.Button("💾 Save Changes", variant="primary", scale=1)
-
-        save_output = gr.Textbox(label="Status", lines=10, interactive=False)
-
-        # Event handlers
-        def load_analyzer(dropdown_value):
-            """Load analyzer data from S3 into the form."""
-            if not dropdown_value:
-                return (
-                    "",  # current_analyzer
-                    "custom",  # current_source
-                    "",  # analyzer_info
-                    gr.update(visible=False),  # edit_toggle_row
-                    False,  # enable_edit_toggle
-                    gr.update(interactive=True),  # save_btn
-                    "",  # description
-                    None,
-                    None,
-                    None,  # models
-                    False,  # enhancement_eligible
-                    "",  # gestalt
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",  # prompts
-                )
-
-            # Parse dropdown value to get name and source
-            # Format: "analyzer_name (Base)" or "analyzer_name (Custom)"
-            if dropdown_value.endswith(" (Base)"):
-                name = dropdown_value[:-7]
-                source = "base"
-            elif dropdown_value.endswith(" (Custom)"):
-                name = dropdown_value[:-9]
-                source = "custom"
-            else:
-                name = dropdown_value
-                source = "custom"
-
-            logger.info("Loading analyzer: %s (source: %s)", name, source)
-
-            bucket = get_config_bucket()
-            if not bucket:
-                return (
-                    "",
-                    "custom",
-                    "❌ CONFIG_BUCKET not configured",
-                    gr.update(visible=False),
-                    False,
-                    gr.update(interactive=False),
-                    "",
-                    None,
-                    None,
-                    None,
-                    False,
-                    "",  # gestalt
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                )
-
-            s3 = get_s3_client()
-
-            # Determine manifest path based on source
-            if source == "custom":
-                manifest_key = f"{CUSTOM_ANALYZERS_PREFIX}/manifests/{name}.json"
-            else:
-                manifest_key = f"manifests/{name}.json"
-
-            # Load manifest from S3
-            try:
-                response = s3.get_object(Bucket=bucket, Key=manifest_key)
-                manifest = json.loads(response["Body"].read().decode("utf-8"))
-            except ClientError as e:
-                logger.error("Could not load manifest: %s", e)
-                return (
-                    "",
-                    "custom",
-                    f"❌ Could not load manifest: {e}",
-                    gr.update(visible=False),
-                    False,
-                    gr.update(interactive=False),
-                    "",
-                    None,
-                    None,
-                    None,
-                    False,
-                    "",  # gestalt
-                    "",
-                    "",
-                    "",
-                    "",
-                    "",
-                )
-
-            # Extract data
-            description = manifest.get("tool", {}).get("description", "")
-            model_sel = manifest.get("analyzer", {}).get("model_selections", {})
-            primary = model_sel.get("primary", MODEL_IDS[0])
-            fallbacks = model_sel.get("fallback_list", MODEL_IDS[1:3])
-            enhancement_eligible_val = manifest.get("analyzer", {}).get(
-                "enhancement_eligible", False
-            )
-
-            # Convert model IDs to names
-            primary_name = AVAILABLE_MODELS.get(primary, MODEL_NAMES[0])
-            fallback_1_name = AVAILABLE_MODELS.get(
-                fallbacks[0] if fallbacks else MODEL_IDS[1], MODEL_NAMES[1]
-            )
-            fallback_2_name = AVAILABLE_MODELS.get(
-                fallbacks[1] if len(fallbacks) > 1 else MODEL_IDS[2], MODEL_NAMES[2]
-            )
-
-            # Load prompts from S3
-            prompts = load_analyzer_prompts_from_s3(name, source)
-            base_name = name.replace("_analyzer", "")
-
-            role_xml = prompts.get(f"{base_name}_job_role.xml", "")
-            rules_xml = prompts.get(f"{base_name}_rules.xml", "")
-            context_xml = prompts.get(f"{base_name}_context.xml", "")
-            tasks_xml = prompts.get(f"{base_name}_tasks.xml", "")
-            format_xml = prompts.get(f"{base_name}_format.xml", "")
-            gestalt_xml = prompts.get(f"{base_name}_gestalt.xml", "")
-
-            # Info text
-            last_mod = manifest.get("metadata", {}).get("last_modified", "Unknown")
-            source_label = "Base (read-only)" if source == "base" else "Custom"
-            info = f"**Loaded:** {name} | **Last modified:** {last_mod} | **Type:** {source_label}"
-
-            # For base analyzers: show toggle, disable save by default
-            # For custom analyzers: hide toggle, enable save
-            show_toggle = source == "base"
-            save_enabled = source == "custom"
-
+    # Event handlers
+    def load_analyzer(dropdown_value):
+        """Load analyzer data from S3 into the form."""
+        if not dropdown_value:
             return (
-                name,  # current_analyzer state
-                source,  # current_source state
-                info,  # analyzer_info
-                gr.update(visible=show_toggle),  # edit_toggle_row
-                False,  # enable_edit_toggle (reset to unchecked)
-                gr.update(interactive=save_enabled),  # save_btn
-                description,
-                primary_name,
-                fallback_1_name,
-                fallback_2_name,
-                enhancement_eligible_val,
-                gestalt_xml,
-                role_xml,
-                rules_xml,
-                context_xml,
-                tasks_xml,
-                format_xml,
+                "",  # current_analyzer
+                "custom",  # current_source
+                "",  # analyzer_info
+                gr.update(visible=False),  # edit_toggle_row
+                False,  # enable_edit_toggle
+                gr.update(interactive=True),  # save_btn
+                "",  # description
+                None,
+                None,
+                None,  # models
+                False,  # enhancement_eligible
+                "",  # gestalt
+                "",
+                "",
+                "",
+                "",
+                "",  # prompts
             )
 
-        def handle_save(
+        # Parse dropdown value to get name and source
+        # Format: "analyzer_name (Base)" or "analyzer_name (Custom)"
+        if dropdown_value.endswith(" (Base)"):
+            name = dropdown_value[:-7]
+            source = "base"
+        elif dropdown_value.endswith(" (Custom)"):
+            name = dropdown_value[:-9]
+            source = "custom"
+        else:
+            name = dropdown_value
+            source = "custom"
+
+        logger.info("Loading analyzer: %s (source: %s)", name, source)
+
+        bucket = get_config_bucket()
+        if not bucket:
+            return (
+                "",
+                "custom",
+                "❌ CONFIG_BUCKET not configured",
+                gr.update(visible=False),
+                False,
+                gr.update(interactive=False),
+                "",
+                None,
+                None,
+                None,
+                False,
+                "",  # gestalt
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
+
+        s3 = get_s3_client()
+
+        # Determine manifest path based on source
+        if source == "custom":
+            manifest_key = f"{CUSTOM_ANALYZERS_PREFIX}/manifests/{name}.json"
+        else:
+            manifest_key = f"manifests/{name}.json"
+
+        # Load manifest from S3
+        try:
+            response = s3.get_object(Bucket=bucket, Key=manifest_key)
+            manifest = json.loads(response["Body"].read().decode("utf-8"))
+        except ClientError as e:
+            logger.error("Could not load manifest: %s", e)
+            return (
+                "",
+                "custom",
+                f"❌ Could not load manifest: {e}",
+                gr.update(visible=False),
+                False,
+                gr.update(interactive=False),
+                "",
+                None,
+                None,
+                None,
+                False,
+                "",  # gestalt
+                "",
+                "",
+                "",
+                "",
+                "",
+            )
+
+        # Extract data
+        description = manifest.get("tool", {}).get("description", "")
+        model_sel = manifest.get("analyzer", {}).get("model_selections", {})
+        primary = model_sel.get("primary", MODEL_IDS[0])
+        fallbacks = model_sel.get("fallback_list", MODEL_IDS[1:3])
+        enhancement_eligible_val = manifest.get("analyzer", {}).get(
+            "enhancement_eligible", False
+        )
+
+        # Convert model IDs to names
+        primary_name = AVAILABLE_MODELS.get(primary, MODEL_NAMES[0])
+        fallback_1_name = AVAILABLE_MODELS.get(
+            fallbacks[0] if fallbacks else MODEL_IDS[1], MODEL_NAMES[1]
+        )
+        fallback_2_name = AVAILABLE_MODELS.get(
+            fallbacks[1] if len(fallbacks) > 1 else MODEL_IDS[2], MODEL_NAMES[2]
+        )
+
+        # Load prompts from S3
+        prompts = load_analyzer_prompts_from_s3(name, source)
+        base_name = name.replace("_analyzer", "")
+
+        role_xml = prompts.get(f"{base_name}_job_role.xml", "")
+        rules_xml = prompts.get(f"{base_name}_rules.xml", "")
+        context_xml = prompts.get(f"{base_name}_context.xml", "")
+        tasks_xml = prompts.get(f"{base_name}_tasks.xml", "")
+        format_xml = prompts.get(f"{base_name}_format.xml", "")
+        gestalt_xml = prompts.get(f"{base_name}_gestalt.xml", "")
+
+        # Info text
+        last_mod = manifest.get("metadata", {}).get("last_modified", "Unknown")
+        source_label = "Base (read-only)" if source == "base" else "Custom"
+        info = f"**Loaded:** {name} | **Last modified:** {last_mod} | **Type:** {source_label}"
+
+        # For base analyzers: show toggle, disable save by default
+        # For custom analyzers: hide toggle, enable save
+        show_toggle = source == "base"
+        save_enabled = source == "custom"
+
+        return (
+            name,  # current_analyzer state
+            source,  # current_source state
+            info,  # analyzer_info
+            gr.update(visible=show_toggle),  # edit_toggle_row
+            False,  # enable_edit_toggle (reset to unchecked)
+            gr.update(interactive=save_enabled),  # save_btn
+            description,
+            primary_name,
+            fallback_1_name,
+            fallback_2_name,
+            enhancement_eligible_val,
+            gestalt_xml,
+            role_xml,
+            rules_xml,
+            context_xml,
+            tasks_xml,
+            format_xml,
+        )
+
+    def handle_save(
+        analyzer_name,
+        source,
+        description,
+        primary,
+        fallback_1,
+        fallback_2,
+        enhancement_eligible_val,
+        gestalt_xml,
+        role_xml,
+        rules_xml,
+        context_xml,
+        tasks_xml,
+        format_xml,
+    ):
+        if not analyzer_name:
+            return "❌ No analyzer selected"
+
+        return save_analyzer(
             analyzer_name,
-            source,
             description,
             primary,
             fallback_1,
@@ -637,138 +644,131 @@ def create_editor():
             context_xml,
             tasks_xml,
             format_xml,
-        ):
-            if not analyzer_name:
-                return "❌ No analyzer selected"
-
-            return save_analyzer(
-                analyzer_name,
-                description,
-                primary,
-                fallback_1,
-                fallback_2,
-                enhancement_eligible_val,
-                gestalt_xml,
-                role_xml,
-                rules_xml,
-                context_xml,
-                tasks_xml,
-                format_xml,
-                source,
-            )
-
-        def toggle_edit_mode(enabled):
-            """Enable/disable save button based on edit toggle."""
-            return gr.update(interactive=enabled)
-
-        def clear_form():
-            """Clear all form fields."""
-            return (
-                "",  # current_analyzer
-                "custom",  # current_source
-                "",  # analyzer_info
-                gr.update(visible=False),  # edit_toggle_row
-                False,  # enable_edit_toggle
-                gr.update(interactive=True),  # save_btn
-                "",  # description
-                MODEL_NAMES[0],  # primary_model
-                MODEL_NAMES[1],  # fallback_1
-                MODEL_NAMES[2],  # fallback_2
-                False,  # enhancement_eligible
-                "",  # gestalt_editor
-                "",  # role_editor
-                "",  # rules_editor
-                "",  # context_editor
-                "",  # tasks_editor
-                "",  # format_editor
-                "",  # save_output
-                None,  # analyzer_dropdown
-            )
-
-        # Wire events
-        clear_btn.click(
-            clear_form,
-            outputs=[
-                current_analyzer,
-                current_source,
-                analyzer_info,
-                edit_toggle_row,
-                enable_edit_toggle,
-                save_btn,
-                description_input,
-                primary_model,
-                fallback_1,
-                fallback_2,
-                enhancement_eligible,
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-                save_output,
-                analyzer_dropdown,
-            ],
+            source,
         )
 
-        load_btn.click(
-            load_analyzer,
-            inputs=[analyzer_dropdown],
-            outputs=[
-                current_analyzer,
-                current_source,
-                analyzer_info,
-                edit_toggle_row,
-                enable_edit_toggle,
-                save_btn,
-                description_input,
-                primary_model,
-                fallback_1,
-                fallback_2,
-                enhancement_eligible,
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-            ],
+    def toggle_edit_mode(enabled):
+        """Enable/disable save button based on edit toggle."""
+        return gr.update(interactive=enabled)
+
+    def clear_form():
+        """Clear all form fields."""
+        return (
+            "",  # current_analyzer
+            "custom",  # current_source
+            "",  # analyzer_info
+            gr.update(visible=False),  # edit_toggle_row
+            False,  # enable_edit_toggle
+            gr.update(interactive=True),  # save_btn
+            "",  # description
+            MODEL_NAMES[0],  # primary_model
+            MODEL_NAMES[1],  # fallback_1
+            MODEL_NAMES[2],  # fallback_2
+            False,  # enhancement_eligible
+            "",  # gestalt_editor
+            "",  # role_editor
+            "",  # rules_editor
+            "",  # context_editor
+            "",  # tasks_editor
+            "",  # format_editor
+            "",  # save_output
+            None,  # analyzer_dropdown
         )
 
-        enable_edit_toggle.change(
-            toggle_edit_mode,
-            inputs=[enable_edit_toggle],
-            outputs=[save_btn],
-        )
+    # Refresh analyzer list from S3 (deferred to avoid blocking startup)
+    def refresh_analyzer_list():
+        choices = _build_analyzer_choices()
+        if not choices:
+            return gr.update(choices=[], value=None)
+        return gr.update(choices=choices, value=None)
 
-        save_btn.click(
-            lambda: "⏳ Saving changes...",
-            outputs=[save_output],
-        ).then(
-            handle_save,
-            inputs=[
-                current_analyzer,
-                current_source,
-                description_input,
-                primary_model,
-                fallback_1,
-                fallback_2,
-                enhancement_eligible,
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-            ],
-            outputs=[save_output],
-        )
+    refresh_btn.click(
+        refresh_analyzer_list,
+        outputs=[analyzer_dropdown],
+    )
 
-    return demo
+    # One-shot timer to auto-refresh on first render (replaces demo.load)
+    timer = gr.Timer(value=0.5, active=True)
+    timer.tick(
+        fn=lambda: (refresh_analyzer_list(), gr.update(active=False)),
+        outputs=[analyzer_dropdown, timer],
+    )
 
+    # Wire events
+    clear_btn.click(
+        clear_form,
+        outputs=[
+            current_analyzer,
+            current_source,
+            analyzer_info,
+            edit_toggle_row,
+            enable_edit_toggle,
+            save_btn,
+            description_input,
+            primary_model,
+            fallback_1,
+            fallback_2,
+            enhancement_eligible,
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+            save_output,
+            analyzer_dropdown,
+        ],
+    )
 
-# Module-level demo for import
-demo = create_editor()
+    load_btn.click(
+        load_analyzer,
+        inputs=[analyzer_dropdown],
+        outputs=[
+            current_analyzer,
+            current_source,
+            analyzer_info,
+            edit_toggle_row,
+            enable_edit_toggle,
+            save_btn,
+            description_input,
+            primary_model,
+            fallback_1,
+            fallback_2,
+            enhancement_eligible,
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+        ],
+    )
 
-if __name__ == "__main__":
-    demo.launch(share=False)
+    enable_edit_toggle.change(
+        toggle_edit_mode,
+        inputs=[enable_edit_toggle],
+        outputs=[save_btn],
+    )
+
+    save_btn.click(
+        lambda: "⏳ Saving changes...",
+        outputs=[save_output],
+    ).then(
+        handle_save,
+        inputs=[
+            current_analyzer,
+            current_source,
+            description_input,
+            primary_model,
+            fallback_1,
+            fallback_2,
+            enhancement_eligible,
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+        ],
+        outputs=[save_output],
+    )

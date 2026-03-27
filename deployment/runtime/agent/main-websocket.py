@@ -238,17 +238,17 @@ class SanitizingSessionManager:
 # =============================================================================
 
 DEFAULT_MODEL_CONFIG = {
-    "model_id": "global.anthropic.claude-opus-4-6-v1",
+    "model_id": "us.anthropic.claude-opus-4-6-v1",
     "temperature": 1.0,
     "max_tokens": 16000,
     "thinking": {"type": "adaptive"},
     "fallback_models": [
         {
-            "model_id": "global.anthropic.claude-opus-4-5-20251101-v1:0",
+            "model_id": "us.anthropic.claude-opus-4-5-20251101-v1:0",
             "thinking": {"type": "enabled", "budget_tokens": 8192},
         },
         {
-            "model_id": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "thinking": {"type": "enabled", "budget_tokens": 8192},
         },
     ],

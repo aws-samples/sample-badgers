@@ -13,14 +13,14 @@ from aws_cdk.aws_bedrock import CfnApplicationInferenceProfile
 from constructs import Construct
 
 
-# System-defined cross-region inference profile IDs
-# These are the actual AWS profile IDs from:
-# https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
+# System-defined inference profile IDs (regional, us.* prefix)
+# Using regional profiles to avoid SCP issues with cross-region (global.*) profiles.
+# See: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
 CROSS_REGION_PROFILES = {
-    "claude_sonnet_4_5": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    "claude_haiku_4_5": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "claude_opus_4_6": "global.anthropic.claude-opus-4-6-v1",
-    "claude_opus_4_5": "global.anthropic.claude-opus-4-5-20251101-v1:0",
+    "claude_sonnet_4_5": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "claude_haiku_4_5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "claude_opus_4_6": "us.anthropic.claude-opus-4-6-v1",
+    "claude_opus_4_5": "us.anthropic.claude-opus-4-5-20251101-v1:0",
     "claude_sonnet_4_6": "us.anthropic.claude-sonnet-4-6",
     "nova_premier": "us.amazon.nova-premier-v1:0",
 }

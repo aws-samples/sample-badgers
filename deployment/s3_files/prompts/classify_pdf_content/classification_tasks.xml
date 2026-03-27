@@ -14,8 +14,9 @@
 
     <task>Determine if image enhancement would improve analysis: <sub_task>Look for signs of degradation: yellowing, fading, noise, low contrast</sub_task>
         <sub_task>Check for handwritten content, annotations, or historical manuscripts</sub_task>
+        <sub_task>CRITICAL — Check for busy backgrounds that will cause extraction failure: watermarks (repeating text tiled across the background), security paper (colored/tinted backgrounds like blue or green), institutional seals or logos overlapping content, or any background pattern that competes with foreground text. These pages ALWAYS need enhancement via desaturate-then-threshold even if the foreground text appears readable. Without enhancement, downstream extractors will misidentify the page as blank or as a cover/authentication page, missing all actual content.</sub_task>
         <sub_task>If enhancement would help, set enhancement_recommended to true and provide a reason</sub_task>
-        <sub_task>Clean modern documents with clear text do NOT need enhancement</sub_task>
+        <sub_task>Only skip enhancement for documents with clean white/near-white backgrounds and no watermarks, patterns, or colored paper</sub_task>
     </task>
 
     <task>Format your response according to the JSON structure in <response_format />.</task>

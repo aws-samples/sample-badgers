@@ -10,6 +10,7 @@ from .agentcore_runtime_websocket_stack import AgentCoreRuntimeWebSocketStack
 from .agentcore_memory_stack import AgentCoreMemoryStack
 from .inference_profiles_stack import InferenceProfilesStack
 from .custom_analyzers_stack import CustomAnalyzersStack
+from .xray_transaction_search_stack import XRayTransactionSearchStack
 
 __all__ = [
     "S3Stack",
@@ -22,4 +23,5 @@ __all__ = [
     "AgentCoreMemoryStack",
     "InferenceProfilesStack",
     "CustomAnalyzersStack",
+    "XRayTransactionSearchStack",
 ]

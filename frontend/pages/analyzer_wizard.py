@@ -82,8 +82,8 @@ def get_config_bucket() -> str:
 
 # Available models
 AVAILABLE_MODELS = {
-    "Claude Opus 4.6": "global.anthropic.claude-opus-4-6-v1",
-    "Claude Sonnet 4.5": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "Claude Opus 4.6": "us.anthropic.claude-opus-4-6-v1",
+    "Claude Sonnet 4.5": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     "Claude Haiku 4.5": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     "Amazon Nova Premier": "us.amazon.nova-premier-v1:0",
 }
@@ -209,7 +209,7 @@ class WizardState:
     max_examples: int = 6
 
     # Model config
-    primary_model: str = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    primary_model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     fallback_models: list = field(
         default_factory=lambda: [
             "us.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -565,584 +565,554 @@ def create_analyzer(state: WizardState) -> str:
 # ============================================================================
 
 
-def create_wizard():
-    """Create the Gradio wizard interface."""
+def build():
+    """Create the Analyzer Wizard UI (no Blocks wrapper)."""
 
-    with gr.Blocks(title="Analyzer Creation Wizard") as wizard_demo:
-        # Shared state - must be inside Blocks context
-        state = gr.State(WizardState())
+    # Shared state - must be inside Blocks context
+    state = gr.State(WizardState())
 
-        gr.Markdown("# 🧙 Analyzer Creation Wizard")
-        gr.Markdown("Create a new document analyzer in 4 easy steps.")
+    gr.Markdown("# 🧙 Analyzer Creation Wizard")
+    gr.Markdown("Create a new document analyzer in 4 easy steps.")
 
-        # Progress/status indicator - visible at top
-        wizard_status = gr.Markdown("", elem_classes=["wizard-status"])
+    # Progress/status indicator - visible at top
+    wizard_status = gr.Markdown("", elem_classes=["wizard-status"])
 
-        with gr.Tabs() as tabs:
+    with gr.Tabs() as tabs:
 
-            # ================================================================
-            # STEP 1: Basic Info
-            # ================================================================
-            with gr.Tab("1️⃣ Basic Info", id=0) as _tab1:
-                gr.Markdown("### Tell us about your analyzer")
+        # ================================================================
+        # STEP 1: Basic Info
+        # ================================================================
+        with gr.Tab("1️⃣ Basic Info", id=0) as _tab1:
+            gr.Markdown("### Tell us about your analyzer")
 
-                display_name = gr.Textbox(
-                    label="Analyzer Display Name",
-                    placeholder="e.g., Medical Form, Invoice, Blueprint",
-                    info="Human-readable name for your analyzer",
+            display_name = gr.Textbox(
+                label="Analyzer Display Name",
+                placeholder="e.g., Medical Form, Invoice, Blueprint",
+                info="Human-readable name for your analyzer",
+            )
+
+            description = gr.Textbox(
+                label="Short Description",
+                placeholder="e.g., Analyzes medical intake forms to extract patient information and diagnoses",
+                lines=2,
+                info="One-line description of what this analyzer does",
+            )
+
+            user_paragraph = gr.Textbox(
+                label="Detailed Description",
+                placeholder="Describe in detail what this analyzer should look for, what kind of documents it will process, what information should be extracted, and any special considerations...",
+                lines=6,
+                info="The more detail you provide, the better the generated prompts will be",
+            )
+
+            gr.Markdown("### Model Selection")
+            with gr.Row():
+                primary_model = gr.Dropdown(
+                    choices=MODEL_CHOICES,
+                    value="Claude Sonnet 4.5",
+                    label="Primary Model",
+                    info="Main model for analysis",
+                )
+                fallback_model_1 = gr.Dropdown(
+                    choices=MODEL_CHOICES,
+                    value="Claude Haiku 4.5",
+                    label="Fallback Model 1",
+                    info="First fallback if primary fails",
+                )
+                fallback_model_2 = gr.Dropdown(
+                    choices=MODEL_CHOICES,
+                    value="Amazon Nova Premier",
+                    label="Fallback Model 2",
+                    info="Second fallback option",
                 )
 
-                description = gr.Textbox(
-                    label="Short Description",
-                    placeholder="e.g., Analyzes medical intake forms to extract patient information and diagnoses",
-                    lines=2,
-                    info="One-line description of what this analyzer does",
+            gr.Markdown("### Enhancement Options")
+            enhancement_eligible = gr.Checkbox(
+                label="Enhancement Eligible",
+                value=False,
+                info="Enable image enhancement for degraded/historical documents. Recommended for handwriting, historical manuscripts, or annotated content.",
+            )
+
+            with gr.Row():
+                clear_wizard_btn = gr.Button(
+                    "🗑️ Clear Form", variant="secondary", scale=1
                 )
+                gr.Markdown("")  # spacer
+                next_btn_1 = gr.Button("Generate Prompts →", variant="primary", scale=1)
 
-                user_paragraph = gr.Textbox(
-                    label="Detailed Description",
-                    placeholder="Describe in detail what this analyzer should look for, what kind of documents it will process, what information should be extracted, and any special considerations...",
-                    lines=6,
-                    info="The more detail you provide, the better the generated prompts will be",
-                )
+        # ================================================================
+        # STEP 2: Review Generated Prompts
+        # ================================================================
+        with gr.Tab("2️⃣ Review Prompts", id=1) as _tab2:
+            gr.Markdown("### Review and edit the generated prompts")
+            gr.Markdown(
+                "*The LLM generated these based on your description. Feel free to edit.*"
+            )
 
-                gr.Markdown("### Model Selection")
-                with gr.Row():
-                    primary_model = gr.Dropdown(
-                        choices=MODEL_CHOICES,
-                        value="Claude Sonnet 4.5",
-                        label="Primary Model",
-                        info="Main model for analysis",
-                    )
-                    fallback_model_1 = gr.Dropdown(
-                        choices=MODEL_CHOICES,
-                        value="Claude Haiku 4.5",
-                        label="Fallback Model 1",
-                        info="First fallback if primary fails",
-                    )
-                    fallback_model_2 = gr.Dropdown(
-                        choices=MODEL_CHOICES,
-                        value="Amazon Nova Premier",
-                        label="Fallback Model 2",
-                        info="Second fallback option",
-                    )
-
-                gr.Markdown("### Enhancement Options")
-                enhancement_eligible = gr.Checkbox(
-                    label="Enhancement Eligible",
-                    value=False,
-                    info="Enable image enhancement for degraded/historical documents. Recommended for handwriting, historical manuscripts, or annotated content.",
-                )
-
-                with gr.Row():
-                    clear_wizard_btn = gr.Button(
-                        "🗑️ Clear Form", variant="secondary", scale=1
-                    )
-                    gr.Markdown("")  # spacer
-                    next_btn_1 = gr.Button(
-                        "Generate Prompts →", variant="primary", scale=1
-                    )
-
-            # ================================================================
-            # STEP 2: Review Generated Prompts
-            # ================================================================
-            with gr.Tab("2️⃣ Review Prompts", id=1) as _tab2:
-                gr.Markdown("### Review and edit the generated prompts")
+            with gr.Accordion("Gestalt Perception", open=True):
                 gr.Markdown(
-                    "*The LLM generated these based on your description. Feel free to edit.*"
+                    "*Visual perception guidance - how to see before extracting*"
+                )
+                gestalt_editor = gr.Code(label="gestalt.xml", language="html", lines=15)
+
+            with gr.Accordion("Job Role", open=True):
+                role_editor = gr.Code(label="job_role.xml", language="html", lines=15)
+
+            with gr.Accordion("Rules", open=True):
+                rules_editor = gr.Code(label="rules.xml", language="html", lines=12)
+
+            with gr.Accordion("Context", open=True):
+                context_editor = gr.Code(label="context.xml", language="html", lines=10)
+
+            with gr.Accordion("Tasks", open=True):
+                tasks_editor = gr.Code(label="tasks.xml", language="html", lines=10)
+
+            with gr.Accordion("Format", open=True):
+                format_editor = gr.Code(label="format.xml", language="html", lines=10)
+
+            with gr.Row():
+                back_btn_2 = gr.Button("← Back", scale=1)
+                gr.Markdown("")  # spacer
+                next_btn_2 = gr.Button("Continue →", variant="primary", scale=1)
+
+        # ================================================================
+        # STEP 3: Example Images
+        # ================================================================
+        with gr.Tab("3️⃣ Examples", id=2) as _tab3:
+            gr.Markdown("### Upload example images (optional)")
+            gr.Markdown(
+                "*Few-shot examples help the analyzer understand what to look for. Max 6 images.*"
+            )
+
+            example_upload = gr.File(
+                label="Example Images",
+                file_count="multiple",
+                file_types=["image"],
+                type="filepath",
+            )
+
+            example_gallery = gr.Gallery(
+                label="Uploaded Examples", columns=3, height=200
+            )
+
+            with gr.Row():
+                back_btn_3 = gr.Button("← Back", scale=1)
+                gr.Markdown("")
+                next_btn_3 = gr.Button("Preview Config →", variant="primary", scale=1)
+
+        # ================================================================
+        # STEP 4: Preview & Deploy
+        # ================================================================
+        with gr.Tab("4️⃣ Deploy", id=3) as _tab4:
+            gr.Markdown("### Review configuration and deploy")
+
+            gr.Markdown("**Files that will be created:**")
+            files_summary = gr.Markdown("")
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("**Manifest (manifest.json)**")
+                    manifest_preview = gr.JSON(label="")
+
+                with gr.Column():
+                    gr.Markdown("**Schema (schema.json)**")
+                    schema_preview = gr.JSON(label="")
+
+            gr.Markdown("---")
+
+            with gr.Row():
+                back_btn_4 = gr.Button("← Back", scale=1)
+                create_btn = gr.Button("💾 Save Analyzer", variant="primary", scale=1)
+
+            deploy_output = gr.Textbox(label="Save Status", lines=15, interactive=False)
+
+            gr.Markdown("---")
+            gr.Markdown("### Deploy to AWS")
+            gr.Markdown("After saving, deploy the Lambda and Gateway target:")
+
+            deploy_cdk_btn = gr.Button(
+                "🚀 Deploy Custom Analyzers Stack", variant="primary"
+            )
+
+            cdk_output = gr.Textbox(
+                label="CDK Deployment Output", lines=20, interactive=False
+            )
+
+    # ====================================================================
+    # EVENT HANDLERS
+    # ====================================================================
+
+    def step1_next(
+        display_name,
+        description,
+        user_paragraph,
+        primary_model,
+        fallback_1,
+        fallback_2,
+        enhancement_eligible_val,
+        current_state,
+    ):
+        """Process step 1 and generate prompts with progress updates."""
+
+        # Validation
+        if not display_name or not description:
+            yield (
+                current_state,
+                "❌ Please fill in the analyzer name and description.",
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(selected=0),
+            )
+            return
+
+        is_valid, result = validate_analyzer_name(display_name)
+        if not is_valid:
+            yield (
+                current_state,
+                f"❌ {result}",
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(selected=0),
+            )
+            return
+
+        # Show loading state FIRST
+        yield (
+            current_state,
+            "⏳ Step 1/2 — Generating prompts with AI... (this may take up to 5 minutes)",
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(selected=0),  # Stay on current tab while loading
+        )
+
+        # Create new state
+        new_state = WizardState(
+            display_name=display_name,
+            analyzer_name=result,
+            description=description,
+            user_paragraph=user_paragraph,
+            primary_model=AVAILABLE_MODELS[primary_model],
+            fallback_models=[
+                AVAILABLE_MODELS[fallback_1],
+                AVAILABLE_MODELS[fallback_2],
+            ],
+            enhancement_eligible=enhancement_eligible_val,
+        )
+
+        # Generate prompts
+        full_description = (
+            f"{description}\n\nDetails: {user_paragraph}"
+            if user_paragraph
+            else description
+        )
+
+        try:
+            generated = generate_prompts_with_llm(
+                full_description, new_state.analyzer_name, display_name
+            )
+
+            prompt_fields = [
+                ("gestalt", "gestalt", "generated_gestalt"),
+                ("job_role", "job role", "generated_role"),
+                ("rules", "rules", "generated_rules"),
+                ("context", "context", "generated_context"),
+                ("tasks", "tasks", "generated_tasks"),
+                ("format", "format", "generated_format"),
+            ]
+            total = len(prompt_fields)
+            for i, (key, label, attr) in enumerate(prompt_fields, 1):
+                setattr(new_state, attr, generated.get(key, ""))
+                yield (
+                    current_state,
+                    f"⏳ Step 2/2 — Parsing prompts ({i}/{total}): {label}",
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(selected=0),
                 )
 
-                with gr.Accordion("Gestalt Perception", open=True):
-                    gr.Markdown(
-                        "*Visual perception guidance - how to see before extracting*"
-                    )
-                    gestalt_editor = gr.Code(
-                        label="gestalt.xml", language="html", lines=15
-                    )
+            logger.info("Generated role length: %d", len(new_state.generated_role))
 
-                with gr.Accordion("Job Role", open=True):
-                    role_editor = gr.Code(
-                        label="job_role.xml", language="html", lines=15
-                    )
+        except Exception as e:
+            logger.error("Error generating prompts: %s", e, exc_info=True)
+            yield (
+                current_state,
+                f"❌ Error generating prompts: {str(e)}",
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(),
+                gr.update(selected=0),
+            )
+            return
 
-                with gr.Accordion("Rules", open=True):
-                    rules_editor = gr.Code(label="rules.xml", language="html", lines=12)
+        # Final yield with all the data
+        yield (
+            new_state,
+            "✓ Prompts generated! Review and edit below.",
+            gr.update(value=new_state.generated_gestalt),
+            gr.update(value=new_state.generated_role),
+            gr.update(value=new_state.generated_rules),
+            gr.update(value=new_state.generated_context),
+            gr.update(value=new_state.generated_tasks),
+            gr.update(value=new_state.generated_format),
+            gr.update(selected=1),
+        )
 
-                with gr.Accordion("Context", open=True):
-                    context_editor = gr.Code(
-                        label="context.xml", language="html", lines=10
-                    )
+    def step2_next(gestalt, role, rules, context, tasks, format_xml, current_state):
+        """Save edited prompts and continue."""
+        logger.info("step2_next: saving prompts for %s", current_state.analyzer_name)
 
-                with gr.Accordion("Tasks", open=True):
-                    tasks_editor = gr.Code(label="tasks.xml", language="html", lines=10)
+        new_state = replace(
+            current_state,
+            generated_gestalt=gestalt,
+            generated_role=role,
+            generated_rules=rules,
+            generated_context=context,
+            generated_tasks=tasks,
+            generated_format=format_xml,
+        )
+        return new_state, gr.update(selected=2)
 
-                with gr.Accordion("Format", open=True):
-                    format_editor = gr.Code(
-                        label="format.xml", language="html", lines=10
-                    )
+    def step3_next(files, current_state):
+        """Process uploaded examples and generate config preview."""
 
-                with gr.Row():
-                    back_btn_2 = gr.Button("← Back", scale=1)
-                    gr.Markdown("")  # spacer
-                    next_btn_2 = gr.Button("Continue →", variant="primary", scale=1)
+        # First yield - show loading state
+        yield (
+            current_state,
+            "⏳ Generating configuration preview...",
+            gr.update(),
+            gr.update(),
+            gr.update(),  # Stay on current tab
+        )
 
-            # ================================================================
-            # STEP 3: Example Images
-            # ================================================================
-            with gr.Tab("3️⃣ Examples", id=2) as _tab3:
-                gr.Markdown("### Upload example images (optional)")
-                gr.Markdown(
-                    "*Few-shot examples help the analyzer understand what to look for. Max 6 images.*"
-                )
+        logger.info("step3_next: analyzer_name=%s", current_state.analyzer_name)
+        logger.info("step3_next: display_name=%s", current_state.display_name)
 
-                example_upload = gr.File(
-                    label="Example Images",
-                    file_count="multiple",
-                    file_types=["image"],
-                    type="filepath",
-                )
+        example_images = files[:6] if files else []
 
-                example_gallery = gr.Gallery(
-                    label="Uploaded Examples", columns=3, height=200
-                )
+        # Create new state with example images first
+        new_state = replace(current_state, example_images=example_images)
 
-                with gr.Row():
-                    back_btn_3 = gr.Button("← Back", scale=1)
-                    gr.Markdown("")
-                    next_btn_3 = gr.Button(
-                        "Preview Config →", variant="primary", scale=1
-                    )
+        # Generate manifest and schema
+        try:
+            manifest = generate_manifest(new_state)
+            schema = generate_schema(new_state)
+            logger.info("Generated manifest: %s", json.dumps(manifest, indent=2)[:500])
+            logger.info("Generated schema: %s", json.dumps(schema, indent=2)[:500])
+        except Exception as e:
+            logger.error("Error generating config: %s", e, exc_info=True)
+            yield (
+                current_state,
+                f"❌ Error generating configuration: {str(e)}",
+                gr.update(),
+                gr.update(),
+                gr.update(selected=2),  # Stay on examples tab
+            )
+            return
 
-            # ================================================================
-            # STEP 4: Preview & Deploy
-            # ================================================================
-            with gr.Tab("4️⃣ Deploy", id=3) as _tab4:
-                gr.Markdown("### Review configuration and deploy")
+        new_state = replace(
+            new_state,
+            manifest_json=manifest,
+            schema_json=schema,
+        )
 
-                gr.Markdown("**Files that will be created:**")
-                files_summary = gr.Markdown("")
+        # Generate file summary
+        base_name = new_state.analyzer_name
+        if base_name.endswith("_analyzer"):
+            analyzer_name = base_name
+            base_name = base_name[:-9]
+        else:
+            analyzer_name = f"{base_name}_analyzer"
 
-                with gr.Row():
-                    with gr.Column():
-                        gr.Markdown("**Manifest (manifest.json)**")
-                        manifest_preview = gr.JSON(label="")
+        num_examples = len(new_state.example_images)
 
-                    with gr.Column():
-                        gr.Markdown("**Schema (schema.json)**")
-                        schema_preview = gr.JSON(label="")
+        # Get bucket for display
+        bucket = get_config_bucket() or "<CONFIG_BUCKET>"
 
-                gr.Markdown("---")
+        summary_lines = [
+            "📁 **Lambda Code:**",
+            f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/code/{analyzer_name}/`",
+            "",
+            "📄 **Configuration:**",
+            f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/manifests/{analyzer_name}.json`",
+            f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/schemas/{analyzer_name}.json`",
+            "",
+            f"📝 **Prompts** (`s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/prompts/{analyzer_name}/`):",
+            f"  - `{base_name}_gestalt.xml`",
+            f"  - `{base_name}_job_role.xml`",
+            f"  - `{base_name}_rules.xml`",
+            f"  - `{base_name}_context.xml`",
+            f"  - `{base_name}_tasks.xml`",
+            f"  - `{base_name}_format.xml`",
+        ]
 
-                with gr.Row():
-                    back_btn_4 = gr.Button("← Back", scale=1)
-                    create_btn = gr.Button(
-                        "💾 Save Analyzer", variant="primary", scale=1
-                    )
+        if num_examples > 0:
+            summary_lines.extend(
+                [
+                    "",
+                    f"🖼️ **Example Images:** {num_examples} file(s) in `few-shot-images/`",
+                ]
+            )
 
-                deploy_output = gr.Textbox(
-                    label="Save Status", lines=15, interactive=False
-                )
+        file_summary = "\n".join(summary_lines)
 
-                gr.Markdown("---")
-                gr.Markdown("### Deploy to AWS")
-                gr.Markdown("After saving, deploy the Lambda and Gateway target:")
+        logger.info("step3_next: returning manifest with %d keys", len(manifest))
 
-                deploy_cdk_btn = gr.Button(
-                    "🚀 Deploy Custom Analyzers Stack", variant="primary"
-                )
+        # Final yield with all the data
+        yield (
+            new_state,
+            file_summary,
+            gr.update(value=manifest),
+            gr.update(value=schema),
+            gr.update(selected=3),
+        )
 
-                cdk_output = gr.Textbox(
-                    label="CDK Deployment Output", lines=20, interactive=False
-                )
+    def handle_deploy(current_state):
+        """Deploy the analyzer."""
+        return create_analyzer(current_state)
 
-        # ====================================================================
-        # EVENT HANDLERS
-        # ====================================================================
+    def update_gallery(files):
+        """Update the gallery with uploaded files."""
+        if files:
+            return files[:6]
+        return []
 
-        def step1_next(
+    def clear_wizard():
+        """Clear all wizard form fields and reset to initial state."""
+        return (
+            WizardState(),  # state
+            "",  # wizard_status
+            "",  # display_name
+            "",  # description
+            "",  # user_paragraph
+            "Claude Sonnet 4.5",  # primary_model
+            "Claude Haiku 4.5",  # fallback_model_1
+            "Amazon Nova Premier",  # fallback_model_2
+            False,  # enhancement_eligible
+            "",  # gestalt_editor
+            "",  # role_editor
+            "",  # rules_editor
+            "",  # context_editor
+            "",  # tasks_editor
+            "",  # format_editor
+            None,  # example_upload
+            [],  # example_gallery
+            "",  # files_summary
+            None,  # manifest_preview
+            None,  # schema_preview
+            "",  # deploy_output
+            "",  # cdk_output
+            gr.update(selected=0),  # tabs - go back to step 1
+        )
+
+    clear_wizard_btn.click(
+        clear_wizard,
+        outputs=[
+            state,
+            wizard_status,
             display_name,
             description,
             user_paragraph,
             primary_model,
-            fallback_1,
-            fallback_2,
-            enhancement_eligible_val,
-            current_state,
-        ):
-            """Process step 1 and generate prompts with progress updates."""
+            fallback_model_1,
+            fallback_model_2,
+            enhancement_eligible,
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+            example_upload,
+            example_gallery,
+            files_summary,
+            manifest_preview,
+            schema_preview,
+            deploy_output,
+            cdk_output,
+            tabs,
+        ],
+    )
 
-            # Validation
-            if not display_name or not description:
-                yield (
-                    current_state,
-                    "❌ Please fill in the analyzer name and description.",
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(selected=0),
-                )
-                return
+    # Wire up events with loading indicators
+    next_btn_1.click(
+        step1_next,
+        inputs=[
+            display_name,
+            description,
+            user_paragraph,
+            primary_model,
+            fallback_model_1,
+            fallback_model_2,
+            enhancement_eligible,
+            state,
+        ],
+        outputs=[
+            state,
+            wizard_status,
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+            tabs,
+        ],
+    )
 
-            is_valid, result = validate_analyzer_name(display_name)
-            if not is_valid:
-                yield (
-                    current_state,
-                    f"❌ {result}",
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(selected=0),
-                )
-                return
+    next_btn_2.click(
+        step2_next,
+        inputs=[
+            gestalt_editor,
+            role_editor,
+            rules_editor,
+            context_editor,
+            tasks_editor,
+            format_editor,
+            state,
+        ],
+        outputs=[state, tabs],
+    )
 
-            # Show loading state FIRST
-            yield (
-                current_state,
-                "⏳ Step 1/2 — Generating prompts with AI... (this may take up to 5 minutes)",
-                gr.update(),
-                gr.update(),
-                gr.update(),
-                gr.update(),
-                gr.update(),
-                gr.update(),
-                gr.update(selected=0),  # Stay on current tab while loading
-            )
+    back_btn_2.click(lambda: gr.update(selected=0), outputs=[tabs])
 
-            # Create new state
-            new_state = WizardState(
-                display_name=display_name,
-                analyzer_name=result,
-                description=description,
-                user_paragraph=user_paragraph,
-                primary_model=AVAILABLE_MODELS[primary_model],
-                fallback_models=[
-                    AVAILABLE_MODELS[fallback_1],
-                    AVAILABLE_MODELS[fallback_2],
-                ],
-                enhancement_eligible=enhancement_eligible_val,
-            )
+    example_upload.change(
+        update_gallery, inputs=[example_upload], outputs=[example_gallery]
+    )
 
-            # Generate prompts
-            full_description = (
-                f"{description}\n\nDetails: {user_paragraph}"
-                if user_paragraph
-                else description
-            )
+    next_btn_3.click(
+        step3_next,
+        inputs=[example_upload, state],
+        outputs=[state, files_summary, manifest_preview, schema_preview, tabs],
+    )
 
-            try:
-                generated = generate_prompts_with_llm(
-                    full_description, new_state.analyzer_name, display_name
-                )
+    back_btn_3.click(lambda: gr.update(selected=1), outputs=[tabs])
+    back_btn_4.click(lambda: gr.update(selected=2), outputs=[tabs])
 
-                prompt_fields = [
-                    ("gestalt", "gestalt", "generated_gestalt"),
-                    ("job_role", "job role", "generated_role"),
-                    ("rules", "rules", "generated_rules"),
-                    ("context", "context", "generated_context"),
-                    ("tasks", "tasks", "generated_tasks"),
-                    ("format", "format", "generated_format"),
-                ]
-                total = len(prompt_fields)
-                for i, (key, label, attr) in enumerate(prompt_fields, 1):
-                    setattr(new_state, attr, generated.get(key, ""))
-                    yield (
-                        current_state,
-                        f"⏳ Step 2/2 — Parsing prompts ({i}/{total}): {label}",
-                        gr.update(),
-                        gr.update(),
-                        gr.update(),
-                        gr.update(),
-                        gr.update(),
-                        gr.update(),
-                        gr.update(selected=0),
-                    )
+    create_btn.click(
+        lambda: "⏳ Saving analyzer locally...",
+        outputs=[deploy_output],
+    ).then(handle_deploy, inputs=[state], outputs=[deploy_output])
 
-                logger.info("Generated role length: %d", len(new_state.generated_role))
-
-            except Exception as e:
-                logger.error("Error generating prompts: %s", e, exc_info=True)
-                yield (
-                    current_state,
-                    f"❌ Error generating prompts: {str(e)}",
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(selected=0),
-                )
-                return
-
-            # Final yield with all the data
-            yield (
-                new_state,
-                "✓ Prompts generated! Review and edit below.",
-                gr.update(value=new_state.generated_gestalt),
-                gr.update(value=new_state.generated_role),
-                gr.update(value=new_state.generated_rules),
-                gr.update(value=new_state.generated_context),
-                gr.update(value=new_state.generated_tasks),
-                gr.update(value=new_state.generated_format),
-                gr.update(selected=1),
-            )
-
-        def step2_next(gestalt, role, rules, context, tasks, format_xml, current_state):
-            """Save edited prompts and continue."""
-            logger.info(
-                "step2_next: saving prompts for %s", current_state.analyzer_name
-            )
-
-            new_state = replace(
-                current_state,
-                generated_gestalt=gestalt,
-                generated_role=role,
-                generated_rules=rules,
-                generated_context=context,
-                generated_tasks=tasks,
-                generated_format=format_xml,
-            )
-            return new_state, gr.update(selected=2)
-
-        def step3_next(files, current_state):
-            """Process uploaded examples and generate config preview."""
-
-            # First yield - show loading state
-            yield (
-                current_state,
-                "⏳ Generating configuration preview...",
-                gr.update(),
-                gr.update(),
-                gr.update(),  # Stay on current tab
-            )
-
-            logger.info("step3_next: analyzer_name=%s", current_state.analyzer_name)
-            logger.info("step3_next: display_name=%s", current_state.display_name)
-
-            example_images = files[:6] if files else []
-
-            # Create new state with example images first
-            new_state = replace(current_state, example_images=example_images)
-
-            # Generate manifest and schema
-            try:
-                manifest = generate_manifest(new_state)
-                schema = generate_schema(new_state)
-                logger.info(
-                    "Generated manifest: %s", json.dumps(manifest, indent=2)[:500]
-                )
-                logger.info("Generated schema: %s", json.dumps(schema, indent=2)[:500])
-            except Exception as e:
-                logger.error("Error generating config: %s", e, exc_info=True)
-                yield (
-                    current_state,
-                    f"❌ Error generating configuration: {str(e)}",
-                    gr.update(),
-                    gr.update(),
-                    gr.update(selected=2),  # Stay on examples tab
-                )
-                return
-
-            new_state = replace(
-                new_state,
-                manifest_json=manifest,
-                schema_json=schema,
-            )
-
-            # Generate file summary
-            base_name = new_state.analyzer_name
-            if base_name.endswith("_analyzer"):
-                analyzer_name = base_name
-                base_name = base_name[:-9]
-            else:
-                analyzer_name = f"{base_name}_analyzer"
-
-            num_examples = len(new_state.example_images)
-
-            # Get bucket for display
-            bucket = get_config_bucket() or "<CONFIG_BUCKET>"
-
-            summary_lines = [
-                "📁 **Lambda Code:**",
-                f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/code/{analyzer_name}/`",
-                "",
-                "📄 **Configuration:**",
-                f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/manifests/{analyzer_name}.json`",
-                f"  - `s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/schemas/{analyzer_name}.json`",
-                "",
-                f"📝 **Prompts** (`s3://{bucket}/{CUSTOM_ANALYZERS_PREFIX}/prompts/{analyzer_name}/`):",
-                f"  - `{base_name}_gestalt.xml`",
-                f"  - `{base_name}_job_role.xml`",
-                f"  - `{base_name}_rules.xml`",
-                f"  - `{base_name}_context.xml`",
-                f"  - `{base_name}_tasks.xml`",
-                f"  - `{base_name}_format.xml`",
-            ]
-
-            if num_examples > 0:
-                summary_lines.extend(
-                    [
-                        "",
-                        f"🖼️ **Example Images:** {num_examples} file(s) in `few-shot-images/`",
-                    ]
-                )
-
-            file_summary = "\n".join(summary_lines)
-
-            logger.info("step3_next: returning manifest with %d keys", len(manifest))
-
-            # Final yield with all the data
-            yield (
-                new_state,
-                file_summary,
-                gr.update(value=manifest),
-                gr.update(value=schema),
-                gr.update(selected=3),
-            )
-
-        def handle_deploy(current_state):
-            """Deploy the analyzer."""
-            return create_analyzer(current_state)
-
-        def update_gallery(files):
-            """Update the gallery with uploaded files."""
-            if files:
-                return files[:6]
-            return []
-
-        def clear_wizard():
-            """Clear all wizard form fields and reset to initial state."""
-            return (
-                WizardState(),  # state
-                "",  # wizard_status
-                "",  # display_name
-                "",  # description
-                "",  # user_paragraph
-                "Claude Sonnet 4.5",  # primary_model
-                "Claude Haiku 4.5",  # fallback_model_1
-                "Amazon Nova Premier",  # fallback_model_2
-                False,  # enhancement_eligible
-                "",  # gestalt_editor
-                "",  # role_editor
-                "",  # rules_editor
-                "",  # context_editor
-                "",  # tasks_editor
-                "",  # format_editor
-                None,  # example_upload
-                [],  # example_gallery
-                "",  # files_summary
-                None,  # manifest_preview
-                None,  # schema_preview
-                "",  # deploy_output
-                "",  # cdk_output
-                gr.update(selected=0),  # tabs - go back to step 1
-            )
-
-        clear_wizard_btn.click(
-            clear_wizard,
-            outputs=[
-                state,
-                wizard_status,
-                display_name,
-                description,
-                user_paragraph,
-                primary_model,
-                fallback_model_1,
-                fallback_model_2,
-                enhancement_eligible,
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-                example_upload,
-                example_gallery,
-                files_summary,
-                manifest_preview,
-                schema_preview,
-                deploy_output,
-                cdk_output,
-                tabs,
-            ],
-        )
-
-        # Wire up events with loading indicators
-        next_btn_1.click(
-            step1_next,
-            inputs=[
-                display_name,
-                description,
-                user_paragraph,
-                primary_model,
-                fallback_model_1,
-                fallback_model_2,
-                enhancement_eligible,
-                state,
-            ],
-            outputs=[
-                state,
-                wizard_status,
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-                tabs,
-            ],
-        )
-
-        next_btn_2.click(
-            step2_next,
-            inputs=[
-                gestalt_editor,
-                role_editor,
-                rules_editor,
-                context_editor,
-                tasks_editor,
-                format_editor,
-                state,
-            ],
-            outputs=[state, tabs],
-        )
-
-        back_btn_2.click(lambda: gr.update(selected=0), outputs=[tabs])
-
-        example_upload.change(
-            update_gallery, inputs=[example_upload], outputs=[example_gallery]
-        )
-
-        next_btn_3.click(
-            step3_next,
-            inputs=[example_upload, state],
-            outputs=[state, files_summary, manifest_preview, schema_preview, tabs],
-        )
-
-        back_btn_3.click(lambda: gr.update(selected=1), outputs=[tabs])
-        back_btn_4.click(lambda: gr.update(selected=2), outputs=[tabs])
-
-        create_btn.click(
-            lambda: "⏳ Saving analyzer locally...",
-            outputs=[deploy_output],
-        ).then(handle_deploy, inputs=[state], outputs=[deploy_output])
-
-        deploy_cdk_btn.click(
-            lambda: "⏳ Running CDK deployment... this may take several minutes...",
-            outputs=[cdk_output],
-        ).then(deploy_custom_analyzers_cdk, outputs=[cdk_output])
-
-    return wizard_demo
-
-
-# Module-level demo for import
-demo = create_wizard()
-
-if __name__ == "__main__":
-    demo.launch(share=False)
+    deploy_cdk_btn.click(
+        lambda: "⏳ Running CDK deployment... this may take several minutes...",
+        outputs=[cdk_output],
+    ).then(deploy_custom_analyzers_cdk, outputs=[cdk_output])

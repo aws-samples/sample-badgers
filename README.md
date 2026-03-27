@@ -198,9 +198,9 @@ layer/python/
     └── *.xml
 ```
 
-**📄 Poppler Layer** (`poppler-layer.zip`)
+**📄 Poppler Layer** (`poppler-qpdf-layer.zip`)
 - PDF rendering library for `pdf_to_images_converter`
-- Built via `deployment/lambdas/build_poppler_layer.sh`
+- Built via `deployment/lambdas/build_poppler_qdf_layer.sh`
 
 ### 🔬 How an Analyzer Works
 
@@ -289,7 +289,7 @@ Each analyzer has a manifest file in S3:
         "name": "full_text_analyzer",
         "enhancement_eligible": true,
         "model_selections": {
-            "primary": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "fallback_list": [
                 "us.anthropic.claude-haiku-4-5-20251001-v1:0",
                 "us.amazon.nova-premier-v1:0"
@@ -370,16 +370,16 @@ BADGERS uses Application Inference Profiles to enable cost allocation and usage 
 │                                                                             │
 │  1. CDK deploys InferenceProfilesStack                                      │
 │     └─> Creates ApplicationInferenceProfile for each model                  │
-│         • badgers-claude-sonnet-{id}  (Global)                              │
-│         • badgers-claude-haiku-{id}   (Global)                              │
-│         • badgers-claude-opus-{id}    (Global)                              │
-│         • badgers-nova-premier-{id}   (US)                                  │
+│         • badgers-claude-sonnet-{id}  (US)                               │
+│         • badgers-claude-haiku-{id}   (US)                               │
+│         • badgers-claude-opus-{id}    (US)                               │
+│         • badgers-nova-premier-{id}   (US)                               │
 │                                                                             │
 │  2. Runtime receives profile ARNs as environment variables                  │
 │     └─> CLAUDE_SONNET_PROFILE_ARN, CLAUDE_HAIKU_PROFILE_ARN, etc.           │
 │                                                                             │
 │  3. At invocation, bedrock_client.py maps model_id → profile ARN            │
-│     └─> "global.anthropic.claude-sonnet-4-5-*" → $CLAUDE_SONNET_PROFILE_ARN │
+│     └─> "us.anthropic.claude-sonnet-4-5-*" → $CLAUDE_SONNET_PROFILE_ARN    │
 │                                                                             │
 │  4. Bedrock invoked with profile ARN (enables cost tracking)                │
 │     └─> Falls back to model ID if no profile configured                     │
@@ -414,6 +414,34 @@ The [Analyzer Creation Wizard](frontend/ANALYZER_CREATION_WIZARD.md) is availabl
 4. ⚡ Create Lambda code in `deployment/lambdas/code/{analyzer_name}/lambda_handler.py`
 5. 📝 Register in `deployment/stacks/lambda_stack.py`
 6. 🚀 Redeploy: `cdk deploy badgers-lambda badgers-gateway`
+
+---
+
+## 🔧 Troubleshooting
+
+### Service Control Policy (SCP) Blocks Cross-Region Inference
+
+If your AWS organization uses strict SCPs that deny cross-region Bedrock operations, you may see:
+
+```
+AccessDeniedException: ... is not authorized to perform: bedrock:InvokeModelWithResponseStream
+on resource: arn:aws:bedrock:::foundation-model/anthropic.claude-* with an explicit deny
+in a service control policy
+```
+
+BADGERS defaults to regional (`us.anthropic.*`) inference profiles which avoid cross-region routing. If you previously deployed with `global.anthropic.*` profiles, redeploy after pulling the latest code.
+
+### Marketplace Subscription Error on First Invocation
+
+After a fresh deployment, the first model invocation may fail with:
+
+```
+AccessDeniedException: Model access is denied due to IAM user or service role is not authorized
+to perform the required AWS Marketplace actions (aws-marketplace:ViewSubscriptions,
+aws-marketplace:Subscribe)
+```
+
+The IAM stack now includes `aws-marketplace:ViewSubscriptions` and `aws-marketplace:Subscribe` permissions. If you see this error on an older deployment, redeploy the IAM stack. As a workaround, manually invoke the model once in the Bedrock console playground to trigger the Marketplace subscription.
 
 ---
 

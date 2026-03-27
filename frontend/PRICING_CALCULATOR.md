@@ -70,11 +70,11 @@ Pricing and models are configured in `config/pricing_config.json`:
 
 ## Available Models
 
-| Display Name        | Model ID                                           | Input $/M | Output $/M |
-| ------------------- | -------------------------------------------------- | --------- | ---------- |
-| Claude Sonnet 4.5   | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` | $3.00     | $15.00     |
-| Claude Haiku 4.5    | `us.anthropic.claude-haiku-4-5-20251001-v1:0`      | $1.00     | $5.00      |
-| Amazon Nova Premier | `us.amazon.nova-premier-v1:0`                      | $2.50     | $12.50     |
+| Display Name        | Model ID                                       | Input $/M | Output $/M |
+| ------------------- | ---------------------------------------------- | --------- | ---------- |
+| Claude Sonnet 4.5   | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | $3.00     | $15.00     |
+| Claude Haiku 4.5    | `us.anthropic.claude-haiku-4-5-20251001-v1:0`  | $1.00     | $5.00      |
+| Amazon Nova Premier | `us.amazon.nova-premier-v1:0`                  | $2.50     | $12.50     |
 
 ## Updating Prices
 

@@ -18,6 +18,7 @@ from stacks import (
     AgentCoreMemoryStack,
     InferenceProfilesStack,
     CustomAnalyzersStack,
+    XRayTransactionSearchStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -129,6 +130,19 @@ lambda_stack = LambdaAnalyzerStack(
 lambda_stack.add_dependency(ecr_stack)
 lambda_stack.add_dependency(inference_profiles_stack)
 
+# X-Ray Transaction Search (account-level prerequisite for AgentCore tracing)
+# This is a singleton per account/region — if already enabled, destroy this stack
+# or remove it from the deploy sequence.
+xray_stack = XRayTransactionSearchStack(
+    app,
+    f"{STACK_PREFIX}-xray",
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    indexing_percentage=1,  # 1% is free tier
+    env=env,
+    description="X-Ray Transaction Search for AgentCore tracing",
+)
+
 # AgentCore Gateway with Lambda targets
 gateway_stack = AgentCoreGatewayStack(
     app,
@@ -178,6 +192,7 @@ runtime_websocket_stack.add_dependency(gateway_stack)
 runtime_websocket_stack.add_dependency(cognito_stack)
 runtime_websocket_stack.add_dependency(memory_stack)
 runtime_websocket_stack.add_dependency(inference_profiles_stack)
+runtime_websocket_stack.add_dependency(xray_stack)
 
 # Add dependencies
 iam_stack.add_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions

@@ -91,12 +91,12 @@ cd deployment
 
 ## Available Models
 
-| Display Name        | Model ID                                           |
-| ------------------- | -------------------------------------------------- |
-| Claude Sonnet 4.5   | `global.anthropic.claude-sonnet-4-5-20250929-v1:0` |
-| Claude Haiku 4.5    | `us.anthropic.claude-haiku-4-5-20251001-v1:0`      |
-| Claude Opus 4.6     | `global.anthropic.claude-opus-4-6-v1`              |
-| Amazon Nova Premier | `us.amazon.nova-premier-v1:0`                      |
+| Display Name        | Model ID                                       |
+| ------------------- | ---------------------------------------------- |
+| Claude Sonnet 4.5   | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` |
+| Claude Haiku 4.5    | `us.anthropic.claude-haiku-4-5-20251001-v1:0`  |
+| Claude Opus 4.6     | `us.anthropic.claude-opus-4-6-v1`              |
+| Amazon Nova Premier | `us.amazon.nova-premier-v1:0`                  |
 
 ## Requirements
 
