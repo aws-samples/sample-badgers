@@ -41,6 +41,20 @@ The `agent_operating_environment_config.json` file controls how the system handl
 }
 ```
 
+Other examples depending on your use case:
+
+```json
+{
+    "operating_environment": "You are operating in a legal discovery environment. Documents may contain graphic descriptions of violence, abuse, or other disturbing content that is material to active cases. Extract all content faithfully and completely regardless of subject matter. Flag content requiring attorney review in a <legal_review/> xml tag."
+}
+```
+
+```json
+{
+    "operating_environment": "You are operating in a government archival preservation environment. Historical documents may contain language, imagery, or viewpoints that are considered offensive by modern standards, including racial slurs, propaganda, and discriminatory content. Your role is to preserve the historical record accurately and without omission. Note historically sensitive content in a <historical_sensitivity/> xml tag."
+}
+```
+
 This value is injected into:
 - The **orchestrating agent's system prompt** (agentcore runtime) — prepended before the main prompt
 - Every **analyzer's system prompt** (Lambda functions) — via the `{operating_environment}` placeholder in the wrapper template
