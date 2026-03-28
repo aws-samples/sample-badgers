@@ -443,31 +443,46 @@ def deploy_custom_analyzers_cdk() -> str:
 
 def create_analyzer(state: WizardState) -> str:
     """Save all analyzer files locally to deployment/custom_analyzers/."""
+    import re
+
     logger.info("Saving analyzer locally: %s", state.analyzer_name)
     results = []
 
     if not state.analyzer_name:
         return "❌ No analyzer configured. Complete the wizard steps first."
 
-    # Avoid double _analyzer suffix
-    if state.analyzer_name.endswith("_analyzer"):
-        analyzer_name = state.analyzer_name
-    else:
-        analyzer_name = f"{state.analyzer_name}_analyzer"
+    # Sanitize analyzer name — allow only alphanumeric, underscore, hyphen
+    raw_name = state.analyzer_name
+    if not re.fullmatch(r"[a-zA-Z0-9_-]+", raw_name):
+        return "❌ Invalid analyzer name. Use only letters, numbers, underscores, and hyphens."
 
-    base_name = state.analyzer_name
+    # Avoid double _analyzer suffix
+    if raw_name.endswith("_analyzer"):
+        analyzer_name = raw_name
+    else:
+        analyzer_name = f"{raw_name}_analyzer"
+
+    base_name = raw_name
     if base_name.endswith("_analyzer"):
         base_name = base_name[:-9]
 
     # Save to deployment/custom_analyzers/
     custom_dir = DEPLOYMENT_ROOT / "custom_analyzers"
     custom_dir.mkdir(parents=True, exist_ok=True)
+    safe_root = os.path.realpath(str(custom_dir))
+
+    def _validate_path(candidate_path: str) -> str:
+        """Resolve and verify a path is within the safe root. Raises ValueError if not."""
+        real = os.path.realpath(candidate_path)
+        if not real.startswith(safe_root + os.sep):
+            raise ValueError(f"Path traversal blocked: {real}")
+        return real
 
     try:
         # 1. Save manifest
         manifests_dir = custom_dir / "manifests"
         manifests_dir.mkdir(exist_ok=True)
-        manifest_path = manifests_dir / f"{analyzer_name}.json"
+        manifest_path = _validate_path(str(manifests_dir / f"{analyzer_name}.json"))
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(state.manifest_json, f, indent=4)
         results.append(f"✓ Saved manifest: {manifest_path}")
@@ -475,13 +490,14 @@ def create_analyzer(state: WizardState) -> str:
         # 2. Save schema
         schemas_dir = custom_dir / "schemas"
         schemas_dir.mkdir(exist_ok=True)
-        schema_path = schemas_dir / f"{analyzer_name}.json"
+        schema_path = _validate_path(str(schemas_dir / f"{analyzer_name}.json"))
         with open(schema_path, "w", encoding="utf-8") as f:
             json.dump(state.schema_json, f, indent=4)
         results.append(f"✓ Saved schema: {schema_path}")
 
         # 3. Save XML prompt files
         prompts_dir = custom_dir / "prompts" / analyzer_name
+        _validate_path(str(prompts_dir))
         prompts_dir.mkdir(parents=True, exist_ok=True)
 
         prompt_files = {
@@ -494,7 +510,7 @@ def create_analyzer(state: WizardState) -> str:
         }
 
         for filename, content in prompt_files.items():
-            prompt_path = prompts_dir / filename
+            prompt_path = _validate_path(str(prompts_dir / filename))
             with open(prompt_path, "w", encoding="utf-8") as f:
                 f.write(content)
         results.append(f"✓ Saved {len(prompt_files)} prompt files to {prompts_dir}/")
@@ -504,16 +520,20 @@ def create_analyzer(state: WizardState) -> str:
             import shutil
 
             examples_dir = prompts_dir / "few-shot-images"
+            _validate_path(str(examples_dir))
             examples_dir.mkdir(exist_ok=True)
             for i, img_path in enumerate(state.example_images):
                 ext = Path(img_path).suffix
-                dest = examples_dir / f"example_{i+1}{ext}"
+                # Sanitize extension
+                if not re.fullmatch(r"\.[a-zA-Z0-9]+", ext):
+                    ext = ".bin"
+                dest = _validate_path(str(examples_dir / f"example_{i+1}{ext}"))
                 shutil.copy2(img_path, dest)
             results.append(f"✓ Copied {len(state.example_images)} example images")
 
         # 5. Update local analyzer registry
-        registry_path = custom_dir / "analyzer_registry.json"
-        if registry_path.exists():
+        registry_path = _validate_path(str(custom_dir / "analyzer_registry.json"))
+        if os.path.isfile(registry_path):
             with open(registry_path, encoding="utf-8") as f:
                 registry = json.load(f)
         else:

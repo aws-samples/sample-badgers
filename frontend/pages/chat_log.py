@@ -18,6 +18,7 @@ def get_session_list():
 
 def read_chat_log(session_id: str):
     """Read the chat history log file for a specific session."""
+    import os.path
     import re
 
     if not session_id or session_id == "No sessions yet":
@@ -25,10 +26,18 @@ def read_chat_log(session_id: str):
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", session_id):
         return "Invalid session ID."
 
-    log_file = CHAT_LOG_DIR / (session_id + ".log")
-    if log_file.exists():  # <-- fixed
+    # Construct candidate path and normalise to defeat traversal
+    safe_root = os.path.realpath(str(CHAT_LOG_DIR))
+    candidate = os.path.realpath(os.path.join(safe_root, session_id + ".log"))
+
+    if not candidate.startswith(safe_root + os.sep):
+        return "Invalid session ID."
+
+    # Re-read from the validated, normalised string path
+    if os.path.isfile(candidate):
         try:
-            content = log_file.read_text(encoding="utf-8")
+            with open(candidate, encoding="utf-8") as fh:
+                content = fh.read()
             lines = content.strip().split("\n")
             formatted = []
             prev_was_assistant = False

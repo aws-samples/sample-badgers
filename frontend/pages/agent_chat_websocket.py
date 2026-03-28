@@ -1028,11 +1028,19 @@ def build():
         safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = "agent_response_" + safe_sid + "_" + timestamp + ".md"
-        filepath = responses_dir / filename
+        filepath = (responses_dir / filename).resolve()
 
-        # Format content for download
-        output = f"# Agent Response\n\n"
-        output += f"**Session:** {sid}\n"
+        # Verify resolved path is within the safe root directory
+        safe_root = responses_dir.resolve()
+        if not str(filepath).startswith(str(safe_root) + "/"):
+            logger.error("Path traversal blocked: %s not under %s", filepath, safe_root)
+            temp_path = safe_root / "error.txt"
+            temp_path.write_text("Error: invalid session ID.")
+            return str(temp_path)
+
+        # Format content for download — use sanitized sid only
+        output = "# Agent Response\n\n"
+        output += f"**Session:** {safe_sid}\n"
         output += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         output += "---\n\n"
         output += content
@@ -1059,15 +1067,20 @@ def build():
 
         safe_sid = _re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = "full_chat_" + safe_sid + "_" + timestamp + ".md"
-        filepath = responses_dir / filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = "chat_history_" + safe_sid + "_" + timestamp + ".md"
-        filepath = Path("/tmp") / filename
+        filepath = (responses_dir / filename).resolve()
 
-        # Format full conversation
-        output = f"# Chat History\n\n"
-        output += f"**Session:** {sid}\n"
+        # Verify resolved path is within the safe root directory
+        safe_root = responses_dir.resolve()
+        if not str(filepath).startswith(str(safe_root) + "/"):
+            logger.error("Path traversal blocked: %s not under %s", filepath, safe_root)
+            temp_path = safe_root / "error.txt"
+            temp_path.write_text("Error: invalid session ID.")
+            return str(temp_path)
+
+        # Format full conversation — use sanitized sid only
+        output = "# Chat History\n\n"
+        output += f"**Session:** {safe_sid}\n"
         output += f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         output += f"**Messages:** {len(history)}\n\n"
         output += "---\n\n"
