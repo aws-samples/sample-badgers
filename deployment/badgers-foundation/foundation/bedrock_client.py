@@ -149,8 +149,8 @@ class BedrockClient:
             region = self.aws_region or "us-west-2"
 
             # Configure timeouts for large response streaming
-            read_timeout = int(os.environ.get("BEDROCK_READ_TIMEOUT", "300"))
-            connect_timeout = int(os.environ.get("BEDROCK_CONNECT_TIMEOUT", "10"))
+            read_timeout = int(os.environ.get("BEDROCK_READ_TIMEOUT", "900"))
+            connect_timeout = int(os.environ.get("BEDROCK_CONNECT_TIMEOUT", "30"))
 
             from botocore.config import Config
 

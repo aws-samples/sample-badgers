@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.1] - 2026-03-28
+### Changed
+- Increased all timeout configurations from 300s to 900s to support 10+ minute agent runs (#42)
+  - Lambda function timeouts (Duration.seconds), BEDROCK_READ_TIMEOUT env var, MCP server timeout
+  - Bedrock client connect_timeout raised from 10s to 30s
+  - WebSocket ping_timeout raised to 90s, close_timeout to 30s for long-running stability
+  - Frontend AGENTCORE_READ_TIMEOUT default raised to 900s
+  - Prompt generator boto3 read_timeout raised to 900s
+- Added operating environment configuration value for agent context (#47)
+
 ## [2.4.0] - 2026-03-28
 ### Added
 - Poppler-qpdf Lambda layer with fontconfig for improved PDF text extraction (#40)
