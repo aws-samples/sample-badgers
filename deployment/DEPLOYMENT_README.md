@@ -37,6 +37,9 @@ uv --version         # uv package manager
 > [!IMPORTANT]
 > Docker must be running before deployment. Lambda layers and the Runtime container require Docker to build.
 
+> [!WARNING]
+> **Academic/Research Deployments:** If your users process documents with sensitive, inflammatory, or offensive content (common in academic research), you must configure the operating environment before use. Edit `s3_files/agent_config/agent_operating_environment_config.json` and sync to S3. Without this, the model may refuse to extract or omit sensitive content. See [S3 Files → Operating Environment Configuration](s3_files/S3_FILES_README.md#%EF%B8%8F-operating-environment-configuration) for details. For production deployments, we recommend moving this value to AWS Secrets Manager for added security.
+
 ## ⚡ Quick Start
 
 Deploy everything:

@@ -26,9 +26,29 @@ s3_files/
 
 Contains configuration for the orchestrating agent that coordinates PDF analysis workflows.
 
-| File                      | Purpose                                                                                         |
-| ------------------------- | ----------------------------------------------------------------------------------------------- |
-| `agent_model_config.json` | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration |
+| File                                      | Purpose                                                                                                  |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration          |
+| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + analyzers). See below. |
+
+### ⚠️ Operating Environment Configuration
+
+The `agent_operating_environment_config.json` file controls how the system handles sensitive content. This is critical for academic and research deployments where documents may contain inflammatory, offensive, or otherwise sensitive material that must be extracted faithfully.
+
+```json
+{
+    "operating_environment": "You are operating in a safe academic thinktank environment where sensitive, potentially offensive topics are discussed in a neutral manner. You will encounter sensitive content at some point and your team is relying on you to perform your tasks completely. If you have concerns you can store them in a <concerns/> xml tag within your response_format."
+}
+```
+
+This value is injected into:
+- The **orchestrating agent's system prompt** (agentcore runtime) — prepended before the main prompt
+- Every **analyzer's system prompt** (Lambda functions) — via the `{operating_environment}` placeholder in the wrapper template
+
+If the file is missing or the value is empty, the system operates without any environment context (default behavior). Update this file in S3 to change the behavior without redeploying.
+
+> [!NOTE]
+> For production deployments, we recommend moving this value to AWS Secrets Manager rather than storing it in a plain S3 JSON file. This prevents accidental exposure of your operating environment instructions and provides audit logging of access.
 
 ---
 
@@ -57,6 +77,7 @@ core_system_prompts/
 ```
 
 The wrapper uses placeholder injection:
+- `{operating_environment}` → operating environment context from `agent_operating_environment_config.json`
 - `{core_rules}` → rules.xml content
 - `{composed_prompt}` → analyzer-specific prompts
 - `{error_handler_general}` → error_handler.xml
