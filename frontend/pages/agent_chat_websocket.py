@@ -91,7 +91,7 @@ def upload_file_to_s3(file_path: str) -> str:
         return f"❌ Upload failed: {e}"
 
 
-AGENTCORE_READ_TIMEOUT = int(os.getenv("AGENTCORE_READ_TIMEOUT", "600"))
+AGENTCORE_READ_TIMEOUT = int(os.getenv("AGENTCORE_READ_TIMEOUT", "900"))
 
 custom_css = """
 gradio-app { background-color: #eef2ff !important; }
@@ -200,8 +200,8 @@ class WebSocketStreamingClient:
             async with websockets.connect(
                 ws_url,
                 ping_interval=30,
-                ping_timeout=10,
-                close_timeout=10,
+                ping_timeout=90,
+                close_timeout=30,
             ) as websocket:
                 # Send the invocation request
                 payload = json.dumps(

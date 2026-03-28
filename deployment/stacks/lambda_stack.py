@@ -198,7 +198,7 @@ class LambdaAnalyzerStack(Stack):
         # Environment variables
         environment = {
             "ANALYZER_NAME": analyzer_name,
-            "BEDROCK_READ_TIMEOUT": "300",
+            "BEDROCK_READ_TIMEOUT": "900",
             "CACHE_ENABLED": "True",
             "FAIL_AFTER_ERROR": "False",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
@@ -255,7 +255,7 @@ class LambdaAnalyzerStack(Stack):
             code=lambda_.Code.from_asset(str(code_dir)),
             role=self.execution_role,
             layers=layers,
-            timeout=Duration.seconds(300),
+            timeout=Duration.seconds(900),
             memory_size=2048,
             reserved_concurrent_executions=5,
             description=description,
@@ -299,7 +299,7 @@ class LambdaAnalyzerStack(Stack):
 
         environment = {
             "ANALYZER_NAME": func_name,
-            "BEDROCK_READ_TIMEOUT": "300",
+            "BEDROCK_READ_TIMEOUT": "900",
             "CACHE_ENABLED": "True",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
@@ -342,7 +342,7 @@ class LambdaAnalyzerStack(Stack):
             handler=lambda_.Handler.FROM_IMAGE,
             runtime=lambda_.Runtime.FROM_IMAGE,
             role=self.execution_role,
-            timeout=Duration.seconds(300),
+            timeout=Duration.seconds(900),
             memory_size=2048,
             reserved_concurrent_executions=5,
             description=description,

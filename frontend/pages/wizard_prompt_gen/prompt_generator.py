@@ -248,7 +248,7 @@ def generate_all_prompts(
     bedrock = boto3.client(
         "bedrock-runtime",
         region_name="us-west-2",
-        config=BotoConfig(read_timeout=300),
+        config=BotoConfig(read_timeout=900),
     )
 
     results: dict[str, str] = {}

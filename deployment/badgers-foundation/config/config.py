@@ -75,7 +75,7 @@ class ServerConfig:
     debug: bool = False
     host: str = "127.0.0.1"
     port: int = 8000
-    timeout: int = 300  # 5 minutes default timeout in seconds
+    timeout: int = 900  # 15 minutes default timeout in seconds
     aws_profile: Optional[str] = None  # AWS profile for Bedrock/AWS services
     logging: Optional[LoggingConfig] = None
 
