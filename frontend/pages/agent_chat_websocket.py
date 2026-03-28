@@ -1028,15 +1028,19 @@ def build():
         safe_sid = re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = "agent_response_" + safe_sid + "_" + timestamp + ".md"
-        filepath = (responses_dir / filename).resolve()
 
-        # Verify resolved path is within the safe root directory
-        safe_root = responses_dir.resolve()
-        if not str(filepath).startswith(str(safe_root) + "/"):
-            logger.error("Path traversal blocked: %s not under %s", filepath, safe_root)
-            temp_path = safe_root / "error.txt"
-            temp_path.write_text("Error: invalid session ID.")
-            return str(temp_path)
+        # Use os.path.realpath to normalize and resolve symlinks (CodeQL-recognized sanitizer)
+        safe_root = os.path.realpath(str(responses_dir))
+        filepath_str = os.path.realpath(os.path.join(safe_root, filename))
+        if not filepath_str.startswith(safe_root + os.sep):
+            logger.error(
+                "Path traversal blocked: %s not under %s", filepath_str, safe_root
+            )
+            temp_path = os.path.join(safe_root, "error.txt")
+            Path(temp_path).write_text("Error: invalid session ID.")
+            return temp_path
+
+        filepath = Path(filepath_str)
 
         # Format content for download — use sanitized sid only
         output = "# Agent Response\n\n"
@@ -1047,7 +1051,7 @@ def build():
 
         filepath.write_text(output, encoding="utf-8")
         logger.info("Downloaded last response to: %s", filepath)
-        return str(filepath)
+        return filepath_str
 
     def download_full_chat(history, sid):
         """Download the full chat history as a markdown file."""
@@ -1068,15 +1072,19 @@ def build():
         safe_sid = _re.sub(r"[^a-zA-Z0-9_-]", "", sid or "unknown")[:8]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = "chat_history_" + safe_sid + "_" + timestamp + ".md"
-        filepath = (responses_dir / filename).resolve()
 
-        # Verify resolved path is within the safe root directory
-        safe_root = responses_dir.resolve()
-        if not str(filepath).startswith(str(safe_root) + "/"):
-            logger.error("Path traversal blocked: %s not under %s", filepath, safe_root)
-            temp_path = safe_root / "error.txt"
-            temp_path.write_text("Error: invalid session ID.")
-            return str(temp_path)
+        # Use os.path.realpath to normalize and resolve symlinks (CodeQL-recognized sanitizer)
+        safe_root = os.path.realpath(str(responses_dir))
+        filepath_str = os.path.realpath(os.path.join(safe_root, filename))
+        if not filepath_str.startswith(safe_root + os.sep):
+            logger.error(
+                "Path traversal blocked: %s not under %s", filepath_str, safe_root
+            )
+            temp_path = os.path.join(safe_root, "error.txt")
+            Path(temp_path).write_text("Error: invalid session ID.")
+            return temp_path
+
+        filepath = Path(filepath_str)
 
         # Format full conversation — use sanitized sid only
         output = "# Chat History\n\n"
@@ -1107,7 +1115,7 @@ def build():
 
         filepath.write_text(output, encoding="utf-8")
         logger.info("Downloaded full chat history to: %s", filepath)
-        return str(filepath)
+        return filepath_str
 
     refresh_tools_btn.click(fn=refresh_tools, outputs=[tools_display])
 
