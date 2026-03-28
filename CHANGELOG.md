@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.4.0] - 2026-03-28
+### Added
+- Poppler-qpdf Lambda layer with fontconfig for improved PDF text extraction (#40)
+- PDF syntax repair pre-processing step in remediation pipeline (#25)
+- Configurable `RESOLVER_MAX_TOKENS` env var for remediation analyzer
+- New pricing models and analyzer defaults in pricing calculator
+
+### Fixed
+- Path injection vulnerabilities in chat download functions (CodeQL py/path-injection)
+
+### Security
+- Remediated CodeQL alerts #11, #12, #18, #19 — path traversal in `agent_chat_websocket.py`
+
+### Dependencies
+- Bumped requests from 2.32.5 to 2.33.0
+- Bumped pypdf from 6.8.0 to 6.9.2
+- Bumped pymupdf from 1.26.6 to 1.26.7
+- Bumped pyjwt from 2.10.1 to 2.12.0
+
 ## [2.3.0] - 2026-03-12
 ### Added
 - Dynamic token estimation based on image complexity (#15)
