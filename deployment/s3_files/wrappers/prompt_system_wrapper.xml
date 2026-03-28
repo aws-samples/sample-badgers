@@ -1,8 +1,2 @@
 <!-- This LLM Prompt is in XML format. -->
-<system_prompt>
-    {core_rules}
-    {composed_prompt}
-    {audit_mode}
-    {error_handler_general}
-    {error_handler_not_found}
-</system_prompt>
+<system_prompt> {operating_environment} {core_rules} {composed_prompt} {audit_mode} {error_handler_general} {error_handler_not_found} </system_prompt>
