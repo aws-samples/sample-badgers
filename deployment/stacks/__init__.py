@@ -11,6 +11,7 @@ from .agentcore_memory_stack import AgentCoreMemoryStack
 from .inference_profiles_stack import InferenceProfilesStack
 from .custom_analyzers_stack import CustomAnalyzersStack
 from .xray_transaction_search_stack import XRayTransactionSearchStack
+from .knowledge_base_stack import KnowledgeBaseStack
 
 __all__ = [
     "S3Stack",
@@ -24,4 +25,5 @@ __all__ = [
     "InferenceProfilesStack",
     "CustomAnalyzersStack",
     "XRayTransactionSearchStack",
+    "KnowledgeBaseStack",
 ]

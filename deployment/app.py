@@ -19,6 +19,7 @@ from stacks import (
     InferenceProfilesStack,
     CustomAnalyzersStack,
     XRayTransactionSearchStack,
+    KnowledgeBaseStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -166,6 +167,18 @@ memory_stack = AgentCoreMemoryStack(
     env=env,
     description="AgentCore Memory for BADGERS session persistence",
 )
+
+# Knowledge Base with OpenSearch Serverless
+kb_stack = KnowledgeBaseStack(
+    app,
+    f"{STACK_PREFIX}-knowledge-base",
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    s3_kms_key=s3_stack.s3_kms_key,
+    env=env,
+    description="Bedrock Knowledge Base with OpenSearch Serverless for BADGERS",
+)
+kb_stack.add_dependency(s3_stack)
 
 
 # AgentCore Runtime WebSocket
