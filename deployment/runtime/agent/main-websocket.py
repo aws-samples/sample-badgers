@@ -274,6 +274,23 @@ def load_config_from_s3() -> tuple[str, dict[str, Any]]:
         )
         system_prompt = response["Body"].read().decode("utf-8")
 
+        # Load operating environment config and inject into system prompt
+        try:
+            response = s3.get_object(
+                Bucket=bucket_name,
+                Key="agent_config/agent_operating_environment_config.json",
+            )
+            env_config = json.loads(response["Body"].read().decode("utf-8"))
+            env_value = env_config.get("operating_environment", "")
+            if env_value:
+                env_block = (
+                    f"<operating_environment>{env_value}</operating_environment>\n\n"
+                )
+                system_prompt = env_block + system_prompt
+                log("Loaded operating environment context")
+        except Exception:
+            logger.debug("No operating environment config found, continuing without it")
+
         model_config = DEFAULT_MODEL_CONFIG.copy()
         try:
             response = s3.get_object(

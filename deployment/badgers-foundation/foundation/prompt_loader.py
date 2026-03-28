@@ -108,6 +108,28 @@ class PromptLoader:
             system_prompt = core_prompt_files["prompt_system_wrapper"]
 
             # Step 4: Inject all the content into the wrapper
+            # Step 4a: Inject operating environment context if available
+            operating_env_content = ""
+            if self.config_source == "s3":
+                try:
+                    s3 = __import__("boto3").client("s3")
+                    response = s3.get_object(
+                        Bucket=self.s3_bucket,
+                        Key="agent_config/agent_operating_environment_config.json",
+                    )
+                    import json as _json
+
+                    env_config = _json.loads(response["Body"].read().decode("utf-8"))
+                    env_value = env_config.get("operating_environment", "")
+                    if env_value:
+                        operating_env_content = f"<operating_environment>{env_value}</operating_environment>"
+                        self.logger.info("Loaded operating environment context")
+                except Exception as e:
+                    self.logger.debug("No operating environment config found: %s", e)
+            system_prompt = system_prompt.replace(
+                "{operating_environment}", operating_env_content
+            )
+
             system_prompt = system_prompt.replace(
                 "{core_rules}", core_prompt_files["core_rules_rules"]
             )
