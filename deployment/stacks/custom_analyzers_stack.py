@@ -199,7 +199,7 @@ class CustomAnalyzersStack(Stack):
 
         environment = {
             "ANALYZER_NAME": analyzer_name,
-            "BEDROCK_READ_TIMEOUT": "300",
+            "BEDROCK_READ_TIMEOUT": "900",
             "CACHE_ENABLED": "True",
             "FAIL_AFTER_ERROR": "False",
             "CONFIG_BUCKET": self.config_bucket_name,
@@ -228,7 +228,7 @@ class CustomAnalyzersStack(Stack):
             code=lambda_.Code.from_asset(str(code_dir)),
             role=self.lambda_role,
             layers=[self.foundation_layer, self.pillow_layer],
-            timeout=Duration.seconds(300),
+            timeout=Duration.seconds(900),
             memory_size=2048,
             reserved_concurrent_executions=5,
             description=description,
