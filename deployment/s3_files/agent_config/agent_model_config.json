@@ -1,6 +1,6 @@
 {
     "model_id": "us.anthropic.claude-opus-4-6-v1",
-    "temperature": 1.0,
+    "temperature": 1,
     "max_tokens": 60000,
     "thinking": {
         "type": "adaptive"

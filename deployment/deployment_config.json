@@ -1,0 +1,104 @@
+{
+    "analyzers": {
+        "pdf_to_images_converter": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "classify_pdf_content": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "full_text_analyzer": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "page_analyzer": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "layout_analyzer": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "charts_analyzer": {
+            "enabled": true,
+            "category": "Visual Content"
+        },
+        "diagram_analyzer": {
+            "enabled": true,
+            "category": "Visual Content"
+        },
+        "general_visual_analysis_analyzer": {
+            "enabled": true,
+            "category": "Visual Content"
+        },
+        "war_map_analyzer": {
+            "enabled": true,
+            "category": "Visual Content"
+        },
+        "decision_tree_analyzer": {
+            "enabled": true,
+            "category": "Visual Content"
+        },
+        "editorial_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "edu_transcript_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "handwriting_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "code_block_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "keyword_topic_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "scientific_analyzer": {
+            "enabled": true,
+            "category": "Text & Language"
+        },
+        "table_analyzer": {
+            "enabled": true,
+            "category": "Structured Data"
+        },
+        "elements_analyzer": {
+            "enabled": true,
+            "category": "Structured Data"
+        },
+        "robust_elements_analyzer": {
+            "enabled": true,
+            "category": "Structured Data"
+        },
+        "correlation_analyzer": {
+            "enabled": true,
+            "category": "Structured Data"
+        },
+        "metadata_generic_analyzer": {
+            "enabled": true,
+            "category": "Metadata"
+        },
+        "metadata_mads_analyzer": {
+            "enabled": true,
+            "category": "Metadata"
+        },
+        "metadata_mods_analyzer": {
+            "enabled": true,
+            "category": "Metadata"
+        },
+        "image_enhancer": {
+            "enabled": true,
+            "category": "Post-Processing"
+        },
+        "remediation_analyzer": {
+            "enabled": true,
+            "category": "Post-Processing"
+        }
+    }
+}
