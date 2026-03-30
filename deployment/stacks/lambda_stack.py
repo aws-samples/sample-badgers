@@ -38,6 +38,7 @@ class LambdaAnalyzerStack(Stack):
         output_bucket: s3.Bucket,
         ecr_repository: ecr.Repository,
         inference_profiles_stack: Optional[InferenceProfilesStack] = None,
+        enabled_analyzers: Optional[set[str]] = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -48,6 +49,7 @@ class LambdaAnalyzerStack(Stack):
         self.output_bucket = output_bucket
         self.ecr_repository = ecr_repository
         self.inference_profiles_stack = inference_profiles_stack
+        self.enabled_analyzers = enabled_analyzers
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -168,7 +170,7 @@ class LambdaAnalyzerStack(Stack):
             )
 
     def create_analyzer_functions(self):
-        """Create all analyzer Lambda functions."""
+        """Create analyzer Lambda functions (filtered by enabled_analyzers if set)."""
         # Get list of analyzers from lambdas/code directory
         lambdas_dir = Path("./lambdas/code")
 
@@ -178,11 +180,19 @@ class LambdaAnalyzerStack(Stack):
         analyzer_dirs = sorted([d for d in lambdas_dir.iterdir() if d.is_dir()])
 
         self.functions = {}
+        logger = logging.getLogger(__name__)
 
         for analyzer_dir in analyzer_dirs:
             analyzer_name = analyzer_dir.name
             # Skip container-based functions
             if analyzer_name in CONTAINER_FUNCTIONS:
+                continue
+            # Skip disabled analyzers
+            if (
+                self.enabled_analyzers is not None
+                and analyzer_name not in self.enabled_analyzers
+            ):
+                logger.info("Skipping disabled analyzer: %s", analyzer_name)
                 continue
             function = self.create_analyzer_function(analyzer_name, analyzer_dir)
             self.functions[analyzer_name] = function
@@ -282,6 +292,13 @@ class LambdaAnalyzerStack(Stack):
         logger = logging.getLogger(__name__)
 
         for func_name in CONTAINER_FUNCTIONS:
+            # Skip disabled analyzers
+            if (
+                self.enabled_analyzers is not None
+                and func_name not in self.enabled_analyzers
+            ):
+                logger.info("Skipping disabled container analyzer: %s", func_name)
+                continue
             # Check if image exists in ECR (tag = func_name)
             # CDK will fail at deploy time if image doesn't exist
             function = self._create_ecr_container_function(func_name)
