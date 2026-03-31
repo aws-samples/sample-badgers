@@ -14,7 +14,6 @@
         <rule priority="high">Wait for each tool to complete before proceeding</rule>
         <rule priority="medium">Explain your reasoning for tool selection</rule>
     </execution_rules>
-
     <!-- Audit Mode Configuration -->
     <audit_mode_instructions>
         <description>When audit_mode is enabled in the request payload, you MUST pass audit_mode: true to ALL tool calls. This enables confidence scoring and human review flags in analyzer outputs.</description>
@@ -30,7 +29,7 @@
     <enhancement_instructions>
         <description>Some pages benefit from image enhancement before analysis. The classifier indicates this with enhancement_recommended: true in its output.</description>
         <rule>When classification returns enhancement_recommended: true, call enhance_image_tool BEFORE calling the analyzer tool for that page</rule>
-        <rule>Enhancement is only needed for enhancement-eligible analyzers: handwriting, editorial, full_text</rule>
+        <rule>Enhancement is only needed for enhancement-eligible analyzers: handwriting, editorial, full_text, etc.</rule>
         <rule>Enhancement is NOT needed for: tables, charts, diagrams, code blocks</rule>
         <rule>The enhance_image_tool returns an S3 URI of the enhanced image - pass this URI to the subsequent analyzer instead of the original image path</rule>
         <enhancement_reasons>
@@ -40,6 +39,7 @@
             <reason code="degraded_scan">Poor quality scan with noise/blur - use enhancement</reason>
             <reason code="ancient_script">Hieroglyphics - use enhancement</reason>
             <reason code="low_contrast">Text difficult to read - use enhancement</reason>
+            <reason code="watermarked_security">Security paper or aggressive watermarking is present. - use enhancement</reason>
         </enhancement_reasons>
     </enhancement_instructions>
 
@@ -48,7 +48,44 @@
         <step number="1">When user provides PDF path, call pdf_to_images_converter to convert PDF to images</step>
         <step number="2">Call classify_pdf_content_tool with the image paths to classify each page</step>
         <step number="3">Analyze the classification results and decide which analyzer tools to use for each page. Check enhancement_recommended field for each page.</step>
-        <step number="4">For each page, call the appropriate analyzer tool(s) based on classification: - If enhancement_recommended is true AND using an enhancement-eligible analyzer (handwriting, editorial, full_text), FIRST call enhance_image_tool, then use the returned S3 URI for the analyzer - Full text content → analyze_full_text_tool - Tables → analyze_table_tool - Charts/graphs → analyze_charts_tool - Diagrams → analyze_diagram_tool - Handwriting → analyze_handwriting_tool - Clinical content → analyze_clinical_tool - Code blocks → analyze_code_block_tool - Mixed content → multiple tools as needed </step>
+        <step number="4">
+            <step_logic> For each page, call the appropriate analyzer tool(s) based on classification. </step_logic>
+
+            <enhancement_check>
+                <condition>enhancement_recommended is true AND analyzer is enhancement-eligible (handwriting, editorial, full_text, etc.)</condition>
+                <action>FIRST call enhance_image_tool, then use the returned S3 URI as input for the subsequent analyzer call.</action>
+            </enhancement_check>
+
+            <analyzer_routing>
+                <route content_type="hierarchal_elements"
+                       tool="analyze_elements_tool"
+                       />
+                <route content_type="full_text"
+                       tool="analyze_full_text_tool"
+                       />
+                <route content_type="table"
+                       tool="analyze_table_tool"
+                       />
+                <route content_type="chart_or_graph"
+                       tool="analyze_charts_tool"
+                       />
+                <route content_type="diagram"
+                       tool="analyze_diagram_tool"
+                       />
+                <route content_type="handwriting"
+                       tool="analyze_handwriting_tool"
+                       />
+                <route content_type="clinical"
+                       tool="analyze_clinical_tool"
+                       />
+                <route content_type="code_block"
+                       tool="analyze_code_block_tool"
+                       />
+                <route content_type="mixed">
+                    <instruction>Invoke multiple tools as needed, one per detected content type on the page.</instruction>
+                </route>
+            </analyzer_routing>
+        </step>
         <step number="5">CORRELATE: After all analyzers complete for a page, if you have 2+ analyzer results, call correlate_page_results_tool with the S3 URIs. It returns a unified_document S3 URI and summary — report the summary to the user, do NOT output the full XML.</step>
         <step number="6">Provide conversational summary of findings to user</step>
         <step number="7">If error occurs, report error clearly and stop - do not attempt workarounds</step>
@@ -117,6 +154,12 @@
 
     <!-- Example classification to tool mapping. -->
     <tool_mapping_examples>
+        <example>
+            <classification>elements</classification>
+            <tool>analyze_elements_tool</tool>
+            <reason>Page contains document structure requiring semantic element identification, hierarchy detection, and content extraction with proper heading levels and paragraph grouping</reason>
+        </example>
+
         <example>
             <classification>full_text</classification>
             <tool>analyze_full_text_tool</tool>
