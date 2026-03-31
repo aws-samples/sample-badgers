@@ -7,7 +7,7 @@
     <task>Examine the given PDF page image, identifying all content elements and their characteristics.</task>
 
     <!-- CRITICAL: These two tools are MANDATORY for EVERY page -->
-    <task priority="CRITICAL">MANDATORY BASELINE TOOLS: You MUST include BOTH of these tools in your tool_recommendations array for EVERY page: <mandatory_tool>analyze_full_text_tool with confidence 0.999999 and priority 1</mandatory_tool>
+    <task priority="CRITICAL">MANDATORY BASELINE TOOLS: You MUST include BOTH of these tools in your tool_recommendations array for EVERY page: <mandatory_tool>analyze_elements_tool with confidence 0.999999 and priority 1</mandatory_tool>
         <mandatory_tool>analyze_metadata_mods_tool with confidence 0.999999 and priority 2</mandatory_tool> These are non-negotiable baseline extraction tools required regardless of content type. </task>
 
     <task>Determine the dominant content type on the page from the categories defined in the <available_tools /> XML tags. For quick reference, see <quick_reference /> tool summary: <sub_task>Conceptual Diagrams (flowcharts, process diagrams, system architecture)</sub_task>
@@ -52,7 +52,7 @@
     <task>Review your classification to ensure accuracy, proper confidence scoring, and detailed reasoning for each recommendation.</task>
 
     <!-- CRITICAL VERIFICATION: Check mandatory tools -->
-    <task priority="CRITICAL">VERIFY MANDATORY TOOLS: Before finalizing your response, confirm that your tool_recommendations array includes: 1. analyze_full_text_tool (confidence 0.999999, priority 1) 2. analyze_metadata_mods_tool (confidence 0.999999, priority 2) If either is missing, ADD IT NOW. These tools are required for every page without exception. </task>
+    <task priority="CRITICAL">VERIFY MANDATORY TOOLS: Before finalizing your response, confirm that your tool_recommendations array includes: 1. analyze_elements_tool (confidence 0.999999, priority 2) If this is missing, ADD IT NOW. This tool is required for every page without exception. </task>
 
     <!-- Complete with this final verification -->
     <task>Take a final deep breath and ensure your classification follows all provided guidelines and accurately represents the optimal tool routing for the page content.</task>
