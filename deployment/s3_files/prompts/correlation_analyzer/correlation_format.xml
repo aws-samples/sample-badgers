@@ -1,126 +1,300 @@
+<!--
+CHECKPOINT_03B_CORRELATION_FORMAT
+==================================
+Updated correlation format prompt.
+Schema version 2.0 — hierarchical content_tree replaces flat content_spine.
+
+KEY CHANGES FROM v1:
+  - <content_spine> replaced by <content_tree>
+  - Nesting via <sect> elements mirrors PDF/UA Sect hierarchy
+  - Headings open new <sect> blocks; content flows inside them
+  - Inline elements (Formula, Reference, Link, Span) nest inside parent <element>
+  - Table substructure expressed with nested <element> children
+  - List substructure expressed with nested <element> children
+  - Enrichments still attach inside each element (unchanged pattern)
+  - schema_version="2.0" on root for downstream routing
+-->
+
 <response_format>
     <unified_document session_id="{SESSION_ID}"
                       page="{PAGE_NUMBER}"
-                      >
+                      schema_version="2.0">
         <metadata>
             <source_image>{SOURCE_IMAGE_PATH}</source_image>
             <correlation_timestamp>{TIMESTAMP}</correlation_timestamp>
             <analyzers_executed>
-                <analyzer name="full_text"
-                          s3_uri="{FULL_TEXT_URI}"
-                          />
-                <analyzer name="{OTHER_ANALYZER}"
-                          s3_uri="{OTHER_URI}"
-                          />
-                <!-- Include all analyzers that were correlated -->
+                <analyzer name="full_text" s3_uri="{FULL_TEXT_URI}"/>
+                <analyzer name="elements" s3_uri="{ELEMENTS_URI}"/>
+                <!-- Include all analyzers that contributed -->
+                <analyzer name="{OTHER_ANALYZER}" s3_uri="{OTHER_URI}"/>
             </analyzers_executed>
         </metadata>
 
-        <content_spine>
-            <!-- Preserve ALL full_text elements exactly as they appear, with enrichments added -->
+        <!--
+        ============================================================
+        CONTENT TREE
+        ============================================================
+        This section IS the document structure. Nesting in this XML
+        directly maps to Sect nesting in the PDF/UA structure tree.
 
-            <element id="elem_001"
-                     type="{TYPE}"
-                     order="1"
-                     >
-                <text>{ORIGINAL_TEXT}</text>
-                <enrichments>
-                    <!-- Add enrichments only if relationships exist -->
-                </enrichments>
-            </element>
+        RULES:
+        1. Wrap all page content in a root <sect id="sect_root">
+        2. When you encounter an H2, open a new <sect> INSIDE sect_root
+        3. When you encounter an H3, open a new <sect> INSIDE the current H2 sect
+        4. When you encounter an H4, open a new <sect> INSIDE the current H3 sect
+        5. Non-heading elements go into the innermost open <sect>
+        6. Close a <sect> when a same-level or higher-level heading appears
+        7. Preserve ALL full_text content verbatim in <text> tags
+        8. Artifacts go inside sect_root but are excluded from tree at build time
 
-            <!-- Example: Text element that references a figure -->
-            <element id="elem_007"
-                     type="paragraph"
-                     order="7"
-                     >
-                <text>...as shown in Figure 3.1...</text>
-                <enrichments>
-                    <cross_reference type="figure_callout"
-                                     target="diag_001"
-                                     >
-                        <citation_text>Figure 3.1</citation_text>
-                        <relationship>text_references_figure</relationship>
-                        <evidence>Text explicitly cites "Figure 3.1"</evidence>
-                    </cross_reference>
-                </enrichments>
-            </element>
+        HEADING-TO-SECT MAPPING:
+          H1 → lives directly in sect_root (document title)
+          H2 → opens sect depth 1 (major section)
+          H3 → opens sect depth 2 (subsection) inside current depth-1 sect
+          H4 → opens sect depth 3 (sub-subsection) inside current depth-2 sect
 
-            <!-- Example: Figure element with embedded diagram structure -->
-            <element id="elem_010"
-                     type="figure"
-                     order="10"
-                     >
-                <caption>{CAPTION_TEXT}</caption>
-                <enrichments>
-                    <diagram ref="diag_001"
-                             type="{DIAGRAM_TYPE}"
-                             >
-                        <!-- Include FULL diagram structure from diagram_analyzer -->
-                        <!-- Do not summarize or truncate -->
-                    </diagram>
-                    <grounded_to_text>
-                        <ref element="elem_007"
-                             relationship="referenced_by"
-                             >
-                            <evidence>Text at elem_007 explicitly cites "Figure 3.1"</evidence>
-                        </ref>
-                        <ref element="elem_005,elem_006"
-                             relationship="illustrates"
-                             >
-                            <evidence>Figure illustrates the process described in paragraphs elem_005-006</evidence>
-                        </ref>
-                    </grounded_to_text>
-                </enrichments>
-            </element>
+        INLINE ELEMENTS:
+          If a paragraph contains formulas, references, links, or spans,
+          list them in an <inline> block inside that element.
+          The parent <text> still contains the full verbatim paragraph text.
 
-            <!-- Example: Table element with embedded table structure -->
-            <element id="elem_015"
-                     type="table"
-                     order="15"
-                     >
-                <caption>{TABLE_CAPTION}</caption>
-                <enrichments>
-                    <table ref="tbl_001">
-                        <!-- Include FULL table structure from table_analyzer -->
-                    </table>
-                    <grounded_to_text>
-                        <ref element="elem_014"
-                             relationship="referenced_by"
-                             >
-                            <evidence>Text at elem_014 says "see Table 2 below"</evidence>
-                        </ref>
-                    </grounded_to_text>
-                </enrichments>
-            </element>
-        </content_spine>
+        TABLE SUBSTRUCTURE:
+          Express as nested elements: Table → THead/TBody → TR → TH/TD
+          TH elements MUST have a scope attribute ("Column" or "Row").
+
+        LIST SUBSTRUCTURE:
+          Express as nested elements: L → LI → Lbl + LBody
+          LBody may contain P elements and nested L elements.
+        -->
+
+        <content_tree>
+
+            <sect id="sect_root">
+
+                <!-- EXAMPLE: Document title (H1) -->
+                <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                    <text>{DOCUMENT_TITLE}</text>
+                </element>
+
+                <!-- EXAMPLE: Body paragraph before any H2 -->
+                <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                    <text>{FULL_VERBATIM_PARAGRAPH_TEXT}</text>
+                </element>
+
+                <!-- EXAMPLE: H2 opens a new section -->
+                <sect id="sect_{SECTION_NAME}">
+
+                    <element id="elem_003" tag="H2" order="3" page="{PAGE}">
+                        <text>{SECTION_HEADING}</text>
+                    </element>
+
+                    <!-- EXAMPLE: Paragraph with inline elements -->
+                    <element id="elem_004" tag="P" order="4" page="{PAGE}">
+                        <text>{FULL_PARAGRAPH_TEXT_INCLUDING_FORMULA}</text>
+                        <inline>
+                            <element id="elem_004_f1" tag="Formula" placement="Inline">
+                                <text>{FORMULA_TEXT}</text>
+                            </element>
+                            <element id="elem_004_ref1" tag="Reference" ref="{NOTE_ELEMENT_ID}">
+                                <text>{REFERENCE_MARKER}</text>
+                            </element>
+                            <element id="elem_004_link1" tag="Link">
+                                <text>{LINK_TEXT_OR_URL}</text>
+                            </element>
+                        </inline>
+                        <enrichments>
+                            <!-- Enrichments attach here, same pattern as v1 -->
+                        </enrichments>
+                    </element>
+
+                    <!-- EXAMPLE: Block-level formula (not inline) -->
+                    <element id="elem_005" tag="Formula" order="5" page="{PAGE}" placement="Block">
+                        <text>{DISPLAY_EQUATION}</text>
+                    </element>
+
+                    <!-- EXAMPLE: Figure with alt text -->
+                    <element id="elem_006" tag="Figure" order="6" page="{PAGE}">
+                        <alt_text>{ACCESSIBILITY_DESCRIPTION}</alt_text>
+                        <enrichments>
+                            <!-- Chart/diagram/table structure from specialized analyzers -->
+                            <chart ref="{CHART_ID}" type="{CHART_TYPE}" category="{CATEGORY}">
+                                <!-- Full chart structure — do not summarize or truncate -->
+                            </chart>
+                            <grounded_to_text>
+                                <ref element="{ELEM_ID}" relationship="referenced_by">
+                                    <evidence>{WHY_THIS_RELATIONSHIP_EXISTS}</evidence>
+                                </ref>
+                            </grounded_to_text>
+                        </enrichments>
+                    </element>
+
+                    <!-- EXAMPLE: Caption linked to figure -->
+                    <element id="elem_006_cap" tag="Caption" order="7" page="{PAGE}" parent_ref="elem_006">
+                        <text>{CAPTION_TEXT}</text>
+                    </element>
+
+                    <!-- EXAMPLE: Note (footnote body, paired with Reference) -->
+                    <element id="note_001" tag="Note" order="8" page="{PAGE}" ref="elem_004_ref1">
+                        <text>{FOOTNOTE_FULL_TEXT}</text>
+                    </element>
+
+                    <!-- EXAMPLE: BlockQuote -->
+                    <sect id="bq_001" tag="BlockQuote">
+                        <element id="elem_009" tag="P" order="9" page="{PAGE}">
+                            <text>{QUOTED_TEXT}</text>
+                        </element>
+                    </sect>
+
+                    <!-- EXAMPLE: H3 opens a nested subsection -->
+                    <sect id="sect_{SUBSECTION_NAME}">
+
+                        <element id="elem_010" tag="H3" order="10" page="{PAGE}">
+                            <text>{SUBSECTION_HEADING}</text>
+                        </element>
+
+                        <!-- EXAMPLE: Ordered list with nested sub-list -->
+                        <element id="list_001" tag="L" order="11" page="{PAGE}">
+                            <children>
+                                <element id="li_001" tag="LI">
+                                    <children>
+                                        <element id="li_001_lbl" tag="Lbl">
+                                            <text>1.</text>
+                                        </element>
+                                        <element id="li_001_body" tag="LBody">
+                                            <children>
+                                                <element id="li_001_p" tag="P">
+                                                    <text>{LIST_ITEM_TEXT}</text>
+                                                </element>
+                                            </children>
+                                        </element>
+                                    </children>
+                                </element>
+                                <element id="li_002" tag="LI">
+                                    <children>
+                                        <element id="li_002_lbl" tag="Lbl">
+                                            <text>2.</text>
+                                        </element>
+                                        <element id="li_002_body" tag="LBody">
+                                            <children>
+                                                <element id="li_002_p" tag="P">
+                                                    <text>{LIST_ITEM_TEXT}</text>
+                                                </element>
+                                                <!-- Nested sub-list inside LBody -->
+                                                <element id="list_002" tag="L">
+                                                    <children>
+                                                        <element id="li_002a" tag="LI">
+                                                            <children>
+                                                                <element id="li_002a_lbl" tag="Lbl">
+                                                                    <text>a.</text>
+                                                                </element>
+                                                                <element id="li_002a_body" tag="LBody">
+                                                                    <children>
+                                                                        <element id="li_002a_p" tag="P">
+                                                                            <text>{SUB_ITEM_TEXT}</text>
+                                                                        </element>
+                                                                    </children>
+                                                                </element>
+                                                            </children>
+                                                        </element>
+                                                    </children>
+                                                </element>
+                                            </children>
+                                        </element>
+                                    </children>
+                                </element>
+                            </children>
+                        </element>
+
+                        <!-- EXAMPLE: Complex table -->
+                        <element id="table_001" tag="Table" order="12" page="{PAGE}">
+                            <children>
+                                <element id="table_001_cap" tag="Caption">
+                                    <text>{TABLE_CAPTION}</text>
+                                </element>
+                                <element id="table_001_thead" tag="THead">
+                                    <children>
+                                        <element id="tr_h" tag="TR">
+                                            <children>
+                                                <element id="th_1" tag="TH" scope="Column">
+                                                    <text>{HEADER_1}</text>
+                                                </element>
+                                                <element id="th_2" tag="TH" scope="Column">
+                                                    <text>{HEADER_2}</text>
+                                                </element>
+                                            </children>
+                                        </element>
+                                    </children>
+                                </element>
+                                <element id="table_001_tbody" tag="TBody">
+                                    <children>
+                                        <element id="tr_1" tag="TR">
+                                            <children>
+                                                <element id="th_r1" tag="TH" scope="Row">
+                                                    <text>{ROW_HEADER}</text>
+                                                </element>
+                                                <element id="td_1" tag="TD">
+                                                    <text>{CELL_VALUE}</text>
+                                                </element>
+                                            </children>
+                                        </element>
+                                    </children>
+                                </element>
+                            </children>
+                            <enrichments>
+                                <table ref="{TABLE_ID}">
+                                    <!-- Full table structure from table_analyzer -->
+                                </table>
+                            </enrichments>
+                        </element>
+
+                    </sect>
+                    <!-- end subsection -->
+
+                </sect>
+                <!-- end H2 section -->
+
+                <!-- EXAMPLE: Bibliography section -->
+                <sect id="sect_references">
+                    <element id="elem_020" tag="H2" order="20" page="{PAGE}">
+                        <text>References</text>
+                    </element>
+                    <element id="bib_001" tag="BibEntry" order="21" page="{PAGE}">
+                        <text>{FULL_BIBLIOGRAPHIC_ENTRY}</text>
+                    </element>
+                </sect>
+
+                <!-- EXAMPLE: Artifact (page number) — inside sect_root but excluded from tree -->
+                <element id="artifact_001" tag="Artifact" order="99" page="{PAGE}">
+                    <text>{PAGE_NUMBER_TEXT}</text>
+                </element>
+
+            </sect>
+            <!-- end sect_root -->
+
+        </content_tree>
 
         <cross_reference_index>
-            <by_diagram>
-                <diagram ref="diag_001"
-                         grounded_to="elem_010"
-                         referenced_by="elem_007"
-                         illustrates="elem_005,elem_006"
-                         />
-            </by_diagram>
+            <by_chart>
+                <chart ref="{CHART_ID}"
+                       grounded_to="{FIGURE_ELEM_ID}"
+                       referenced_by="{TEXT_ELEM_ID}"
+                       illustrates="{TEXT_ELEM_IDS}"/>
+            </by_chart>
             <by_table>
-                <table ref="tbl_001"
-                       grounded_to="elem_015"
-                       referenced_by="elem_014"
-                       />
+                <table ref="{TABLE_ID}"
+                       grounded_to="{TABLE_ELEM_ID}"
+                       referenced_by="{TEXT_ELEM_ID}"/>
             </by_table>
-            <!-- Add by_chart if charts were correlated -->
+            <!-- Add by_diagram, by_note, etc. as needed -->
         </cross_reference_index>
 
         <raw_outputs>
-            <output analyzer="full_text"
-                    s3_uri="{FULL_TEXT_URI}"
-                    />
-            <output analyzer="{OTHER_ANALYZER}"
-                    s3_uri="{OTHER_URI}"
-                    />
+            <output analyzer="full_text" s3_uri="{FULL_TEXT_URI}"/>
+            <output analyzer="elements" s3_uri="{ELEMENTS_URI}"/>
+            <output analyzer="{OTHER}" s3_uri="{OTHER_URI}"/>
         </raw_outputs>
 
-        <summary>{2-4 sentence description: what analyzers were correlated, how many elements in spine, key relationships found}</summary>
+        <summary>{2-4 sentence description: analyzers correlated, element count, tree depth, key relationships}</summary>
+
     </unified_document>
 </response_format>

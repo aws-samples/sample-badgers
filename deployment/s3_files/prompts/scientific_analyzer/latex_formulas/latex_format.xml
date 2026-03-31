@@ -1,22 +1,46 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + latex -->
 
 <response_format>
-    <response extraction_type="latex_formula">
+    <response analyzer="latex"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>latex</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_LATEX_FORMULAS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per LaTeX formula found -->
-        <elements>
-            <element type="latex_formula">
-                <type>{INLINE_OR_DISPLAY}</type>
-                <content>
-                    <latex_code>{LATEX_FORMULA_CODE}</latex_code>
-                </content>
-                <context>{BRIEF_DESCRIPTION_OF_SURROUNDING_CONTENT}</context>
+
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Each formula as a text element -->
+            <element id="elem_001" tag="Formula" order="1" page="{PAGE}" placement="{Block|Inline}">
+                <text>{LATEX_FORMULA_AS_READABLE_TEXT}</text>
             </element>
-        </elements>
+            <!-- Surrounding text for context -->
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{SURROUNDING_TEXT_IF_VISIBLE}</text>
+            </element>
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <specialized type="latex_formula">
+            <elements>
+                <element type="latex_formula">
+                    <type>{INLINE_OR_DISPLAY}</type>
+                    <content>
+                        <latex_code>{LATEX_FORMULA_CODE}</latex_code>
+                    </content>
+                    <context>{BRIEF_DESCRIPTION_OF_SURROUNDING_CONTENT}</context>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

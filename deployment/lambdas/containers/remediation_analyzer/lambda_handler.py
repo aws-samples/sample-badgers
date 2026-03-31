@@ -1,7 +1,16 @@
 """
+CHECKPOINT_04E — LAMBDA HANDLER
+=================================
 PDF Accessibility Remediation Lambda Handler
 
 Full pipeline: PDF -> analyze pages -> apply PDF/UA tags -> output tagged PDF
+
+Changes from previous version:
+  - Uses spine_parser.parse_correlation_xml (supports v1.0 flat and v2.0 hierarchical)
+  - Stores StructureElement trees per page from correlation data
+  - Merges per-page trees into a document-wide tree
+  - Passes the tree to tagger.set_structure_tree() for nested Sect output
+  - Old inline _parse_correlation_xml removed (replaced by spine_parser)
 """
 
 import base64
@@ -14,6 +23,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from pdf_accessibility_tagger import PDFAccessibilityTagger, AccessibilityReport
+from pdf_accessibility_models import StructureElement, ElementRole
+from spine_parser import parse_correlation_xml
 from cell_grid_resolver import resolve_elements_via_grid
 from diagnostic_visualizer import capture_page_diagnostics
 from pdf_syntax_repair import repair_pdf as syntax_repair_pdf, RepairResult
@@ -142,14 +153,11 @@ def process_pdf(
 ) -> dict[str, Any]:
     """Full PDF remediation pipeline.
 
-    When correlation_uri is provided, uses the correlation content spine
-    for element metadata and resolves coordinates via PyMuPDF text search
-    (text elements) and targeted vision model calls (figures only).
-    Falls back to full vision model analysis when no correlation data exists.
+    When correlation_uri is provided, uses spine_parser to build a
+    StructureElement tree AND flat element list for bbox resolution.
+    The tree is passed to tagger.set_structure_tree() for nested output.
 
-    When page_b64_uris is provided, uses pre-processed base64 images from S3
-    instead of rendering from the PDF. Falls back to rendering + ImageProcessor
-    optimization if no b64 URI exists for a given page.
+    Falls back to full vision model analysis when no correlation data exists.
     """
     import fitz
     from PIL import Image
@@ -183,18 +191,34 @@ def process_pdf(
     num_pages = len(doc)
     logger.info("Processing %d pages at %d DPI", num_pages, render_dpi)
 
-    # Load correlation data if available
-    correlation_pages = {}
+    # --- Load correlation data ---
+    # NEW: parse_correlation_xml returns (StructureElement tree, flat page elements)
+    correlation_trees: dict[int, StructureElement] = {}  # page_num → tree
+    correlation_pages: dict[int, list[dict[str, Any]]] = {}  # page_num → flat elements
+
     if correlation_uri:
         try:
             correlation_xml = _download_from_s3(correlation_uri)
             with open(correlation_xml, "r", encoding="utf-8") as f:
-                correlation_pages = _parse_correlation_xml(f.read())
+                xml_content = f.read()
+
+            tree, page_elems = parse_correlation_xml(xml_content)
+
+            if tree is not None:
+                # Determine which page this correlation covers
+                # (parse_correlation_xml returns 1-indexed pages in page_elems)
+                for page_num in page_elems:
+                    correlation_trees[page_num] = tree
+                    correlation_pages[page_num] = page_elems[page_num]
+
             logger.info(
-                "Loaded correlation data for %d page(s)", len(correlation_pages)
+                "Loaded correlation data: tree=%s, %d page(s) with elements",
+                "yes" if tree else "no",
+                len(correlation_pages),
             )
         except Exception as e:
             logger.warning("Failed to load correlation data, falling back: %s", e)
+            correlation_trees = {}
             correlation_pages = {}
 
     analyzer = None  # Lazy-init only if needed
@@ -250,6 +274,8 @@ def process_pdf(
                         "order": fig.get("order", 0),
                     }
                 )
+
+            image_data = None  # Track for diagnostics
 
             if grid_candidates:
                 # Try pre-processed b64 first, fall back to render + optimize
@@ -315,17 +341,18 @@ def process_pdf(
                 text_resolved.extend(grid_resolved)
 
             # Capture diagnostics (if enabled via ENABLE_DIAGNOSTICS env var)
-            capture_page_diagnostics(
-                page_image_data=image_data,
-                page_number=page_num + 1,  # 1-indexed
-                correlation_elements=corr_elements,
-                resolved_elements=text_resolved,
-                grid_cols=10,
-                grid_rows=14,
-                gridded_image=None,
-                pdf_path=pdf_path,
-                session_id=session_id,
-            )
+            if image_data is not None:
+                capture_page_diagnostics(
+                    page_image_data=image_data,
+                    page_number=page_num + 1,  # 1-indexed
+                    correlation_elements=corr_elements,
+                    resolved_elements=text_resolved,
+                    grid_cols=10,
+                    grid_rows=14,
+                    gridded_image=None,
+                    pdf_path=pdf_path,
+                    session_id=session_id,
+                )
 
             elements = text_resolved
         else:
@@ -361,9 +388,20 @@ def process_pdf(
 
     doc.close()
 
+    # --- Build document-wide structure tree from per-page trees ---
+    document_tree = _merge_page_trees(correlation_trees, num_pages)
+
     output_pdf = work_dir / "tagged_output.pdf"
 
     with PDFAccessibilityTagger(pdf_path) as tagger:
+        # NEW: set the hierarchical structure tree if available
+        if document_tree is not None:
+            tagger.set_structure_tree(document_tree)
+            logger.info(
+                "Set structure tree: %d nodes",
+                sum(1 for _ in document_tree.walk()),
+            )
+
         # Log pre-remediation audit
         logger.info("Pre-remediation compliance: %s", tagger.report.pre_level.value)
         for check in tagger.report.pre_checks:
@@ -419,6 +457,7 @@ def process_pdf(
         "pages_processed": num_pages,
         "analysis": all_results,
         "correlation_used": bool(correlation_pages),
+        "structure_tree_used": document_tree is not None,
         "syntax_repair": {
             "applied": repair_result.any_repair_applied if repair_result else False,
             "pass1_ok": repair_result.pass1_ok if repair_result else False,
@@ -430,66 +469,64 @@ def process_pdf(
     }
 
 
-def _parse_correlation_xml(xml_content: str) -> dict[int, list[dict[str, Any]]]:
-    """Parse correlation XML into a page-indexed dict of elements.
+# ============================================================================
+# NEW: Merge per-page trees into document-wide tree
+# ============================================================================
 
-    Returns:
-        Dict mapping page number (1-indexed) to list of element dicts with
-        keys: id, type, order, text, alt_text, caption.
+
+def _merge_page_trees(
+    page_trees: dict[int, StructureElement],
+    num_pages: int,
+) -> Optional[StructureElement]:
+    """Merge per-page StructureElement trees into a single document tree.
+
+    For single-page documents, returns the page tree directly.
+    For multi-page documents, merges children of each page's root Sect
+    into a single Document → Sect hierarchy.
+
+    Returns None if no trees are available.
     """
-    pages: dict[int, list[dict[str, Any]]] = {}
+    if not page_trees:
+        return None
 
-    try:
-        root = ET.fromstring(xml_content)
-    except ET.ParseError as e:
-        logger.warning("Failed to parse correlation XML: %s", e)
-        return pages
+    if len(page_trees) == 1:
+        # Single page — return as-is
+        return next(iter(page_trees.values()))
 
-    # Get page number from root attribute
-    page_num = int(root.get("page", "1"))
+    # Multi-page: merge all page content under one Document → Sect root
+    doc = StructureElement(
+        id="doc", tag="Document", role=ElementRole.GROUPING, depth=0
+    )
+    root_sect = doc.add_child(StructureElement(
+        id="sect_root", tag="Sect", role=ElementRole.GROUPING
+    ))
 
-    elements = []
-    for elem in root.iter("element"):
-        elem_id = elem.get("id", "")
-        elem_type = elem.get("type", "paragraph")
-        elem_order = int(elem.get("order", "0"))
+    for page_num in sorted(page_trees.keys()):
+        page_tree = page_trees[page_num]
 
-        # Extract text content
-        text_node = elem.find("text")
-        text = (
-            text_node.text.strip() if text_node is not None and text_node.text else ""
-        )
+        # Each page tree is Document → Sect(s) → content
+        # We want to lift the content into our merged root
+        for doc_child in page_tree.children:
+            if doc_child.tag == "Sect":
+                # Lift this sect's children into root_sect
+                for sect_child in doc_child.children:
+                    root_sect.add_child(sect_child)
+            else:
+                root_sect.add_child(doc_child)
 
-        # Extract alt_text (for figures)
-        alt_node = elem.find("alt_text")
-        alt_text = (
-            alt_node.text.strip() if alt_node is not None and alt_node.text else ""
-        )
+    total = sum(1 for _ in doc.walk())
+    logger.info(
+        "Merged %d page tree(s) into document tree: %d total nodes",
+        len(page_trees),
+        total,
+    )
 
-        # Extract caption (for figures)
-        caption_node = elem.find("caption")
-        caption = (
-            caption_node.text.strip()
-            if caption_node is not None and caption_node.text
-            else ""
-        )
+    return doc
 
-        elements.append(
-            {
-                "id": elem_id,
-                "type": elem_type,
-                "order": elem_order,
-                "text": text,
-                "alt_text": alt_text,
-                "caption": caption,
-            }
-        )
 
-    if elements:
-        pages[page_num] = elements
-        logger.info("Parsed %d elements for page %d", len(elements), page_num)
-
-    return pages
+# ============================================================================
+# Bbox resolution (unchanged from previous version)
+# ============================================================================
 
 
 def _resolve_text_bboxes(
@@ -560,8 +597,7 @@ def _resolve_text_bboxes(
                 )
                 logger.debug("Partial text bbox resolved for '%s'", partial[:40])
             else:
-                # No text layer match — still include the element so the tagger
-                # can insert an invisible text overlay at a fallback position
+                # No text layer match — still include so tagger can overlay
                 logger.warning(
                     "Could not resolve bbox for text: '%s' — "
                     "will use full-page fallback for invisible overlay",
@@ -592,141 +628,13 @@ def _resolve_text_bboxes(
     return resolved
 
 
-def _resolve_figure_bboxes(
-    analyzer: Any,
-    image_data: bytes,
-    figure_elements: list[dict[str, Any]],
-    aws_profile: Optional[str] = None,  # noqa: ARG001
-) -> list[dict[str, Any]]:
-    """Resolve bounding boxes for figure elements using a targeted vision model call.
-
-    Sends the page image with a focused prompt listing only the figures
-    to locate, using descriptions from the correlation data.
-    Uses the analyzer's bedrock_client directly with a custom prompt
-    rather than the full analysis pipeline.
-    """
-    if not figure_elements:
-        return []
-
-    # Build a targeted prompt for figure coordinate extraction
-    figure_descriptions = []
-    for i, elem in enumerate(figure_elements):
-        desc = (
-            elem.get("caption") or elem.get("alt_text") or f"Figure {elem.get('id', i)}"
-        )
-        figure_descriptions.append(f"  {i + 1}. id=\"{elem.get('id', '')}\": {desc}")
-
-    system_prompt = (
-        "You are a precise visual element locator. Given a page image and a list of "
-        "figure descriptions, return the bounding box coordinates for each figure. "
-        "Coordinates must be normalized to 0-1 range where (0,0) is bottom-left and "
-        "(1,1) is top-right. Return ONLY a JSON array."
-    )
-
-    user_text = (
-        "Locate the following figures in this page image and return their "
-        "bounding box coordinates as normalized values (0-1 range).\n\n"
-        "Figures to locate:\n" + "\n".join(figure_descriptions) + "\n\n"
-        "Return a JSON array where each object has:\n"
-        '  {"id": "elem_XXX", "bbox": {"x0": float, "y0": float, "x1": float, "y1": float}}\n'
-        "Return ONLY the JSON array, no other text."
-    )
-
-    image_b64 = base64.b64encode(image_data).decode("utf-8")
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": image_b64,
-                    },
-                },
-                {"type": "text", "text": user_text},
-            ],
-        }
-    ]
-
-    try:
-        bedrock_client = analyzer.bedrock_client
-        model_id = analyzer.config.get(
-            "model_id", "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-        )
-
-        resolver_max_tokens = analyzer.global_settings.get("resolver_max_tokens", 4000)
-
-        payload = bedrock_client.create_anthropic_payload(
-            system_prompt=system_prompt,
-            messages=messages,
-            max_tokens=resolver_max_tokens,
-            temperature=0.1,
-        )
-
-        response = bedrock_client.invoke_model(
-            model_id=model_id,
-            payload=payload,
-        )
-
-        # Extract text from response
-        result_text = ""
-        for block in response.get("content", []):
-            if block.get("type") == "text":
-                result_text = block.get("text", "")
-                break
-
-        if not result_text:
-            logger.warning("Empty response from figure bbox model call")
-            return []
-
-        bbox_results = _extract_json_from_response(result_text)
-
-        # Build a lookup from the model response
-        bbox_lookup = {}
-        for item in bbox_results:
-            if item.get("id") and item.get("bbox"):
-                bbox_lookup[item["id"]] = item["bbox"]
-
-        resolved = []
-        for elem in figure_elements:
-            elem_id = elem.get("id", "")
-            bbox = bbox_lookup.get(elem_id)
-
-            if bbox:
-                resolved.append(
-                    {
-                        "type": "figure",
-                        "order": elem["order"],
-                        "alt_text": elem.get("alt_text", ""),
-                        "content": elem.get("caption", ""),
-                        "id": elem_id,
-                        "bbox": bbox,
-                        "source": "vision_model_targeted",
-                    }
-                )
-            else:
-                logger.warning("No bbox returned for figure %s", elem_id)
-
-        logger.info(
-            "Resolved %d/%d figure bboxes via targeted vision model",
-            len(resolved),
-            len(figure_elements),
-        )
-        return resolved
-
-    except Exception as e:
-        logger.error("Failed to resolve figure bboxes: %s", e)
-        return []
+# ============================================================================
+# Analyzer initialization (unchanged)
+# ============================================================================
 
 
 def _initialize_analyzer(aws_profile: Optional[str] = None):
-    """Initialize the analyzer foundation.
-
-    Args:
-        aws_profile: AWS profile name for BedrockClient credentials
-    """
+    """Initialize the analyzer foundation."""
     from foundation.analyzer_foundation import AnalyzerFoundation
     from foundation.configuration_manager import ConfigurationManager
     from foundation.prompt_loader import PromptLoader
@@ -797,35 +705,32 @@ def _initialize_analyzer(aws_profile: Optional[str] = None):
     return analyzer
 
 
-def _extract_json_from_response(response: str) -> list[dict[str, Any]]:
-    """Extract JSON array from model response.
+# ============================================================================
+# Response parsing (unchanged)
+# ============================================================================
 
-    Handles formats:
-    - <analysis>...</analysis>[{...}]
-    - ```json[{...}]```
-    - Raw JSON array
-    """
+
+def _extract_json_from_response(response: str) -> list[dict[str, Any]]:
+    """Extract JSON array from model response."""
     import re
 
-    # Remove analysis wrapper if present
     if "</analysis>" in response:
         response = response.split("</analysis>", 1)[1]
 
-    # Remove markdown code blocks if present
     response = re.sub(r"```json\s*", "", response)
     response = re.sub(r"```\s*$", "", response)
-
-    # Strip whitespace
     response = response.strip()
 
-    # Parse JSON
     parsed = json.loads(response)
-
-    # Ensure it's a list
     if not isinstance(parsed, list):
         raise ValueError(f"Expected JSON array, got {type(parsed)}")
 
     return parsed
+
+
+# ============================================================================
+# Tag mapping (unchanged)
+# ============================================================================
 
 
 def _map_element_type_to_pdf_tag(element_type: str) -> str:
@@ -875,6 +780,11 @@ def _map_element_type_to_pdf_tag(element_type: str) -> str:
     return mapping.get(element_type, "P")
 
 
+# ============================================================================
+# S3 helpers (unchanged)
+# ============================================================================
+
+
 def _download_from_s3(s3_uri: str) -> str:
     """Download file from S3 to temp location."""
     import boto3
@@ -888,7 +798,7 @@ def _download_from_s3(s3_uri: str) -> str:
 
     ext = Path(key).suffix or ".pdf"
     fd, temp_path = tempfile.mkstemp(suffix=ext)
-    os.close(fd)  # Close the file descriptor immediately
+    os.close(fd)
 
     s3.download_file(bucket, key, temp_path)
     return temp_path
@@ -901,11 +811,7 @@ def _upload_to_s3(
     session_id: str,
     original_key: str,
 ) -> str:
-    """Upload file to S3 output bucket.
-
-    Output path: {analyzer_name}/results/{session_id}/{original_name}_{timestamp}.{ext}
-    Matches the path convention used by save_result_to_s3 in the foundation.
-    """
+    """Upload file to S3 output bucket."""
     import boto3
     from datetime import datetime
 

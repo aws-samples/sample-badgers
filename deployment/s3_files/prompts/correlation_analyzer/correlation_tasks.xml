@@ -1,19 +1,121 @@
+<!--
+CHECKPOINT_04D — CORRELATION TASKS
+====================================
+Updated for schema_version 2.0 — hierarchical content_tree.
+-->
 <tasks>
-    <task>Review the full_text analyzer output — this is your content spine. Note all element IDs and types.</task>
-    <task>Review each additional analyzer output (diagram, table, chart, etc.). Note their element IDs and content.</task>
-    <task>For each full_text element, determine if any enrichments from other analyzers should attach: <sub_task>Does this text reference a figure? (e.g., "see Figure 3", "as shown in Table 1")</sub_task>
-        <sub_task>Does this text describe content that a figure illustrates?</sub_task>
-        <sub_task>Is this element a figure caption that should link to a diagram/table/chart?</sub_task>
+
+    <task>
+        <n>Inventory analyzer outputs</n>
+        <description>Review each analyzer output provided to you:</description>
+        <sub_task>Full_text analyzer: note all element IDs, types, reading order, and verbatim text. This is your TEXT source — every word must be preserved.</sub_task>
+        <sub_task>Elements analyzer: note hierarchical_level, section grouping, sub_type, and context for each element. This is your STRUCTURE source — it tells you how to nest.</sub_task>
+        <sub_task>Specialized analyzers (chart, diagram, table): note their element IDs, extracted data structures, and any figure references. These are your ENRICHMENT sources.</sub_task>
     </task>
-    <task>For each figure/diagram/table/chart, establish grounding: <sub_task>Which text elements reference it? (referenced_by)</sub_task>
-        <sub_task>Which text elements does it illustrate? (illustrates)</sub_task>
-        <sub_task>What is the evidence for each relationship?</sub_task>
+
+    <task>
+        <n>Build the section skeleton</n>
+        <description>Using the elements analyzer's hierarchy data, determine the sect nesting:</description>
+        <sub_task>Identify all headings and their levels (H1-H6).</sub_task>
+        <sub_task>Determine which heading opens which section. H1 stays at root. Each H2 opens a depth-1 sect. Each H3 opens a depth-2 sect inside its H2 parent. Each H4 opens a depth-3 sect inside its H3 parent.</sub_task>
+        <sub_task>If the elements analyzer provides explicit section grouping or hierarchical_level, use it. If not, infer from heading levels.</sub_task>
+        <sub_task>Give each sect a descriptive id based on the heading text (e.g., sect_linear_equations, sect_methodology).</sub_task>
+        <sub_task>If a heading level is skipped in the source document (e.g., H1 → H3), note this and use the elements analyzer's guidance to assign the correct level.</sub_task>
     </task>
-    <task>Build the unified_document: <sub_task>Start with metadata (source_image, analyzers_executed with S3 URIs)</sub_task>
-        <sub_task>Create content_spine with all full_text elements in order</sub_task>
-        <sub_task>Attach enrichments inside each element where relationships exist</sub_task>
-        <sub_task>Build cross_reference_index</sub_task>
-        <sub_task>Include raw_outputs section</sub_task>
+
+    <task>
+        <n>Place content into sections</n>
+        <description>Walk through the full_text elements in reading order and place each one into the correct sect:</description>
+        <sub_task>For each non-heading element, determine which sect it belongs in — it goes in the innermost currently-open sect at the point where it appears in reading order.</sub_task>
+        <sub_task>Preserve the EXACT element ID and verbatim text from the full_text analyzer.</sub_task>
+        <sub_task>Map the full_text element type to the correct PDF/UA tag: h1→H1, h2→H2, paragraph→P, figure→Figure, footnote→Note, header→Artifact, footer→Artifact, etc.</sub_task>
+        <sub_task>Figures MUST have an alt_text tag. Use the full_text analyzer's alt_text if available. Otherwise use the specialized analyzer's description.</sub_task>
+        <sub_task>Captions should include parent_ref pointing to their Figure or Table.</sub_task>
     </task>
-    <task>Write a 2-4 sentence summary of what was correlated and key relationships found.</task>
+
+    <task>
+        <n>Identify inline elements</n>
+        <description>For each paragraph element, check if it contains inline semantic content:</description>
+        <sub_task>Mathematical formulas: look for equations (y = mx + b), variable notation (f(x)), Greek letters, subscripts. Create inline Formula elements.</sub_task>
+        <sub_task>Footnote references: look for superscript numbers (¹, ²) or symbols (*, †). Create inline Reference elements with ref pointing to the corresponding Note.</sub_task>
+        <sub_task>Hyperlinks: look for URLs or "click here" style text. Create inline Link elements.</sub_task>
+        <sub_task>Styled spans: if the elements analyzer identifies specific styled text within a paragraph (e.g., institution name, emphasis), create inline Span elements.</sub_task>
+        <sub_task>The parent element's text tag still contains the FULL verbatim text. The inline children specify which fragments are semantically distinct — they do not replace the text.</sub_task>
+    </task>
+
+    <task>
+        <n>Build table substructure</n>
+        <description>When a table is present (identified by full_text and/or table analyzer):</description>
+        <sub_task>Create a Table element with a children block.</sub_task>
+        <sub_task>If a caption exists, include it as the first child (Caption element).</sub_task>
+        <sub_task>Create THead with TR containing TH elements. Each TH MUST have scope="Column".</sub_task>
+        <sub_task>Create TBody with TR elements. If a row has a header cell, use TH with scope="Row". Data cells are TD.</sub_task>
+        <sub_task>Each TH and TD should contain a text tag with the cell's verbatim content.</sub_task>
+        <sub_task>If the table analyzer provides structured data, attach it as an enrichment inside the Table element.</sub_task>
+    </task>
+
+    <task>
+        <n>Build list substructure</n>
+        <description>When a list is present:</description>
+        <sub_task>Create an L element with a children block.</sub_task>
+        <sub_task>Each list item becomes LI containing Lbl (bullet/number) and LBody.</sub_task>
+        <sub_task>LBody contains one or more P elements with the item's text.</sub_task>
+        <sub_task>For nested lists (sub-items), place a nested L element inside the parent LBody.</sub_task>
+        <sub_task>Use the full_text analyzer's list content for text. If the elements analyzer identifies list structure, use it for nesting depth.</sub_task>
+    </task>
+
+    <task>
+        <n>Attach enrichments</n>
+        <description>For each specialized analyzer output, attach its data to the correct element:</description>
+        <sub_task>Chart data → enrichments block inside the Figure element it corresponds to.</sub_task>
+        <sub_task>Diagram structure → enrichments block inside the Figure element.</sub_task>
+        <sub_task>Table structure → enrichments block inside the Table element.</sub_task>
+        <sub_task>Include the FULL structure from the specialized analyzer. Do not summarize or truncate.</sub_task>
+    </task>
+
+    <task>
+        <n>Establish cross-references</n>
+        <description>Identify relationships between elements:</description>
+        <sub_task>Does text explicitly reference a figure? (e.g., "see Figure 3", "as shown in Table 1") → cross_reference with type="figure_callout" and evidence quoting the callout.</sub_task>
+        <sub_task>Does text describe content that a figure illustrates? → cross_reference with type="illustrated_by_figure" and evidence explaining the relationship.</sub_task>
+        <sub_task>Does a footnote reference pair with a note? → Reference element with ref pointing to Note, and Note with ref pointing back to Reference.</sub_task>
+        <sub_task>Every relationship MUST have explicit evidence. Do not fabricate relationships.</sub_task>
+        <sub_task>Build grounded_to_text blocks inside figure/table elements listing which text elements reference or are illustrated by them.</sub_task>
+    </task>
+
+    <task>
+        <n>Handle special elements</n>
+        <description>Handle elements that require special treatment:</description>
+        <sub_task>BlockQuotes: wrap in a sect with tag="BlockQuote". Content inside becomes P elements.</sub_task>
+        <sub_task>Bibliography entries: tag as BibEntry. Place inside a sect headed by the References heading.</sub_task>
+        <sub_task>Table of Contents: wrap in TOC, with each entry as TOCI containing inline Link elements.</sub_task>
+        <sub_task>Page numbers, running headers/footers: tag as Artifact. Place inside sect_root.</sub_task>
+        <sub_task>Block-level formulas (displayed equations): tag as Formula with placement="Block".</sub_task>
+    </task>
+
+    <task>
+        <n>Assemble the unified_document</n>
+        <description>Build the final output:</description>
+        <sub_task>Root element: unified_document with session_id, page number, and schema_version="2.0".</sub_task>
+        <sub_task>Metadata: source_image path, correlation_timestamp, analyzers_executed with S3 URIs.</sub_task>
+        <sub_task>Content_tree: the hierarchical structure you've built.</sub_task>
+        <sub_task>Cross_reference_index: grouped by type (by_chart, by_table, by_diagram, by_note).</sub_task>
+        <sub_task>Raw_outputs: S3 URIs for all source analyzer results.</sub_task>
+        <sub_task>Summary: 2-4 sentences describing what was correlated, element count, tree depth, key relationships.</sub_task>
+    </task>
+
+    <task>
+        <n>Final validation</n>
+        <description>Before outputting, verify:</description>
+        <sub_task>Every full_text element ID appears in the content_tree (no elements lost).</sub_task>
+        <sub_task>Every text tag contains exact verbatim text (no truncation).</sub_task>
+        <sub_task>Heading hierarchy has no level skips within any sect.</sub_task>
+        <sub_task>Every Figure has alt_text.</sub_task>
+        <sub_task>Every TH has a scope attribute.</sub_task>
+        <sub_task>Every Reference has a ref pointing to a Note, and vice versa.</sub_task>
+        <sub_task>Every Caption has a parent_ref pointing to its Figure or Table.</sub_task>
+        <sub_task>No enrichments were summarized or truncated.</sub_task>
+        <sub_task>schema_version="2.0" is present on the root element.</sub_task>
+    </task>
+
 </tasks>

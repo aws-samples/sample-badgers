@@ -1,4 +1,15 @@
-<!-- Provides a step-by-step process for element extraction and analysis, guiding the AI through the task of identifying and documenting atomic elements in publications. -->
+<!--
+CHECKPOINT_05C — ELEMENTS TASKS
+=================================
+Updated extraction tasks for the elements analyzer.
+
+CHANGES FROM PREVIOUS:
+  - Added: verbatim text extraction sub-task (under "for each identified element")
+  - Added: elem_XXX ID assignment sub-task
+  - Added: inline element detection task
+  - Added: table/list structural detail tasks
+  - Preserved: all original tasks and sub-tasks
+-->
 <tasks>
     <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
 
@@ -9,28 +20,51 @@
         <sub_task>Identify major sections and subsections of the document.</sub_task>
     </task>
 
-    <task>Examine the given publication page by page, focusing on identifying atomic elements as defined in the <elements_dictionary/>
- XML tags.</task>
+    <task>Examine the given publication page by page, focusing on identifying atomic elements as defined in the <elements_dictionary/> XML tags.</task>
 
     <task>For each identified element:
+        <sub_task>Assign a unique sequential ID using the format elem_001, elem_002, elem_003, etc. IDs must start at elem_001 and increment with no gaps.</sub_task>
         <sub_task>Determine its type and sub-type if applicable.</sub_task>
-        <sub_task>If it's a heading or section, determine its hierarchical level within the document structure.</sub_task>
-        <sub_task>Extract the full content of the element.</sub_task>
+        <sub_task>If it is a heading or section, determine its hierarchical level within the document structure. Level 1 = document title, Level 2 = major section, Level 3 = subsection, Level 4 = sub-subsection. Base this on document structure, not visual size alone.</sub_task>
+        <sub_task>Extract the FULL, EXACT, VERBATIM text content of the element. Do not summarize, truncate, or paraphrase. Extract every word as it appears on the page. This text will be used for screen reader content — missing words mean missing content for blind users.</sub_task>
         <sub_task>Identify the formatting style (e.g., APA, MLA) if applicable.</sub_task>
-        <sub_task>Note the element's location on the page and its context within the document structure.</sub_task>
-        <sub_task>Assign a sequential number based on its order of appearance, starting from the top-left of each page and moving right and down.</sub_task>
+        <sub_task>Note the element's location on the page and its context within the document structure. The context should describe which section it belongs to, what elements surround it, and its role in the document flow.</sub_task>
+        <sub_task>Assign a sequential order number based on reading order, starting from the top-left of each page and moving right and down.</sub_task>
+    </task>
+
+    <task>For each paragraph element, check for inline semantic content:
+        <sub_task>Look for mathematical formulas or equations within the paragraph text. These include: variable equations (y = mx + b), function notation (f(x)), Greek letters used as variables, subscripts/superscripts in mathematical context, summation or integral notation. List each formula found in the inline_elements field with type="formula".</sub_task>
+        <sub_task>Look for footnote reference markers: superscript numbers (¹, ², ³), asterisks (*), daggers (†, ‡), or other reference symbols. List each in inline_elements with type="reference".</sub_task>
+        <sub_task>Look for hyperlinks or URLs embedded in the text. List each in inline_elements with type="link".</sub_task>
+        <sub_task>Look for semantically distinct styled text (defined terms, institution names, foreign language phrases). List each in inline_elements with type="span".</sub_task>
+        <sub_task>The content field must still contain the FULL paragraph text including all inline content. The inline_elements field supplements — it does not replace — the content.</sub_task>
     </task>
 
     <task>Pay special attention to the following elements:
         <sub_task>In-text citations and their corresponding full references, ensuring you capture both.</sub_task>
-        <sub_task>Captions, noting which figure, table, or image they correspond to.</sub_task>
-        <sub_task>Footnotes or endnotes, linking them to their in-text references.</sub_task>
-        <sub_task>Equations, both inline and display types.</sub_task>
-        <sub_task>Lists, including their type and relationship to surrounding text.</sub_task>
+        <sub_task>Captions, noting which figure, table, or image they correspond to. Include this association in the context field.</sub_task>
+        <sub_task>Footnotes or endnotes, linking them to their in-text references. Note the reference marker and the footnote text.</sub_task>
+        <sub_task>Equations, both inline (within paragraph text) and display types (on their own line). For inline equations, list them in inline_elements. For display equations, extract as separate elements.</sub_task>
+        <sub_task>Lists, including their type (ordered/unordered) and relationship to surrounding text.</sub_task>
+    </task>
+
+    <task>When extracting list elements, provide structural detail:
+        <sub_task>Identify whether the list is ordered (numbered: 1, 2, 3 or a, b, c) or unordered (bulleted).</sub_task>
+        <sub_task>For each list item, extract: the label/bullet/number, the full item text, and the nesting depth (1 for top-level, 2 for sub-items).</sub_task>
+        <sub_task>Include this in the list_structure field of the element.</sub_task>
+        <sub_task>The content field should still contain the full text of all list items together.</sub_task>
+    </task>
+
+    <task>When extracting table elements, provide structural detail:
+        <sub_task>Identify which row(s) are headers (typically the first row, or a visually distinct top row).</sub_task>
+        <sub_task>For each header cell, determine if it is a column header (applies to the column below it) or a row header (applies to the row beside it).</sub_task>
+        <sub_task>Extract the full text of every cell.</sub_task>
+        <sub_task>Include this in the table_structure field of the element.</sub_task>
+        <sub_task>The content field should contain all table text in a readable format.</sub_task>
     </task>
 
     <task>When extracting paragraphs:
-        <sub_task>Note their relationship to surrounding headings and sections.</sub_task>
+        <sub_task>Note their relationship to surrounding headings and sections in the context field.</sub_task>
         <sub_task>Identify any topic sentences or key ideas within each paragraph.</sub_task>
     </task>
 
@@ -46,19 +80,23 @@
 
     <task>Pay attention to any changes in formatting or style throughout the document, as these may indicate different sections or types of content.</task>
 
-    <task>Organize your findings according to the structure provided in the <response_format/>
- XML tags, ensuring that:
-    <sub_task>The 'order' field accurately reflects the element's position in the document.</sub_task>
-    <sub_task>The 'hierarchical_level' is correctly assigned for structural elements.</sub_task>
-    <sub_task>The 'context' field describes both surrounding content and the element's role in the overall document structure.</sub_task>
-</task>
+    <task>Organize your findings according to the structure provided in the <response_format/> XML tags, ensuring that:
+        <sub_task>Every element has a unique id attribute in the format elem_001, elem_002, etc.</sub_task>
+        <sub_task>The order field accurately reflects the element's position in reading order.</sub_task>
+        <sub_task>The hierarchical_level is correctly assigned for structural elements.</sub_task>
+        <sub_task>The content field contains FULL VERBATIM text with no truncation.</sub_task>
+        <sub_task>The context field describes section membership and surrounding content.</sub_task>
+        <sub_task>The inline_elements field is populated for paragraphs containing formulas, references, links, or spans.</sub_task>
+    </task>
 
-<task>Review your extracted elements to ensure:
-    <sub_task>Accuracy and completeness of content extraction.</sub_task>
-    <sub_task>Correct ordering of elements.</sub_task>
-    <sub_task>Proper identification of element types and sub-types.</sub_task>
-    <sub_task>Accurate representation of the document's hierarchical structure.</sub_task>
-</task>
+    <task>Review your extracted elements to ensure:
+        <sub_task>Accuracy and completeness of content extraction — every word on the page is captured.</sub_task>
+        <sub_task>Correct ordering of elements.</sub_task>
+        <sub_task>Proper identification of element types and sub-types.</sub_task>
+        <sub_task>Accurate representation of the document's hierarchical structure.</sub_task>
+        <sub_task>All inline elements within paragraphs have been identified.</sub_task>
+        <sub_task>Table and list structures have been detailed.</sub_task>
+    </task>
 
-<task>Take a final deep breath and ensure your analysis is thorough, follows all provided guidelines, and accurately represents the atomic elements and overall structure present in the publication.</task>
+    <task>Take a final deep breath and ensure your analysis is thorough, follows all provided guidelines, and accurately represents the atomic elements and overall structure present in the publication.</task>
 </tasks>

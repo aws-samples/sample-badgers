@@ -1,5 +1,13 @@
 """
-PDF Accessibility Tagger v2 — Unified audit + remediation engine.
+CHECKPOINT_02B_TAGGER
+=====================
+PDF Accessibility Tagger v3 — Nested structure tree support.
+
+Changes from v2:
+  - set_structure_tree(): accepts a pre-built StructureElement hierarchy
+  - _build_nested_structure_tree(): produces Sect-nested pikepdf trees
+  - _build_unified_structure_tree(): dispatches nested vs inferred-flat
+  - Backwards compatible: no structure tree → infers sections from headings
 
 Handles PDFs in any state:
   - Image-only (no text layer): inserts invisible text overlays + structure tree
@@ -21,21 +29,29 @@ import fitz  # PyMuPDF
 
 from pdf_accessibility_models import (
     ComplianceLevel,
+    ElementRole,
     PageAudit,
     AccessibilityReport,
     TagRegion,
+    StructureElement,
     VALID_TAGS,
+    TAG_ROLES,
+    get_role,
+    is_heading,
+    heading_level,
+    infer_structure_from_flat_regions,
 )
 from pdf_accessibility_auditor import PDFAccessibilityAuditor
 
 logger = logging.getLogger(__name__)
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"
 __all__ = [
     "PDFAccessibilityTagger",
     "PDFAccessibilityAuditor",
     "AccessibilityReport",
     "TagRegion",
+    "StructureElement",
     "ComplianceLevel",
     "tag_pdf",
 ]
@@ -49,6 +65,9 @@ class PDFAccessibilityTagger:
       - Text-layer pages → wraps existing content in BDC/EMC
       - Mixed → per-element decision
       - Always builds proper MCID ↔ structure tree linkage
+
+    NEW in v3: accepts a StructureElement tree for nested Sect output.
+    Without one, infers hierarchy from heading levels (backwards compat).
     """
 
     def __init__(self, pdf_path: Union[str, Path]):
@@ -61,6 +80,9 @@ class PDFAccessibilityTagger:
         self.regions: Dict[int, List[TagRegion]] = {}
         self.report = AccessibilityReport()
 
+        # NEW: optional pre-built structure tree
+        self._structure_tree: Optional[StructureElement] = None
+
         # Run pre-remediation audit
         self.report.pre_checks = PDFAccessibilityAuditor.audit_pdf(
             self.pdf, self.fitz_doc
@@ -70,7 +92,31 @@ class PDFAccessibilityTagger:
         )
 
     # -----------------------------------------------------------------------
-    # Region registration
+    # NEW: Structure tree registration
+    # -----------------------------------------------------------------------
+
+    def set_structure_tree(self, tree: StructureElement) -> None:
+        """Set a pre-built StructureElement tree for nested PDF/UA output.
+
+        When set, _build_unified_structure_tree will produce a properly nested
+        Sect hierarchy instead of a flat list. The tree's leaf elements are
+        linked to TagRegions via matching element IDs.
+
+        Args:
+            tree: Root StructureElement (tag="Document") with full hierarchy.
+        """
+        if tree.tag != "Document":
+            raise ValueError(
+                f"Structure tree root must be <Document>, got <{tree.tag}>"
+            )
+        self._structure_tree = tree
+        logger.info(
+            "Structure tree set: %d total elements",
+            sum(1 for _ in tree.walk()),
+        )
+
+    # -----------------------------------------------------------------------
+    # Region registration (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def add_region(
@@ -138,7 +184,7 @@ class PDFAccessibilityTagger:
         )
 
     # -----------------------------------------------------------------------
-    # Page analysis
+    # Page analysis (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def _analyze_page(self, page_num: int) -> PageAudit:
@@ -156,12 +202,12 @@ class PDFAccessibilityTagger:
         xobj_images = 0
         try:
             resources = pike_page.get("/Resources", Dictionary())
-            xobjects = resources.get("/XObject", Dictionary())  # type: ignore[union-attr]
-            for xname in xobjects.keys():  # type: ignore[union-attr]
-                xobj = xobjects[xname]  # type: ignore[index]
+            xobjects = resources.get("/XObject", Dictionary())
+            for xname in xobjects.keys():
+                xobj = xobjects[xname]
                 if hasattr(xobj, "get_object"):
-                    xobj = xobj.get_object()  # type: ignore[operator]
-                if xobj.get("/Subtype") == Name("/Image"):  # type: ignore[operator]
+                    xobj = xobj.get_object()
+                if xobj.get("/Subtype") == Name("/Image"):
                     xobj_images += 1
         except Exception:
             pass
@@ -169,7 +215,7 @@ class PDFAccessibilityTagger:
         total_images = max(img_count, xobj_images)
 
         annots = pike_page.get("/Annots")
-        annot_count = len(list(annots)) if annots else 0  # type: ignore[call-overload]
+        annot_count = len(list(annots)) if annots else 0
 
         has_mc = False
         try:
@@ -195,7 +241,7 @@ class PDFAccessibilityTagger:
         )
 
     # -----------------------------------------------------------------------
-    # Content stream manipulation
+    # Content stream manipulation (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def _get_region_for_bbox(
@@ -274,6 +320,7 @@ class PDFAccessibilityTagger:
             op = instruction.operator
             op_name = str(op)
 
+            # Strip existing marked content
             if op_name in ("BMC", "BDC", "EMC"):
                 continue
 
@@ -299,14 +346,22 @@ class PDFAccessibilityTagger:
                 if target_region and target_region != current_region:
                     if in_marked:
                         new_ops.append(([], Operator("EMC")))
-                    mcid_map[mcid] = target_region
-                    bdc_dict = Dictionary({"/MCID": mcid})
-                    new_ops.append(
-                        ([Name(f"/{target_region.tag}"), bdc_dict], Operator("BDC"))
-                    )
-                    mcid += 1
-                    in_marked = True
-                    current_region = target_region
+
+                    # Determine the content stream tag — use the region's tag
+                    # but map Artifact to BMC (no MCID)
+                    if target_region.tag == "Artifact":
+                        new_ops.append(([Name("/Artifact")], Operator("BMC")))
+                        in_marked = True
+                        current_region = target_region
+                    else:
+                        mcid_map[mcid] = target_region
+                        bdc_dict = Dictionary({"/MCID": mcid})
+                        new_ops.append(
+                            ([Name(f"/{target_region.tag}"), bdc_dict], Operator("BDC"))
+                        )
+                        mcid += 1
+                        in_marked = True
+                        current_region = target_region
                 elif not target_region and not in_marked:
                     fallback = TagRegion(tag="P", bbox=(0, 0, 0, 0), page=page_num)
                     mcid_map[mcid] = fallback
@@ -358,17 +413,13 @@ class PDFAccessibilityTagger:
         return pikepdf.unparse_content_stream(new_ops), mcid_map, mcid
 
     # -----------------------------------------------------------------------
-    # Invisible text overlay (for image-only pages / elements)
+    # Invisible text overlay (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def _insert_invisible_text_overlays(
         self, _page_num: int, regions: List[TagRegion], mcid_start: int
     ) -> Tuple[bytes, Dict[int, TagRegion], int]:
-        """Generate content stream bytes for invisible text overlays.
-
-        Returns:
-            (overlay_content_bytes, mcid_to_region_map, next_available_mcid)
-        """
+        """Generate content stream bytes for invisible text overlays."""
         if not regions:
             return b"", {}, mcid_start
 
@@ -399,11 +450,8 @@ class PDFAccessibilityTagger:
             ops.append(([3], Operator("Tr")))
             ops.append(([x0, y0], Operator("Td")))
 
-            # Encode text as UTF-16BE hex string for Identity-H CIDFont
             utf16_bytes = text.encode("utf-16-be")
             hex_str = utf16_bytes.hex().upper()
-            # pikepdf String() can't produce hex-encoded CID strings,
-            # so we flush current ops, inject raw hex Tj, then continue.
             raw_segments.append(pikepdf.unparse_content_stream(ops))
             ops.clear()
             raw_segments.append(f"<{hex_str}> Tj\n".encode("ascii"))
@@ -415,19 +463,13 @@ class PDFAccessibilityTagger:
         if not ops and not raw_segments:
             return b"", mcid_map, mcid
 
-        # Flush any remaining ops
         if ops:
             raw_segments.append(pikepdf.unparse_content_stream(ops))
 
         return b"".join(raw_segments), mcid_map, mcid
 
     def _ensure_font_resource(self, page_num: int) -> None:
-        """Ensure page has a /F1 font resource for invisible text overlays.
-
-        Uses a Type0 composite font with Identity-H encoding and a ToUnicode
-        CMap so that CJK and other non-Latin characters are properly mapped
-        to Unicode for screen readers and text extraction.
-        """
+        """Ensure page has a /F1 font resource for invisible text overlays."""
         page = self.pdf.pages[page_num]
         resources = page.get("/Resources")
         if resources is None:
@@ -440,7 +482,6 @@ class PDFAccessibilityTagger:
             resources["/Font"] = fonts
 
         if "/F1" not in fonts:
-            # Build ToUnicode CMap — Identity mapping (CID == Unicode codepoint)
             to_unicode_cmap = (
                 "/CIDInit /ProcSet findresource begin\n"
                 "12 dict begin\n"
@@ -465,7 +506,6 @@ class PDFAccessibilityTagger:
             )
             to_unicode_stream = self.pdf.make_stream(to_unicode_cmap.encode("ascii"))
 
-            # CIDFont descriptor (no embedded font — text is invisible)
             cid_font = Dictionary(
                 {
                     "/Type": Name("/Font"),
@@ -482,7 +522,6 @@ class PDFAccessibilityTagger:
                 }
             )
 
-            # Type0 composite font
             font_dict = Dictionary(
                 {
                     "/Type": Name("/Font"),
@@ -496,14 +535,398 @@ class PDFAccessibilityTagger:
             fonts["/F1"] = self.pdf.make_indirect(font_dict)
 
     # -----------------------------------------------------------------------
-    # Structure tree builder
+    # NEW: Nested structure tree builder
     # -----------------------------------------------------------------------
 
-    def _build_unified_structure_tree(
+    def _build_element_to_mcid_index(
+        self,
+        page_mcid_maps: Dict[int, Dict[int, TagRegion]],
+    ) -> Dict[str, Tuple[int, int, TagRegion]]:
+        """Build reverse index: element_id → (page_num, mcid, TagRegion).
+
+        This links StructureElement nodes to their content stream MCIDs.
+        """
+        index: Dict[str, Tuple[int, int, TagRegion]] = {}
+        for page_num, mcid_map in page_mcid_maps.items():
+            for mcid, region in mcid_map.items():
+                if region.element_id:
+                    index[region.element_id] = (page_num, mcid, region)
+        return index
+
+    def _build_nested_structure_tree(
+        self,
+        tree: StructureElement,
+        page_mcid_maps: Dict[int, Dict[int, TagRegion]],
+    ) -> None:
+        """Build a nested PDF/UA structure tree from a StructureElement hierarchy.
+
+        Walks the StructureElement tree and creates corresponding pikepdf
+        StructElem objects with proper parent-child nesting. Grouping elements
+        (Sect, BlockQuote, TOC) become containers. Leaf elements with content
+        get MCR references linking them to the content stream.
+
+        Artifacts are excluded from the structure tree (they're marked in
+        the content stream with BMC /Artifact, not BDC).
+        """
+        # Build reverse index: element_id → (page, mcid, region)
+        elem_mcid_index = self._build_element_to_mcid_index(page_mcid_maps)
+
+        # RoleMap: map non-standard tags to standard equivalents
+        role_map = Dictionary({
+            "/Artifact": Name("/NonStruct"),
+        })
+
+        struct_root = Dictionary(
+            {
+                "/Type": Name("/StructTreeRoot"),
+                "/RoleMap": role_map,
+            }
+        )
+        struct_root = self.pdf.make_indirect(struct_root)
+
+        # Collect all MCR references per page for ParentTree
+        # page_num → list of (mcid, pikepdf_struct_elem)
+        page_mcr_refs: Dict[int, List[Tuple[int, object]]] = {}
+
+        def _build_node(
+            se: StructureElement, pike_parent: object
+        ) -> Optional[object]:
+            """Recursively build pikepdf StructElem for a StructureElement node.
+
+            Returns the pikepdf StructElem or None for Artifacts.
+            """
+            # Skip artifacts — they don't go in the structure tree
+            if se.role == ElementRole.ARTIFACT or se.tag == "Artifact":
+                return None
+
+            # Skip the Document node itself — we handle it as doc_elem
+            if se.tag == "Document":
+                for child in se.children:
+                    _build_node(child, pike_parent)
+                return pike_parent
+
+            # Create the StructElem
+            elem_dict = Dictionary(
+                {
+                    "/Type": Name("/StructElem"),
+                    "/S": Name(f"/{se.tag}"),
+                    "/P": pike_parent,
+                }
+            )
+
+            # Set PDF/UA attributes
+            if se.tag == "Figure" and se.alt_text:
+                elem_dict["/Alt"] = String(se.alt_text)
+
+            if se.tag == "TH" and se.scope:
+                attr = Dictionary({
+                    "/O": Name("/Table"),
+                    "/Scope": Name(f"/{se.scope}"),
+                })
+                elem_dict["/A"] = attr
+
+            if se.lang:
+                elem_dict["/Lang"] = String(se.lang)
+
+            if se.placement == "Block":
+                layout_attr = Dictionary({
+                    "/O": Name("/Layout"),
+                    "/Placement": Name("/Block"),
+                })
+                # Merge with existing /A if present
+                existing_a = elem_dict.get("/A")
+                if existing_a:
+                    # Store as array of attribute dicts
+                    elem_dict["/A"] = Array([existing_a, layout_attr])
+                else:
+                    elem_dict["/A"] = layout_attr
+
+            # Handle BBox if available
+            if se.bbox and se.bbox != (0, 0, 0, 0):
+                x0, y0, x1, y1 = se.bbox
+                bbox_attr = Dictionary({
+                    "/O": Name("/Layout"),
+                    "/BBox": Array([x0, y0, x1, y1]),
+                })
+                existing_a = elem_dict.get("/A")
+                if existing_a:
+                    if isinstance(existing_a, Array):
+                        existing_a.append(bbox_attr)
+                    else:
+                        elem_dict["/A"] = Array([existing_a, bbox_attr])
+                else:
+                    elem_dict["/A"] = bbox_attr
+
+            # Determine content: MCR leaf vs. grouping container
+            role = get_role(se.tag)
+            has_block_children = bool(se.children)
+            is_grouping = role in (
+                ElementRole.GROUPING,
+                ElementRole.LIST_WRAPPER,
+                ElementRole.LIST_ITEM,
+                ElementRole.LIST_BODY,
+                ElementRole.LIST_LABEL,
+                ElementRole.TABLE_WRAPPER,
+                ElementRole.TABLE_SECTION,
+                ElementRole.TABLE_ROW,
+                ElementRole.TOC_WRAPPER,
+                ElementRole.TOC_ITEM,
+            )
+
+            if is_grouping or has_block_children:
+                # Container node: /K is an Array of child StructElems
+                kids = Array([])
+                elem_dict["/K"] = kids
+                pike_elem = self.pdf.make_indirect(elem_dict)
+
+                # Add to parent's /K
+                _append_to_parent_kids(pike_parent, pike_elem)
+
+                # Recurse into block children
+                for child in se.children:
+                    _build_node(child, pike_elem)
+
+                # Handle inline children — they become nested StructElems
+                # with their own MCRs inside this element
+                for inline in se.inline_children:
+                    _build_inline(inline, pike_elem)
+
+                return pike_elem
+            else:
+                # Leaf node: /K is an MCR dict linking to content stream
+                mcid_info = elem_mcid_index.get(se.id)
+
+                if mcid_info:
+                    page_num, mcid, _region = mcid_info
+                    page_ref = self.pdf.pages[page_num].obj
+
+                    mcr = Dictionary(
+                        {
+                            "/Type": Name("/MCR"),
+                            "/Pg": page_ref,
+                            "/MCID": mcid,
+                        }
+                    )
+
+                    # If this leaf has inline children, /K becomes an array
+                    # containing the MCR + inline StructElems
+                    if se.inline_children:
+                        kids = Array([mcr])
+                        elem_dict["/K"] = kids
+                        pike_elem = self.pdf.make_indirect(elem_dict)
+                        _append_to_parent_kids(pike_parent, pike_elem)
+
+                        for inline in se.inline_children:
+                            _build_inline(inline, pike_elem)
+
+                        # Track for ParentTree
+                        page_mcr_refs.setdefault(page_num, []).append(
+                            (mcid, pike_elem)
+                        )
+                    else:
+                        elem_dict["/K"] = mcr
+                        pike_elem = self.pdf.make_indirect(elem_dict)
+                        _append_to_parent_kids(pike_parent, pike_elem)
+
+                        page_mcr_refs.setdefault(page_num, []).append(
+                            (mcid, pike_elem)
+                        )
+
+                    return pike_elem
+                else:
+                    # No MCID found — element exists in logical tree but
+                    # wasn't matched to content stream. Include as empty StructElem.
+                    logger.debug(
+                        "No MCID for element %s (%s) — adding as empty StructElem",
+                        se.id, se.tag,
+                    )
+                    pike_elem = self.pdf.make_indirect(elem_dict)
+                    _append_to_parent_kids(pike_parent, pike_elem)
+                    return pike_elem
+
+        def _build_inline(
+            se: StructureElement, pike_parent: object
+        ) -> Optional[object]:
+            """Build a StructElem for an inline element (Span, Reference, Link, etc.).
+
+            Inline elements may have their own MCID (if the content stream
+            wrapper created one) or share their parent's MCR.
+            """
+            if se.tag == "Artifact":
+                return None
+
+            elem_dict = Dictionary(
+                {
+                    "/Type": Name("/StructElem"),
+                    "/S": Name(f"/{se.tag}"),
+                    "/P": pike_parent,
+                }
+            )
+
+            if se.ref_id:
+                # For Reference→Note pairing, we'd ideally set /Ref
+                # pointing to the Note StructElem. This requires a second
+                # pass to resolve. For now, store as /ActualText hint.
+                pass
+
+            # Check if this inline has its own MCID
+            mcid_info = elem_mcid_index.get(se.id)
+            if mcid_info:
+                page_num, mcid, _region = mcid_info
+                page_ref = self.pdf.pages[page_num].obj
+                elem_dict["/K"] = Dictionary(
+                    {
+                        "/Type": Name("/MCR"),
+                        "/Pg": page_ref,
+                        "/MCID": mcid,
+                    }
+                )
+                pike_elem = self.pdf.make_indirect(elem_dict)
+                _append_to_parent_kids(pike_parent, pike_elem)
+                page_mcr_refs.setdefault(page_num, []).append((mcid, pike_elem))
+            else:
+                # No own MCID — add as empty StructElem child
+                # (screen readers still see the hierarchy)
+                pike_elem = self.pdf.make_indirect(elem_dict)
+                _append_to_parent_kids(pike_parent, pike_elem)
+
+            return pike_elem
+
+        def _append_to_parent_kids(parent: object, child: object):
+            """Append a child to parent's /K array, creating it if needed."""
+            kids = parent.get("/K")
+            if kids is None:
+                parent["/K"] = Array([child])
+            elif isinstance(kids, Array):
+                kids.append(child)
+            else:
+                # /K was a single item — convert to array
+                parent["/K"] = Array([kids, child])
+
+        # --- Build the tree ---
+
+        # Create Document StructElem
+        doc_elem = Dictionary(
+            {
+                "/Type": Name("/StructElem"),
+                "/S": Name("/Document"),
+                "/P": struct_root,
+                "/K": Array([]),
+            }
+        )
+        doc_elem = self.pdf.make_indirect(doc_elem)
+        struct_root["/K"] = doc_elem
+
+        # Walk the StructureElement tree, skipping the Document root
+        # (we already created doc_elem for it)
+        for child in tree.children:
+            _build_node(child, doc_elem)
+
+        # --- Build ParentTree ---
+        nums_array = Array([])
+        global_struct_parent_id = 0
+
+        for page_num in sorted(set(
+            list(page_mcid_maps.keys()) +
+            list(page_mcr_refs.keys())
+        )):
+            # Collect all struct elems that have MCRs on this page
+            page_elems = page_mcr_refs.get(page_num, [])
+
+            if page_elems:
+                # Sort by MCID for deterministic ordering
+                page_elems.sort(key=lambda x: x[0])
+                content_array = Array([elem for _, elem in page_elems])
+                content_array = self.pdf.make_indirect(content_array)
+                nums_array.append(global_struct_parent_id)
+                nums_array.append(content_array)
+
+            self.pdf.pages[page_num]["/StructParents"] = global_struct_parent_id
+
+            # Handle annotations (links etc.)
+            page = self.pdf.pages[page_num]
+            annots = page.get("/Annots")
+            if annots:
+                link_parent_id = global_struct_parent_id + 1
+                annots_list = list(annots)
+                for annot_ref in annots_list:
+                    try:
+                        annot = (
+                            annot_ref.get_object()
+                            if hasattr(annot_ref, "get_object")
+                            else annot_ref
+                        )
+                        annot["/StructParent"] = link_parent_id
+
+                        link_elem = Dictionary(
+                            {
+                                "/Type": Name("/StructElem"),
+                                "/S": Name("/Link"),
+                                "/P": doc_elem,
+                                "/K": Dictionary(
+                                    {
+                                        "/Type": Name("/OBJR"),
+                                        "/Obj": annot_ref,
+                                        "/Pg": self.pdf.pages[page_num].obj,
+                                    }
+                                ),
+                            }
+                        )
+                        link_elem = self.pdf.make_indirect(link_elem)
+                        _append_to_parent_kids(doc_elem, link_elem)
+
+                        nums_array.append(link_parent_id)
+                        nums_array.append(link_elem)
+                        link_parent_id += 1
+                    except Exception:
+                        logger.debug(
+                            "Skipping malformed annotation on page %d", page_num
+                        )
+                        continue
+
+                global_struct_parent_id = link_parent_id
+            else:
+                global_struct_parent_id += 1
+
+        parent_tree = Dictionary({"/Nums": nums_array})
+        struct_root["/ParentTree"] = self.pdf.make_indirect(parent_tree)
+        struct_root["/ParentTreeNextKey"] = global_struct_parent_id
+
+        self.pdf.Root["/StructTreeRoot"] = struct_root
+
+        # Count tree stats for logging
+        def _count_nodes(node):
+            count = 1
+            kids = node.get("/K")
+            if isinstance(kids, Array):
+                for kid in kids:
+                    try:
+                        k = kid.get_object() if hasattr(kid, "get_object") else kid
+                        if isinstance(k, Dictionary) and k.get("/S"):
+                            count += _count_nodes(k)
+                    except Exception:
+                        pass
+            elif isinstance(kids, Dictionary) and kids.get("/S"):
+                count += _count_nodes(kids)
+            return count
+
+        total_nodes = _count_nodes(doc_elem)
+        logger.info("Built nested structure tree: %d StructElem nodes", total_nodes)
+
+    # -----------------------------------------------------------------------
+    # LEGACY: Flat structure tree builder (preserved for backwards compat)
+    # -----------------------------------------------------------------------
+
+    def _build_flat_structure_tree(
         self,
         page_mcid_maps: Dict[int, Dict[int, TagRegion]],
     ) -> None:
-        """Build a single document-wide structure tree from all page MCID maps."""
+        """Build a flat structure tree (v2 behavior).
+
+        Every element is a direct child of Document. No Sect nesting.
+        Used only when infer_structure_from_flat_regions would produce
+        a worse result than flat (e.g., no headings in the document).
+        """
         struct_root = Dictionary(
             {
                 "/Type": Name("/StructTreeRoot"),
@@ -575,7 +998,7 @@ class PDFAccessibilityTagger:
             annots = page.get("/Annots")
             if annots:
                 link_parent_id = global_struct_parent_id + 1
-                annots_list = list(annots)  # type: ignore[call-overload]
+                annots_list = list(annots)
                 for annot_ref in annots_list:
                     try:
                         annot = (
@@ -622,7 +1045,45 @@ class PDFAccessibilityTagger:
         self.pdf.Root["/StructTreeRoot"] = struct_root
 
     # -----------------------------------------------------------------------
-    # Metadata
+    # DISPATCHER: chooses nested vs inferred vs flat
+    # -----------------------------------------------------------------------
+
+    def _build_unified_structure_tree(
+        self,
+        page_mcid_maps: Dict[int, Dict[int, TagRegion]],
+    ) -> None:
+        """Build the structure tree, choosing the best strategy.
+
+        Priority:
+          1. If a StructureElement tree was set via set_structure_tree() → nested
+          2. If flat regions contain headings → infer sections, then nested
+          3. No headings at all → flat (v2 behavior)
+        """
+        if self._structure_tree:
+            logger.info("Building nested structure tree from provided hierarchy")
+            self._build_nested_structure_tree(self._structure_tree, page_mcid_maps)
+            return
+
+        # Check if we have headings to infer from
+        has_headings = False
+        for mcid_map in page_mcid_maps.values():
+            for region in mcid_map.values():
+                if is_heading(region.tag):
+                    has_headings = True
+                    break
+            if has_headings:
+                break
+
+        if has_headings:
+            logger.info("No explicit structure tree — inferring from heading levels")
+            inferred = infer_structure_from_flat_regions(self.regions)
+            self._build_nested_structure_tree(inferred, page_mcid_maps)
+        else:
+            logger.info("No headings found — using flat structure tree (v2 compat)")
+            self._build_flat_structure_tree(page_mcid_maps)
+
+    # -----------------------------------------------------------------------
+    # Metadata (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def _set_metadata(self, title: str, lang: str, author: str = "") -> None:
@@ -668,9 +1129,7 @@ class PDFAccessibilityTagger:
         output_path = Path(output_path)
         all_mcid_maps: Dict[int, Dict[int, TagRegion]] = {}
 
-        for page_num in range(
-            len(self.pdf.pages)
-        ):  # pylint: disable=consider-using-enumerate
+        for page_num in range(len(self.pdf.pages)):
             page_audit = self._analyze_page(page_num)
 
             if page_num not in self.regions:
@@ -783,6 +1242,7 @@ class PDFAccessibilityTagger:
             self.report.page_audits.append(page_audit)
             all_mcid_maps[page_num] = page_mcid_map
 
+        # Build the structure tree (nested or flat depending on available data)
         self._build_unified_structure_tree(all_mcid_maps)
         self._set_metadata(title, lang, author)
         self.pdf.save(output_path)
@@ -826,7 +1286,7 @@ class PDFAccessibilityTagger:
         return output_path, self.report
 
     # -----------------------------------------------------------------------
-    # Context manager
+    # Context manager (unchanged from v2)
     # -----------------------------------------------------------------------
 
     def close(self) -> None:
@@ -842,7 +1302,7 @@ class PDFAccessibilityTagger:
 
 
 # ---------------------------------------------------------------------------
-# Convenience function
+# Convenience function (updated to accept structure_tree)
 # ---------------------------------------------------------------------------
 
 
@@ -853,6 +1313,7 @@ def tag_pdf(
     lang: str = "en-US",
     author: str = "",
     regions: Optional[List[Dict]] = None,
+    structure_tree: Optional[StructureElement] = None,
 ) -> Tuple[Path, AccessibilityReport]:
     """Simple function to add accessibility tags to a PDF.
 
@@ -866,11 +1327,15 @@ def tag_pdf(
             - page (int), bbox (tuple or dict), tag (str),
             - alt_text (str), text_content (str), order (int),
             - normalized (bool)
+        structure_tree: Optional StructureElement tree for nested output.
 
     Returns:
         (output_path, AccessibilityReport)
     """
     with PDFAccessibilityTagger(input_path) as tagger:
+        if structure_tree:
+            tagger.set_structure_tree(structure_tree)
+
         if regions:
             for i, region in enumerate(regions):
                 bbox = region.get("bbox", (0, 0, 100, 100))

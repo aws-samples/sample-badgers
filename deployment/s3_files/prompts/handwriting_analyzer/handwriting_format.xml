@@ -1,72 +1,111 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 9 (handwriting) -->
 
 <response_format>
-    <response extraction_type="handwriting">
+    <response analyzer="handwriting"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>handwriting</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_HANDWRITTEN_TEXT_REGIONS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per handwritten text region found -->
-        <elements>
-            <element type="handwritten_text" id="{REGION_ID}">
-                <type>Handwritten Text</type>
-                <summary>
-                    <location>{DESCRIPTION_OF_LOCATION_ON_PAGE}</location>
-                    <handwriting_style>{CURSIVE/PRINT/MIXED/HISTORICAL_SCRIPT_TYPE}</handwriting_style>
-                    <confidence_level>{HIGH/MEDIUM/LOW}</confidence_level>
-                </summary>
-                <content>
-                    <transcription>
-                        <raw_text>{EXACT_TRANSCRIPTION_WITH_CONFIDENCE_MARKERS}</raw_text>
-                        <structured_text>
-                            <line number="1">{TRANSCRIBED_LINE_1}</line>
-                            <line number="2">{TRANSCRIBED_LINE_2}</line>
-                        </structured_text>
-                        <uncertain_elements>
-                            <uncertain text="{CHARACTER_OR_WORD}" alternatives="{POSSIBLE_READINGS}"
-                                confidence="LOW" />
-                        </uncertain_elements>
-                        <illegible_sections>
-                            <illegible location="{DESCRIPTION}"
-                                length="{APPROXIMATE_CHARACTER_COUNT}" />
-                        </illegible_sections>
-                    </transcription>
-                    <analysis_notes>
-                        <morphological_characteristics>{DESCRIPTION_OF_WRITING_CHARACTERISTICS}</morphological_characteristics>
-                        <writer_identification>{SINGLE_WRITER/MULTIPLE_WRITERS/UNKNOWN}</writer_identification>
-                        <historical_period>{IF_APPLICABLE_ESTIMATED_TIME_PERIOD}</historical_period>
-                        <language_detected>{LANGUAGE_OF_TEXT}</language_detected>
-                        <document_type>{LETTER/MANUSCRIPT/FORM/DIARY/ETC}</document_type>
-                    </analysis_notes>
-                    <physical_evidence>
-                        <ink_type>{PEN/PENCIL/QUILL/OTHER}</ink_type>
-                        <paper_condition>{GOOD/FAIR/POOR/DEGRADED}</paper_condition>
-                        <corrections_present>{YES/NO}</corrections_present>
-                        <bleed_through>{YES/NO}</bleed_through>
-                    </physical_evidence>
-                </content>
-            </element>
 
-            <!-- For marginal annotations, include as separate elements -->
-            <element type="marginal_annotation" id="{ANNOTATION_ID}">
-                <type>Marginal Annotation</type>
-                <content>
-                    <location>{MARGIN_LOCATION}</location>
-                    <transcription>{ANNOTATION_TEXT}</transcription>
-                    <confidence>{HIGH/MEDIUM/LOW}</confidence>
-                    <relationship_to_main_text>{DESCRIPTION}</relationship_to_main_text>
-                </content>
+        <!--
+        ============================================================
+        COMMON SPINE — extract ALL transcribed text in reading order.
+        CRITICAL: On pages where only the handwriting analyzer runs
+        (no full_text), this spine IS the text source for the
+        correlator and downstream consumers. Every transcribed word
+        must appear here in elem_XXX format.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Each transcribed region becomes a text element -->
+            <element id="elem_001" tag="P" order="1" page="{PAGE}">
+                <text>{FULL_TRANSCRIBED_TEXT_OF_REGION_1}</text>
             </element>
-        </elements>
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{FULL_TRANSCRIBED_TEXT_OF_REGION_2}</text>
+            </element>
+            <!-- Marginal annotations as separate elements -->
+            <element id="elem_003" tag="Note" order="3" page="{PAGE}">
+                <text>{MARGINAL_ANNOTATION_TEXT}</text>
+            </element>
+            <!-- If headings are identifiable in the handwriting, use H1/H2/etc. -->
+            <!-- Include ALL transcribed text, in reading order -->
+        </common_spine>
 
-        <!-- Overall assessment included at response level -->
-        <document_assessment>
-            <overall_legibility>{EXCELLENT/GOOD/FAIR/POOR}</overall_legibility>
-            <transcription_completeness>{PERCENTAGE_TRANSCRIBED}</transcription_completeness>
-            <primary_challenges>{LIST_OF_MAIN_DIFFICULTIES}</primary_challenges>
-            <recommended_follow_up>{SUGGESTIONS_FOR_IMPROVED_ANALYSIS}</recommended_follow_up>
-        </document_assessment>
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_TRANSCRIBED_CONTENT}</topical_analysis>
+
+        <specialized type="handwriting">
+            <!-- If element_count is 0, omit inner content entirely -->
+            <!-- Include one <element> per handwritten text region found -->
+            <elements>
+                <element type="handwritten_text" id="{REGION_ID}">
+                    <type>Handwritten Text</type>
+                    <summary>
+                        <location>{DESCRIPTION_OF_LOCATION_ON_PAGE}</location>
+                        <handwriting_style>{CURSIVE/PRINT/MIXED/HISTORICAL_SCRIPT_TYPE}</handwriting_style>
+                        <confidence_level>{HIGH/MEDIUM/LOW}</confidence_level>
+                    </summary>
+                    <content>
+                        <transcription>
+                            <raw_text>{EXACT_TRANSCRIPTION_WITH_CONFIDENCE_MARKERS}</raw_text>
+                            <structured_text>
+                                <line number="1">{TRANSCRIBED_LINE_1}</line>
+                                <line number="2">{TRANSCRIBED_LINE_2}</line>
+                            </structured_text>
+                            <uncertain_elements>
+                                <uncertain text="{CHARACTER_OR_WORD}" alternatives="{POSSIBLE_READINGS}"
+                                    confidence="LOW" />
+                            </uncertain_elements>
+                            <illegible_sections>
+                                <illegible location="{DESCRIPTION}"
+                                    length="{APPROXIMATE_CHARACTER_COUNT}" />
+                            </illegible_sections>
+                        </transcription>
+                        <analysis_notes>
+                            <morphological_characteristics>{DESCRIPTION_OF_WRITING_CHARACTERISTICS}</morphological_characteristics>
+                            <writer_identification>{SINGLE_WRITER/MULTIPLE_WRITERS/UNKNOWN}</writer_identification>
+                            <historical_period>{IF_APPLICABLE_ESTIMATED_TIME_PERIOD}</historical_period>
+                            <language_detected>{LANGUAGE_OF_TEXT}</language_detected>
+                            <document_type>{LETTER/MANUSCRIPT/FORM/DIARY/ETC}</document_type>
+                        </analysis_notes>
+                        <physical_evidence>
+                            <ink_type>{PEN/PENCIL/QUILL/OTHER}</ink_type>
+                            <paper_condition>{GOOD/FAIR/POOR/DEGRADED}</paper_condition>
+                            <corrections_present>{YES/NO}</corrections_present>
+                            <bleed_through>{YES/NO}</bleed_through>
+                        </physical_evidence>
+                    </content>
+                </element>
+
+                <!-- For marginal annotations, include as separate elements -->
+                <element type="marginal_annotation" id="{ANNOTATION_ID}">
+                    <type>Marginal Annotation</type>
+                    <content>
+                        <location>{MARGIN_LOCATION}</location>
+                        <transcription>{ANNOTATION_TEXT}</transcription>
+                        <confidence>{HIGH/MEDIUM/LOW}</confidence>
+                        <relationship_to_main_text>{DESCRIPTION}</relationship_to_main_text>
+                    </content>
+                </element>
+            </elements>
+
+            <document_assessment>
+                <overall_legibility>{EXCELLENT/GOOD/FAIR/POOR}</overall_legibility>
+                <transcription_completeness>{PERCENTAGE_TRANSCRIBED}</transcription_completeness>
+                <primary_challenges>{LIST_OF_MAIN_DIFFICULTIES}</primary_challenges>
+                <recommended_follow_up>{SUGGESTIONS_FOR_IMPROVED_ANALYSIS}</recommended_follow_up>
+            </document_assessment>
+        </specialized>
+
     </response>
 </response_format>
