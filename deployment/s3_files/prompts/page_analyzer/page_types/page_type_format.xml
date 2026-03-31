@@ -1,11 +1,56 @@
 <!-- This is your page type response format. -->
+<!-- SKIP THE PREAMBLE - NO introductory text like "Here is my analysis..." -->
+<!-- BADGERS MASTER SCHEMA v1.0 — Common Envelope + Spine + Specialized -->
+<!--
+     NOTE: page_type is a classification-stage analyzer. The common_spine
+     is MINIMAL here — capture any prominent text that helped identify the
+     page type (title, header, watermark). If no text is relevant to the
+     classification, set element_count="0" and leave common_spine empty.
+-->
+
 <response_format>
-    <response>
-        <page type="{PAGE TYPE}">
-            <page_sub_type>{SUB-TYPE IF APPLICABLE}</page_sub_type>
-            <page_number>{PAGE NUMBER}</page_number>
-            <writing_direction>{LANGUAGE WRITING DIRECTION}</writing_direction>
-            <language>{ELEMENT LANGUAGE}</language>
-        </page>
+    <response analyzer="page_type"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>page_type</analyzer_name>
+            <analyzer_version>{ANALYZER_VERSION}</analyzer_version>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <image_quality>{good|fair|poor}</image_quality>
+            <enhancement_applied>{true|false}</enhancement_applied>
+            <enhancement_source>{S3_URI_OF_ENHANCED_IMAGE_IF_APPLIED}</enhancement_source>
+            <confidence>{overall_confidence: high|medium|low}</confidence>
+        </metadata>
+
+        <!-- Common spine: MINIMAL for classification-stage analyzers -->
+        <!-- Include only prominent text that informed the page type decision -->
+        <!-- e.g. a title like "Table of Contents" or "References" -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS_OR_0}">
+
+            <element id="{elem_XXX}"
+                     tag="{H1|H2|P|Artifact}"
+                     order="{READING_ORDER_INTEGER}"
+                     page="{PAGE_NUMBER}">
+                <text>{FULL_VERBATIM_TEXT}</text>
+            </element>
+
+        </common_spine>
+
+        <topical_analysis>{COMMA_SEPARATED_TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!-- Specialized: page type classification (existing format preserved) -->
+        <specialized type="page_type">
+            <page type="{PAGE TYPE}">
+                <page_sub_type>{SUB-TYPE IF APPLICABLE}</page_sub_type>
+                <page_number>{PAGE NUMBER}</page_number>
+                <writing_direction>{LANGUAGE WRITING DIRECTION}</writing_direction>
+                <language>{ELEMENT LANGUAGE}</language>
+            </page>
+        </specialized>
+
     </response>
 </response_format>

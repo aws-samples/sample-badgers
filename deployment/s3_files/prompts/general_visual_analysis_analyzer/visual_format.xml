@@ -1,42 +1,57 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + visual -->
 
 <response_format>
-    <response extraction_type="visual_element">
+    <response analyzer="visual"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
-            <page_number>{PAGE_NUMBER}</page_number>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>visual</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_VISUAL_ELEMENTS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- Reference for visual element styles -->
-        <visual_styles>
-            <style name="Raster">Pixel-based images, typically used for photographs and complex
-                graphics.</style>
-            <style name="Vector">Scalable graphics based on mathematical formulas, often used for
-                logos and illustrations.</style>
-            <style name="Hand-drawn">Illustrations or sketches created by hand or simulating a
-                hand-drawn appearance.</style>
-            <style name="3D Rendered">Computer-generated three-dimensional graphics.</style>
-            <style name="Data Visualization">Graphics that represent data or statistics visually.</style>
-            <style name="Mixed Media">Combinations of different visual styles or techniques.</style>
-        </visual_styles>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per visual element found -->
-        <elements>
-            <element type="visual_element">
-                <type>{ELEMENT TYPE (e.g., image, diagram, workflow)}</type>
-                <sub_type>{SUB-TYPE IF APPLICABLE}</sub_type>
-                <description>{BRIEF DESCRIPTION OF THE VISUAL CONTENT}</description>
-                <style>{IDENTIFIED STYLE (e.g., Raster, Vector, Hand-drawn)}</style>
-                <color_scheme>{DESCRIPTION OF COLOR USAGE (e.g., full color, grayscale, monochrome)}</color_scheme>
-                <location>
-                    <page>{PAGE NUMBER}</page>
-                    <position>{POSITION ON PAGE (e.g., top, bottom, full-page)}</position>
-                </location>
-                <size>{APPROXIMATE SIZE (e.g., quarter-page, half-page, full-page)}</size>
-                <caption>{EXTRACTED CAPTION TEXT IF PRESENT}</caption>
-                <reference>{IN-TEXT REFERENCE TO THE VISUAL ELEMENT IF PRESENT}</reference>
-                <context>{BRIEF DESCRIPTION OF SURROUNDING CONTENT AND RELEVANCE}</context>
+
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Each visual element as a Figure -->
+            <element id="elem_001" tag="Figure" order="1" page="{PAGE}">
+                <alt_text>{DESCRIPTION_OF_VISUAL_CONTENT}</alt_text>
+                <caption>{CAPTION_IF_VISIBLE}</caption>
             </element>
-        </elements>
+            <!-- Any text visible on the page -->
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{ANY_VISIBLE_TEXT}</text>
+            </element>
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <specialized type="visual_element">
+            <visual_styles>
+                <style name="Raster">Pixel-based images, typically used for photographs and complex graphics.</style>
+                <style name="Vector">Scalable graphics based on mathematical formulas.</style>
+                <style name="Hand-drawn">Illustrations or sketches created by hand.</style>
+                <style name="3D Rendered">Computer-generated three-dimensional graphics.</style>
+                <style name="Data Visualization">Graphics that represent data or statistics visually.</style>
+                <style name="Mixed Media">Combinations of different visual styles.</style>
+            </visual_styles>
+            <elements>
+                <element type="visual_element">
+                    <type>{ELEMENT TYPE (e.g., image, diagram, workflow)}</type>
+                    <sub_type>{SUB-TYPE IF APPLICABLE}</sub_type>
+                    <description>{BRIEF DESCRIPTION OF THE VISUAL CONTENT}</description>
+                    <style>{IDENTIFIED STYLE (e.g., Raster, Vector, Hand-drawn)}</style>
+                    <color_scheme>{DESCRIPTION OF COLOR USAGE}</color_scheme>
+                    <dimensions>{APPROXIMATE_DIMENSIONS_OR_PROPORTION}</dimensions>
+                    <context>{ROLE_OF_VISUAL_IN_DOCUMENT}</context>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

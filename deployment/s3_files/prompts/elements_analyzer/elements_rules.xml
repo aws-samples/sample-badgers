@@ -1,3 +1,106 @@
+<!--
+CHECKPOINT_05A — ELEMENTS RULES
+=================================
+Updated to support hierarchical correlation pipeline.
+
+CHANGES FROM PREVIOUS:
+  - Added: verbatim text extraction rule (critical)
+  - Added: elem_XXX ID scheme matching full_text analyzer
+  - Added: inline element identification rule
+  - Added: table/list structural detail rules
+  - Preserved: original "don't invent elements" rule
+-->
 <element_rules>
-    <rule>You may not find every element in the dictionary on this page or within this content.  Do not use this content to try and define elements that don't actually exist.</rule>
+
+    <!-- ============================================================
+         TEXT FIDELITY
+         ============================================================ -->
+    <rule priority="critical">
+        <n>Verbatim text extraction</n>
+        <description>The content field for every text-bearing element MUST contain the EXACT, COMPLETE, verbatim text as it appears on the page. Do not summarize, truncate, paraphrase, or correct any text. Do not add ellipses or "[...]" to shorten content. The downstream pipeline uses this text for PDF accessibility overlays — if text is lost, screen readers will skip that content entirely. For headings, extract the full heading text. For paragraphs, extract every word of the paragraph. For list items, extract the full item text including its label/number.</description>
+    </rule>
+
+    <!-- ============================================================
+         ELEMENT IDENTIFICATION
+         ============================================================ -->
+    <rule priority="critical">
+        <n>Sequential element IDs</n>
+        <description>Assign a unique sequential ID to every element using the format elem_001, elem_002, elem_003, etc. IDs must start at elem_001 and increment sequentially with no gaps. These IDs are used by downstream systems to link structural metadata with text content and bounding box data. Consistency is critical.</description>
+    </rule>
+
+    <rule priority="high">
+        <n>Do not invent elements</n>
+        <description>You may not find every element type from the dictionary on this page. Do not use the dictionary to define elements that do not actually exist on the page. Only extract elements you can see.</description>
+    </rule>
+
+    <rule priority="high">
+        <n>Complete extraction</n>
+        <description>Extract ALL elements visible on the page. Every heading, every paragraph, every list, every figure, every caption, every footnote, every page number. Missing an element is worse than misclassifying one — the downstream correlator can fix classification but cannot recover missing content.</description>
+    </rule>
+
+    <!-- ============================================================
+         HIERARCHY AND STRUCTURE
+         ============================================================ -->
+    <rule priority="critical">
+        <n>Hierarchical level accuracy</n>
+        <description>The hierarchical_level field is critical for building the PDF/UA structure tree. Assign levels based on DOCUMENT STRUCTURE, not visual size alone:
+            - Level 1: Document title (H1)
+            - Level 2: Major sections (H2)
+            - Level 3: Subsections within a major section (H3)
+            - Level 4: Sub-subsections (H4)
+            Do not skip levels (e.g., H1 directly to H3). If visual cues conflict with structural logic, prefer structural logic. A visually smaller heading that logically belongs at level 2 should be assigned level 2.</description>
+    </rule>
+
+    <rule priority="high">
+        <n>Section context</n>
+        <description>The context field should describe which section an element belongs to and its relationship to surrounding elements. For example: "Second paragraph in the Linear Equations section, following the general equation definition and preceding the worked examples." This context helps the downstream correlator place elements into the correct nested section.</description>
+    </rule>
+
+    <!-- ============================================================
+         INLINE ELEMENT DETECTION
+         ============================================================ -->
+    <rule priority="high">
+        <n>Identify inline elements</n>
+        <description>When a paragraph contains semantically distinct inline content, identify it in the context field or as a sub-element. Inline content includes:
+            - Mathematical formulas or equations (e.g., y = mx + b, E = mc², f(x) = 3x + 2)
+            - Footnote reference markers (superscript numbers ¹ ² ³, symbols * † ‡)
+            - Hyperlinks or URLs
+            - Styled text that serves a semantic purpose (e.g., defined terms, institution names)
+            Note these in the context field so the downstream correlator can create inline Formula, Reference, Link, or Span elements within the paragraph.</description>
+    </rule>
+
+    <!-- ============================================================
+         TABLE AND LIST STRUCTURE
+         ============================================================ -->
+    <rule priority="high">
+        <n>Table structure detail</n>
+        <description>When extracting a table element, include in the content field:
+            - The full text of all cells, preserving row/column structure
+            - Identification of which row(s) are headers vs data
+            - Whether headers apply to columns or rows (or both)
+            This enables the correlator to build proper THead/TBody/TR/TH[scope]/TD structure for PDF/UA compliance.</description>
+    </rule>
+
+    <rule priority="high">
+        <n>List structure detail</n>
+        <description>When extracting a list element, include in the content field:
+            - The full text of every list item including its bullet/number
+            - The nesting depth of each item (for nested/sub-lists)
+            - Whether the list is ordered (numbered) or unordered (bulleted)
+            This enables the correlator to build proper L/LI/Lbl/LBody structure.</description>
+    </rule>
+
+    <!-- ============================================================
+         FIGURE AND CAPTION
+         ============================================================ -->
+    <rule priority="high">
+        <n>Figure accessibility</n>
+        <description>For figure elements, always provide a description in the content field that could serve as alt text. Describe WHAT the figure shows (not what it means): "Bar chart showing quarterly revenue for 2024 with four bars labeled Q1 through Q4." The downstream pipeline requires alt text for every Figure element for PDF/UA compliance.</description>
+    </rule>
+
+    <rule priority="medium">
+        <n>Caption-figure association</n>
+        <description>When a caption accompanies a figure or table, note this association in the context field. For example: "Caption for the supply-and-demand graph above" or "Table title for the statistics table below." This helps the correlator link Caption elements to their parent Figure or Table.</description>
+    </rule>
+
 </element_rules>

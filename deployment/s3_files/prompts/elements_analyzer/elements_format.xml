@@ -1,3 +1,16 @@
+<!--
+CHECKPOINT_05B — ELEMENTS FORMAT
+==================================
+Updated response format for the elements analyzer.
+
+CHANGES FROM PREVIOUS:
+  - Added id attribute (elem_001, elem_002, etc.) on each element
+  - Added order attribute on element tag for reading sequence
+  - Clarified content as FULL VERBATIM text (not summary)
+  - Added inline_elements field for formulas/references/links within paragraphs
+  - Added list_structure and table_structure fields for detailed substructure
+-->
+
 <!-- You must respond using the format within the <response_format/> xml tags. -->
 
 <response_format>
@@ -24,19 +37,37 @@
         <!-- If element_count is 0, omit <elements> section entirely -->
         <!-- Include one <element> per document element found -->
         <elements>
-            <element type="document_element">
+            <element type="document_element" id="{ELEM_ID}" order="{READING_ORDER}">
                 <type>{ELEMENT TYPE (e.g., section, heading, paragraph, citation)}</type>
-                <order>{SEQUENTIAL NUMBER BASED ON APPEARANCE}</order>
                 <sub_type>{SUB-TYPE IF APPLICABLE}</sub_type>
-                <hierarchical_level>{LEVEL IN DOCUMENT STRUCTURE, IF APPLICABLE}</hierarchical_level>
-                <content>{EXTRACTED CONTENT}</content>
+                <hierarchical_level>{LEVEL IN DOCUMENT STRUCTURE: 1=title, 2=major section, 3=subsection, 4=sub-subsection}</hierarchical_level>
+                <content>{FULL VERBATIM TEXT — extract every word exactly as it appears. Do NOT summarize, truncate, or paraphrase. For figures, provide a visual description.}</content>
                 <style>{IDENTIFIED STYLE (e.g., APA, MLA) IF APPLICABLE}</style>
                 <location>
                     <page>{PAGE NUMBER}</page>
                     <position>{POSITION ON PAGE (e.g., top, bottom, inline)}</position>
                 </location>
-                <context>{BRIEF DESCRIPTION OF SURROUNDING CONTENT AND RELATION TO DOCUMENT
-                    STRUCTURE}</context>
+                <context>{DESCRIPTION OF: which section this element belongs to, its relationship to surrounding elements, and any inline content it contains (formulas, references, links)}</context>
+                <!-- Include inline_elements ONLY if the element contains formulas, references, links, or semantic spans -->
+                <inline_elements>
+                    <inline type="{formula|reference|link|span}" text="{THE INLINE TEXT}"/>
+                    <!-- One <inline> per inline element found within the content -->
+                </inline_elements>
+                <!-- Include list_structure ONLY for list elements -->
+                <list_structure list_type="{ordered|unordered}">
+                    <item level="{NESTING_DEPTH: 1=top, 2=nested}" label="{BULLET_OR_NUMBER}">
+                        {FULL TEXT OF LIST ITEM}
+                    </item>
+                </list_structure>
+                <!-- Include table_structure ONLY for table elements -->
+                <table_structure>
+                    <header_row>
+                        <cell scope="{column|row}">{HEADER_TEXT}</cell>
+                    </header_row>
+                    <data_row>
+                        <cell>{CELL_TEXT}</cell>
+                    </data_row>
+                </table_structure>
             </element>
         </elements>
     </response>

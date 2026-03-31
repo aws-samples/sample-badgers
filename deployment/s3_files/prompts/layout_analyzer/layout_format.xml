@@ -1,86 +1,61 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + layout -->
 
 <response_format>
-    <response extraction_type="layout">
+    <response analyzer="layout"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
-            <page_number>{PAGE_NUMBER}</page_number>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>layout</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_LAYOUT_ZONES_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
 
-        <document_info>
-            <document_type>{DOCUMENT_TYPE (e.g., book, magazine, research paper, periodical, newspaper)}</document_type>
-            <orientation>{ORIENTATION (portrait/landscape)}</orientation>
-            <language>{DOCUMENT_LANGUAGE}</language>
-            <additional_languages>{ADDITIONAL_LANGUAGES_IN_DOCUMENT}</additional_languages>
-            <writing_direction>{PRIMARY_WRITING_DIRECTION (left-to-right/right-to-left)}</writing_direction>
-        </document_info>
-
-        <overall_layout>
-            <grid_system>{DESCRIPTION_OF_GRID_SYSTEM_USED}</grid_system>
-            <column_structure>{NUMBER_OF_COLUMNS_AND_ARRANGEMENT}</column_structure>
-            <visual_hierarchy>{DESCRIPTION_OF_VISUAL_HIERARCHY}</visual_hierarchy>
-            <white_space_usage>{DESCRIPTION_OF_WHITE_SPACE_USAGE}</white_space_usage>
-            <color_scheme>{DESCRIPTION_OF_COLOR_USAGE}</color_scheme>
-            <overall_balance>{ASSESSMENT_OF_LAYOUT_BALANCE}</overall_balance>
-        </overall_layout>
-
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per layout zone found -->
-        <elements>
-            <element type="header_zone">
-                <presence>{PRESENT/ABSENT}</presence>
-                <description>{DESCRIPTION_OF_HEADER_CONTENT_AND_STYLE}</description>
-                <zone_elements>
-                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
-                </zone_elements>
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Layout analyzer sees all text — extract in reading order -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{HEADING_TEXT_IF_VISIBLE}</text>
             </element>
-
-            <element type="footer_zone">
-                <presence>{PRESENT/ABSENT}</presence>
-                <description>{DESCRIPTION_OF_FOOTER_CONTENT_AND_STYLE}</description>
-                <zone_elements>
-                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
-                </zone_elements>
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{BODY_TEXT_IF_VISIBLE}</text>
             </element>
+            <!-- Include ALL visible text in reading order -->
+        </common_spine>
 
-            <element type="main_content_zone">
-                <description>{DESCRIPTION_OF_MAIN_CONTENT_LAYOUT}</description>
-                <typography>
-                    <body_text>{DESCRIPTION_OF_BODY_TEXT_STYLE}</body_text>
-                    <headings>{DESCRIPTION_OF_HEADING_STYLES}</headings>
-                </typography>
-                <zone_elements>
-                    <zone_element>{ELEMENT_TYPE_AND_DESCRIPTION}</zone_element>
-                </zone_elements>
-            </element>
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-            <element type="left_rail_zone">
-                <presence>{PRESENT/ABSENT}</presence>
-                <description>{DESCRIPTION_OF_LEFT_RAIL_CONTENT}</description>
-            </element>
+        <specialized type="layout">
+            <document_info>
+                <document_type>{DOCUMENT_TYPE (e.g., book, magazine, research paper, periodical, newspaper)}</document_type>
+                <orientation>{ORIENTATION (portrait/landscape)}</orientation>
+                <language>{DOCUMENT_LANGUAGE}</language>
+                <additional_languages>{ADDITIONAL_LANGUAGES_IN_DOCUMENT}</additional_languages>
+                <writing_direction>{PRIMARY_WRITING_DIRECTION (left-to-right/right-to-left)}</writing_direction>
+            </document_info>
+            <overall_layout>
+                <grid_system>{DESCRIPTION_OF_GRID_SYSTEM_USED}</grid_system>
+                <column_structure>{NUMBER_OF_COLUMNS_AND_ARRANGEMENT}</column_structure>
+                <visual_hierarchy>{DESCRIPTION_OF_VISUAL_HIERARCHY}</visual_hierarchy>
+                <white_space_usage>{DESCRIPTION_OF_WHITE_SPACE_USAGE}</white_space_usage>
+                <color_scheme>{DESCRIPTION_OF_COLOR_USAGE}</color_scheme>
+                <overall_balance>{ASSESSMENT_OF_LAYOUT_BALANCE}</overall_balance>
+            </overall_layout>
+            <elements>
+                <element type="layout_zone">
+                    <zone_type>{ZONE TYPE (e.g., header, body, sidebar, footer, image, table)}</zone_type>
+                    <position>{POSITION ON PAGE}</position>
+                    <dimensions>{APPROXIMATE_SIZE}</dimensions>
+                    <content_description>{WHAT_IS_IN_THIS_ZONE}</content_description>
+                    <visual_weight>{HIGH/MEDIUM/LOW}</visual_weight>
+                </element>
+            </elements>
+        </specialized>
 
-            <element type="right_rail_zone">
-                <presence>{PRESENT/ABSENT}</presence>
-                <description>{DESCRIPTION_OF_RIGHT_RAIL_CONTENT}</description>
-            </element>
-
-            <element type="column_zone">
-                <count>{NUMBER_OF_COLUMNS}</count>
-                <description>{DESCRIPTION_OF_COLUMN_ARRANGEMENT}</description>
-            </element>
-
-            <element type="special_element">
-                <special_type>{SPECIAL_ELEMENT_TYPE (e.g., pull quote, sidebar)}</special_type>
-                <description>{DESCRIPTION_OF_SPECIAL_ELEMENT}</description>
-                <position>{POSITION_IN_LAYOUT}</position>
-            </element>
-        </elements>
-
-        <layout_assessment>{SUMMARY_OF_OVERALL_LAYOUT_AND_NOTABLE_FEATURES}</layout_assessment>
-
-        <full_text_extract>
-            <text type="{TYPE}">{TEXT_CONTENT_IN_READING_ORDER}</text>
-        </full_text_extract>
     </response>
 </response_format>

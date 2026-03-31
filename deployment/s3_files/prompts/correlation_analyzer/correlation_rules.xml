@@ -1,12 +1,151 @@
+<!--
+CHECKPOINT_04C — CORRELATION RULES
+====================================
+Updated for schema_version 2.0 — hierarchical content_tree.
+-->
 <correlation_rules>
-    <rule priority="critical">full_text elements are the CANONICAL SPINE — preserve ALL IDs exactly (elem_001, elem_002, etc.)</rule>
-    <rule priority="critical">NEVER modify, merge, rename, or omit full_text elements</rule>
-    <rule priority="critical">Every correlation MUST have explicit evidence — do not guess or assume relationships</rule>
-    <rule priority="critical">If no clear relationship exists between elements, do not fabricate one</rule>
-    <rule priority="high">Enrichments attach INSIDE each element's enrichments block, not as separate sections</rule>
-    <rule priority="high">For figures: identify "referenced_by" (text that cites it), "illustrates" (text it visualizes), "grounded_to" (the figure element itself)</rule>
-    <rule priority="high">Include the full structure from diagram/table/chart analyzers in the enrichment — do not summarize or truncate</rule>
-    <rule priority="medium">Build cross_reference_index for efficient downstream lookup by diagram, table, or layout region</rule>
-    <rule priority="medium">Include raw_outputs section with S3 URIs of all source analyzer results</rule>
-    <rule priority="low">Summary should be 2-4 sentences describing what was correlated and key findings</rule>
+
+    <!-- ============================================================
+         TEXT FIDELITY RULES
+         ============================================================ -->
+    <rule priority="critical">
+        <name>Verbatim text preservation</name>
+        <description>Every text-bearing element MUST carry the EXACT verbatim text from the full_text analyzer. Do not summarize, truncate, paraphrase, or correct any text. The downstream tagger uses this text for invisible overlays and screen reader content. If text is lost, screen readers will skip that content entirely.</description>
+    </rule>
+
+    <rule priority="critical">
+        <name>Element ID preservation</name>
+        <description>Preserve ALL element IDs from the full_text analyzer exactly (elem_001, elem_002, etc.). These IDs link the structure tree to content stream MCIDs. Renaming, merging, or omitting IDs breaks the tagging pipeline.</description>
+    </rule>
+
+    <rule priority="critical">
+        <name>No elements omitted</name>
+        <description>Every element from the full_text analyzer MUST appear in the content_tree. If you cannot determine where an element belongs structurally, place it in the innermost currently-open sect. A misplaced element is better than a missing one.</description>
+    </rule>
+
+    <!-- ============================================================
+         HIERARCHY RULES
+         ============================================================ -->
+    <rule priority="critical">
+        <name>Sect nesting from headings</name>
+        <description>Headings define section boundaries. When you encounter a heading:
+            - H1: place directly in sect_root (typically the document title)
+            - H2: open a new sect (depth 1) inside sect_root. Close any previously open depth-1 sect.
+            - H3: open a new sect (depth 2) inside the current depth-1 sect. Close any previously open depth-2 sect.
+            - H4: open a new sect (depth 3) inside the current depth-2 sect. Close any previously open depth-3 sect.
+            The heading element itself is the FIRST child of its new sect.
+        </description>
+    </rule>
+
+    <rule priority="critical">
+        <name>No heading level skipping</name>
+        <description>PDF/UA requires heading levels not skip (e.g., H1 → H3 without H2 is invalid). If the source document skips levels, use the elements analyzer's hierarchical_level to determine the correct level. If still ambiguous, prefer the higher level (use H2 instead of H3).</description>
+    </rule>
+
+    <rule priority="high">
+        <name>Content belongs to innermost sect</name>
+        <description>Non-heading elements (P, Figure, Table, L, etc.) belong inside the innermost currently-open sect. If a paragraph appears between two H2 headings, it belongs in the first H2's sect, not floating at root level.</description>
+    </rule>
+
+    <rule priority="high">
+        <name>Use elements analyzer for hierarchy</name>
+        <description>When the elements analyzer provides hierarchical_level and section context, prefer this over inferring hierarchy from visual cues alone. The elements analyzer was specifically designed to understand document structure. Cross-reference its output with the full_text reading order to determine correct placement.</description>
+    </rule>
+
+    <!-- ============================================================
+         INLINE ELEMENT RULES
+         ============================================================ -->
+    <rule priority="high">
+        <name>Identify inline elements</name>
+        <description>When a paragraph contains mathematical formulas, footnote references, hyperlinks, or styled spans, identify them and list them in an inline block inside the element. The parent text tag still contains the FULL verbatim paragraph text (including the inline content as it appears in the text). The inline children specify which fragments are semantically distinct.</description>
+    </rule>
+
+    <rule priority="high">
+        <name>Formula detection</name>
+        <description>Mathematical expressions within paragraph text should be identified as inline Formula elements. Look for: equations with variables (y = mx + b), Greek letters, subscripts/superscripts, mathematical operators beyond basic arithmetic, function notation f(x). Block-level equations (displayed on their own line, often numbered) should be separate elements with placement="Block".</description>
+    </rule>
+
+    <rule priority="medium">
+        <name>Reference and Note pairing</name>
+        <description>Footnote callouts in text (¹, ², *, †, etc.) should be identified as inline Reference elements with a ref attribute pointing to the corresponding Note element. The Note element contains the footnote text and has a ref back to the Reference. Both elements need IDs for the pairing.</description>
+    </rule>
+
+    <!-- ============================================================
+         TABLE AND LIST RULES
+         ============================================================ -->
+    <rule priority="high">
+        <name>Table substructure</name>
+        <description>When the table analyzer provides structured table data, express it with proper PDF/UA nesting inside the Table element's children block:
+            Table → Caption (if present)
+            Table → THead → TR → TH (with scope="Column")
+            Table → TBody → TR → TH (with scope="Row" for row headers) + TD
+            Every TH MUST have a scope attribute: "Column" for column headers, "Row" for row headers.
+        </description>
+    </rule>
+
+    <rule priority="high">
+        <name>List substructure</name>
+        <description>When a list is identified, express it with proper PDF/UA nesting:
+            L → LI → Lbl (bullet/number) + LBody (content)
+            LBody may contain P elements and nested L elements for sub-lists.
+            If the elements analyzer identifies a list structure, use it. If only the full_text analyzer identified it, still attempt to decompose into LI/Lbl/LBody.
+        </description>
+    </rule>
+
+    <!-- ============================================================
+         ENRICHMENT RULES (unchanged from v1)
+         ============================================================ -->
+    <rule priority="high">
+        <name>Enrichments attach inside elements</name>
+        <description>Enrichments from specialized analyzers (chart data, diagram structure) attach inside the element's enrichments block. Do not create separate sections for enrichments. A single traversal of the content_tree should yield everything.</description>
+    </rule>
+
+    <rule priority="high">
+        <name>Full enrichment structure</name>
+        <description>Include the FULL structure from diagram/table/chart analyzers in the enrichment — do not summarize or truncate. This data is used for enhanced accessibility descriptions and data extraction.</description>
+    </rule>
+
+    <rule priority="critical">
+        <name>Evidence-based relationships only</name>
+        <description>Every cross-reference (text references figure, figure illustrates text) MUST have explicit evidence. Do not guess or assume relationships. If the text says "as shown in Figure 3" that is evidence. If a paragraph merely discusses a topic that a figure also covers, that is a weaker relationship — note the evidence strength.</description>
+    </rule>
+
+    <!-- ============================================================
+         FIGURE AND CAPTION RULES
+         ============================================================ -->
+    <rule priority="high">
+        <name>Figure alt text</name>
+        <description>Every Figure element MUST have an alt_text tag. Use the full_text analyzer's alt_text if provided. If not, use the chart/diagram analyzer's description. If neither is available, write a brief accessibility description based on available context. PDF/UA requires alt text on all Figure elements — a missing alt_text is a compliance failure.</description>
+    </rule>
+
+    <rule priority="high">
+        <name>Caption linkage</name>
+        <description>Caption elements should include a parent_ref attribute pointing to the Figure or Table they describe. Place the Caption inside the same sect as the Figure/Table, immediately after it in reading order.</description>
+    </rule>
+
+    <!-- ============================================================
+         ARTIFACT RULES
+         ============================================================ -->
+    <rule priority="medium">
+        <name>Artifact identification</name>
+        <description>Page numbers, running headers, running footers, watermarks, and decorative elements should be tagged as Artifact. Place them inside sect_root. The downstream tagger will mark them in the content stream with BMC /Artifact (not BDC with MCID) and exclude them from the structure tree.</description>
+    </rule>
+
+    <!-- ============================================================
+         OUTPUT RULES
+         ============================================================ -->
+    <rule priority="critical">
+        <name>Schema version</name>
+        <description>Include schema_version="2.0" on the unified_document root element. This tells the downstream parser to use the v2.0 hierarchical parsing path instead of the v1.0 flat parser.</description>
+    </rule>
+
+    <rule priority="medium">
+        <name>Cross-reference index</name>
+        <description>Build cross_reference_index for efficient downstream lookup by diagram, table, chart, or note. Group by type (by_chart, by_table, by_diagram, by_note).</description>
+    </rule>
+
+    <rule priority="low">
+        <name>Summary</name>
+        <description>Summary should be 2-4 sentences describing: which analyzers were correlated, how many elements in the tree, tree depth, and key relationships found.</description>
+    </rule>
 </correlation_rules>
