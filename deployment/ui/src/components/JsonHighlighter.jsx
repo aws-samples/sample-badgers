@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import hljs from 'highlight.js/lib/core'
 import json from 'highlight.js/lib/languages/json'
 
@@ -29,9 +29,10 @@ export const THEMES = [
 ]
 
 export default function JsonHighlighter({ text, theme = 'github-dark' }) {
+  const codeRef = useRef(null)
+
   // Dynamically inject the theme stylesheet
   useEffect(() => {
-    const id = `hljs-theme-${theme}`
     // Remove old theme link if present
     const old = document.getElementById('hljs-theme-link')
     if (old) old.remove()
@@ -48,12 +49,13 @@ export default function JsonHighlighter({ text, theme = 'github-dark' }) {
     }
   }, [theme])
 
-  const html = useMemo(() => {
-    try {
-      return hljs.highlight(text, { language: 'json' }).value
-    } catch {
-      return text
-    }
+  // Set text content and highlight via DOM API (no innerHTML)
+  useEffect(() => {
+    const el = codeRef.current
+    if (!el) return
+    el.textContent = text + '\n'
+    el.removeAttribute('data-highlighted')
+    hljs.highlightElement(el)
   }, [text])
 
   return (
@@ -66,7 +68,8 @@ export default function JsonHighlighter({ text, theme = 'github-dark' }) {
         background: 'transparent',
         pointerEvents: 'none',
       }}
-      dangerouslySetInnerHTML={{ __html: html + '\n' }}
-    />
+    >
+      <code ref={codeRef} className="language-json" />
+    </pre>
   )
 }
