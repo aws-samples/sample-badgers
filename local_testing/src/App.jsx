@@ -26,17 +26,27 @@ export default function App() {
   const [logs, setLogs] = useState([])
   const [running, setRunning] = useState(false)
   const dirtyRef = useRef(false)
+  const abortRef = useRef(null)
 
-  const appendLog = (line) => setLogs(prev => [...prev, line])
+  const MAX_LOG_LINES = 2000
+  const appendLog = (line) => setLogs(prev => {
+    const next = [...prev, line]
+    return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next
+  })
   const clearLogs = () => setLogs([])
 
   const runSSE = (url, body) => {
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     clearLogs()
     setRunning(true)
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: controller.signal,
     }).then(async (res) => {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -56,7 +66,13 @@ export default function App() {
           } catch {}
         }
       }
-    }).catch(e => appendLog(`\n❌ ${e.message}`)).finally(() => setRunning(false))
+    }).catch(e => {
+      if (e.name === 'AbortError') return
+      appendLog(`\n❌ ${e.message}`)
+    }).finally(() => {
+      abortRef.current = null
+      setRunning(false)
+    })
   }
 
   const switchTab = (t) => {
