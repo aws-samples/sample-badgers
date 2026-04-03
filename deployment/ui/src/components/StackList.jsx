@@ -28,7 +28,7 @@ function StatusBadge({ status }) {
   )
 }
 
-export default function StackList({ runSSE, running }) {
+export default function StackList({ runSSE, runSSEGet, running }) {
   const [stacks, setStacks] = useState([])
   const [loading, setLoading] = useState(true)
   const [deploymentId, setDeploymentId] = useState('')
@@ -37,12 +37,30 @@ export default function StackList({ runSSE, running }) {
 
   const fetchStacks = () => {
     setLoading(true)
-    fetch('/api/stacks').then(r => r.json()).then(setStacks).finally(() => setLoading(false))
+    fetch('/api/stacks').then(r => r.json()).then(data => {
+      setStacks(data)
+      // Evict cached outputs for stacks that are no longer deployed
+      setOutputs(prev => {
+        const next = {}
+        for (const s of data) {
+          if (prev[s.id] && s.status.includes('COMPLETE') && !s.status.includes('DELETE')) {
+            next[s.id] = prev[s.id]
+          }
+        }
+        return next
+      })
+    }).finally(() => setLoading(false))
   }
 
   useEffect(() => { fetchStacks() }, [])
   // Refresh after a deploy/destroy finishes
   useEffect(() => { if (!running) fetchStacks() }, [running])
+  // Poll stack status every 15s while a deploy is running
+  useEffect(() => {
+    if (!running) return
+    const interval = setInterval(fetchStacks, 15000)
+    return () => clearInterval(interval)
+  }, [running])
 
   const toggleOutputs = async (stackId) => {
     if (expanded === stackId) { setExpanded(null); return }
@@ -86,7 +104,7 @@ export default function StackList({ runSSE, running }) {
           <button className="primary" disabled={running}
             onClick={() => {
               if (confirm('Deploy all stacks from scratch? This runs the full deploy_from_scratch.sh script.'))
-                runSSE('/api/deploy-all', {})
+                runSSEGet('/api/deploy-test')
             }}>
             🚀 Deploy All
           </button>

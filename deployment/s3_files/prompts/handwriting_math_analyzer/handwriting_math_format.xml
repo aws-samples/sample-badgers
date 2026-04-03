@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Handwriting-Math Specialized -->
+
+<response_format>
+    <response analyzer="handwriting_math"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>handwriting_math</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{TOTAL_NUMBER_OF_SEMANTIC_REGIONS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
+
+        <!--
+        ============================================================
+        COMMON SPINE — ALL transcribed content in pedagogical reading order.
+        This spine is the primary text source for the correlator.
+        Every transcribed expression and text block must appear here.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_ELEMENTS}">
+            <!-- Section headers -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}" color="{INK_COLOR}">
+                <text>{SECTION_HEADER_TEXT}</text>
+            </element>
+
+            <!-- Definitions / theorems / properties -->
+            <element id="elem_002" tag="Definition" order="2" page="{PAGE}" color="{INK_COLOR}">
+                <text>{DEFINITION_OR_THEOREM_TEXT}</text>
+            </element>
+
+            <!-- Problem statements -->
+            <element id="elem_003" tag="Problem" order="3" page="{PAGE}" color="{INK_COLOR}">
+                <text>{PROBLEM_STATEMENT_TEXT}</text>
+                <latex>{PROBLEM_LATEX_IF_APPLICABLE}</latex>
+            </element>
+
+            <!-- Annotations / verbal descriptions of steps -->
+            <element id="elem_004" tag="Note" order="4" page="{PAGE}" color="{INK_COLOR}">
+                <text>{ANNOTATION_TEXT}</text>
+            </element>
+
+            <!-- Solution steps (each step in a chain is a separate element) -->
+            <element id="elem_005" tag="SolutionStep" order="5" page="{PAGE}" color="{INK_COLOR}"
+                     chain_id="{SOLUTION_CHAIN_ID}" step_number="{STEP_IN_CHAIN}">
+                <latex>{LATEX_FOR_THIS_STEP}</latex>
+                <operation>{MATHEMATICAL_OPERATION_FROM_PREVIOUS_STEP}</operation>
+            </element>
+
+            <!-- Boxed / emphasized answers -->
+            <element id="elem_006" tag="Answer" order="6" page="{PAGE}" color="{INK_COLOR}"
+                     emphasis="{box|circle|underline|color_highlight}"
+                     chain_id="{PARENT_SOLUTION_CHAIN_ID}">
+                <latex>{ANSWER_LATEX}</latex>
+            </element>
+
+            <!-- Geometric figures (as alt-text descriptions in reading order) -->
+            <element id="elem_007" tag="Figure" order="7" page="{PAGE}">
+                <alt_text>{ACCESSIBILITY_DESCRIPTION_OF_FIGURE}</alt_text>
+                <figure_ref>{REFERENCE_TO_SPECIALIZED_FIGURE_ID}</figure_ref>
+            </element>
+
+            <!-- Include ALL visible content in pedagogical reading order -->
+        </common_spine>
+
+        <topical_analysis>{MATHEMATICAL_TOPICS_COVERED: e.g., "Function transformations, inverse functions, similar triangles, proportional reasoning"}</topical_analysis>
+
+        <specialized type="handwriting_math">
+
+            <!-- Color map observed on this page -->
+            <color_map>
+                <color_role color="{COLOR_NAME}" role="{OBSERVED_SEMANTIC_ROLE}" coverage="{approximate_percentage_of_page}"/>
+                <!-- Repeat for each distinct color -->
+            </color_map>
+
+            <!-- Page layout pattern -->
+            <layout_pattern>{DOMINANT_PATTERN: vertical_derivation|two_column_solution|figure_with_adjacent_work|definition_then_example|transformation_sequence|correspondence_mapping|mixed}</layout_pattern>
+
+            <!-- Solution chains — the core mathematical structure -->
+            <solution_chains>
+                <chain id="{CHAIN_ID}" problem_ref="{PROBLEM_ELEMENT_ID}" answer_ref="{ANSWER_ELEMENT_ID}">
+                    <problem_statement>
+                        <latex>{ORIGINAL_PROBLEM_LATEX}</latex>
+                        <natural_language>{PROBLEM_IN_WORDS_IF_APPLICABLE}</natural_language>
+                    </problem_statement>
+                    <steps>
+                        <step number="1" confidence="{HIGH|MEDIUM|LOW}">
+                            <latex>{STEP_1_LATEX}</latex>
+                            <operation>{WHAT_WAS_DONE: e.g., "swap x and y for inverse", "cross-multiply"}</operation>
+                        </step>
+                        <step number="2" confidence="{HIGH|MEDIUM|LOW}">
+                            <latex>{STEP_2_LATEX}</latex>
+                            <operation>{WHAT_WAS_DONE}</operation>
+                        </step>
+                        <!-- Continue for all steps -->
+                    </steps>
+                    <final_answer>
+                        <latex>{FINAL_ANSWER_LATEX}</latex>
+                        <emphasis_type>{box|circle|underline|color_highlight|none}</emphasis_type>
+                    </final_answer>
+                    <correctness_notes>{ASSESSMENT: e.g., "All steps verified correct" or "Error in step 3: should be x+2 not x-2"}</correctness_notes>
+                </chain>
+                <!-- Repeat for each solution chain on the page -->
+            </solution_chains>
+
+            <!-- Geometric figures with full label extraction -->
+            <geometric_figures>
+                <figure id="{FIGURE_ID}" type="{FIGURE_TYPE_FROM_DICTIONARY}" medium="{pencil|ink_blue|ink_black|etc}">
+                    <description>{NATURAL_LANGUAGE_DESCRIPTION}</description>
+
+                    <!-- For triangles and polygons -->
+                    <vertices>
+                        <vertex label="{LABEL}" position="{top|bottom_left|bottom_right|etc}"/>
+                        <!-- Repeat for each vertex -->
+                    </vertices>
+                    <sides>
+                        <side from="{VERTEX_1}" to="{VERTEX_2}" length="{LENGTH_IF_LABELED}" unit="{UNIT_IF_GIVEN}"
+                              congruence_marks="{NUMBER_OF_TICK_MARKS: 0|1|2|3}"/>
+                        <!-- Repeat for each side -->
+                    </sides>
+                    <angles>
+                        <angle vertex="{VERTEX_LABEL}" measure="{DEGREES_IF_LABELED}"
+                               equality_marks="{NUMBER_OF_ARC_MARKS: 0|1|2|3}"/>
+                        <!-- Repeat for each angle -->
+                    </angles>
+                    <special_marks>
+                        <mark type="{right_angle|parallel|midpoint|altitude|median}" location="{DESCRIPTION}"/>
+                    </special_marks>
+
+                    <!-- For coordinate planes / function graphs -->
+                    <coordinate_system>
+                        <x_axis label="{LABEL}" range="{VISIBLE_RANGE}"/>
+                        <y_axis label="{LABEL}" range="{VISIBLE_RANGE}"/>
+                        <plotted_points>
+                            <point coordinates="({X},{Y})" label="{LABEL_IF_ANY}"/>
+                        </plotted_points>
+                        <curves>
+                            <curve equation_latex="{EQUATION}" type="{parabola|line|radical|etc}" direction="{opens_up|opens_down|etc}"/>
+                        </curves>
+                    </coordinate_system>
+
+                    <!-- Similarity / congruence relationships -->
+                    <relationships>
+                        <similarity statement="{e.g., △ABE ~ △CDE}">
+                            <vertex_correspondence from="{A}" to="{C}"/>
+                            <vertex_correspondence from="{B}" to="{D}"/>
+                            <vertex_correspondence from="{E}" to="{E}"/>
+                        </similarity>
+                        <parallel_lines statement="{e.g., AB ∥ CD}"/>
+                    </relationships>
+
+                    <!-- Associated solution chains -->
+                    <associated_chains>
+                        <chain_ref id="{CHAIN_ID}"/>
+                    </associated_chains>
+                </figure>
+                <!-- Repeat for each geometric figure -->
+            </geometric_figures>
+
+            <!-- Uncertain elements requiring attention -->
+            <uncertain_elements>
+                <uncertain element_ref="{ELEMENT_ID}" location="{DESCRIPTION}"
+                           transcribed="{BEST_READING}" alternatives="{OTHER_POSSIBLE_READINGS}"
+                           confidence="LOW" reason="{WHY_UNCERTAIN}"/>
+            </uncertain_elements>
+
+            <!-- Illegible sections -->
+            <illegible_sections>
+                <illegible location="{DESCRIPTION}" estimated_extent="{APPROX_CHARACTERS_OR_EXPRESSIONS}"
+                           context="{WHAT_SURROUNDS_IT}"/>
+            </illegible_sections>
+
+            <!-- Overall page assessment -->
+            <page_assessment>
+                <overall_legibility>{EXCELLENT|GOOD|FAIR|POOR}</overall_legibility>
+                <transcription_completeness>{PERCENTAGE_OF_CONTENT_SUCCESSFULLY_TRANSCRIBED}</transcription_completeness>
+                <mathematical_domains>{LIST_OF_MATH_TOPICS: e.g., "algebra, geometry, trigonometry"}</mathematical_domains>
+                <writer_consistency>{SINGLE_WRITER|MULTIPLE_WRITERS|MIXED_PRINT_AND_CURSIVE}</writer_consistency>
+                <primary_challenges>{LIST_OF_MAIN_DIFFICULTIES_ENCOUNTERED}</primary_challenges>
+            </page_assessment>
+
+        </specialized>
+
+    </response>
+</response_format>

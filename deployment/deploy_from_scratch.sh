@@ -11,19 +11,30 @@ set -e  # Exit on error
 
 # Parse arguments
 WEBSOCKET_ONLY=false
+FORCE_UPDATE=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         --websocket-only)
             WEBSOCKET_ONLY=true
             shift
             ;;
+        --force)
+            FORCE_UPDATE=true
+            shift
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: ./deploy_from_scratch.sh [--websocket-only]"
+            echo "Usage: ./deploy_from_scratch.sh [--websocket-only] [--force]"
             exit 1
             ;;
     esac
 done
+
+# Fail fast if interactive input would be needed but we're not in a terminal
+if [ ! -t 0 ] && [ "$FORCE_UPDATE" != true ]; then
+    echo "[ERROR] Not running in an interactive terminal. Pass --force to skip prompts."
+    exit 1
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -66,10 +77,14 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Check CDK
+    # Check CDK (may be available via uv)
     if ! command -v cdk &> /dev/null; then
-        log_error "AWS CDK not found. Install with: npm install -g aws-cdk"
-        exit 1
+        if command -v uv &> /dev/null && uv run cdk --version &> /dev/null; then
+            log_info "CDK found via uv"
+        else
+            log_error "AWS CDK not found. Install with: npm install -g aws-cdk"
+            exit 1
+        fi
     fi
 
     # Check Docker
@@ -126,24 +141,28 @@ main() {
         --output text 2>/dev/null || echo "")
 
     if [ -n "$EXISTING_STACKS" ] && [ "$EXISTING_STACKS" != "None" ]; then
-        log_warn "Found existing stacks: $EXISTING_STACKS"
-        log_warn "This script is designed for fresh deployments."
-        log_warn "For existing deployments, run './destroy.sh' first, or use 'cdk deploy --all' for updates."
-        echo ""
-        read -p "Do you want to run destroy.sh first? (y/N): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Running destroy.sh..."
-            if [ -f "$SCRIPT_DIR/destroy.sh" ]; then
-                chmod +x "$SCRIPT_DIR/destroy.sh"
-                "$SCRIPT_DIR/destroy.sh" || handle_error "Destroy existing stacks"
-                log_success "Existing stacks destroyed"
-            else
-                handle_error "destroy.sh not found"
-            fi
+        if [ "$FORCE_UPDATE" = true ]; then
+            log_info "Found existing stacks — --force passed, proceeding with update deployment"
         else
-            log_error "Aborting deployment. Please destroy existing stacks first or use 'cdk deploy --all'."
-            exit 1
+            log_warn "Found existing stacks: $EXISTING_STACKS"
+            log_warn "This script is designed for fresh deployments."
+            log_warn "For existing deployments, run './destroy.sh' first, or use 'cdk deploy --all' for updates."
+            echo ""
+            read -p "Do you want to run destroy.sh first? (y/N): " -n 1 -r
+            echo ""
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                log_info "Running destroy.sh..."
+                if [ -f "$SCRIPT_DIR/destroy.sh" ]; then
+                    chmod +x "$SCRIPT_DIR/destroy.sh"
+                    "$SCRIPT_DIR/destroy.sh" || handle_error "Destroy existing stacks"
+                    log_success "Existing stacks destroyed"
+                else
+                    handle_error "destroy.sh not found"
+                fi
+            else
+                log_error "Aborting deployment. Please destroy existing stacks first or use 'cdk deploy --all'."
+                exit 1
+            fi
         fi
     fi
 
@@ -204,7 +223,7 @@ main() {
     else
         log_warn "build_pdf_processing_layer.sh not found, checking for existing pdf-processing-layer.zip"
         if [ ! -f "pdf-processing-layer.zip" ]; then
-            log_warn "PDF processing lambda layer not found - remediation_analyzer may fail"
+            log_warn "PDF processing lambda layer not found - this is OK for container-based remediation_analyzer (bundles its own deps)"
         fi
     fi
     cd "$CDK_DIR"

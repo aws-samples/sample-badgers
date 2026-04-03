@@ -54,6 +54,7 @@ fi
 STACKS=(
     "${STACK_PREFIX}-custom-analyzers"
     "${STACK_PREFIX}-runtime-websocket"
+    "${STACK_PREFIX}-xray"
     "${STACK_PREFIX}-gateway"
     "${STACK_PREFIX}-lambda"
     "${STACK_PREFIX}-memory"

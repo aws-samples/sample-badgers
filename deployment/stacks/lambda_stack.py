@@ -246,9 +246,10 @@ class LambdaAnalyzerStack(Stack):
             layers.append(self.poppler_layer)
 
         # Attach PDF processing layer to functions that need PDF manipulation
-        pdf_processing_functions = [
-            "remediation_analyzer",
-        ]
+        # NOTE: Container functions (remediation_analyzer) are built via
+        # _create_ecr_container_function and never reach this code path.
+        # They bundle their own deps in the Docker image.
+        pdf_processing_functions: list[str] = []
         if self.pdf_processing_layer and analyzer_name in pdf_processing_functions:
             layers.append(self.pdf_processing_layer)
 
@@ -323,10 +324,6 @@ class LambdaAnalyzerStack(Stack):
             "MAX_TOKENS": "16000",
             "TEMPERATURE": "0.1",
         }
-
-        # Enable diagnostics for remediation analyzer
-        if func_name == "remediation_analyzer":
-            environment["ENABLE_DIAGNOSTICS"] = "true"
 
         # Add inference profile ARNs for cost tracking
         if self.inference_profiles_stack:

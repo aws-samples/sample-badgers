@@ -1,26 +1,84 @@
-<!-- This defines how you must format your responses -->
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + classification -->
+
 <response_format>
-  <!-- Response requirements -->
-  <response_format_requirements>
-    <requirement>Use proper JSON formatting with no syntax errors</requirement>
-    <requirement>Write descriptions in complete, natural sentences</requirement>
-    <requirement>Be specific about what you observe - describe the actual content</requirement>
-    <requirement>Note location and prominence of different content areas</requirement>
-  </response_format_requirements>
+    <response analyzer="classification"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-  <!-- JSON structure -->
-  <json_output_schema> { "page_number": "Page number if visible, otherwise 'unknown'", "image_quality": "good | fair | poor", "content_description": "A complete description of what is on this page. Write in full sentences describing all the content you observe, where it's located, and any notable characteristics. Be specific and thorough.", "quality_notes": "Any issues affecting the image (blur, skew, artifacts) - null if none", "enhancement_recommended": "true | false - whether image enhancement would improve analysis", "enhancement_reason": "Reason for enhancement recommendation - null if enhancement_recommended is false" } </json_output_schema>
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>classification</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>0</element_count>
+            <confidence>{high|medium|low}</confidence>
+            <image_quality>{good|fair|poor}</image_quality>
+        </metadata>
 
-  <!-- Examples -->
-  <example name="research_paper_title"> { "page_number": "1", "image_quality": "good", "content_description": "This is a title page for an academic research paper. The title 'Machine Learning Applications in Healthcare' appears prominently at the top. Below that are three author names with their institutional affiliations at Stanford University. The middle section contains an abstract of approximately 200 words summarizing the research. At the bottom are keywords including 'machine learning', 'healthcare', 'diagnosis', and 'neural networks'. A DOI and publication date (March 2024) appear in the footer.", "quality_notes": null, "enhancement_recommended": false, "enhancement_reason": null } </example>
+        <!--
+        ============================================================
+        COMMON SPINE — extract prominent text visible on the page
+        that informed the classification decision (titles, headings, etc.)
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Key text elements that helped identify content type -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{PROMINENT_TITLE_OR_HEADING}</text>
+            </element>
 
-  <example name="mixed_content"> { "page_number": "12", "image_quality": "good", "content_description": "This page contains two distinct sections. The upper half has a data table showing quarterly revenue figures for 2023, with columns for Q1 through Q4 and rows for different product categories. The table has clear headers and numerical data in each cell. The lower half contains a flowchart diagram illustrating an approval workflow process, with rectangular boxes connected by arrows showing the sequence from 'Submit Request' through 'Manager Review' to 'Final Approval'. There are also some handwritten annotations in blue ink in the right margin that appear to be notes or comments.", "quality_notes": null, "enhancement_recommended": true, "enhancement_reason": "handwritten_annotations" } </example>
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{KEY_TEXT_SNIPPET_THAT_HELPED_CLASSIFICATION}</text>
+            </element>
 
-  <example name="poor_quality"> { "page_number": "unknown", "image_quality": "poor", "content_description": "This page appears to contain text content but the image quality makes it difficult to read clearly. There seems to be a paragraph of body text in the upper portion and what might be a small diagram or figure in the lower right corner. The text is blurry and some words are not legible.", "quality_notes": "Image is blurry with low resolution. Text is partially illegible. Some skew detected.", "enhancement_recommended": true, "enhancement_reason": "degraded_scan" } </example>
+            <!-- Include prominent text that informed classification -->
+        </common_spine>
 
-  <example name="minimal_content"> { "page_number": "8", "image_quality": "good", "content_description": "This is a nearly blank page. The only content is the page number '8' centered at the bottom footer. The rest of the page is empty white space. This appears to be an intentional separator or blank page.", "quality_notes": null, "enhancement_recommended": false, "enhancement_reason": null } </example>
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-  <example name="historical_manuscript"> { "page_number": "unknown", "image_quality": "fair", "content_description": "This appears to be a historical manuscript page with handwritten text in cursive script. The paper shows visible yellowing and age-related discoloration. The ink has faded in several areas making some words difficult to read. There are margin notes in a different hand. The document appears to be from the 18th or 19th century based on the writing style and paper condition.", "quality_notes": "Yellowed paper, faded ink in places, some foxing visible", "enhancement_recommended": true, "enhancement_reason": "historical_manuscript" } </example>
+        <!--
+        ============================================================
+        SPECIALIZED — page content classification and quality assessment.
+        This guides downstream analyzer selection.
+        ============================================================
+        -->
+        <specialized type="classification">
 
-  <example name="watermarked_security_paper"> { "page_number": "1", "image_quality": "good", "content_description": "This is an official university transcript printed on blue security paper. The background contains repeating 'UNIVERSITY OF MICHIGAN' watermark text tiled across the entire page, an institutional seal overlapping the content area, and a light blue tinted background. The foreground contains academic content including degree information, semester course listings with course numbers, titles, credit hours, and grades organized in tabular format, along with GPA calculations. Transfer credit information and advanced placement credits are also listed.", "quality_notes": "Security watermarks and blue-tinted background will interfere with automated text extraction despite text being visually readable", "enhancement_recommended": true, "enhancement_reason": "watermarked_security_paper — repeating watermark text, institutional seal, and colored background will cause downstream extractors to misidentify this page as a blank security/authentication page, missing all academic content. Requires desaturate-then-threshold enhancement." } </example>
+            <content_description>{COMPLETE_DESCRIPTION_OF_PAGE_CONTENT: Write in full sentences describing all content, location, and notable characteristics. Be specific and thorough.}</content_description>
+
+            <quality_assessment>
+                <image_quality>{good|fair|poor}</image_quality>
+                <quality_notes>{ANY_ISSUES_AFFECTING_IMAGE: blur, skew, artifacts - null if none}</quality_notes>
+                <enhancement_recommended>{true|false}</enhancement_recommended>
+                <enhancement_reason>{REASON_FOR_ENHANCEMENT: handwritten_annotations|degraded_scan|watermarked_security_paper|historical_manuscript|null if not recommended}</enhancement_reason>
+            </quality_assessment>
+
+            <!-- Classification examples for common page types -->
+            <classification_examples>
+                <example type="research_paper_title">
+                    <description>Title page for academic research paper with prominent title at top, author names with institutional affiliations, abstract section, keywords at bottom, DOI and publication date in footer.</description>
+                </example>
+                <example type="mixed_content">
+                    <description>Page with multiple content types: upper half contains data table with clear headers and numerical data; lower half contains flowchart diagram showing process flow with boxes and arrows; handwritten annotations in margins.</description>
+                </example>
+                <example type="poor_quality">
+                    <description>Page with text content but blurry/low resolution image quality making text partially illegible. Some skew detected.</description>
+                </example>
+                <example type="blank_page">
+                    <description>Nearly blank page with only page number in footer. Empty white space. Appears to be intentional separator or blank page.</description>
+                </example>
+                <example type="historical_manuscript">
+                    <description>Historical manuscript page with handwritten cursive script. Visible yellowing and age-related discoloration. Faded ink in several areas. Margin notes in different hand. 18th or 19th century based on writing style.</description>
+                </example>
+                <example type="watermarked_security">
+                    <description>Official document on blue security paper with repeating watermark text tiled across page, institutional seal overlapping content, light blue tinted background. Foreground contains structured data in tabular format.</description>
+                </example>
+            </classification_examples>
+
+        </specialized>
+
+    </response>
 </response_format>

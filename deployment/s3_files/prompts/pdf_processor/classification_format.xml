@@ -1,91 +1,109 @@
-<!-- This defines how you must format your responses -->
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + tool_recommendations -->
+
 <response_format>
-  <!-- These are the mandatory requirements for your JSON response -->
-  <response_format_requirements>
-    <requirement>Always use exact tool names from the available tools list</requirement>
-    <requirement>Confidence scores must be decimal values between 0.0 and 1.0</requirement>
-    <requirement>tool_recommendations must ALWAYS be an array, even for single tool recommendations</requirement>
-    <requirement>For multiple tools, order them by priority (most important first)</requirement>
-    <requirement>Include priority field (1=highest, 2=second, etc.) for system processing order</requirement>
-    <requirement>Empty array [] if no tools are recommended</requirement>
-    <requirement>Provide specific, actionable reasoning for each recommendation</requirement>
-    <requirement>Include content_match details that justify the tool selection</requirement>
-    <requirement>Include tools_not_recommended section explaining which available tools were
-      excluded and why, referencing specific prompt guidelines</requirement>
-    <requirement>Use proper JSON formatting with no syntax errors</requirement>
-  </response_format_requirements>
+    <response analyzer="pdf_processor"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-  <!-- This is the exact JSON structure you must follow -->
-  <json_output_schema>
-    <!-- These comments guide your decision on which format to use -->
-    <!-- IF NO TOOLS ARE RECOMMENDED: Use empty array format -->
-    <!-- IF ONE TOOL IS RECOMMENDED: Use single tool array format with priority 1 -->
-    <!-- IF MULTIPLE TOOLS ARE RECOMMENDED: Use multiple tools array format with ascending
-    priorities -->
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>pdf_processor</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>0</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
 
-    <base_structure> { "page_analysis": { "content_description": "Brief description of what you
-      observe on this page", "dominant_content_type": "Primary content category identified",
-      "secondary_content_types": ["List", "of", "additional", "content", "types", "if", "present"],
-      "image_quality": "Assessment of image clarity and analyzability" }, "tool_recommendations": [ <!--
-      CONDITIONAL CONTENT BASED ON NUMBER OF TOOLS - SEE EXAMPLES BELOW -->
-      ], "tools_not_recommended": { "explanation": "Explain which available tools were NOT
-      recommended and why they don't match this page's content", "excluded_tools": [ { "tool_name":
-      "name_of_excluded_tool", "reason": "Specific reason why this tool was not selected based on
-      content analysis and prompt guidelines" } ] }, "classification_metadata": {
-      "analysis_timestamp": "Current timestamp", "total_tools_considered": 4,
-      "recommendation_count": "Number of tools in recommendations array", "fallback_used": false,
-      "notes": "Any additional observations or concerns about the classification" } } </base_structure>
+        <!--
+        ============================================================
+        COMMON SPINE — extract prominent text visible on the page
+        that helps identify which specialized analyzers to invoke.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Key text that identifies content type -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{PROMINENT_TITLE_OR_HEADING}</text>
+            </element>
 
-    <!-- These are the specific formats to use based on your analysis results -->
-    <conditional_formats>
-      <!-- Use this format when no tools meet the confidence threshold -->
-      <no_tools_format>
-        "tool_recommendations": []
-      </no_tools_format>
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{SAMPLE_CONTENT_TEXT}</text>
+            </element>
 
-      <!-- Use this format when one tool clearly matches the content -->
-      <single_tool_format>
-        "tool_recommendations": [
-        {
-        "tool_name": "exact_tool_name_from_available_tools",
-        "confidence": 0.85,
-        "reasoning": "Detailed explanation of why this tool was selected and confidence level",
-        "content_match": "Specific content elements that match this tool's capabilities",
-        "priority": 1
-        }
-        ]
-      </single_tool_format>
+            <!-- Include representative text that informed tool selection -->
+        </common_spine>
 
-      <!-- Use this format when multiple distinct content areas need different tools -->
-      <multiple_tools_format>
-        "tool_recommendations": [
-        {
-        "tool_name": "primary_tool_name",
-        "confidence": 0.88,
-        "reasoning": "Explanation for primary tool selection",
-        "content_match": "Content elements for primary tool",
-        "priority": 1
-        },
-        {
-        "tool_name": "secondary_tool_name",
-        "confidence": 0.76,
-        "reasoning": "Explanation for secondary tool selection",
-        "content_match": "Content elements for secondary tool",
-        "priority": 2
-        }
-        ]
-      </multiple_tools_format>
-    </conditional_formats>
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-    <!-- This is your step-by-step decision process for choosing the right format -->
-    <decision_logic>
-      <!-- Follow this decision tree to select the correct format -->
-      <!-- 1. Analyze page content -->
-      <!-- 2. IF no suitable tools found OR confidence too low: USE no_tools_format -->
-      <!-- 3. IF one dominant content type with clear tool match: USE single_tool_format -->
-      <!-- 4. IF multiple distinct content regions requiring different tools: USE
-      multiple_tools_format -->
-      <!-- 5. ALWAYS prioritize tools by content area size and importance -->
-    </decision_logic>
-  </json_output_schema>
+        <!--
+        ============================================================
+        SPECIALIZED — tool recommendations for downstream processing.
+        Determines which specialized analyzers should process this page.
+        ============================================================
+        -->
+        <specialized type="tool_recommendations">
+
+            <page_analysis>
+                <content_description>{BRIEF_DESCRIPTION_OF_PAGE_CONTENT}</content_description>
+                <dominant_content_type>{PRIMARY_CONTENT_CATEGORY}</dominant_content_type>
+                <secondary_content_types>
+                    <type>{ADDITIONAL_CONTENT_TYPE_1}</type>
+                    <type>{ADDITIONAL_CONTENT_TYPE_2}</type>
+                </secondary_content_types>
+                <image_quality>{ASSESSMENT_OF_IMAGE_CLARITY}</image_quality>
+            </page_analysis>
+
+            <!-- Tool recommendations: ordered by priority -->
+            <!-- Empty if no tools recommended -->
+            <tool_recommendations>
+                <tool priority="1">
+                    <tool_name>{EXACT_TOOL_NAME_FROM_AVAILABLE_TOOLS}</tool_name>
+                    <confidence>{0.0_TO_1.0}</confidence>
+                    <reasoning>{DETAILED_EXPLANATION_OF_WHY_THIS_TOOL_WAS_SELECTED}</reasoning>
+                    <content_match>{SPECIFIC_CONTENT_ELEMENTS_THAT_MATCH_TOOL_CAPABILITIES}</content_match>
+                </tool>
+                <tool priority="2">
+                    <tool_name>{SECONDARY_TOOL_IF_APPLICABLE}</tool_name>
+                    <confidence>{0.0_TO_1.0}</confidence>
+                    <reasoning>{EXPLANATION_FOR_SECONDARY_TOOL}</reasoning>
+                    <content_match>{CONTENT_ELEMENTS_FOR_SECONDARY_TOOL}</content_match>
+                </tool>
+                <!-- Repeat for each recommended tool -->
+            </tool_recommendations>
+
+            <!-- Tools not recommended: explain why -->
+            <tools_not_recommended>
+                <explanation>{EXPLAIN_WHICH_TOOLS_WERE_NOT_RECOMMENDED_AND_WHY}</explanation>
+                <excluded_tools>
+                    <tool>
+                        <tool_name>{NAME_OF_EXCLUDED_TOOL}</tool_name>
+                        <reason>{SPECIFIC_REASON_WHY_NOT_SELECTED_BASED_ON_CONTENT_AND_GUIDELINES}</reason>
+                    </tool>
+                    <!-- Repeat for each excluded tool -->
+                </excluded_tools>
+            </tools_not_recommended>
+
+            <classification_metadata>
+                <analysis_timestamp>{CURRENT_TIMESTAMP}</analysis_timestamp>
+                <total_tools_considered>{NUMBER_OF_TOOLS_EVALUATED}</total_tools_considered>
+                <recommendation_count>{NUMBER_OF_TOOLS_RECOMMENDED}</recommendation_count>
+                <fallback_used>{true|false}</fallback_used>
+                <notes>{ANY_ADDITIONAL_OBSERVATIONS_OR_CONCERNS}</notes>
+            </classification_metadata>
+
+            <!-- Decision process guidelines -->
+            <decision_logic>
+                <!-- 1. Analyze page content -->
+                <!-- 2. IF no suitable tools found OR confidence too low: leave tool_recommendations empty -->
+                <!-- 3. IF one dominant content type with clear tool match: recommend single tool with priority 1 -->
+                <!-- 4. IF multiple distinct content regions: recommend multiple tools with ascending priorities -->
+                <!-- 5. ALWAYS prioritize tools by content area size and importance -->
+            </decision_logic>
+
+        </specialized>
+
+    </response>
 </response_format>

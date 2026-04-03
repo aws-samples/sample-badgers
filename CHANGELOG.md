@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.5.0] - 2026-04-03
+### Added
+- Local Testing UI (`local_testing/`) — React + Express app replacing the Gradio frontend
+  - 8-tab interface: Home, Chat, Edit Analyzer, Create Analyzer, Evaluations, Pricing, Observability, Chat Log
+  - WebSocket proxy to AgentCore Runtime for interactive chat
+  - SSE streaming for long-running operations
+  - Vite dev server (port 5174) + Express API (port 3457)
+- Deployment UI (`deployment/ui/`) — React + Express app for CDK stack management
+  - 4-tab interface: Stacks, Analyzers, S3 Configs, Deploy Tags
+  - Deploy/destroy individual CDK stacks with streaming log output
+  - S3 config file editor for manifests, prompts, and schemas
+  - Vite dev server (port 5173) + Express API (port 3456)
+- `local_testing/LOCAL_TESTING_README.md` — documentation for the Local Testing UI
+- `deployment/ui/DEPLOYMENT_UI_README.md` — documentation for the Deployment UI
+
+### Removed
+- Gradio-based frontend (`frontend/`) replaced by `local_testing/` and `deployment/ui/`
+
+### Changed
+- Updated navigation bars across all 10 README files to replace `frontend/` links with Local Testing and Deployment UI links
+- Updated inline references to Analyzer Creation Wizard in deployment and Lambda analyzer docs
+- Updated project structure section in main README to reflect `local_testing/` replacing `frontend/`
+
 ## [2.4.1] - 2026-03-28
 ### Changed
 - Increased all timeout configurations from 300s to 900s to support 10+ minute agent runs (#42)

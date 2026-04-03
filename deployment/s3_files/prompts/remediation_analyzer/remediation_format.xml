@@ -1,206 +1,174 @@
-<!-- ===================================================================
-SECTION 6: OUTPUT SPECIFICATION WITH CHAIN-OF-THOUGHT
-=================================================================== -->
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 10 (remediation) -->
 
-<output_specification>
-       <format> You MUST provide your analysis FIRST inside &lt;analysis&gt; tags, THEN output the JSON array. No markdown code blocks. No additional explanatory text after the JSON. </format>
+<response_format>
+    <response analyzer="remediation"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-       <analysis_requirements>
-              <requirement id="1"
-                           name="Page Overview"
-                           > Describe the overall page layout: - Single column or multi-column? - What major sections or regions exist? - Any headers, footers, or sidebars? - Approximate element count </requirement>
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>remediation</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_ELEMENTS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
 
-              <requirement id="2"
-                           name="Element Inventory"
-                           > List all elements you identify, in reading order: - "1. H1 - Document title at top center" - "2. P - Introductory paragraph below title" - "3. Figure - Chart in upper right" - etc. </requirement>
+        <!--
+        ============================================================
+        COMMON SPINE — extract ALL visible text/content in reading order.
+        This provides the semantic text that will be tagged in the PDF.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Page artifacts (headers/footers/page numbers) -->
+            <element id="elem_001" tag="Artifact" order="1" page="{PAGE}">
+                <text>{PAGE_HEADER_OR_FOOTER_TEXT}</text>
+            </element>
 
-              <requirement id="3"
-                           name="Boundary Tracing"
-                           > For EACH significant element, trace its boundaries: - TOP edge: what marks it? (first line of text, top of image frame) - BOTTOM edge: what marks it? (last line of text, bottom of image) - LEFT edge: where does content start? - RIGHT edge: where does content end? Map each edge to the grid coordinates. </requirement>
+            <!-- Document title -->
+            <element id="elem_002" tag="H1" order="2" page="{PAGE}">
+                <text>{DOCUMENT_TITLE}</text>
+            </element>
 
-              <requirement id="4"
-                           name="Coordinate Assignment"
-                           > State the top_left and bottom_right for each element: - "H1: B2 → AE3 (title spans nearly full width, rows 2-3)" - "P: B5 → R15 (left column paragraph)" - "Figure: T5 → AE15 (chart in right column)" </requirement>
+            <!-- Section headings -->
+            <element id="elem_003" tag="H2" order="3" page="{PAGE}">
+                <text>{SECTION_HEADING}</text>
+            </element>
 
-              <requirement id="5"
-                           name="Validation Checks"
-                           > Verify your coordinates: - Elements don't overlap inappropriately - Reading order makes logical sense - Proportions match visual estimates - Headings are assigned correct levels </requirement>
-       </analysis_requirements>
+            <element id="elem_004" tag="H3" order="4" page="{PAGE}">
+                <text>{SUBSECTION_HEADING}</text>
+            </element>
 
-       <output_sequence>
-              <step order="1">Write your complete analysis inside &lt;analysis&gt;...&lt;/analysis&gt; tags</step>
-              <step order="2">Output ONLY the JSON array after the analysis (no markdown, no ```json blocks)</step>
-       </output_sequence>
+            <!-- Body paragraphs -->
+            <element id="elem_005" tag="P" order="5" page="{PAGE}">
+                <text>{PARAGRAPH_TEXT}</text>
+            </element>
 
-       <schema>
-   <![CDATA[
-   <analysis>
-   [Your detailed reasoning following all 5 analysis requirements]
-   </analysis>
+            <!-- Figures -->
+            <element id="elem_006" tag="Figure" order="6" page="{PAGE}">
+                <alt_text>{ACCESSIBILITY_DESCRIPTION_OF_VISUAL_CONTENT}</alt_text>
+                <caption>{CAPTION_IF_ANY}</caption>
+            </element>
 
-   [
-     {
-       "page_number": "string - Page number if visible, or 'unknown'",
-       "order": "integer - Reading order (1-indexed)",
-       "type": "string - PDF/UA element type from element_types",
-       "content": "string - Text content or description (first 200 chars for long content)",
-       "top_left": "string - Cell at upper-left corner (e.g., B2)",
-       "bottom_right": "string - Cell at lower-right corner (e.g., AE5)",
-       "confidence": "string - high|medium|low",
-       "alt_text": "string|null - Alternative text for figures (required for Figure type)",
-       "parent_order": "integer|null - Order number of parent element for captions/nested items",
-       "heading_level": "integer|null - 1-6 for heading elements",
-       "is_artifact": "boolean - true if decorative/non-content element"
-     }
-   ]
-   ]]>
-       </schema>
+            <!-- Captions -->
+            <element id="elem_007" tag="Caption" order="7" page="{PAGE}">
+                <text>{CAPTION_TEXT}</text>
+            </element>
 
-       <field_descriptions>
-              <field name="page_number">Page number visible on the page, or "unknown" if not visible</field>
-              <field name="order">Sequential number based on reading order, starting at 1</field>
-              <field name="type">PDF/UA element type (H1, H2, P, Figure, Table, L, Artifact, etc.)</field>
-              <field name="content">The text content, or a brief description for non-text elements</field>
-              <field name="top_left">Grid cell at the upper-left corner of the bounding box</field>
-              <field name="bottom_right">Grid cell at the lower-right corner of the bounding box</field>
-              <field name="confidence">high (clear boundaries), medium (some ambiguity), low (uncertain)</field>
-              <field name="alt_text">Descriptive text for figures - REQUIRED for all Figure elements</field>
-              <field name="parent_order">For captions, the order number of the figure/table they describe</field>
-              <field name="heading_level">1-6 indicating the heading hierarchy level</field>
-              <field name="is_artifact">true for non-content elements (page numbers, decorations)</field>
-       </field_descriptions>
+            <!-- Tables -->
+            <element id="elem_008" tag="Table" order="8" page="{PAGE}">
+                <text>{ALL_TABLE_CONTENT_AS_READABLE_TEXT}</text>
+                <caption>{TABLE_CAPTION_IF_ANY}</caption>
+            </element>
 
-       <confidence_levels>
-              <level value="high">Element is clearly visible, boundaries are unambiguous, type is certain</level>
-              <level value="medium">Element is identifiable but some boundaries or classification is unclear</level>
-              <level value="low">Element presence or boundaries are uncertain</level>
-       </confidence_levels>
+            <!-- Lists -->
+            <element id="elem_009" tag="L" order="9" page="{PAGE}">
+                <text>{ALL_LIST_ITEMS_AS_TEXT}</text>
+            </element>
 
-       <example description="Simple document page with heading, paragraphs, figure, and page number (36x36 grid)">
-   <![CDATA[
-   <analysis>
-   **1. Page Overview**
-   Single-column layout with a document title at the top, followed by two paragraphs of body text. A figure (bar chart) appears in the middle of the page with a caption below it. There's a page number "1" at the bottom center. Approximately 6 elements total.
+            <!-- Include ALL text you can see, in reading order -->
+        </common_spine>
 
-   **2. Element Inventory**
-   1. H1 - Document title "Annual Report 2024" centered at top
-   2. P - Introductory paragraph below title
-   3. Figure - Bar chart showing quarterly revenue
-   4. Caption - "Figure 1: Quarterly Revenue Growth" below the chart
-   5. P - Additional paragraph below the caption
-   6. Artifact - Page number "1" at bottom center
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-   **3. Boundary Tracing**
-   H1 "Annual Report 2024":
-   - TOP: First line of title text → row 3
-   - BOTTOM: Single line heading → row 4
-   - LEFT: Title starts around column E
-   - RIGHT: Title ends around column AB
+        <!--
+        ============================================================
+        SPECIALIZED — PDF/UA remediation tagging with grid-based
+        bounding box coordinates for precise PDF tagging.
+        ============================================================
+        -->
+        <specialized type="remediation">
 
-   P (first paragraph):
-   - TOP: First line of paragraph → row 6
-   - BOTTOM: Last line of paragraph → row 10
-   - LEFT: Left margin → column C
-   - RIGHT: Right margin → column AD
+            <!-- Chain-of-thought analysis for boundary tracing -->
+            <analysis>
+                <page_overview>{DESCRIPTION_OF_OVERALL_PAGE_LAYOUT: single/multi-column, major sections, headers/footers/sidebars, approximate element count}</page_overview>
+                <element_inventory>{LIST_ALL_ELEMENTS_IN_READING_ORDER: "1. H1 - Document title at top center", "2. P - Introductory paragraph below title", etc.}</element_inventory>
+                <boundary_tracing>{FOR_EACH_SIGNIFICANT_ELEMENT_TRACE_BOUNDARIES: TOP/BOTTOM/LEFT/RIGHT edges mapped to grid coordinates}</boundary_tracing>
+                <coordinate_assignment>{STATE_TOP_LEFT_AND_BOTTOM_RIGHT_FOR_EACH_ELEMENT}</coordinate_assignment>
+                <validation_checks>{VERIFY_COORDINATES: no inappropriate overlaps, logical reading order, proportions match visual estimates, correct heading levels}</validation_checks>
+            </analysis>
 
-   Figure (bar chart):
-   - TOP: Top of chart frame → row 12
-   - BOTTOM: Bottom of chart including x-axis labels → row 24
-   - LEFT: Y-axis labels → column D
-   - RIGHT: Right edge of chart → column AC
+            <!-- Grid system: 36x36 cell overlay (columns A-AJ, rows 1-36) -->
+            <grid_system>
+                <columns>36</columns>
+                <rows>36</rows>
+                <description>Page is divided into a 36x36 grid. Columns labeled A through AJ (left to right), rows numbered 1 through 36 (top to bottom). Each cell represents approximately 2.8% of page width/height.</description>
+            </grid_system>
 
-   Caption:
-   - TOP: Caption text → row 25
-   - BOTTOM: Single line → row 26
-   - LEFT: Centered start → column J
-   - RIGHT: Centered end → column W
+            <!-- PDF/UA element type reference -->
+            <element_types>
+                <type name="Document">Root element containing entire document</type>
+                <type name="H1">Top-level heading (document title)</type>
+                <type name="H2">Major section heading</type>
+                <type name="H3">Subsection heading</type>
+                <type name="H4">Sub-subsection heading</type>
+                <type name="H5">Lower-level heading</type>
+                <type name="H6">Lowest-level heading</type>
+                <type name="P">Paragraph of body text</type>
+                <type name="Figure">Image, chart, diagram, or visual element</type>
+                <type name="Caption">Caption text for a figure or table</type>
+                <type name="Table">Tabular data structure</type>
+                <type name="L">List container</type>
+                <type name="LI">List item</type>
+                <type name="Lbl">List item label (bullet/number)</type>
+                <type name="LBody">List item body content</type>
+                <type name="BibEntry">Bibliographic entry/citation</type>
+                <type name="Quote">Block quotation</type>
+                <type name="Note">Footnote or endnote</type>
+                <type name="Reference">Reference marker linking to a note</type>
+                <type name="Code">Code block or inline code</type>
+                <type name="Formula">Mathematical formula</type>
+                <type name="Link">Hyperlink</type>
+                <type name="Artifact">Non-content element (page numbers, decorative elements, headers/footers)</type>
+            </element_types>
 
-   P (second paragraph):
-   - TOP: First line → row 28
-   - BOTTOM: Last line → row 32
-   - LEFT: Left margin → column C
-   - RIGHT: Right margin → column AD
+            <!-- Confidence levels -->
+            <confidence_levels>
+                <level value="high">Element is clearly visible, boundaries are unambiguous, type is certain</level>
+                <level value="medium">Element is identifiable but some boundaries or classification is unclear</level>
+                <level value="low">Element presence or boundaries are uncertain</level>
+            </confidence_levels>
 
-   Artifact (page number):
-   - TOP/BOTTOM: Row 35
-   - LEFT/RIGHT: Centered, columns Q-S
+            <!-- If element_count is 0, omit <elements> section entirely -->
+            <elements>
+                <element type="pdf_ua_element">
+                    <type>{PDF_UA_ELEMENT_TYPE: H1|H2|H3|P|Figure|Table|L|Artifact|etc}</type>
+                    <content>
+                        <description>{TEXT_CONTENT_OR_DESCRIPTION: first 200 chars for long content}</description>
+                    </content>
+                    <grid_position>
+                        <top_left>{CELL_AT_UPPER_LEFT_CORNER: e.g., B2}</top_left>
+                        <bottom_right>{CELL_AT_LOWER_RIGHT_CORNER: e.g., AE5}</bottom_right>
+                    </grid_position>
+                    <confidence>{high|medium|low}</confidence>
+                    <alt_text>{ALTERNATIVE_TEXT_FOR_FIGURES: required for all Figure type elements}</alt_text>
+                    <parent_order>{ORDER_NUMBER_OF_PARENT_ELEMENT: for captions/nested items}</parent_order>
+                    <heading_level>{1-6 for heading elements, null for others}</heading_level>
+                    <is_artifact>{true|false: true for decorative/non-content elements}</is_artifact>
+                </element>
+            </elements>
 
-   **4. Coordinate Assignment**
-   - H1: E3 → AB4
-   - P (first): C6 → AD10
-   - Figure: D12 → AC24
-   - Caption: J25 → W26 (parent: Figure at order 3)
-   - P (second): C28 → AD32
-   - Artifact: Q35 → S35
+            <!-- Example element for reference -->
+            <example>
+                <element type="pdf_ua_element">
+                    <type>H1</type>
+                    <content>
+                        <description>Annual Report 2024</description>
+                    </content>
+                    <grid_position>
+                        <top_left>E3</top_left>
+                        <bottom_right>AB4</bottom_right>
+                    </grid_position>
+                    <confidence>high</confidence>
+                    <heading_level>1</heading_level>
+                </element>
+            </example>
 
-   **5. Validation Checks**
-   - No overlapping bounding boxes ✓
-   - Reading order flows top to bottom ✓
-   - Figure ends at row 24 (~67% down page), matches visual ✓
-   - Caption correctly linked to Figure via parent_order ✓
-   - H1 is appropriate for document title ✓
-   </analysis>
+        </specialized>
 
-   [
-     {
-       "page_number": "1",
-       "order": 1,
-       "type": "H1",
-       "content": "Annual Report 2024",
-       "top_left": "E3",
-       "bottom_right": "AB4",
-       "confidence": "high",
-       "heading_level": 1
-     },
-     {
-       "page_number": "1",
-       "order": 2,
-       "type": "P",
-       "content": "This report summarizes the key achievements and financial performance of our organization during the 2024 fiscal year...",
-       "top_left": "C6",
-       "bottom_right": "AD10",
-       "confidence": "high"
-     },
-     {
-       "page_number": "1",
-       "order": 3,
-       "type": "Figure",
-       "content": "Bar chart showing quarterly revenue",
-       "top_left": "D12",
-       "bottom_right": "AC24",
-       "confidence": "high",
-       "alt_text": "Bar chart displaying quarterly revenue for 2024: Q1 $2.1M, Q2 $2.4M, Q3 $2.8M, Q4 $3.2M, showing consistent growth throughout the year"
-     },
-     {
-       "page_number": "1",
-       "order": 4,
-       "type": "Caption",
-       "content": "Figure 1: Quarterly Revenue Growth",
-       "top_left": "J25",
-       "bottom_right": "W26",
-       "confidence": "high",
-       "parent_order": 3
-     },
-     {
-       "page_number": "1",
-       "order": 5,
-       "type": "P",
-       "content": "As shown in Figure 1, revenue increased steadily across all quarters, with Q4 representing our strongest performance...",
-       "top_left": "C28",
-       "bottom_right": "AD32",
-       "confidence": "high"
-     },
-     {
-       "page_number": "1",
-       "order": 6,
-       "type": "Artifact",
-       "content": "1",
-       "top_left": "Q35",
-       "bottom_right": "S35",
-       "confidence": "high",
-       "is_artifact": true
-     }
-   ]
-   ]]>
-       </example>
-</output_specification>
+    </response>
+</response_format>

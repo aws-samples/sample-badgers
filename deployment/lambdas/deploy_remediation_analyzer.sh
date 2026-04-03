@@ -43,31 +43,23 @@ echo ""
 echo "=== ECR login ==="
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
-# 3. Copy foundation + config into build context
-echo ""
-echo "=== Preparing build context ==="
-cp -r ./layer/python/foundation ./containers/remediation_analyzer/foundation
-cp -r ./layer/python/config ./containers/remediation_analyzer/config
-
-# 4. Build
+# 3. Build
 echo ""
 echo "=== Building container ==="
 docker build \
   --platform linux/amd64 \
   --provenance=false \
+  --no-cache \
   -t "${ECR_URI}:remediation_analyzer" \
   ./containers/remediation_analyzer
 
-# 5. Clean up build context copies
-rm -rf ./containers/remediation_analyzer/foundation ./containers/remediation_analyzer/config
-
-# 6. Push
+# 4. Push
 echo ""
 echo "=== Pushing to ECR ==="
 docker push "${ECR_URI}:remediation_analyzer"
 echo "✓ Image pushed"
 
-# 7. Update Lambda
+# 5. Update Lambda
 echo ""
 echo "=== Updating Lambda function ==="
 aws lambda update-function-code \

@@ -1,86 +1,116 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 4 (robust_elements) -->
+
 <response_format>
-    <response>
-        <format_type>JSON</format_type>
+    <response analyzer="robust_elements"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-        <structure>
-            <root_object>
-                <field name="page_info" type="object" required="true">
-                    <description>Image dimensions and page identification</description>
-                    <properties>
-                        <property name="page_number" type="string">Page number visible on the page
-                            or
-                            inferred from context</property>
-                        <property name="width" type="integer">[[PIXEL_WIDTH]]</property>
-                        <property name="height" type="integer">[[PIXEL_HEIGHT]]</property>
-                    </properties>
-                </field>
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>robust_elements</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_ELEMENTS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
+            <page_dimensions>
+                <width>{PIXEL_WIDTH}</width>
+                <height>{PIXEL_HEIGHT}</height>
+            </page_dimensions>
+        </metadata>
 
-                <field name="elements" type="array" required="true">
-                    <description>Array of identified structural elements</description>
-                    <item_schema>
-                        <property name="order" type="integer" required="true">
-                            Sequential reading order number (starting at 1)
-                        </property>
-                        <property name="type" type="string" required="true">
-                            Element type (heading, paragraph, table, image, list, footnote, link,
-                            keyword, caption, header, footer)
-                        </property>
-                        <property name="level" type="integer" required="false">
-                            Hierarchical level (for headings: 1, 2, 3, etc.)
-                        </property>
-                        <property name="content" type="string" required="true">
-                            Extracted text content or description
-                        </property>
-                        <property name="bbox" type="object" required="true">
-                            <description>Bounding box coordinates in pixels</description>
-                            <coordinates>
-                                <coord name="x1" type="integer">Left edge x-coordinate</coord>
-                                <coord name="y1" type="integer">Top edge y-coordinate</coord>
-                                <coord name="x2" type="integer">Right edge x-coordinate</coord>
-                                <coord name="y2" type="integer">Bottom edge y-coordinate</coord>
-                            </coordinates>
-                        </property>
-                    </item_schema>
-                </field>
-            </root_object>
-        </structure>
+        <!--
+        ============================================================
+        COMMON SPINE — extract ALL visible text/content in reading order.
+        This is the primary text source for the correlator.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Headings at various levels -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{HEADING_TEXT}</text>
+            </element>
 
-        <example>
-        <![CDATA[
-{
-    "page_info": {
-        "page_number": "1",
-        "width": [[PIXEL_WIDTH]],
-        "height": [[PIXEL_HEIGHT]]
-    },
-    "elements": [
-        {
-            "order": 1,
-            "type": "heading",
-            "level": 1,
-            "content": "Document Title",
-            "bbox": {
-                "x1": 45,
-                "y1": 43,
-                "x2": 450,
-                "y2": 145
-            }
-        },
-        {
-            "order": 2,
-            "type": "paragraph",
-            "content": "This is a paragraph of text.",
-            "bbox": {
-                "x1": 45,
-                "y1": 150,
-                "x2": 500,
-                "y2": 200
-            }
-        }
-    ]
-}
-        ]]>
-    </example>
+            <element id="elem_002" tag="H2" order="2" page="{PAGE}">
+                <text>{SUBHEADING_TEXT}</text>
+            </element>
+
+            <!-- Paragraphs -->
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{PARAGRAPH_TEXT}</text>
+            </element>
+
+            <!-- Images/Figures -->
+            <element id="elem_004" tag="Figure" order="4" page="{PAGE}">
+                <alt_text>{DESCRIPTION_OF_IMAGE_CONTENT}</alt_text>
+                <caption>{CAPTION_IF_ANY}</caption>
+            </element>
+
+            <!-- Tables -->
+            <element id="elem_005" tag="Table" order="5" page="{PAGE}">
+                <text>{ALL_TABLE_CONTENT_AS_TEXT}</text>
+                <caption>{TABLE_CAPTION_IF_ANY}</caption>
+            </element>
+
+            <!-- Lists -->
+            <element id="elem_006" tag="L" order="6" page="{PAGE}">
+                <text>{ALL_LIST_ITEMS_AS_TEXT}</text>
+            </element>
+
+            <!-- Keywords/Links -->
+            <element id="elem_007" tag="Link" order="7" page="{PAGE}">
+                <text>{LINK_TEXT}</text>
+            </element>
+
+            <!-- Footnotes -->
+            <element id="elem_008" tag="Note" order="8" page="{PAGE}">
+                <text>{FOOTNOTE_TEXT}</text>
+            </element>
+
+            <!-- Headers/Footers -->
+            <element id="elem_009" tag="Artifact" order="9" page="{PAGE}">
+                <text>{HEADER_OR_FOOTER_TEXT}</text>
+            </element>
+
+            <!-- Captions -->
+            <element id="elem_010" tag="Caption" order="10" page="{PAGE}">
+                <text>{CAPTION_TEXT}</text>
+            </element>
+
+            <!-- Include ALL text you can see, in reading order -->
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!--
+        ============================================================
+        SPECIALIZED — robust layout analysis with bounding boxes.
+        Provides precise positioning for each element.
+        ============================================================
+        -->
+        <specialized type="robust_elements">
+            <!-- If element_count is 0, omit <elements> section entirely -->
+            <elements>
+                <element type="structural_element">
+                    <type>{heading|paragraph|table|image|list|footnote|link|keyword|caption|header|footer}</type>
+                    <hierarchical_level>{1|2|3|4|5|6 for headings, null for others}</hierarchical_level>
+                    <content>
+                        <description>{BRIEF_DESCRIPTION_OF_ELEMENT: first 200 chars for long content}</description>
+                    </content>
+                    <bounding_box>
+                        <x1>{LEFT_EDGE_X_COORDINATE_IN_PIXELS}</x1>
+                        <y1>{TOP_EDGE_Y_COORDINATE_IN_PIXELS}</y1>
+                        <x2>{RIGHT_EDGE_X_COORDINATE_IN_PIXELS}</x2>
+                        <y2>{BOTTOM_EDGE_Y_COORDINATE_IN_PIXELS}</y2>
+                    </bounding_box>
+                    <confidence>{high|medium|low}</confidence>
+                    <parent_order>{ORDER_NUMBER_OF_PARENT_ELEMENT_FOR_CAPTIONS_NESTED_ITEMS}</parent_order>
+                    <is_artifact>{true|false: true for decorative/non-content elements}</is_artifact>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>
