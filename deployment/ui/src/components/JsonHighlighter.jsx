@@ -33,6 +33,9 @@ export default function JsonHighlighter({ text, theme = 'github-dark' }) {
 
   // Dynamically inject the theme stylesheet
   useEffect(() => {
+    // Validate theme against allowlist to prevent injection via href
+    const safeTheme = THEMES.includes(theme) ? theme : 'github-dark'
+
     // Remove old theme link if present
     const old = document.getElementById('hljs-theme-link')
     if (old) old.remove()
@@ -40,7 +43,7 @@ export default function JsonHighlighter({ text, theme = 'github-dark' }) {
     const link = document.createElement('link')
     link.id = 'hljs-theme-link'
     link.rel = 'stylesheet'
-    link.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/${theme}.min.css`
+    link.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/${safeTheme}.min.css`
     document.head.appendChild(link)
 
     return () => {
