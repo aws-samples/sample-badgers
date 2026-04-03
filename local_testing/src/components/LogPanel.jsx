@@ -1,7 +1,8 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 
 export default function LogPanel({ logs, onClear }) {
   const ref = useRef(null)
+  const logText = useMemo(() => logs.join(''), [logs])
   useEffect(() => { ref.current?.scrollTo(0, ref.current.scrollHeight) }, [logs])
 
   return (
@@ -15,7 +16,7 @@ export default function LogPanel({ logs, onClear }) {
         fontFamily: 'SF Mono, Menlo, monospace', fontSize: 12,
         whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       }}>
-        {logs.join('')}
+        {logText}
       </div>
     </div>
   )

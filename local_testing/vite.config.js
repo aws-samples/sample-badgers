@@ -6,7 +6,20 @@ export default defineConfig({
     server: {
         port: 5174,
         proxy: {
-            '/api': 'http://localhost:3457'
+            '/api': {
+                target: 'http://localhost:3457',
+                configure: (proxy) => {
+                    proxy.on('proxyRes', (proxyRes, _req, res) => {
+                        if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+                            res.setHeader('Content-Type', 'text/event-stream');
+                            res.setHeader('Cache-Control', 'no-cache');
+                            res.setHeader('Connection', 'keep-alive');
+                            res.setHeader('X-Accel-Buffering', 'no');
+                            res.flushHeaders();
+                        }
+                    });
+                },
+            }
         }
     }
 })

@@ -185,14 +185,17 @@ function MyComposer() {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf,image/*'
+  accept = 'application/pdf'
 
   async add({ file }) {
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      throw new Error('Only PDF files are supported')
+    }
     return {
       id: crypto.randomUUID(),
-      type: file.type.startsWith('image/') ? 'image' : 'document',
+      type: 'document',
       name: file.name,
-      contentType: file.type,
+      contentType: 'application/pdf',
       file,
       status: { type: 'requires-action', reason: 'composer-send' },
     }

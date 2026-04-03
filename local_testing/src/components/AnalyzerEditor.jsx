@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const ANALYZER_CATALOG = {
   'Content Extraction': {
@@ -64,6 +64,7 @@ export default function AnalyzerEditor({ dirtyRef }) {
   const [editing, setEditing] = useState({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const loadAbortRef = useRef(null)
 
   useEffect(() => {
     fetch('/api/analyzers').then(r => r.json()).then(setAnalyzers).catch(() => {})
@@ -78,14 +79,21 @@ export default function AnalyzerEditor({ dirtyRef }) {
 
   const loadAnalyzer = async (name) => {
     if (isDirty && !confirm('Unsaved changes. Discard?')) return
+    if (loadAbortRef.current) loadAbortRef.current.abort()
+    const controller = new AbortController()
+    loadAbortRef.current = controller
+
     setSelected(name)
     setSaved(false)
     try {
-      const res = await fetch(`/api/analyzers/${name}/prompts`)
+      const res = await fetch(`/api/analyzers/${name}/prompts`, { signal: controller.signal })
       const data = await res.json()
       setPrompts(data)
       setEditing(data)
-    } catch { setPrompts({}); setEditing({}) }
+    } catch (e) {
+      if (e.name === 'AbortError') return
+      setPrompts({}); setEditing({})
+    }
   }
 
   const save = async () => {
