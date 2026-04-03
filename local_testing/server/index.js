@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { readFileSync, readdirSync, existsSync, mkdirSync, appendFileSync, writeFileSync } from 'fs';
 import { readFile, readdir, appendFile, writeFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
@@ -23,6 +24,10 @@ const LOGS_DIR = resolve(LOCAL_TESTING_DIR, 'logs', 'chat_sessions');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Rate limiting — 100 requests per minute per IP
+const limiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+app.use('/api/', limiter);
 
 // ── Helpers ──
 
@@ -174,6 +179,11 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 app.post('/api/chat', async (req, res) => {
     const { message, session_id, audit_mode, dynamic_tokens } = req.body;
 
+    // Validate session_id to prevent path traversal
+    if (!session_id || !/^[a-zA-Z0-9_-]+$/.test(session_id)) {
+        return res.status(400).json({ error: 'Invalid session_id' });
+    }
+
     // ── Session logging ──
     mkdirSync(LOGS_DIR, { recursive: true });
     const logFile = resolve(LOGS_DIR, `${session_id}.log`);
@@ -322,6 +332,7 @@ app.get('/api/chat-sessions', async (_req, res) => {
 app.get('/api/chat-sessions/:sid', async (req, res) => {
     const sid = req.params.sid.replace(/[^a-zA-Z0-9_-]/g, '');
     const filePath = resolve(LOGS_DIR, `${sid}.log`);
+    if (!filePath.startsWith(LOGS_DIR)) return res.status(403).json({ error: 'Forbidden' });
     try {
         res.json({ content: await readFile(filePath, 'utf-8') });
     } catch { res.json({ content: 'Session not found' }); }
@@ -346,6 +357,7 @@ app.get('/api/analyzers/:name/prompts', async (req, res) => {
     const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
     const manifestPath = resolve(DEPLOY_DIR, 's3_files', 'manifests', `${name}.json`);
     const promptsBase = resolve(DEPLOY_DIR, 's3_files', 'prompts');
+    if (!manifestPath.startsWith(resolve(DEPLOY_DIR, 's3_files', 'manifests'))) return res.status(403).json({ error: 'Forbidden' });
 
     try {
         const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
@@ -375,6 +387,7 @@ app.put('/api/analyzers/:name/prompts', async (req, res) => {
     const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
     const promptsBase = resolve(DEPLOY_DIR, 's3_files', 'prompts');
     const analyzerPromptDir = resolve(promptsBase, name);
+    if (!analyzerPromptDir.startsWith(promptsBase)) return res.status(403).json({ error: 'Forbidden' });
 
     try {
         const edits = req.body || {};
@@ -427,6 +440,9 @@ app.post('/api/observability', async (req, res) => {
     if (!session_id?.trim()) return res.json({ error: 'Please enter a Session ID' });
 
     const sid = session_id.trim();
+    // Sanitize sid for safe embedding in CloudWatch Insights queries
+    const safeSid = sid.replace(/[^a-zA-Z0-9_\-:.]/g, '');
+    if (safeSid !== sid) return res.json({ error: 'Session ID contains invalid characters' });
     const hoursBack = Math.min(Math.max(parseInt(req.body.hours_back) || 24, 1), 720);
     const endTime = Date.now();
     const startTime = endTime - hoursBack * 60 * 60 * 1000;
@@ -446,9 +462,9 @@ app.post('/api/observability', async (req, res) => {
         // Step 1: Find trace IDs
         let results = await cwQuery(
             `fields traceId, name, @timestamp ` +
-            `| filter attributes.\`aws.bedrock.agentcore.session_id\` = '${sid}' ` +
-            `   or attributes.\`session.id\` = '${sid}' ` +
-            `   or attributes.\`rpc.request.metadata.x-amzn-bedrock-agentcore-runtime-session-id\` = '${sid}' ` +
+            `| filter attributes.\`aws.bedrock.agentcore.session_id\` = '${safeSid}' ` +
+            `   or attributes.\`session.id\` = '${safeSid}' ` +
+            `   or attributes.\`rpc.request.metadata.x-amzn-bedrock-agentcore-runtime-session-id\` = '${safeSid}' ` +
             `| stats count() as cnt, min(@timestamp) as first_seen, max(@timestamp) as last_seen by traceId ` +
             `| sort first_seen asc`,
             startTime, endTime, 10000, () => clientDisconnected
@@ -456,7 +472,7 @@ app.post('/api/observability', async (req, res) => {
 
         if (!results.length) {
             results = await cwQuery(
-                `fields traceId, name, @message | filter @message like '${sid}' | stats count() as cnt by traceId | sort cnt desc`,
+                `fields traceId, name, @message | filter @message like '${safeSid}' | stats count() as cnt by traceId | sort cnt desc`,
                 startTime, endTime, 10000, () => clientDisconnected
             );
         }
