@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { execFile, spawn } from 'child_process';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { readFile, writeFile, readdir, stat } from 'fs/promises';
@@ -14,6 +15,10 @@ const S3_FILES_DIR = resolve(DEPLOY_DIR, 's3_files');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
+
+// Rate limiting — 100 requests per minute per IP
+const limiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+app.use('/api/', limiter);
 
 const STACK_PREFIX = 'badgers';
 const STACKS = [
