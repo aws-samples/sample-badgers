@@ -13,11 +13,11 @@
             "category": "Document Processing"
         },
         "page_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Document Processing"
         },
         "layout_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Document Processing"
         },
         "charts_analyzer": {
@@ -29,35 +29,35 @@
             "category": "Visual Content"
         },
         "general_visual_analysis_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Visual Content"
         },
         "war_map_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Visual Content"
         },
         "decision_tree_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Visual Content"
         },
         "editorial_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Text & Language"
         },
         "edu_transcript_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Text & Language"
         },
         "handwriting_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Text & Language"
         },
         "code_block_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Text & Language"
         },
         "keyword_topic_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Text & Language"
         },
         "scientific_analyzer": {
@@ -73,7 +73,7 @@
             "category": "Structured Data"
         },
         "robust_elements_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Structured Data"
         },
         "correlation_analyzer": {
@@ -81,15 +81,15 @@
             "category": "Structured Data"
         },
         "metadata_generic_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Metadata"
         },
         "metadata_mads_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Metadata"
         },
         "metadata_mods_analyzer": {
-            "enabled": true,
+            "enabled": false,
             "category": "Metadata"
         },
         "image_enhancer": {

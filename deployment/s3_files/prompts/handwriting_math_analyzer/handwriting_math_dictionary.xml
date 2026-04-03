@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Dictionary -->
+<handwriting_math_dictionary>
+
+    <!-- Semantic regions found in handwritten math documents -->
+    <semantic_regions>
+        <region type="problem_statement">
+            <description>The original problem as posed — often copied from a textbook or written by an instructor. May begin with directive language ("Graph the function", "Find the inverse", "Solve for x").</description>
+            <indicators>Directive verbs, standalone equations without solution steps, different handwriting or ink color from solution work.</indicators>
+        </region>
+        <region type="definition">
+            <description>A formal or informal mathematical definition, often introduced with "Definition:" or descriptive language explaining a concept.</description>
+            <indicators>Declarative statements about mathematical objects, often in a distinct color or with underlines.</indicators>
+        </region>
+        <region type="theorem_property">
+            <description>A stated mathematical property, theorem, or rule being applied (e.g., "The sum of the measures of the angles of any triangle is 180°").</description>
+            <indicators>Universal statements, often highlighted or in a distinct color, stated without proof.</indicators>
+        </region>
+        <region type="worked_example">
+            <description>A complete worked solution including setup, intermediate steps, and final answer. The core unit of mathematical instruction.</description>
+            <indicators>Labeled with "Example" or numbered, contains a problem followed by step-by-step solution.</indicators>
+        </region>
+        <region type="solution_chain">
+            <description>The step-by-step algebraic or logical progression within a worked example. Each step should follow logically from the previous one.</description>
+            <indicators>Sequential equations or expressions connected by logical operations, aligned vertically or following left-to-right progression.</indicators>
+        </region>
+        <region type="boxed_answer">
+            <description>A final answer that has been visually emphasized — boxed, circled, underlined, or written in a distinct color — to indicate it is the conclusion of a solution.</description>
+            <indicators>Rectangular border, circle, color change, or other visual emphasis around a final expression.</indicators>
+        </region>
+        <region type="annotation">
+            <description>Explanatory text alongside mathematical work — verbal descriptions of steps, reminders, or clarifying notes.</description>
+            <indicators>Natural language text interspersed with or adjacent to mathematical expressions, often in a different color.</indicators>
+        </region>
+        <region type="section_header">
+            <description>A title or heading indicating the topic or section of the notes.</description>
+            <indicators>Larger text, distinct color, underlined, positioned at top of page or before new content blocks.</indicators>
+        </region>
+        <region type="scratch_work">
+            <description>Informal or incomplete calculations not part of the primary solution — side computations, trial values, or exploration.</description>
+            <indicators>Lighter writing, crossed-out content, marginal placement, no clear connection to main solution flow.</indicators>
+        </region>
+    </semantic_regions>
+
+    <!-- Types of mathematical expressions -->
+    <expression_types>
+        <type name="equation">A statement of equality: left-hand side = right-hand side.</type>
+        <type name="inequality">A comparison using &lt;, &gt;, ≤, ≥, or ≠.</type>
+        <type name="function_definition">Defines a function: f(x) = expression.</type>
+        <type name="transformation_description">Verbal or symbolic description of a function transformation (shift, reflect, scale).</type>
+        <type name="proportion">A ratio equality: a/b = c/d, often used in similar triangle problems.</type>
+        <type name="angle_measure">An angle measurement, typically in degrees, using the ∠ symbol.</type>
+        <type name="congruence_similarity">Statements using ≅ (congruent) or ~ (similar) between geometric objects.</type>
+        <type name="set_notation">Domain, range, or set definitions using interval or set-builder notation.</type>
+    </expression_types>
+
+    <!-- Types of geometric figures found in handwritten math -->
+    <figure_types>
+        <type name="coordinate_plane">
+            <description>An x-y axis system with plotted points, curves, or regions.</description>
+            <labeled_elements>axis labels, scale markings, plotted points with coordinates, curve equations, intercepts</labeled_elements>
+        </type>
+        <type name="triangle">
+            <description>A three-sided polygon, often with labeled vertices, side lengths, angle measures, and congruence/similarity marks.</description>
+            <labeled_elements>vertex labels (A, B, C), side lengths, angle measures (degrees), tick marks (equal sides), arc marks (equal angles), altitude/median lines</labeled_elements>
+        </type>
+        <type name="function_graph">
+            <description>The graph of a mathematical function on a coordinate plane, showing shape, key points, and transformations.</description>
+            <labeled_elements>function equation label, vertex/extrema coordinates, intercepts, asymptotes, transformation annotations</labeled_elements>
+        </type>
+        <type name="circle">
+            <description>A circle with potential labels for center, radius, diameter, chords, arcs, or inscribed/circumscribed elements.</description>
+            <labeled_elements>center point, radius length, diameter, arc measures, inscribed angles, tangent lines</labeled_elements>
+        </type>
+        <type name="parallel_lines">
+            <description>Lines marked as parallel (often with arrow marks), typically cut by a transversal showing angle relationships.</description>
+            <labeled_elements>parallel marks, transversal, angle measures, corresponding/alternate angle labels</labeled_elements>
+        </type>
+        <type name="generic_polygon">
+            <description>Any polygon (quadrilateral, pentagon, etc.) with labeled properties.</description>
+            <labeled_elements>vertex labels, side lengths, angle measures, diagonal lengths, special property marks</labeled_elements>
+        </type>
+        <type name="number_line">
+            <description>A one-dimensional representation showing points, intervals, or inequalities.</description>
+            <labeled_elements>scale markings, labeled points, open/closed circles, shaded regions</labeled_elements>
+        </type>
+    </figure_types>
+
+    <!-- Ink color semantic roles commonly found in educational handwritten math -->
+    <color_semantics>
+        <color name="black_pencil">
+            <typical_role>Base content — figures, diagrams, primary problem setup. Often the first layer written.</typical_role>
+        </color>
+        <color name="blue">
+            <typical_role>Solution work, annotations, step-by-step derivations. The most common working ink color.</typical_role>
+        </color>
+        <color name="red">
+            <typical_role>Emphasis, boxed answers, corrections, or important results. Draws attention to final answers or key errors.</typical_role>
+        </color>
+        <color name="green">
+            <typical_role>Section headers, topic labels, or secondary annotations. Often used for organizational structure.</typical_role>
+        </color>
+        <color name="purple">
+            <typical_role>Alternative annotations or tertiary emphasis. Less common, context-dependent.</typical_role>
+        </color>
+        <note>Color roles are conventions, not rules. Actual semantic roles must be inferred from context on each page. Report observed colors and their apparent roles.</note>
+    </color_semantics>
+
+    <!-- Common symbol disambiguation pairs in handwritten math -->
+    <symbol_disambiguation>
+        <pair symbols="x, ×" context="Variable 'x' appears in algebraic expressions; multiplication '×' appears between numbers or is implied."/>
+        <pair symbols="l, 1, |" context="Lowercase 'l' in labels; digit '1' in numbers; absolute value bars '|' around expressions."/>
+        <pair symbols="o, 0, °" context="Letter 'o' in labels; digit '0' in numbers; degree symbol '°' after angle measures."/>
+        <pair symbols="2, z, Z" context="Digit '2' in numbers/exponents; variable 'z' in expressions. Check position and context."/>
+        <pair symbols="(, [" context="Parentheses for grouping or function arguments; brackets for intervals or matrices."/>
+        <pair symbols="−, –, =" context="Minus sign, dash, equals. Distinguished by length, position, and context."/>
+        <pair symbols="∠, &lt;, L" context="Angle symbol before vertex labels; less-than in inequalities; letter L in labels."/>
+        <pair symbols="~, ∼, ≈" context="Tilde for similarity (~); similar-to (∼); approximately equal (≈). Context determines meaning."/>
+        <pair symbols="', ¹, superscript" context="Prime notation f'(x); superscript -1 for inverse f⁻¹(x); exponent. Check function context."/>
+        <pair symbols="√, v, ∨" context="Square root radical; letter 'v' in labels; logical or. Radical has a vinculum (overbar)."/>
+    </symbol_disambiguation>
+
+</handwriting_math_dictionary>

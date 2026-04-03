@@ -37,7 +37,6 @@
             "../shared/gestalt_perception_foundation.xml",
             "handwriting_gestalt.xml",
             "handwriting_context.xml",
-            "handwriting_conversation_example.xml",
             "handwriting_format.xml",
             "handwriting_help.xml",
             "handwriting_job_role.xml",

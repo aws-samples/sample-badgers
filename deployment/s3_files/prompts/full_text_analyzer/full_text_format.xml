@@ -1,43 +1,99 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 3 (full_text) -->
 
 <response_format>
-    <response extraction_type="full_text">
+    <response analyzer="full_text"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>full_text</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_TEXT_ELEMENTS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per text element found -->
-        <!-- Types: header, footer, h1, h2, h3, paragraph, sidebar, footnote, caption, figure,
-        table_content, pull_quote, list -->
-        <elements>
-            <element type="header" id="elem_001" order="1">
+
+        <!--
+        ============================================================
+        COMMON SPINE — extract ALL visible text on this page in
+        reading order. This is the primary full-text extraction.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Page header (if present) -->
+            <element id="elem_001" tag="Artifact" order="1" page="{PAGE}">
                 <text>{PAGE_HEADER_TEXT}</text>
             </element>
 
-            <element type="h1" id="elem_002" order="2">
+            <!-- Main title/heading -->
+            <element id="elem_002" tag="H1" order="2" page="{PAGE}">
                 <text>{MAIN_TITLE}</text>
             </element>
 
-            <element type="paragraph" id="elem_003" order="3">
+            <!-- Subheadings -->
+            <element id="elem_003" tag="H2" order="3" page="{PAGE}">
+                <text>{SECTION_HEADING}</text>
+            </element>
+
+            <!-- Body paragraphs -->
+            <element id="elem_004" tag="P" order="4" page="{PAGE}">
                 <text>{BODY_PARAGRAPH_TEXT}</text>
             </element>
 
-            <element type="figure" id="elem_004" order="4">
-                <caption>{FIGURE_CAPTION}</caption>
-                <alt_text>{BRIEF_DESCRIPTION_OF_VISUAL_CONTENT_FOR_ACCESSIBILITY}</alt_text>
+            <!-- Pull quotes or sidebars -->
+            <element id="elem_005" tag="BlockQuote" order="5" page="{PAGE}">
+                <text>{PULL_QUOTE_TEXT}</text>
             </element>
 
-            <element type="footnote" id="elem_005" order="5" ref="elem_003">
+            <!-- Lists -->
+            <element id="elem_006" tag="L" order="6" page="{PAGE}">
+                <text>{LIST_ITEMS_AS_TEXT}</text>
+            </element>
+
+            <!-- Tables -->
+            <element id="elem_007" tag="Table" order="7" page="{PAGE}">
+                <text>{ALL_TABLE_CONTENT_AS_READABLE_TEXT}</text>
+                <caption>{TABLE_CAPTION_IF_ANY}</caption>
+            </element>
+
+            <!-- Figures -->
+            <element id="elem_008" tag="Figure" order="8" page="{PAGE}">
+                <alt_text>{BRIEF_DESCRIPTION_OF_VISUAL_CONTENT_FOR_ACCESSIBILITY}</alt_text>
+                <caption>{FIGURE_CAPTION}</caption>
+            </element>
+
+            <!-- Footnotes -->
+            <element id="elem_009" tag="Note" order="9" page="{PAGE}" ref="elem_004">
                 <text>{FOOTNOTE_TEXT}</text>
             </element>
 
-            <element type="footer" id="elem_006" order="6">
+            <!-- Page footer (if present) -->
+            <element id="elem_010" tag="Artifact" order="10" page="{PAGE}">
                 <text>{PAGE_FOOTER_TEXT}</text>
             </element>
-        </elements>
+
+            <!-- Include ALL text you can see, in reading order -->
+        </common_spine>
 
         <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!--
+        ============================================================
+        SPECIALIZED — full_text analyzer doesn't typically need
+        specialized enrichment, but structure is here for consistency.
+        ============================================================
+        -->
+        <specialized type="full_text">
+            <!-- Optional: page-level summary or text statistics -->
+            <page_summary>
+                <word_count>{APPROXIMATE_WORD_COUNT}</word_count>
+                <primary_content_type>{article|report|book_page|form|letter|etc}</primary_content_type>
+            </page_summary>
+        </specialized>
+
     </response>
 </response_format>

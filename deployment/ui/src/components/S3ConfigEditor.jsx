@@ -55,14 +55,28 @@ export default function S3ConfigEditor({ runSSE, running, dirtyRef }) {
     return () => { if (dirtyRef) dirtyRef.current = false; };
   }, [isDirty, dirtyRef]);
 
+  const loadAbortRef = useRef(null);
+
   const loadFile = async (path) => {
     if (isDirty && !confirm('You have unsaved changes. Discard them?')) return;
+    // Abort any in-flight load
+    if (loadAbortRef.current) loadAbortRef.current.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+
     setSelected(path); setSaved(false); setParseError(null);
-    const res = await fetch('/api/s3-configs/' + path);
-    const data = await res.json();
-    const text = data.error ? '' : JSON.stringify(data.content, null, 4);
-    setEditText(text);
-    setLastSavedText(text);
+    try {
+      const res = await fetch('/api/s3-configs/' + path, { signal: controller.signal });
+      const data = await res.json();
+      const text = data.error ? '' : JSON.stringify(data.content, null, 4);
+      setEditText(text);
+      setLastSavedText(text);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        setEditText('');
+        setLastSavedText('');
+      }
+    }
   };
 
   const handleEdit = (val) => {

@@ -42,7 +42,6 @@
             "charts_tasks_extraction.xml",
             "charts_format.xml",
             "charts_help.xml",
-            "charts_conversation_example.xml",
             "charts_two_step_verfication_process.xml"
         ],
         "examples_path": "prompts",

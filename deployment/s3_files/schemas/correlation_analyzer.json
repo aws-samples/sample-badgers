@@ -53,9 +53,9 @@
         "outputSchema": {
             "type": "object",
             "properties": {
-                "unified_document_uri": {
+                "correlation_analyzer_uri": {
                     "type": "string",
-                    "description": "S3 URI of the saved unified_document"
+                    "description": "S3 URI of the saved correlation_analyzer output"
                 },
                 "summary": {
                     "type": "string",

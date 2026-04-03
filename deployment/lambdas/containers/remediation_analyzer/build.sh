@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build and deploy script for remediation_analyzer container Lambda
+# Build and deploy script for remediation-analyzer container Lambda
 #
 # Usage:
 #   ./build.sh [OPTIONS]
@@ -71,6 +71,23 @@ if [ -n "$AWS_REGION" ]; then
     AWS_CMD="$AWS_CMD --region $AWS_REGION"
 fi
 
+# ── Assemble build context ──
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Verify required files exist in the build context
+if [ ! -f "$SCRIPT_DIR/pdf_syntax_repair.py" ]; then
+    echo "ERROR: Missing pdf_syntax_repair.py in build context"
+    exit 1
+fi
+
+if [ ! -d "$SCRIPT_DIR/utils" ]; then
+    echo "ERROR: Missing utils/ directory in build context"
+    exit 1
+fi
+
+# Clean __pycache__
+find "$SCRIPT_DIR/utils" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
 echo "==> Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
 docker build --platform linux/amd64 -t "${IMAGE_NAME}:${IMAGE_TAG}" .
 
@@ -108,7 +125,6 @@ IMAGE_URI="${ECR_REPO}:${IMAGE_TAG}"
 echo "==> Image pushed successfully: ${IMAGE_URI}"
 
 if [ "$ACTION" = "update-lambda" ]; then
-    # Prompt for Lambda function name
     read -p "Enter Lambda function name (default: remediation-analyzer): " LAMBDA_FUNCTION_NAME
     LAMBDA_FUNCTION_NAME="${LAMBDA_FUNCTION_NAME:-remediation-analyzer}"
 

@@ -1,7 +1,7 @@
 [
     {
         "name": "analyze_remediation_tool",
-        "description": "PDF accessibility remediation tool that processes entire PDF documents to identify structural elements, apply PDF/UA tags, and generate Section 508 compliant output. Supports correlation-guided tagging when a content spine is provided, with fallback to full vision model analysis.",
+        "description": "PDF accessibility remediation tool that processes entire PDF documents to apply PDF/UA tags and build a structure tree for Section 508 compliance. Uses correlation XML for guided element resolution and content stream tagging.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -21,22 +21,15 @@
                     "type": "string",
                     "description": "Document language code (default: 'en-US')"
                 },
-                "dpi": {
-                    "type": "integer",
-                    "description": "Render DPI for page image analysis (default: 150)"
-                },
                 "correlation_uri": {
                     "type": "string",
                     "description": "S3 URI to correlation XML content spine for guided element resolution"
-                },
-                "aws_profile": {
-                    "type": "string",
-                    "description": "Optional AWS profile name for Bedrock authentication"
                 }
             },
             "required": [
                 "pdf_path",
-                "session_id"
+                "session_id",
+                "correlation_uri"
             ]
         },
         "outputSchema": {
@@ -44,7 +37,7 @@
             "properties": {
                 "result": {
                     "type": "object",
-                    "description": "Remediation result containing tagged PDF path, analysis, and accessibility report",
+                    "description": "Remediation result containing tagged PDF path and tagging statistics",
                     "properties": {
                         "output_pdf": {
                             "type": "string",
@@ -54,25 +47,43 @@
                             "type": "integer",
                             "description": "Number of pages processed"
                         },
-                        "analysis": {
-                            "type": "array",
-                            "description": "Per-page element detection results"
+                        "total_mcids": {
+                            "type": "integer",
+                            "description": "Total marked content IDs inserted into content streams"
                         },
-                        "correlation_used": {
-                            "type": "boolean",
-                            "description": "Whether correlation data was used for tagging"
+                        "total_struct_elems": {
+                            "type": "integer",
+                            "description": "Total structure elements built in the structure tree"
                         },
-                        "accessibility_report": {
+                        "syntax_repair": {
                             "type": "object",
-                            "description": "Pre and post remediation compliance audit"
+                            "description": "PDF syntax repair pass results",
+                            "properties": {
+                                "applied": {
+                                    "type": "boolean",
+                                    "description": "Whether any repair was applied"
+                                },
+                                "pass1_ok": {
+                                    "type": "boolean",
+                                    "description": "Whether pass 1 (xref/stream repair) succeeded"
+                                },
+                                "pass2_ok": {
+                                    "type": "boolean",
+                                    "description": "Whether pass 2 (linearization cleanup) succeeded"
+                                },
+                                "size_delta": {
+                                    "type": "integer",
+                                    "description": "Byte size change from repair"
+                                },
+                                "logs": {
+                                    "type": "array",
+                                    "description": "Repair log messages"
+                                }
+                            }
                         },
                         "s3_output_uri": {
                             "type": "string",
                             "description": "S3 URI of the uploaded tagged PDF (when OUTPUT_BUCKET is configured)"
-                        },
-                        "s3_report_uri": {
-                            "type": "string",
-                            "description": "S3 URI of the uploaded accessibility report JSON"
                         }
                     }
                 },
@@ -81,10 +92,6 @@
                 },
                 "session_id": {
                     "type": "string"
-                },
-                "compliance": {
-                    "type": "string",
-                    "description": "Post-remediation compliance level"
                 }
             }
         }

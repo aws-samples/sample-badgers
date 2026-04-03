@@ -120,7 +120,7 @@
             <rule>Pass the full_text S3 URI as full_text_uri.</rule>
             <rule>Pass the elements S3 URI AND any specialized analyzer results in the analyzer_uris array.</rule>
             <rule>The correlator merges full_text verbatim content with elements structural hierarchy and any specialized enrichments into a single hierarchical document tree.</rule>
-            <rule>It returns a unified_document S3 URI and summary — report the summary to the user, do NOT output the full XML.</rule>
+            <rule>It returns a correlation_analyzer S3 URI and summary — report the summary to the user, do NOT output the full XML.</rule>
         </step>
         <step number="6">Provide conversational summary of findings to user</step>
         <step number="7">If error occurs, report error clearly and stop - do not attempt workarounds</step>
@@ -185,7 +185,7 @@
 }
                 ]]>
             </example>
-            <response>The tool returns unified_document_uri and summary. Report the summary to the user. Do NOT output the full unified_document XML in chat.</response>
+            <response>The tool returns correlation_analyzer_uri and summary. Report the summary to the user. Do NOT output the full correlation_analyzer XML in chat.</response>
         </tool_usage>
     </correlation_instructions>
 

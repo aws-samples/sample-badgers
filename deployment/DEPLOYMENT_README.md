@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | [Frontend](../frontend/FRONTEND_README.md) | 🔵 **Deployment** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Lambda Analyzers](lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Analyzer Wizard](../frontend/ANALYZER_CREATION_WIZARD.md)</sub>
+<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | [Local Testing](../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](ui/DEPLOYMENT_UI_README.md) | 🔵 **Deployment** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Lambda Analyzers](lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -91,7 +91,7 @@ cd ..
 | ------------------------------- | -------------------------- | ----------------------------------------- | ---------------------------------------- |
 | `build_foundation_layer.sh`     | `layer.zip`                | Core analyzer framework, AWS SDK, Pillow  | All Lambda analyzers                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion | `pdf_to_images_converter`                |
-| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation     | `remediation_analyzer`                   |
+| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation     | Non-container analyzers needing PDF libs |
 | `build_container_lambdas.sh`    | ECR images                 | Container images for complex analyzers    | `image_enhancer`, `remediation_analyzer` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
@@ -210,7 +210,7 @@ deployment/
 │   ├── prompts/
 │   ├── schemas/
 │   └── wrappers/
-└── badgers-foundation/       # 🏗️ Shared analyzer framework
+├── badgers-foundation/       # 🏗️ Shared analyzer framework (used by non-container analyzers and image_enhancer)
 ```
 
 ## 📋 Analyzer Manifest Configuration
@@ -311,7 +311,7 @@ s3://{config-bucket}/
 
 ### Workflow
 
-1. **Create analyzer** via wizard UI (`frontend/analyzer_wizard.py`)
+1. **Create analyzer** via the 🧙 Create Analyzer tab in the [Local Testing UI](../local_testing/LOCAL_TESTING_README.md)
    - Wizard uploads files to S3 under `custom-analyzers/` prefix
 
 2. **Sync to local** for CDK deployment:
@@ -337,7 +337,7 @@ The custom stack:
 | Base   | Read-only by default, toggle to enable with warning |
 | Custom | Always editable                                     |
 
-See [Analyzer Wizard](../frontend/ANALYZER_CREATION_WIZARD.md) for detailed usage.
+See the 🧙 Create Analyzer tab in the [Local Testing UI](../local_testing/LOCAL_TESTING_README.md) for detailed usage.
 
 ## 🔄 Redeploying
 

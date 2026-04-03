@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Frontend](../../frontend/FRONTEND_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Analyzers](../lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Local Testing](../../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](../ui/DEPLOYMENT_UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Analyzers](../lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 

@@ -52,3 +52,8 @@ test_*.py
 *.log
 .env
 .env.*
+
+# Notebook artifacts
+*.ipynb
+inputs/
+outputs/

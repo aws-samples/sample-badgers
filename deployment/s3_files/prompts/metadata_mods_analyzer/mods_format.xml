@@ -1,150 +1,212 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + MODS Library Standard -->
+
 <response_format>
-    <response>
-        <xml_declaration>&lt;?xml version="1.0" encoding="UTF-8"?&gt;</xml_declaration>
-        <namespace_declarations>
-            <namespace>xmlns="http://www.loc.gov/mods/v3"</namespace>
-            <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
-            <namespace>xsi:schemaLocation="http://www.loc.gov/mods/v3
-                http://www.loc.gov/standards/mods/v3/mods-3-8.xsd"</namespace>
-        </namespace_declarations>
+    <response analyzer="metadata_mods"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-        <output_format>
-            <page_number_note>Include page_number element at the start of the MODS record as a note
-                element</page_number_note>
-            <sample>
-                &lt;mods xmlns="http://www.loc.gov/mods/v3"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://www.loc.gov/mods/v3
-                http://www.loc.gov/standards/mods/v3/mods-3-8.xsd" version="3.8"&gt;
-                &lt;note
-                type="source_page"&gt;{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}&lt;/note&gt;
-                &lt;titleInfo&gt;
-                &lt;title&gt;{DOCUMENT_TITLE}&lt;/title&gt;
-                &lt;subTitle&gt;{SUBTITLE}&lt;/subTitle&gt;
-                &lt;/titleInfo&gt;
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>metadata_mods</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_METADATA_ELEMENTS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
 
-                &lt;name type="personal"&gt;
-                &lt;namePart&gt;{AUTHOR_NAME}&lt;/namePart&gt;
-                &lt;role&gt;
-                &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
-                &lt;/role&gt;
-                &lt;/name&gt;
+        <!--
+        ============================================================
+        COMMON SPINE — extract visible text that informed the MODS
+        metadata extraction (title, authors, abstract, subjects, etc.)
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Document title -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{DOCUMENT_TITLE}</text>
+            </element>
 
-                &lt;name type="corporate"&gt;
-                &lt;namePart&gt;{ORGANIZATION_NAME}&lt;/namePart&gt;
-                &lt;role&gt;
-                &lt;roleTerm type="text"&gt;publisher&lt;/roleTerm&gt;
-                &lt;/role&gt;
-                &lt;/name&gt;
+            <!-- Authors/creators -->
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{AUTHOR_OR_CREATOR_NAMES}</text>
+            </element>
 
-                &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
-                &lt;genre&gt;{DOCUMENT_TYPE}&lt;/genre&gt;
+            <!-- Abstract/summary -->
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{ABSTRACT_TEXT}</text>
+            </element>
 
-                &lt;originInfo&gt;
-                &lt;publisher&gt;{PUBLISHER}&lt;/publisher&gt;
-                &lt;dateIssued encoding="w3cdtf"&gt;{YYYY-MM-DD}&lt;/dateIssued&gt;
-                &lt;place&gt;
-                &lt;placeTerm type="text"&gt;{LOCATION}&lt;/placeTerm&gt;
-                &lt;/place&gt;
-                &lt;/originInfo&gt;
+            <!-- Publisher/origin info -->
+            <element id="elem_004" tag="P" order="4" page="{PAGE}">
+                <text>{PUBLISHER_AND_DATE_INFO}</text>
+            </element>
 
-                &lt;physicalDescription&gt;
-                &lt;internetMediaType&gt;application/pdf&lt;/internetMediaType&gt;
-                &lt;extent&gt;{PAGE_COUNT} pages&lt;/extent&gt;
-                &lt;/physicalDescription&gt;
+            <!-- Subject terms -->
+            <element id="elem_005" tag="P" order="5" page="{PAGE}">
+                <text>{SUBJECT_KEYWORDS}</text>
+            </element>
 
-                &lt;abstract&gt;{DOCUMENT_SUMMARY}&lt;/abstract&gt;
+            <!-- Include all text relevant to bibliographic metadata -->
+        </common_spine>
 
-                &lt;subject&gt;
-                &lt;topic&gt;{TOPIC_1}&lt;/topic&gt;
-                &lt;/subject&gt;
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-                &lt;subject&gt;
-                &lt;topic&gt;{TOPIC_2}&lt;/topic&gt;
-                &lt;/subject&gt;
+        <!--
+        ============================================================
+        SPECIALIZED — Library of Congress MODS (Metadata Object
+        Description Schema) v3.8 standard format output.
+        Preserves the official MODS XML structure for library systems.
+        ============================================================
+        -->
+        <specialized type="mods" format="Library of Congress MODS v3.8">
 
-                &lt;identifier type="doi"&gt;{DOI}&lt;/identifier&gt;
-                &lt;identifier type="uri"&gt;{URL}&lt;/identifier&gt;
+            <mods_output_instructions>
+                <format>Output valid MODS XML conforming to http://www.loc.gov/standards/mods/v3/mods-3-8.xsd</format>
+                <page_number_note>Include source page number as a note element with type="source_page" at the start of the MODS record</page_number_note>
+                <namespace_declarations>
+                    <namespace>xmlns="http://www.loc.gov/mods/v3"</namespace>
+                    <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
+                    <namespace>xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd"</namespace>
+                </namespace_declarations>
+            </mods_output_instructions>
 
-                &lt;language&gt;
-                &lt;languageTerm type="code" authority="iso639-2b"&gt;eng&lt;/languageTerm&gt;
-                &lt;/language&gt;
+            <mods_sample_structure>
+                <![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<mods xmlns="http://www.loc.gov/mods/v3"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.loc.gov/mods/v3 http://www.loc.gov/standards/mods/v3/mods-3-8.xsd"
+      version="3.8">
+    <note type="source_page">{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</note>
+    <titleInfo>
+        <title>{DOCUMENT_TITLE}</title>
+        <subTitle>{SUBTITLE}</subTitle>
+    </titleInfo>
+    <name type="personal">
+        <namePart>{AUTHOR_NAME}</namePart>
+        <role>
+            <roleTerm type="text">author</roleTerm>
+        </role>
+    </name>
+    <name type="corporate">
+        <namePart>{ORGANIZATION_NAME}</namePart>
+        <role>
+            <roleTerm type="text">publisher</roleTerm>
+        </role>
+    </name>
+    <typeOfResource>text</typeOfResource>
+    <genre>{DOCUMENT_TYPE}</genre>
+    <originInfo>
+        <publisher>{PUBLISHER}</publisher>
+        <dateIssued encoding="w3cdtf">{YYYY-MM-DD}</dateIssued>
+        <place>
+            <placeTerm type="text">{LOCATION}</placeTerm>
+        </place>
+    </originInfo>
+    <physicalDescription>
+        <internetMediaType>application/pdf</internetMediaType>
+        <extent>{PAGE_COUNT} pages</extent>
+    </physicalDescription>
+    <abstract>{DOCUMENT_SUMMARY}</abstract>
+    <subject>
+        <topic>{TOPIC_1}</topic>
+    </subject>
+    <subject>
+        <topic>{TOPIC_2}</topic>
+    </subject>
+    <identifier type="doi">{DOI}</identifier>
+    <identifier type="uri">{URL}</identifier>
+    <language>
+        <languageTerm type="code" authority="iso639-2b">eng</languageTerm>
+    </language>
+    <note>{ADDITIONAL_INFORMATION}</note>
+    <recordInfo>
+        <recordCreationDate encoding="w3cdtf">{YYYY-MM-DD}</recordCreationDate>
+        <recordContentSource>{SOURCE}</recordContentSource>
+        <languageOfCataloging>
+            <languageTerm type="code" authority="iso639-2b">eng</languageTerm>
+        </languageOfCataloging>
+    </recordInfo>
+</mods>
+                ]]>
+            </mods_sample_structure>
 
-                &lt;note&gt;{ADDITIONAL_INFORMATION}&lt;/note&gt;
+            <common_document_templates>
+                <report>
+                    <description>Use for technical reports, research reports, and organizational documents</description>
+                    <template>
+                        <![CDATA[
+<mods version="3.8">
+    <titleInfo>
+        <title>{REPORT_TITLE}</title>
+    </titleInfo>
+    <name type="corporate">
+        <namePart>{AUTHORING_ORGANIZATION}</namePart>
+        <role>
+            <roleTerm type="text">author</roleTerm>
+        </role>
+    </name>
+    <typeOfResource>text</typeOfResource>
+    <genre>report</genre>
+    <originInfo>
+        <publisher>{PUBLISHER}</publisher>
+        <dateIssued>{YEAR}</dateIssued>
+    </originInfo>
+</mods>
+                        ]]>
+                    </template>
+                </report>
 
-                &lt;recordInfo&gt;
-                &lt;recordCreationDate encoding="w3cdtf"&gt;{YYYY-MM-DD}&lt;/recordCreationDate&gt;
-                &lt;recordContentSource&gt;{SOURCE}&lt;/recordContentSource&gt;
-                &lt;languageOfCataloging&gt;
-                &lt;languageTerm type="code" authority="iso639-2b"&gt;eng&lt;/languageTerm&gt;
-                &lt;/languageOfCataloging&gt;
-                &lt;/recordInfo&gt;
-                &lt;/mods&gt;
-            </sample>
-        </output_format>
+                <guideline>
+                    <description>Use for guidelines, standards, and procedural documents</description>
+                    <template>
+                        <![CDATA[
+<mods version="3.8">
+    <titleInfo>
+        <title>{GUIDELINE_TITLE}</title>
+    </titleInfo>
+    <name type="corporate">
+        <namePart>{ISSUING_ORGANIZATION}</namePart>
+        <role>
+            <roleTerm type="text">creator</roleTerm>
+        </role>
+    </name>
+    <typeOfResource>text</typeOfResource>
+    <genre>guideline</genre>
+    <abstract>{GUIDELINE_SCOPE}</abstract>
+    <note type="version">{VERSION_INFO}</note>
+</mods>
+                        ]]>
+                    </template>
+                </guideline>
 
-        <common_document_templates>
-            <report>
-                <template>
-                    &lt;mods version="3.8"&gt;
-                    &lt;titleInfo&gt;
-                    &lt;title&gt;{REPORT_TITLE}&lt;/title&gt;
-                    &lt;/titleInfo&gt;
-                    &lt;name type="corporate"&gt;
-                    &lt;namePart&gt;{AUTHORING_ORGANIZATION}&lt;/namePart&gt;
-                    &lt;role&gt;
-                    &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
-                    &lt;/role&gt;
-                    &lt;/name&gt;
-                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
-                    &lt;genre&gt;report&lt;/genre&gt;
-                    &lt;originInfo&gt;
-                    &lt;publisher&gt;{PUBLISHER}&lt;/publisher&gt;
-                    &lt;dateIssued&gt;{YEAR}&lt;/dateIssued&gt;
-                    &lt;/originInfo&gt;
-                    &lt;/mods&gt;
-                </template>
-            </report>
+                <article>
+                    <description>Use for journal articles, research papers, and scholarly publications</description>
+                    <template>
+                        <![CDATA[
+<mods version="3.8">
+    <titleInfo>
+        <title>{ARTICLE_TITLE}</title>
+    </titleInfo>
+    <name type="personal">
+        <namePart>{AUTHOR_NAME}</namePart>
+        <role>
+            <roleTerm type="text">author</roleTerm>
+        </role>
+    </name>
+    <typeOfResource>text</typeOfResource>
+    <genre>article</genre>
+    <abstract>{ABSTRACT}</abstract>
+</mods>
+                        ]]>
+                    </template>
+                </article>
+            </common_document_templates>
 
-            <guideline>
-                <template>
-                    &lt;mods version="3.8"&gt;
-                    &lt;titleInfo&gt;
-                    &lt;title&gt;{GUIDELINE_TITLE}&lt;/title&gt;
-                    &lt;/titleInfo&gt;
-                    &lt;name type="corporate"&gt;
-                    &lt;namePart&gt;{ISSUING_ORGANIZATION}&lt;/namePart&gt;
-                    &lt;role&gt;
-                    &lt;roleTerm type="text"&gt;creator&lt;/roleTerm&gt;
-                    &lt;/role&gt;
-                    &lt;/name&gt;
-                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
-                    &lt;genre&gt;guideline&lt;/genre&gt;
-                    &lt;abstract&gt;{GUIDELINE_SCOPE}&lt;/abstract&gt;
-                    &lt;note type="version"&gt;{VERSION_INFO}&lt;/note&gt;
-                    &lt;/mods&gt;
-                </template>
-            </guideline>
+        </specialized>
 
-            <article>
-                <template>
-                    &lt;mods version="3.8"&gt;
-                    &lt;titleInfo&gt;
-                    &lt;title&gt;{ARTICLE_TITLE}&lt;/title&gt;
-                    &lt;/titleInfo&gt;
-                    &lt;name type="personal"&gt;
-                    &lt;namePart&gt;{AUTHOR_NAME}&lt;/namePart&gt;
-                    &lt;role&gt;
-                    &lt;roleTerm type="text"&gt;author&lt;/roleTerm&gt;
-                    &lt;/role&gt;
-                    &lt;/name&gt;
-                    &lt;typeOfResource&gt;text&lt;/typeOfResource&gt;
-                    &lt;genre&gt;article&lt;/genre&gt;
-                    &lt;abstract&gt;{ABSTRACT}&lt;/abstract&gt;
-                    &lt;/mods&gt;
-                </template>
-            </article>
-        </common_document_templates>
     </response>
 </response_format>
