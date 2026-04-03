@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Frontend](../../frontend/FRONTEND_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Analyzers** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Analyzer Wizard](../../frontend/ANALYZER_CREATION_WIZARD.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Local Testing](../../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](../ui/DEPLOYMENT_UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Analyzers** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -13,12 +13,12 @@ This document explains how Lambda analyzers work in BADGERS—their anatomy, req
 
 BADGERS uses four types of Lambda functions:
 
-| Type                    | Purpose                                     | Example                                      |
-| ----------------------- | ------------------------------------------- | -------------------------------------------- |
-| 🔍 **Vision Analyzers**  | Analyze images using Bedrock vision models  | `full_text_analyzer`, `table_analyzer`, etc. |
-| 🐳 **Container Lambdas** | ML-based processing requiring large deps    | `image_enhancer`, `remediation_analyzer`     |
-| 🔧 **Utilities**         | Transform or prepare data                   | `pdf_to_images_converter`                    |
-| 🔗 **Correlators**       | Correlate outputs across analyzers per page | `correlation_analyzer`                       |
+| Type                    | Purpose                                             | Example                                      |
+| ----------------------- | --------------------------------------------------- | -------------------------------------------- |
+| 🔍 **Vision Analyzers**  | Analyze images using Bedrock vision models          | `full_text_analyzer`, `table_analyzer`, etc. |
+| 🐳 **Container Lambdas** | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_analyzer`     |
+| 🔧 **Utilities**         | Transform or prepare data                           | `pdf_to_images_converter`                    |
+| 🔗 **Correlators**       | Correlate outputs across analyzers per page         | `correlation_analyzer`                       |
 
 ---
 
@@ -311,7 +311,7 @@ cd frontend
 uv run python main.py
 ```
 
-The [Analyzer Creation Wizard](../../frontend/ANALYZER_CREATION_WIZARD.md) is available as a tab in the multi-page Gradio app.
+The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [Local Testing UI](../../local_testing/LOCAL_TESTING_README.md).
 
 **Option 2: Manual Creation**
 

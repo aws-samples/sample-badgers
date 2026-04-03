@@ -1,98 +1,162 @@
+<!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + MADS Library Standard -->
+
 <response_format>
-    <response>
-        <xml_declaration>&#60;?xml version="1.0" encoding="UTF-8"?&#62;</xml_declaration>
-        <namespace_declarations>
-            <namespace>xmlns:mads="http://www.loc.gov/mads/v2"</namespace>
-            <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
-            <namespace>xmlns:xlink="http://www.w3.org/1999/xlink"</namespace>
-            <namespace>xsi:schemaLocation="http://www.loc.gov/mads/v2
-                http://www.loc.gov/standards/mads/v2/mads-2-1.xsd"</namespace>
-        </namespace_declarations>
+    <response analyzer="metadata_mads"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
 
-        <output_format>
-            <page_number_note>Include source page number as a note element in the MADS record</page_number_note>
-            <sample>
-                &#60;mads xmlns="http://www.loc.gov/mads/v2"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns:xlink="http://www.w3.org/1999/xlink"
-                xsi:schemaLocation="http://www.loc.gov/mads/v2
-                http://www.loc.gov/standards/mads/v2/mads-2-1.xsd" version="2.1"&#62;
-                &#60;note
-                type="source_page"&#62;{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}&#60;/note&#62;
-                &#60;authority&#62;
-                &#60;name type="personal"&#62;
-                &#60;namePart type="family"&#62;{FAMILY_NAME}&#60;/namePart&#62;
-                &#60;namePart type="given"&#62;{GIVEN_NAME}&#60;/namePart&#62;
-                &#60;namePart type="date"&#62;{DATES}&#60;/namePart&#62;
-                &#60;/name&#62;
-                &#60;/authority&#62;
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>metadata_mads</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>{NUMBER_OF_AUTHORITY_ENTITIES_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
 
-                &#60;personInfo&#62;
-                &#60;fieldOfEndeavor&#62;{FIELD_OF_ENDEAVOR}&#60;/fieldOfEndeavor&#62;
-                &#60;/personInfo&#62;
+        <!--
+        ============================================================
+        COMMON SPINE — extract visible text that informed the MADS
+        metadata extraction (names, locations, topics, etc.)
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Names extracted -->
+            <element id="elem_001" tag="P" order="1" page="{PAGE}">
+                <text>{PERSONAL_OR_CORPORATE_NAME_TEXT}</text>
+            </element>
 
-                &#60;variant type="other"&#62;
-                &#60;name type="personal"&#62;
-                &#60;namePart&#62;{VARIANT_NAME}&#60;/namePart&#62;
-                &#60;/name&#62;
-                &#60;/variant&#62;
+            <!-- Geographic terms -->
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{GEOGRAPHIC_NAME_TEXT}</text>
+            </element>
 
-                &#60;related type="other" otherType="{RELATIONSHIP_TYPE}"&#62;
-                &#60;name type="{RELATED_ENTITY_TYPE}"&#62;
-                &#60;namePart&#62;{RELATED_ENTITY_NAME}&#60;/namePart&#62;
-                &#60;/name&#62;
-                &#60;/related&#62;
+            <!-- Topic terms -->
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{TOPIC_TEXT}</text>
+            </element>
 
-                &#60;recordInfo&#62;
-                &#60;recordCreationDate
-                encoding="w3cdtf"&#62;{CREATION_DATE}&#60;/recordCreationDate&#62;
-                &#60;recordContentSource&#62;{CONTENT_SOURCE}&#60;/recordContentSource&#62;
-                &#60;languageOfCataloging&#62;
-                &#60;languageTerm type="code" authority="iso639-2b"&#62;eng&#60;/languageTerm&#62;
-                &#60;/languageOfCataloging&#62;
-                &#60;/recordInfo&#62;
-                &#60;/mads&#62;
-            </sample>
-        </output_format>
+            <!-- Include all text relevant to authority metadata -->
+        </common_spine>
 
-        <common_entity_templates>
-            <personal_name>
-                <template>
-                    &#60;authority&#62;
-                    &#60;name type="personal"&#62;
-                    &#60;namePart type="family"&#62;{FAMILY_NAME}&#60;/namePart&#62;
-                    &#60;namePart type="given"&#62;{GIVEN_NAME}&#60;/namePart&#62;
-                    &#60;namePart type="date"&#62;{DATES}&#60;/namePart&#62;
-                    &#60;/name&#62;
-                    &#60;/authority&#62;
-                </template>
-            </personal_name>
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
 
-            <corporate_name>
-                <template>
-                    &#60;authority&#62;
-                    &#60;name type="corporate"&#62;
-                    &#60;namePart&#62;{CORPORATE_NAME}&#60;/namePart&#62;
-                    &#60;/name&#62;
-                    &#60;/authority&#62;
-                </template>
-            </corporate_name>
+        <!--
+        ============================================================
+        SPECIALIZED — Library of Congress MADS (Metadata Authority
+        Description Schema) v2.1 standard format output.
+        Preserves the official MADS XML structure for library systems.
+        ============================================================
+        -->
+        <specialized type="mads" format="Library of Congress MADS v2.1">
 
-            <geographic>
-                <template>
-                    &#60;authority&#62;
-                    &#60;geographic&#62;{GEOGRAPHIC_NAME}&#60;/geographic&#62;
-                    &#60;/authority&#62;
-                </template>
-            </geographic>
+            <mads_output_instructions>
+                <format>Output valid MADS XML conforming to http://www.loc.gov/standards/mads/v2/mads-2-1.xsd</format>
+                <page_number_note>Include source page number as a note element with type="source_page" in the MADS record</page_number_note>
+                <namespace_declarations>
+                    <namespace>xmlns:mads="http://www.loc.gov/mads/v2"</namespace>
+                    <namespace>xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"</namespace>
+                    <namespace>xmlns:xlink="http://www.w3.org/1999/xlink"</namespace>
+                    <namespace>xsi:schemaLocation="http://www.loc.gov/mads/v2 http://www.loc.gov/standards/mads/v2/mads-2-1.xsd"</namespace>
+                </namespace_declarations>
+            </mads_output_instructions>
 
-            <topic>
-                <template>
-                    &#60;authority&#62;
-                    &#60;topic&#62;{TOPIC_TERM}&#60;/topic&#62;
-                    &#60;/authority&#62;
-                </template>
-            </topic>
-        </common_entity_templates>
+            <mads_sample_structure>
+                <![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<mads xmlns="http://www.loc.gov/mads/v2"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xsi:schemaLocation="http://www.loc.gov/mads/v2 http://www.loc.gov/standards/mads/v2/mads-2-1.xsd"
+      version="2.1">
+    <note type="source_page">{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</note>
+    <authority>
+        <name type="personal">
+            <namePart type="family">{FAMILY_NAME}</namePart>
+            <namePart type="given">{GIVEN_NAME}</namePart>
+            <namePart type="date">{DATES}</namePart>
+        </name>
+    </authority>
+    <personInfo>
+        <fieldOfEndeavor>{FIELD_OF_ENDEAVOR}</fieldOfEndeavor>
+    </personInfo>
+    <variant type="other">
+        <name type="personal">
+            <namePart>{VARIANT_NAME}</namePart>
+        </name>
+    </variant>
+    <related type="other" otherType="{RELATIONSHIP_TYPE}">
+        <name type="{RELATED_ENTITY_TYPE}">
+            <namePart>{RELATED_ENTITY_NAME}</namePart>
+        </name>
+    </related>
+    <recordInfo>
+        <recordCreationDate encoding="w3cdtf">{CREATION_DATE}</recordCreationDate>
+        <recordContentSource>{CONTENT_SOURCE}</recordContentSource>
+        <languageOfCataloging>
+            <languageTerm type="code" authority="iso639-2b">eng</languageTerm>
+        </languageOfCataloging>
+    </recordInfo>
+</mads>
+                ]]>
+            </mads_sample_structure>
+
+            <common_entity_templates>
+                <personal_name>
+                    <description>Use for persons, including authors, subjects, and related entities</description>
+                    <template>
+                        <![CDATA[
+<authority>
+    <name type="personal">
+        <namePart type="family">{FAMILY_NAME}</namePart>
+        <namePart type="given">{GIVEN_NAME}</namePart>
+        <namePart type="date">{DATES}</namePart>
+    </name>
+</authority>
+                        ]]>
+                    </template>
+                </personal_name>
+
+                <corporate_name>
+                    <description>Use for organizations, institutions, and corporate bodies</description>
+                    <template>
+                        <![CDATA[
+<authority>
+    <name type="corporate">
+        <namePart>{CORPORATE_NAME}</namePart>
+    </name>
+</authority>
+                        ]]>
+                    </template>
+                </corporate_name>
+
+                <geographic>
+                    <description>Use for place names and geographic locations</description>
+                    <template>
+                        <![CDATA[
+<authority>
+    <geographic>{GEOGRAPHIC_NAME}</geographic>
+</authority>
+                        ]]>
+                    </template>
+                </geographic>
+
+                <topic>
+                    <description>Use for subject terms and topical concepts</description>
+                    <template>
+                        <![CDATA[
+<authority>
+    <topic>{TOPIC_TERM}</topic>
+</authority>
+                        ]]>
+                    </template>
+                </topic>
+            </common_entity_templates>
+
+        </specialized>
+
     </response>
 </response_format>

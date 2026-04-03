@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Help -->
+<handwriting_math_help>
+
+    <critical_instructions>
+        <item>Analyze ONLY the final image provided for analysis. NEVER analyze any of the example images provided earlier.</item>
+        <item>Absence of handwritten mathematical content is a valid outcome. Do not force transcription or formula identification if none is present.</item>
+        <item>When in doubt about a symbol, do NOT guess. Mark uncertain symbols with confidence indicators and provide alternative readings.</item>
+        <item>NEVER transcribe printed text, typed text, or watermarks as handwritten content.</item>
+        <item>NEVER silently correct mathematical errors. Transcribe what is written, then flag errors separately.</item>
+        <item>Every LaTeX expression you produce must be syntactically valid. If you cannot confidently produce valid LaTeX for an expression, describe it in natural language instead.</item>
+        <item>Geometric figure extraction requires exhaustive label capture. Missing a single vertex label or side measurement is a significant omission.</item>
+    </critical_instructions>
+
+    <handwritten_math_definition>
+        <item>Handwritten mathematical content is any mathematical notation, expression, equation, figure, or annotation created by human hand using writing implements.</item>
+        <item>This includes: algebraic equations, geometric proofs, function definitions, graphed curves, labeled geometric figures, proportion setups, transformation descriptions, and verbal mathematical reasoning.</item>
+        <item>Mathematical handwriting shows the same stroke variation, pressure patterns, and personal character formation as non-mathematical handwriting, but with the additional complexity of mathematical symbol systems.</item>
+        <item>Handwritten math often mixes mathematical notation with natural language (e.g., "Solve for y:", "shift 2 units up"), and both must be captured.</item>
+    </handwritten_math_definition>
+
+    <analysis_methodology>
+        <math_specific_morphology>
+            <item>Mathematical handwriting uses the spatial dimension more aggressively than regular text: superscripts, subscripts, fraction bars, radical vinculums, and matrix arrangements all encode meaning through position.</item>
+            <item>The VERTICAL POSITION of a character relative to the baseline determines its role: baseline = normal, elevated-and-small = exponent, lowered-and-small = subscript, centered-between-lines = fraction numerator/denominator.</item>
+            <item>HORIZONTAL SPACING encodes grouping: tighter spacing within a term (e.g., "2x"), wider spacing between terms (e.g., "2x + 3").</item>
+            <item>LINE THICKNESS may vary by writing implement: pencil (lighter, variable) vs. pen (darker, more consistent). This distinguishes construction lines from solution work.</item>
+        </math_specific_morphology>
+
+        <symbol_resolution_strategy>
+            <item>First attempt: morphological identification based on stroke patterns alone.</item>
+            <item>Second attempt: compare against writer's exemplar characters from elsewhere on the page.</item>
+            <item>Third attempt: apply mathematical context — which interpretation makes the expression mathematically valid?</item>
+            <item>Fourth attempt: apply pedagogical context — which interpretation fits the topic being taught?</item>
+            <item>If still ambiguous after all four attempts, record both interpretations with confidence levels.</item>
+        </symbol_resolution_strategy>
+
+        <geometric_figure_strategy>
+            <item>Start with the shape: count sides/vertices to determine figure type.</item>
+            <item>Read labels clockwise (or counterclockwise) starting from the most prominent vertex.</item>
+            <item>For each side, check BOTH for a length label AND for congruence tick marks.</item>
+            <item>For each angle, check BOTH for a degree measure AND for arc equality marks.</item>
+            <item>Look for special markers: right angle squares, parallel arrows, midpoint dots.</item>
+            <item>Note the relative scale: are similar triangles drawn at different sizes to emphasize the size difference?</item>
+        </geometric_figure_strategy>
+
+        <solution_chain_strategy>
+            <item>Identify the starting expression (usually the problem statement or initial equation).</item>
+            <item>Follow the vertical or sequential progression of equals signs or implication arrows.</item>
+            <item>At each step, identify what operation was performed. Common operations: substitute, distribute, combine like terms, factor, take square root, cross-multiply, add/subtract/multiply/divide both sides.</item>
+            <item>The final step is typically isolated, emphasized (boxed/colored), and represents the answer.</item>
+            <item>If steps appear to be missing (a jump that skips intermediate algebra), note the gap.</item>
+        </solution_chain_strategy>
+    </analysis_methodology>
+
+    <not_handwritten_math>
+        <item>Printed textbook excerpts or typed formulas are NOT handwritten math, even if they appear on the same page.</item>
+        <item>Ruled lines, grid lines, and pre-printed margin guides are NOT mathematical content.</item>
+        <item>Stains, smudges, or accidental marks are NOT mathematical symbols.</item>
+        <item>Bleed-through from the reverse side of the page is NOT content on this page.</item>
+        <item>Doodles, decorative elements, or non-mathematical drawings are NOT mathematical content (though they may be noted as scratch_work if they appear to be exploratory).</item>
+    </not_handwritten_math>
+
+    <confidence_scoring>
+        <item>HIGH: Clear character formation, unambiguous in context, verified against writer's other instances of the same character, mathematically consistent with surrounding work.</item>
+        <item>MEDIUM: Recognizable character with minor ambiguity, resolved by mathematical or pedagogical context. Alternative reading is possible but less likely.</item>
+        <item>LOW: Character formation present but genuinely ambiguous. Multiple readings are plausible even with context. Provide alternatives.</item>
+        <item>UNCERTAIN: Mark with [?] when a specific character cannot be determined. Provide best guess with alternatives.</item>
+        <item>ILLEGIBLE: Mark with [...] when handwriting is present but completely unreadable. Estimate the extent (number of characters, words, or expressions).</item>
+    </confidence_scoring>
+
+    <common_pitfalls>
+        <pitfall>Confusing a fraction bar with an equals sign or a minus sign. Fraction bars are typically shorter and positioned between vertically-stacked expressions.</pitfall>
+        <pitfall>Misreading exponents as regular-sized characters (or vice versa). Always check vertical position relative to the baseline.</pitfall>
+        <pitfall>Missing the vinculum (overbar) on a radical, leading to incorrect grouping of the radicand.</pitfall>
+        <pitfall>Confusing similarity (~) with approximate equality (≈) or negation (~). Context determines: geometry = similarity, numerical = approximation.</pitfall>
+        <pitfall>Reading angle arc marks as the letter 'c' or parentheses. Arc marks are always at vertices inside the angle.</pitfall>
+        <pitfall>Misattributing a measurement to the wrong side of a geometric figure. Always trace which two vertices the number sits between.</pitfall>
+        <pitfall>Confusing the degree symbol (°) with a zero exponent or a small 'o' superscript. In geometry contexts, numbers followed by ° are almost always angle measures.</pitfall>
+    </common_pitfalls>
+
+</handwriting_math_help>

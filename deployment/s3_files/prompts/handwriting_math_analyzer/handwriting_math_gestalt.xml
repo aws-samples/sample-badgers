@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Gestalt Perception -->
+<gestalt_perception analyzer="handwriting_math">
+
+    <prescan>
+        <instruction>Before analyzing any individual element, perceive the page as a whole composition of mathematical thinking:</instruction>
+        <step>View the entire page without reading. What is the overall spatial organization? (Single worked example? Multiple problems? Definition-then-examples? Two-column comparison?)</step>
+        <step>Identify the dominant content types: Is this page primarily algebraic work, geometric figures, graphing, a mix? What ratio of text to figures to equations?</step>
+        <step>Map the color landscape: How many distinct ink colors are present? Which color occupies the most area? Do colors appear to carry consistent semantic roles across the page?</step>
+        <step>Locate visual anchors: boxed answers, labeled figures, section headers, page numbers. These are your orientation landmarks.</step>
+        <step>Trace the pedagogical flow: Where does instruction begin on this page? What is the intended reading/working order?</step>
+        <step>Identify figure-text pairings: Which figures are associated with which text blocks? Proximity and alignment reveal these relationships.</step>
+    </prescan>
+
+    <principles_emphasis>
+
+        <primary principle="figure_ground">
+            <guidance>
+                Separate mathematical content layers from the physical page:
+                - FIGURE (primary content): Handwritten equations, solution steps, geometric constructions, function graphs, annotations
+                - GROUND (structural/physical): Ruled lines on paper, grid lines, page edges, margin boundaries, bleed-through from reverse side
+                - CRITICAL for handwritten math: Pencil-drawn geometric figures are often lighter than ink-written solutions overlaid on them. The figure is ground for the labels/measurements written on it, but figure relative to the blank page.
+                - Multiple figure layers may exist: a pencil diagram is ground for blue ink annotations, which are ground for red boxed answers.
+            </guidance>
+        </primary>
+
+        <primary principle="proximity">
+            <guidance>
+                Spatial proximity defines mathematical semantic units:
+                - Equations aligned vertically with consistent left margins form a SOLUTION CHAIN — they are sequential steps in a single derivation
+                - Text immediately above or beside a figure is its LABEL or DESCRIPTION
+                - An expression inside a box/circle is a FINAL ANSWER — the box boundary creates a proximity group
+                - Side-by-side solution columns (e.g., solving for two unknowns simultaneously) are PARALLEL SOLUTION CHAINS
+                - Annotations written between solution steps explain the OPERATION performed
+                - Content separated by a horizontal divider line (wavy, straight, or decorative) indicates a TOPIC BREAK
+                Key insight: In handwritten math, vertical alignment is the primary grouping axis for solution chains, while horizontal alignment groups parallel or comparative work.
+            </guidance>
+        </primary>
+
+        <primary principle="continuity">
+            <guidance>
+                Follow the logical flow of mathematical reasoning:
+                - Solution chains flow top-to-bottom: each line should be derivable from the line above
+                - Arrows or "therefore" symbols (∴) indicate explicit logical continuation
+                - When a variable is isolated step-by-step (e.g., x+2=5 → x=3), continuity connects these as one derivation
+                - Function transformation sequences (shift → reflect → shift) follow a defined order
+                - In geometric proofs, the chain of angle/side correspondences follows a logical path
+                - BREAK in continuity signals: horizontal divider lines, new "Example" labels, change in variables used, or significant spatial gaps
+            </guidance>
+        </primary>
+
+        <secondary principle="similarity">
+            <guidance>
+                Visual consistency encodes mathematical meaning:
+                - Same ink color throughout a solution chain = same writer/phase of work
+                - Consistent use of a color for ALL section headers = organizational color coding
+                - Same tick-mark pattern on triangle sides = EQUAL LENGTHS (congruence mark)
+                - Same arc-mark pattern on angles = EQUAL ANGLE MEASURES
+                - Repeated proportion structure (a/b = c/d pattern) = SIMILAR FIGURE reasoning
+                - Same handwriting style throughout = single author; style change may indicate instructor vs. student
+            </guidance>
+        </secondary>
+
+        <secondary principle="closure">
+            <guidance>
+                Recognize implied boundaries in mathematical content:
+                - A box drawn around an expression (even if not fully closed) marks it as a FINAL ANSWER
+                - A vinculum (overbar) in a radical sign √ groups everything under it as the radicand
+                - Fraction bars create implicit grouping of numerator and denominator
+                - Parentheses and brackets create expression boundaries even when handwriting is ambiguous about nesting
+                - A geometric figure's shape is perceived as closed even if hand-drawn lines don't perfectly meet at vertices
+                - Coordinate axes create four implicit quadrant regions
+            </guidance>
+        </secondary>
+
+        <secondary principle="common_region">
+            <guidance>
+                Shared spatial regions indicate related content:
+                - All content within a single coordinate plane belongs to the same graphing context
+                - All labels written inside or adjacent to a geometric figure describe that figure's properties
+                - Content to the left of an equals sign and content to the right form a balanced pair
+                - Side-by-side figures (e.g., two similar triangles drawn next to each other) are meant to be COMPARED
+                - A "Let" or "Given" statement and the work below it share a problem context
+            </guidance>
+        </secondary>
+
+    </principles_emphasis>
+
+    <mathematical_layout_patterns>
+        <pattern name="vertical_derivation">
+            <description>The most common layout: equations stacked vertically, each derived from the one above. Left-aligned or center-aligned.</description>
+            <reading_order>Top to bottom. Each line is one logical step.</reading_order>
+            <example_context>Solving equations, simplifying expressions, finding inverses.</example_context>
+        </pattern>
+        <pattern name="two_column_solution">
+            <description>Two parallel solution chains side by side, often solving for different unknowns from the same setup.</description>
+            <reading_order>Left column top-to-bottom, then right column top-to-bottom (or interleaved if cross-referenced).</reading_order>
+            <example_context>Finding QS and QR from similar triangles, solving systems of equations.</example_context>
+        </pattern>
+        <pattern name="figure_with_adjacent_work">
+            <description>A geometric figure (triangle, graph, coordinate plane) with solution work written beside or below it.</description>
+            <reading_order>Figure provides visual context; adjacent text provides the algebraic work. Read together.</reading_order>
+            <example_context>Similar triangle problems, graphing transformations.</example_context>
+        </pattern>
+        <pattern name="definition_then_example">
+            <description>A concept or property stated first, followed by one or more worked examples applying it.</description>
+            <reading_order>Definition/property first, then each example in sequence.</reading_order>
+            <example_context>Section introductions: state theorem, then show application.</example_context>
+        </pattern>
+        <pattern name="transformation_sequence">
+            <description>A base function followed by a series of transformations, often with before/after graphs.</description>
+            <reading_order>Base function → transformation 1 → transformation 2 → final form, possibly with graphs at each stage.</reading_order>
+            <example_context>Graphing f(x) = -(x-1)² + 2 by starting from x² and applying shifts/reflections.</example_context>
+        </pattern>
+        <pattern name="correspondence_mapping">
+            <description>Explicit pairing of elements between two structures (e.g., matching angles and sides of similar triangles).</description>
+            <reading_order>Left structure ↔ Right structure, with correspondence arrows or alignment.</reading_order>
+            <example_context>△ABE ~ △CDE with angle and side correspondences listed.</example_context>
+        </pattern>
+    </mathematical_layout_patterns>
+
+    <geometric_figure_perception>
+        <instruction>When perceiving geometric figures, apply these specific strategies:</instruction>
+        <step>Identify the figure type: triangle, coordinate plane, circle, parallel lines with transversal, etc.</step>
+        <step>Locate ALL vertex labels — they are typically single uppercase letters placed at or near each vertex.</step>
+        <step>Read ALL numerical labels: side lengths (numbers on or near edges), angle measures (numbers with ° near vertices), and coordinates (ordered pairs near points).</step>
+        <step>Detect congruence marks: tick marks on sides indicate equal lengths; arc marks on angles indicate equal measures. COUNT the marks — single tick ≠ double tick ≠ triple tick.</step>
+        <step>Identify special marks: parallel arrows (→→) on sides, right angle squares (□) at 90° angles, midpoint marks.</step>
+        <step>Determine if the figure is drawn to scale or is schematic (most handwritten math figures are schematic).</step>
+        <step>Note any dashed or dotted lines — these typically indicate altitudes, medians, extensions, or construction lines.</step>
+    </geometric_figure_perception>
+
+    <color_perception>
+        <instruction>Systematically catalog ink colors and their semantic roles:</instruction>
+        <step>Identify all distinct ink colors/media present on the page (pencil, blue ink, red ink, green ink, etc.).</step>
+        <step>For each color, note what TYPE of content it carries (figures? solutions? headers? answers?).</step>
+        <step>Look for consistent patterns: Is one color ALWAYS used for section headers? Is another ALWAYS for boxed answers?</step>
+        <step>Note cases where color changes MID-SOLUTION — this often indicates a switch between problem setup and solution work, or between different work sessions.</step>
+        <step>Record the color mapping as part of your analysis — downstream consumers need this to understand the page's semantic structure.</step>
+    </color_perception>
+
+    <validation>
+        <instruction>After initial perception, verify your gestalt reading:</instruction>
+        <check>Does your identified reading order match the logical flow of mathematical reasoning? (Each step should follow from the previous.)</check>
+        <check>Are all geometric figure labels accounted for? (Count vertices, count side labels, count angle labels.)</check>
+        <check>Do your proximity-based groupings make mathematical sense? (A solution chain shouldn't mix steps from different problems.)</check>
+        <check>Are color roles consistent across the page, or did you misidentify a color's function?</check>
+        <check>Have you correctly identified which content is a PROBLEM STATEMENT vs. SOLUTION WORK? (These have different downstream roles.)</check>
+        <check>Are figure-text pairings correct? (Does the algebraic work reference the variables/labels visible in the adjacent figure?)</check>
+    </validation>
+
+</gestalt_perception>

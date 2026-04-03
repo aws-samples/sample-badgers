@@ -47,22 +47,27 @@ for CONTAINER in "${CONTAINERS[@]}"; do
     echo "URI: ${FULL_URI}"
     echo "=========================================="
 
-    # Copy foundation and config modules to container build context
-    echo "Copying foundation and config modules to build context..."
-    if [ -d "./layer/python/foundation" ]; then
-        rm -rf "${CONTAINER_DIR}/foundation"
-        cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
-    else
-        echo "Error: foundation module not found at ./layer/python/foundation"
-        exit 1
-    fi
+    # Copy foundation and config modules for containers that need them
+    # (remediation_analyzer is self-contained — no foundation/config dependency)
+    if [ "$CONTAINER" != "remediation_analyzer" ]; then
+        echo "Copying foundation and config modules to build context..."
+        if [ -d "./layer/python/foundation" ]; then
+            rm -rf "${CONTAINER_DIR}/foundation"
+            cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
+        else
+            echo "Error: foundation module not found at ./layer/python/foundation"
+            exit 1
+        fi
 
-    if [ -d "./layer/python/config" ]; then
-        rm -rf "${CONTAINER_DIR}/config"
-        cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
+        if [ -d "./layer/python/config" ]; then
+            rm -rf "${CONTAINER_DIR}/config"
+            cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
+        else
+            echo "Error: config module not found at ./layer/python/config"
+            exit 1
+        fi
     else
-        echo "Error: config module not found at ./layer/python/config"
-        exit 1
+        echo "Skipping foundation/config copy (self-contained container)"
     fi
 
     # Build for x86_64 (Lambda runtime)
@@ -73,9 +78,11 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         -t "${FULL_URI}" \
         "${CONTAINER_DIR}"
 
-    # Clean up foundation and config copies
-    rm -rf "${CONTAINER_DIR}/foundation"
-    rm -rf "${CONTAINER_DIR}/config"
+    # Clean up foundation and config copies (if they were added)
+    if [ "$CONTAINER" != "remediation_analyzer" ]; then
+        rm -rf "${CONTAINER_DIR}/foundation"
+        rm -rf "${CONTAINER_DIR}/config"
+    fi
 
     # Push to ECR
     echo "Pushing ${FULL_URI}..."

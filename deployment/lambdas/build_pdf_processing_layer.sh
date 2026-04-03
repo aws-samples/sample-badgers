@@ -72,7 +72,8 @@ Usage:
   import fitz  # PyMuPDF
   import pikepdf
 
-Attach to: remediation_analyzer (PDF accessibility tagging)
+Attach to: Non-container Lambda functions that need PDF manipulation.
+Note: remediation_analyzer is a container Lambda and bundles its own deps.
 
 Version: $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 EOF
@@ -93,4 +94,4 @@ echo "✅ Layer built successfully!"
 echo "   File: $OUTPUT_FILE"
 echo "   Size: $LAYER_SIZE"
 echo ""
-echo "Attach to functions that need PDF manipulation (remediation_analyzer)"
+echo "Attach to functions that need PDF manipulation (not needed for container Lambdas)"

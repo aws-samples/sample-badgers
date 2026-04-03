@@ -1,7 +1,7 @@
-"""Correlation Analyzer Lambda - Correlates multiple analyzer outputs into unified_document.
+"""Correlation Analyzer Lambda - Correlates multiple analyzer outputs into correlation_analyzer XML.
 
 This analyzer takes S3 URIs of analyzer XML outputs and correlates them into
-a unified_document structure using Opus 4.6 with adaptive thinking.
+a correlation_analyzer XML structure using Opus 4.6 with adaptive thinking.
 """
 
 import json
@@ -113,7 +113,7 @@ def lambda_handler(
             adaptive_effort=model_config.get("effort", "high"),
         )
 
-        # Extract the unified_document from response
+        # Extract the correlation_analyzer output from response
         logger.info("Response keys: %s", list(response.keys()))
         logger.info("Content blocks count: %d", len(response.get("content", [])))
 
@@ -137,7 +137,7 @@ def lambda_handler(
                 continue
 
         logger.info(
-            "Extracted unified_document length: %d",
+            "Extracted correlation_analyzer output length: %d",
             len(unified_document) if unified_document else 0,
         )
 
@@ -147,17 +147,18 @@ def lambda_handler(
                 json.dumps(response, default=str)[:1000],
             )
             return _error_response(
-                "No unified_document generated - no text content in response"
+                "No correlation_analyzer output generated - no text content in response"
             )
 
         # Clean markdown artifacts from response
         unified_document = _clean_markdown_artifacts(unified_document)
 
         logger.info(
-            "After cleaning, unified_document length: %d", len(unified_document)
+            "After cleaning, correlation_analyzer output length: %d",
+            len(unified_document),
         )
 
-        # Extract summary from the unified_document
+        # Extract summary from the correlation_analyzer output
         summary = _extract_summary(unified_document)
 
         # Save to S3
@@ -166,12 +167,14 @@ def lambda_handler(
             return _error_response("OUTPUT_BUCKET not configured")
 
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        s3_key = f"{session_id}/correlated/unified_document_page_{page_number}_{timestamp}.xml"
+        s3_key = f"{session_id}/correlated/correlation_analyzer_page_{page_number}_{timestamp}.xml"
 
         # Verify we have content before writing
         if not unified_document or len(unified_document.strip()) == 0:
-            logger.error("unified_document is empty after processing!")
-            return _error_response("unified_document is empty after processing")
+            logger.error("correlation_analyzer output is empty after processing!")
+            return _error_response(
+                "correlation_analyzer output is empty after processing"
+            )
 
         body_bytes = unified_document.encode("utf-8")
         logger.info(
@@ -183,17 +186,17 @@ def lambda_handler(
             Key=s3_key,
             Body=body_bytes,
             ContentType="application/xml",
-            Tagging=f"session_id={session_id}&type=unified_document&page={page_number}",
+            Tagging=f"session_id={session_id}&type=correlation_analyzer&page={page_number}",
         )
 
-        unified_document_uri = f"s3://{output_bucket}/{s3_key}"
-        logger.info("Saved unified_document to %s", unified_document_uri)
+        correlation_analyzer_uri = f"s3://{output_bucket}/{s3_key}"
+        logger.info("Saved correlation_analyzer output to %s", correlation_analyzer_uri)
 
         return {
             "statusCode": 200,
             "body": json.dumps(
                 {
-                    "unified_document_uri": unified_document_uri,
+                    "correlation_analyzer_uri": correlation_analyzer_uri,
                     "summary": summary,
                     "success": True,
                     "session_id": session_id,
@@ -334,13 +337,13 @@ def _clean_markdown_artifacts(text: str) -> str:
 
 
 def _extract_summary(unified_document: str) -> str:
-    """Extract summary from unified_document XML."""
+    """Extract summary from correlation_analyzer XML."""
     import re
 
     match = re.search(r"<summary>(.*?)</summary>", unified_document, re.DOTALL)
     if match:
         return match.group(1).strip()
-    return "Correlation completed. See unified_document for details."
+    return "Correlation completed. See correlation_analyzer output for details."
 
 
 def _error_response(message: str) -> dict:
@@ -349,7 +352,7 @@ def _error_response(message: str) -> dict:
         "statusCode": 500,
         "body": json.dumps(
             {
-                "unified_document_uri": None,
+                "correlation_analyzer_uri": None,
                 "summary": f"Error: {message}",
                 "success": False,
             }

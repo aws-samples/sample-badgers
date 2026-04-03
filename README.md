@@ -1,7 +1,7 @@
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🧭 **Navigation:**</sub><br>
-<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [Frontend](frontend/FRONTEND_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Analyzer Wizard](frontend/ANALYZER_CREATION_WIZARD.md) | [Pricing Calculator](frontend/PRICING_CALCULATOR.md)</sub>
+<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [Local Testing](local_testing/LOCAL_TESTING_README.md) | [Deployment UI](deployment/ui/DEPLOYMENT_UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -21,6 +21,16 @@ Traditional document processing tools extract text but lose context. They can't 
 - 🤖 **Automating complex workflows** - Orchestrates multiple specialized analyzers via an AI agent
 
 Use cases: research acceleration, compliance automation, content management, accessibility remediation.
+
+## 📸 Screenshots
+
+| Local Testing — Home                                               | Local Testing — Chat                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| ![Home Page](github-assets/badgers-local-testing-ui-home-page.png) | ![Chat Interface](github-assets/badgers-local-testing-ui-chat.png) |
+
+| Deployment UI — Stacks                                                      | Deployment UI — Config Editor                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| ![Stack Information](github-assets/badgers-deploy-ui-stack-information.png) | ![Config Editor](github-assets/badgers-deploy-ui-config-editor.png) |
 
 ## ⚙️ How It Works
 
@@ -62,8 +72,8 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 1. 📄 **User submits a document** with analysis instructions
 2. 🧠 **Strands Agent** (running in AgentCore Runtime) interprets the request
-3. 🔧 **Agent selects tools** from 25 specialized analyzers via MCP Gateway
-4. ⚡ **Lambda analyzers** (25 functions, including 2 container-based) process document elements using Claude vision models
+3. 🔧 **Agent selects tools** from a library of specialized analyzers via MCP Gateway
+4. ⚡ **Lambda analyzers** (standardized and domain-specific functions, including container-based) process document elements using Claude vision models
 5. 📊 **Results aggregate** with preserved structure and semantic relationships
 
 ## 🛠️ Tech Stack
@@ -74,7 +84,7 @@ Use cases: research acceleration, compliance automation, content management, acc
 | 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                   |
 | 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                    |
 | 🧠 Foundation Model | Claude Sonnet 4.5 (via Amazon Bedrock)                             |
-| ⚡ Compute          | AWS Lambda (25 analyzer functions: 23 code + 2 container)          |
+| ⚡ Compute          | AWS Lambda (modular analyzer functions, including container-based) |
 | 📦 Storage          | Amazon S3 (configs, prompts, outputs)                              |
 | 🔐 Auth             | Amazon Cognito (OAuth 2.0 client credentials)                      |
 | 🏗️ IaC              | AWS CDK (Python)                                                   |
@@ -83,34 +93,34 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 ## 🔬 Analyzers
 
-| Analyzer                             | Purpose                                                                               |
-| ------------------------------------ | ------------------------------------------------------------------------------------- |
-| 📸 `pdf_to_images_converter`          | Convert PDF pages to images                                                           |
-| 🏷️ `classify_pdf_content`             | Classify document content type                                                        |
-| 📝 `full_text_analyzer`               | Extract all text content                                                              |
-| 📊 `table_analyzer`                   | Extract and structure tables                                                          |
-| 📈 `charts_analyzer`                  | Analyze charts and graphs                                                             |
-| 🔀 `diagram_analyzer`                 | Process diagrams and flowcharts                                                       |
-| 📐 `layout_analyzer`                  | Document structure analysis                                                           |
-| ♿ `accessibility_analyzer`           | Generate accessibility metadata (part of remediation)                                 |
-| 🏥 `decision_tree_analyzer`           | Medical/clinical document analysis                                                    |
-| 🔬 `scientific_analyzer`              | Scientific paper analysis                                                             |
-| ✍️ `handwriting_analyzer`             | Handwritten text recognition                                                          |
-| 💻 `code_block_analyzer`              | Extract code snippets                                                                 |
-| 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction                                                           |
-| 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction                                                       |
-| 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction                                                       |
-| 🔑 `keyword_topic_analyzer`           | Extract keywords and topics                                                           |
-| 🔧 `remediation_analyzer`             | PDF accessibility remediation (container, cell grid resolver + diagnostic visualizer) |
-| 📄 `page_analyzer`                    | Single page content analysis                                                          |
-| 🧱 `elements_analyzer`                | Document element detection                                                            |
-| 🧱 `robust_elements_analyzer`         | Enhanced element detection with fallbacks                                             |
-| 👁️ `general_visual_analysis_analyzer` | General-purpose visual content analysis                                               |
-| ✏️ `editorial_analyzer`               | Editorial content and markup analysis                                                 |
-| 🗺️ `war_map_analyzer`                 | Historical war map analysis                                                           |
-| 🎓 `edu_transcript_analyzer`          | Educational transcript analysis                                                       |
-| 🔗 `correlation_analyzer`             | Correlate multi-analyzer results per page                                             |
-| 🖼️ `image_enhancer`                   | Image enhancement and preprocessing                                                   |
+| Analyzer                             | Purpose                                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 📸 `pdf_to_images_converter`          | Convert PDF pages to images                                                                |
+| 🏷️ `classify_pdf_content`             | Classify document content type                                                             |
+| 📝 `full_text_analyzer`               | Extract all text content                                                                   |
+| 📊 `table_analyzer`                   | Extract and structure tables                                                               |
+| 📈 `charts_analyzer`                  | Analyze charts and graphs                                                                  |
+| 🔀 `diagram_analyzer`                 | Process diagrams and flowcharts                                                            |
+| 📐 `layout_analyzer`                  | Document structure analysis                                                                |
+| ♿ `accessibility_analyzer`           | Generate accessibility metadata (part of remediation)                                      |
+| 🏥 `decision_tree_analyzer`           | Medical/clinical document analysis                                                         |
+| 🔬 `scientific_analyzer`              | Scientific paper analysis                                                                  |
+| ✍️ `handwriting_analyzer`             | Handwritten text recognition                                                               |
+| 💻 `code_block_analyzer`              | Extract code snippets                                                                      |
+| 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction                                                                |
+| 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction                                                            |
+| 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction                                                            |
+| 🔑 `keyword_topic_analyzer`           | Extract keywords and topics                                                                |
+| 🔧 `remediation_analyzer`             | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
+| 📄 `page_analyzer`                    | Single page content analysis                                                               |
+| 🧱 `elements_analyzer`                | Document element detection                                                                 |
+| 🧱 `robust_elements_analyzer`         | Enhanced element detection with fallbacks                                                  |
+| 👁️ `general_visual_analysis_analyzer` | General-purpose visual content analysis                                                    |
+| ✏️ `editorial_analyzer`               | Editorial content and markup analysis                                                      |
+| 🗺️ `war_map_analyzer`                 | Historical war map analysis                                                                |
+| 🎓 `edu_transcript_analyzer`          | Educational transcript analysis                                                            |
+| 🔗 `correlation_analyzer`             | Correlate multi-analyzer results per page                                                  |
+| 🖼️ `image_enhancer`                   | Image enhancement and preprocessing                                                        |
 
 ## 🚀 Deployment
 
@@ -162,9 +172,9 @@ cd deployment
 │   ├── runtime/               # AgentCore Runtime container
 │   ├── s3_files/              # Prompts, schemas, manifests
 │   └── badgers-foundation/    # Shared analyzer framework
-├── frontend/
-│   ├── main.py                # Multi-page Gradio app entry point
-│   └── pages/                 # UI modules (chat, wizard, editor, etc.)
+├── local_testing/             # Local dev/testing UI (React + Express)
+│   ├── src/                   # React components (chat, wizard, editor, pricing, etc.)
+│   └── server/                # Express API server
 └── pyproject.toml
 ```
 
@@ -337,7 +347,7 @@ When enabled, BADGERS estimates the optimal `max_tokens` per image based on visu
 
 Four metrics are combined into a complexity score: text pixel ratio, grayscale entropy, edge density, and color standard deviation. The score maps to a token budget (8K / 12K / 16K / 24K).
 
-**Enabling:** Toggle "Dynamic Token Estimation" in the Gradio chat UI, or set the Lambda environment variable `DYNAMIC_TOKENS_ENABLED=true`.
+**Enabling:** Toggle "Dynamic Token Estimation" in the chat UI, or set the Lambda environment variable `DYNAMIC_TOKENS_ENABLED=true`.
 
 **Tuning:** Add a `dynamic_tokens` block to an analyzer manifest to customize weights and thresholds:
 ```json
@@ -400,11 +410,11 @@ Model ID to environment variable mapping:
 **Option 1: Use the Wizard (Recommended)**
 
 ```bash
-cd frontend
-uv run python main.py
+cd local_testing
+npm run dev
 ```
 
-The [Analyzer Creation Wizard](frontend/ANALYZER_CREATION_WIZARD.md) is available as a tab in the multi-page Gradio app.
+The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [Local Testing UI](local_testing/LOCAL_TESTING_README.md).
 
 **Option 2: Manual Creation**
 

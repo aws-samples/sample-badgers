@@ -3,6 +3,7 @@
 
 import os
 import uuid
+import json
 import warnings
 from pathlib import Path
 
@@ -114,6 +115,23 @@ inference_profiles_stack = InferenceProfilesStack(
     description="Application Inference Profiles for cost tracking and usage monitoring",
 )
 
+# Load deployment config for selective analyzer deployment
+enabled_analyzers = None
+deployment_config_path = Path("./deployment_config.json")
+if deployment_config_path.exists():
+    with open(deployment_config_path, encoding="utf-8") as f:
+        deployment_config = json.load(f)
+    analyzers_config = deployment_config.get("analyzers", {})
+    enabled_analyzers = {
+        name for name, cfg in analyzers_config.items() if cfg.get("enabled", True)
+    }
+    disabled = {
+        name for name, cfg in analyzers_config.items() if not cfg.get("enabled", True)
+    }
+    if disabled:
+        print(f"Disabled analyzers: {', '.join(sorted(disabled))}")
+    print(f"Enabled analyzers: {len(enabled_analyzers)} of {len(analyzers_config)}")
+
 # Lambda functions and layer
 lambda_stack = LambdaAnalyzerStack(
     app,
@@ -124,6 +142,7 @@ lambda_stack = LambdaAnalyzerStack(
     output_bucket=s3_stack.output_bucket,
     ecr_repository=ecr_stack.repository,
     inference_profiles_stack=inference_profiles_stack,
+    enabled_analyzers=enabled_analyzers,
     env=env,
     description="Lambda analyzers for BADGERS",
 )

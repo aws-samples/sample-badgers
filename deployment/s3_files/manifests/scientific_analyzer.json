@@ -39,7 +39,6 @@
             "latex_formulas/latex_tasks_extraction.xml",
             "latex_formulas/latex_format.xml",
             "latex_formulas/latex_help.xml",
-            "latex_formulas/latex_conversation_example.xml",
             "latex_formulas/latex_two_step_verfication_process.xml"
         ],
         "examples_path": "prompts",

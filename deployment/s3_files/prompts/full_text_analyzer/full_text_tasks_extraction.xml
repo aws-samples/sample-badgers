@@ -1,6 +1,17 @@
+<!--
+CHECKPOINT_05E — FULL TEXT TASKS
+==================================
+Updated to support hierarchical correlation pipeline.
+
+CHANGES FROM PREVIOUS:
+  - Added: heading hierarchy verification task
+  - Added: inline content preservation guidance within existing tasks
+  - Added: footnote pairing verification in review task
+  - All original tasks preserved
+-->
 <tasks>
     <task>Extract all relevant topics for this content.</task>
-    
+
     <task>Take a deep breath and carefully review the information provided in the system prompt and this prompt.</task>
 
     <task>Examine the given page, identifying all textual elements as defined in the <full_text_dictionary /> XML tags.</task>
@@ -11,18 +22,19 @@
         <sub_task>Assign a unique sequential ID (elem_001, elem_002, elem_003, etc.).</sub_task>
         <sub_task>Determine its type (e.g., h1, h2, paragraph, header, footer, sidebar, figure, footnote, caption).</sub_task>
         <sub_task>Assign an order number reflecting its position in the logical reading sequence.</sub_task>
-        <sub_task>Extract the full text content of the element.</sub_task>
+        <sub_task>Extract the full text content of the element. Do not truncate, summarize, or paraphrase — every word matters for screen reader accessibility.</sub_task>
         <sub_task>For footnotes and captions, set the ref attribute to the ID of the element they reference.</sub_task>
         <sub_task>For figures, include both caption (visible text) and alt_text (description of visual content).</sub_task>
     </task>
 
     <task>Pay special attention to the layout of the page, including columns, sidebars, and any non-standard text arrangements.</task>
 
-    <task>Determine heading hierarchy:
-        <sub_task>Identify the main title or most prominent heading as h1.</sub_task>
-        <sub_task>Identify major section headings as h2.</sub_task>
+    <task>Determine heading hierarchy with care — this drives the entire document structure downstream:
+        <sub_task>Identify the main title or most prominent heading as h1. There is typically one h1 per document (or per page for standalone pages).</sub_task>
+        <sub_task>Identify major section headings as h2. These divide the document into main parts.</sub_task>
         <sub_task>Identify subsection headings as h3 or h4.</sub_task>
-        <sub_task>Use visual prominence (size, weight, spacing) to determine hierarchy.</sub_task>
+        <sub_task>Use visual prominence (size, weight, spacing) as a guide, but verify against document structure. A visually smaller heading that opens a new major section should be h2, not h3.</sub_task>
+        <sub_task>Do not skip heading levels. If you see what appears to be h1 followed by h3 with no h2, verify this is correct. If uncertain, prefer the higher level.</sub_task>
     </task>
 
     <task>Ensure that footnotes, captions, and other supplementary text are extracted in a logical order relative to their references in the main text.</task>
@@ -36,9 +48,16 @@
         <sub_task>Every element has an order attribute reflecting reading sequence.</sub_task>
         <sub_task>Order numbers are sequential with no gaps (1, 2, 3, not 1, 3, 5).</sub_task>
         <sub_task>Cross-references use the ref attribute where applicable.</sub_task>
+        <sub_task>Heading levels follow a logical hierarchy without skipping levels.</sub_task>
     </task>
 
-    <task>Review your extracted text to ensure completeness, accuracy, and proper ordering, checking that you've captured all textual content from the page.</task>
+    <task>Review your extracted text to ensure completeness, accuracy, and proper ordering:
+        <sub_task>Verify you have captured all textual content from the page.</sub_task>
+        <sub_task>Confirm paragraph text is complete — no sentences cut off, no words missing.</sub_task>
+        <sub_task>Verify heading levels form a valid hierarchy (h1 → h2 → h3, no skips).</sub_task>
+        <sub_task>Confirm every footnote has a ref pointing to its source element.</sub_task>
+        <sub_task>Confirm every figure has both caption and alt_text.</sub_task>
+    </task>
 
     <task>Take a final deep breath and ensure your extraction is thorough, follows all provided guidelines, and accurately represents the full textual content of the page in its original reading order.</task>
 </tasks>
