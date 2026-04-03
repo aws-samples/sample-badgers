@@ -86,5 +86,10 @@ disallow_untyped_defs = true
 [tool.pylint.messages_control]
 disable = ["C0103", "R0903"]
 
+[tool.uv.workspace]
+members = [
+    ".kiro/skills/markdown_converter",
+]
+
 [dependency-groups]
 dev = ["types-requests>=2.32.4.20260107"]

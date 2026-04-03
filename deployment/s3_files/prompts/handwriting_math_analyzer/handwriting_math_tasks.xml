@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Tasks -->
+<tasks>
+    <task>Apply the gestalt prescan from <gestalt_perception/>: perceive the page holistically before analyzing individual elements. Identify the dominant layout pattern, color landscape, and pedagogical flow.</task>
+
+    <task>Execute Phase 1 (Page Survey) of the verification process: map all content regions, classify by semantic type, catalog figures, catalog colors, and establish reading order.</task>
+
+    <task>Execute Phase 2 (Symbol-Level Transcription): for each mathematical expression identified in Phase 1, perform character-level reading using morphological analysis, resolve ambiguities using the symbol_disambiguation pairs, verify mathematical sense through contextual checks, and convert to valid LaTeX.</task>
+
+    <task>Execute Phase 3 (Geometric Figure Extraction): for each geometric figure identified in Phase 1, extract the figure type, ALL vertex labels, ALL side lengths, ALL angle measures, ALL congruence/equality marks (count tick marks and arc marks precisely), and associate each figure with its related text and solution chains.</task>
+
+    <task>Execute Phase 4 (Solution Chain Analysis): for each worked example, identify the complete solution chain from problem statement through final answer. Number each step, identify the operation at each step, and assess mathematical correctness where steps are clearly legible. Extract all boxed/emphasized answers and associate them with their parent chains.</task>
+
+    <task>Execute Phase 5 (Cross-Reference and Coherence): verify that all variables in solutions appear in problem statements or figure labels, that all figure labels referenced in equations exist in figures, and that the complete output forms an internally consistent representation of the page.</task>
+
+    <task>Assign confidence levels to all transcribed elements. Provide alternative readings for uncertain symbols. Mark illegible sections with [...] and estimated extent.</task>
+
+    <task>Structure all findings according to the <response_format/> XML tags, ensuring the common_spine preserves pedagogical reading order and the specialized section captures all math-specific detail.</task>
+
+    <task>Perform final verification: confirm all content comes from the target image only, all LaTeX is syntactically valid, all figure labels are captured, and the output is complete and accurate.</task>
+</tasks>

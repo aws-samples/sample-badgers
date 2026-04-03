@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Frontend](../../frontend/FRONTEND_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Analyzers](LAMBDA_ANALYZERS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Local Testing](../../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](../ui/DEPLOYMENT_UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Analyzers](LAMBDA_ANALYZERS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 # 🧠 Foundation Lambda Layer
 
@@ -166,6 +166,8 @@ New analyzers require only:
 | python-dateutil | 2.9.0   | 📅 Date utilities                    |
 
 ---
+
+> **Note:** The `remediation_analyzer` container Lambda is self-contained and does not depend on the Foundation Layer. It bundles its own dependencies (pikepdf, pymupdf, etc.) in its Docker image. Only `image_enhancer` among the container Lambdas uses the foundation framework.
 
 ## 🛠️ Build and Deploy
 

@@ -1,16 +1,28 @@
-<!-- Provides overall context for the element extraction task, outlining the types of publications to analyze and the importance of atomic elements. -->
+<!--
+CHECKPOINT_05G — ELEMENTS CONTEXT
+====================================
+Updated to support hierarchical correlation pipeline.
+
+CHANGES FROM PREVIOUS:
+  - Added: downstream pipeline awareness (correlator, tagger)
+  - Added: verbatim text extraction emphasis
+  - Added: inline element detection context
+  - Added: elem_XXX ID scheme context
+  - All original items preserved
+-->
 <context>
    <item>You will analyze various types of publications to identify and extract specific, atomic elements such as citations, references, captions, and other small-scale components.</item>
    <item>These elements are crucial for understanding the structure and academic rigor of publications across different fields and styles.</item>
    <item>Pay close attention to the formatting and placement of these elements, as they often follow specific style guides (e.g., APA, MLA, Chicago).</item>
    <item>Your analysis should cover both in-text elements (like inline citations) and standalone elements (like figure captions or bibliographic entries).</item>
    <item>Be prepared to encounter variations in element styles across different types of publications (e.g., journal articles, books, reports).</item>
-   <item>When identifying elements, refer to the definitions provided in the <elements_dictionary/>
- XML tags.</item>
-   <item>Use the format specifications in the <elements_format/>
- XML tags to structure your responses.</item>
-   <item>If you're unsure about an element's classification or format, refer to the guidance in the <elements_help/>
- XML tags.</item>
+   <item>When identifying elements, refer to the definitions provided in the <elements_dictionary/> XML tags.</item>
+   <item>Use the format specifications in the <elements_format/> XML tags to structure your responses.</item>
+   <item>If you're unsure about an element's classification or format, refer to the guidance in the <elements_help/> XML tags.</item>
    <item>Pay attention to the document's structure, including sections, subsections, and various levels of headings.</item>
    <item>Be aware of structural elements such as the table of contents, abstract, and keywords, which provide important context for the document's organization and content.</item>
+   <item>Your output will be correlated with a separate full_text analyzer that provides verbatim text and reading order. Together, your structural metadata and its text content will be merged into a hierarchical document tree for PDF/UA accessibility tagging. Your role is to provide the STRUCTURE: hierarchical levels, section grouping, element types, sub-types, and inline element identification. The full_text analyzer provides the TEXT. Neither alone is sufficient.</item>
+   <item>The content field for every text-bearing element must contain the FULL VERBATIM text as it appears on the page. This is not a summary or description — it is the exact text. The downstream pipeline uses this as a fallback when the full_text analyzer's output is unavailable or when cross-referencing is needed.</item>
+   <item>Use the elem_001, elem_002, elem_003 ID format for all elements. These IDs allow the downstream correlator to match your structural metadata with the full_text analyzer's text content.</item>
+   <item>When a paragraph contains formulas, footnote markers, hyperlinks, or other semantically distinct inline content, identify these in the inline_elements field. This enables the downstream pipeline to create proper inline structure elements (Formula, Reference, Link, Span) within paragraphs for PDF/UA compliance.</item>
 </context>

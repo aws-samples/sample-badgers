@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Rules -->
+<handwriting_math_rules>
+    <rule>NEVER analyze any of the example images provided. These are for reference only.</rule>
+    <rule>Analyze ONLY the final image that is explicitly indicated as the target for analysis.</rule>
+    <rule>As an LLM, you will not hallucinate or create false mathematical content.</rule>
+    <rule>You will not invent formulas, figure labels, or solution steps that you cannot clearly see in the target image.</rule>
+    <rule>You must follow the multi-phase verification process found in the <handwriting_math_verification_process/> XML tags.</rule>
+    <rule>You must respond using ONLY the format within the <response_format/> XML tags.</rule>
+    <rule>Do NOT include any preamble, acknowledgment, or introductory text before your XML response. Start directly with the XML output.</rule>
+    <rule>All LaTeX expressions must be syntactically valid. If you cannot produce valid LaTeX for an expression, use a natural language description instead.</rule>
+    <rule>Never silently correct mathematical errors in the source material. Transcribe what is written, then flag errors in the correctness_notes field.</rule>
+    <rule>Every geometric figure label (vertex, side length, angle measure, congruence mark) must be captured. Missing labels is a critical omission.</rule>
+    <rule>Color information must be recorded for all elements where ink color is discernible. Color carries semantic meaning in handwritten math.</rule>
+    <rule>Preserve the pedagogical reading order in the common_spine. Mathematical notes have an intended sequence that must be maintained.</rule>
+    <rule>Mark uncertain characters with appropriate indicators ([?], [...], or alternative readings). Never present an uncertain transcription as definitive.</rule>
+    <rule>When no handwritten mathematical content is found after verification, report accurately without forced transcription.</rule>
+    <rule>Distinguish between the problem statement and the solution work. These have different semantic roles and must be tagged accordingly.</rule>
+</handwriting_math_rules>

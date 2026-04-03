@@ -1,40 +1,91 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 7 (tables) -->
 
 <response_format>
-    <response extraction_type="table">
+    <response analyzer="tables"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>tables</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_TABLES_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per table found -->
-        <elements>
-            <element type="table">
-                <type>Table</type>
-                <content>
-                    <table border="1">
-                        <caption>{TABLE_CAPTION_IF_ANY}</caption>
-                        <thead>
-                            <tr>
-                                <th>{HEADER_1}</th>
-                                <th>{HEADER_2}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>{DATA_1_1}</td>
-                                <td>{DATA_1_2}</td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="{TOTAL_NUMBER_OF_COLUMNS}">{FOOTNOTE_OR_SUMMARY_IF_ANY}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </content>
+
+        <!--
+        ============================================================
+        COMMON SPINE — extract ALL visible text on this page in
+        reading order. Include table captions, header text, cell
+        contents as readable text, and any body text around the table.
+        ============================================================
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Table caption -->
+            <element id="elem_001" tag="Caption" order="1" page="{PAGE}">
+                <text>{TABLE_CAPTION_TEXT}</text>
             </element>
-        </elements>
+            <!-- Table as a reading-order text block -->
+            <element id="elem_002" tag="Table" order="2" page="{PAGE}">
+                <text>{ALL_TABLE_CONTENT_AS_READABLE_TEXT}</text>
+                <caption>{TABLE_CAPTION_IF_ANY}</caption>
+            </element>
+            <!-- Any body text surrounding the table -->
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{BODY_TEXT_IF_ANY}</text>
+            </element>
+            <!-- Include ALL text you can see, in reading order -->
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!--
+        ============================================================
+        SPECIALIZED — table-specific structured extraction.
+        Preserves full row/column structure with header identification.
+        Embedded as enrichment on the Table element during correlation.
+        ============================================================
+        -->
+        <specialized type="table">
+            <!-- If element_count is 0, omit inner content entirely -->
+            <!-- Include one <element> per table found -->
+            <elements>
+                <element type="table">
+                    <type>Table</type>
+                    <content>
+                        <table border="1">
+                            <caption>{TABLE_CAPTION_IF_ANY}</caption>
+                            <thead>
+                                <tr>
+                                    <th>{HEADER_1}</th>
+                                    <th>{HEADER_2}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>{DATA_1_1}</td>
+                                    <td>{DATA_1_2}</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="{TOTAL_NUMBER_OF_COLUMNS}">{FOOTNOTE_OR_SUMMARY_IF_ANY}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </content>
+                    <figure_reference>
+                        <table_id>{TABLE_LABEL e.g. "Table 1"}</table_id>
+                        <caption>{CAPTION_TEXT}</caption>
+                    </figure_reference>
+                    <context>{ROLE_OF_TABLE_IN_DOCUMENT}</context>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

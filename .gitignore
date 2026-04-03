@@ -4,6 +4,9 @@ deployment/cdk.out/
 layer/
 *.zip
 
+# GIT
+../.pre-commit-config.yaml
+
 # CDK
 cdk.out/
 cdk.context.json
@@ -80,3 +83,6 @@ deployment/custom_analyzers/*
 # Hidden dot-directories (repo-wide)
 .**/
 !.github/
+
+# Security scan reports
+.security-reports/

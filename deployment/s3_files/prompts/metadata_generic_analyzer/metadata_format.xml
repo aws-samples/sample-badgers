@@ -1,21 +1,64 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
 <!-- SKIP THE PREAMBLE - NO introductory text like "Here is my analysis..." -->
+<!-- BADGERS MASTER SCHEMA v1.0 — Common Envelope + Spine + Specialized -->
 
 <response_format>
-    <response extraction_type="metadata">
+    <response analyzer="metadata"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>metadata</analyzer_name>
+            <analyzer_version>{ANALYZER_VERSION}</analyzer_version>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <image_quality>{good|fair|poor}</image_quality>
+            <enhancement_applied>{true|false}</enhancement_applied>
+            <enhancement_source>{S3_URI_OF_ENHANCED_IMAGE_IF_APPLIED}</enhancement_source>
+            <confidence>{overall_confidence: high|medium|low}</confidence>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_METADATA_ELEMENTS_DETECTED}</element_count>
         </metadata>
+
+        <!-- Common spine: text elements visible on the page in reading order -->
+        <!-- Even metadata pages have visible text — capture it here -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+
+            <!-- One element per visible text block on the page -->
+            <element id="{elem_XXX}"
+                     tag="{H1|H2|H3|H4|H5|H6|P|Caption|Note|Artifact}"
+                     order="{READING_ORDER_INTEGER}"
+                     page="{PAGE_NUMBER}">
+                <text>{FULL_VERBATIM_TEXT}</text>
+            </element>
+
+            <!-- Figure elements if any visuals present -->
+            <element id="{elem_XXX}"
+                     tag="Figure"
+                     order="{READING_ORDER_INTEGER}"
+                     page="{PAGE_NUMBER}">
+                <alt_text>{ACCESSIBILITY_DESCRIPTION_OF_VISUAL_CONTENT}</alt_text>
+                <caption>{VISIBLE_CAPTION_TEXT_IF_ANY}</caption>
+            </element>
+
+        </common_spine>
+
+        <topical_analysis>{COMMA_SEPARATED_TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!-- Specialized: metadata extraction (existing format preserved) -->
         <!-- If element_count is 0, omit <elements> section entirely -->
         <!-- Include one <element> per metadata element found -->
-        <elements>
-            <element type="{ELEMENT_TYPE}">
-                <extracted_text>{EXTRACTED_TEXT}</extracted_text>
-                <writing_direction>{LTR_OR_RTL}</writing_direction>
-                <language>{ELEMENT_LANGUAGE}</language>
-            </element>
-        </elements>
+        <specialized type="metadata">
+            <elements>
+                <element type="{ELEMENT_TYPE}">
+                    <extracted_text>{EXTRACTED_TEXT}</extracted_text>
+                    <writing_direction>{LTR_OR_RTL}</writing_direction>
+                    <language>{ELEMENT_LANGUAGE}</language>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

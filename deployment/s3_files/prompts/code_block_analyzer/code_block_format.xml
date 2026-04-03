@@ -1,45 +1,63 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + Part 11 (code_blocks) -->
 
 <response_format>
-    <response extraction_type="code_block">
+    <response analyzer="code_block"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>code_block</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_CODE_BLOCKS_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per code block found -->
-        <elements>
-            <element type="code_block">
-                <type>Code Block</type>
-                <content>
-                    <language>{PROGRAMMING_LANGUAGE_OR_FORMAT_TYPE}</language>
-                    <format_type>{script|config|markup|query|command|other}</format_type>
-                    <context>{DESCRIPTION_OF_CODE_PURPOSE_OR_CONTEXT}</context>
-                    <structure>
-                        <syntax_elements>
-                            <element>
-                                <name>{SYNTAX_ELEMENT_NAME}</name>
-                                <pattern>{PATTERN_DESCRIPTION}</pattern>
-                                <description>{ELEMENT_DESCRIPTION}</description>
-                            </element>
-                        </syntax_elements>
-                        <formatting>
-                            <indentation>{INDENTATION_STYLE e.g. "4 spaces", "tabs"}</indentation>
-                            <spacing>{SPACING_CONVENTIONS}</spacing>
-                            <line_breaks>{LINE_BREAK_PATTERNS}</line_breaks>
-                        </formatting>
-                    </structure>
-                    <original_code>{EXACT_CODE_AS_SHOWN_PRESERVING_ALL_FORMATTING}</original_code>
-                    <explanation>{EDUCATIONAL_EXPLANATION_OF_WHAT_THE_CODE_DOES}</explanation>
-                    <line_count>{NUMBER_OF_LINES}</line_count>
-                    <has_line_numbers>{YES/NO}</has_line_numbers>
-                </content>
-                <figure_reference>
-                    <figure_id>{FIGURE_OR_LISTING_NUMBER e.g. "Listing 1", "Code Example 3"}</figure_id>
-                    <caption>{EXACT_CAPTION_TEXT_IF_PRESENT}</caption>
-                </figure_reference>
+
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Code block as a text element preserving full content -->
+            <element id="elem_001" tag="Code" order="1" page="{PAGE}">
+                <text>{FULL_CODE_TEXT_PRESERVING_INDENTATION}</text>
             </element>
-        </elements>
+            <!-- Any surrounding text (comments, explanations) -->
+            <element id="elem_002" tag="P" order="2" page="{PAGE}">
+                <text>{EXPLANATORY_TEXT_IF_ANY}</text>
+            </element>
+            <!-- Include ALL visible text in reading order -->
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <specialized type="code_block">
+            <elements>
+                <element type="code_block">
+                    <type>Code Block</type>
+                    <content>
+                        <language>{PROGRAMMING_LANGUAGE_OR_FORMAT_TYPE}</language>
+                        <format_type>{script|config|markup|query|command|other}</format_type>
+                        <context>{DESCRIPTION_OF_CODE_PURPOSE_OR_CONTEXT}</context>
+                        <structure>
+                            <syntax_elements>
+                                <element>
+                                    <n>{SYNTAX_ELEMENT_NAME}</n>
+                                    <pattern>{PATTERN_DESCRIPTION}</pattern>
+                                    <description>{ELEMENT_DESCRIPTION}</description>
+                                </element>
+                            </syntax_elements>
+                            <formatting>
+                                <indentation>{INDENTATION_STYLE}</indentation>
+                                <spacing>{SPACING_CONVENTIONS}</spacing>
+                                <line_breaks>{LINE_BREAK_PATTERNS}</line_breaks>
+                            </formatting>
+                        </structure>
+                        <code_text>{FULL_CODE_TEXT_PRESERVING_WHITESPACE}</code_text>
+                    </content>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

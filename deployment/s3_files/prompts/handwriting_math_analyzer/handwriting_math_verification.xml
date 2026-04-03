@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- BADGERS Schema v1.0 — Handwriting-Math Analyzer: Verification Process -->
+<handwriting_math_verification_process>
+
+    <!-- Initial step to ensure focus on the target image -->
+    <initial_step>
+        <instruction>Confirm that you are working ONLY with the final target image provided for analysis. Disregard all previous example images.</instruction>
+    </initial_step>
+
+    <!-- Phase 1: Page Survey and Region Mapping -->
+    <phase_1_page_survey>
+        <purpose>Establish the page's overall mathematical structure before reading any individual element.</purpose>
+        <step>Scan ONLY the target image. If the page contains no handwritten mathematical content, skip immediately to final_verification.</step>
+        <step>Identify all distinct content regions on the page. Mark their approximate spatial boundaries in your mind.</step>
+        <step>Classify each region by type using the semantic_regions definitions: problem_statement, definition, theorem_property, worked_example, solution_chain, boxed_answer, annotation, section_header, scratch_work.</step>
+        <step>Catalog all geometric figures present. For each, note the figure type and its spatial relationship to adjacent text/equations.</step>
+        <step>Catalog all distinct ink colors/media and hypothesize their semantic roles based on usage patterns.</step>
+        <step>Determine the page's dominant layout pattern(s): vertical_derivation, two_column_solution, figure_with_adjacent_work, definition_then_example, transformation_sequence, or correspondence_mapping.</step>
+        <step>Establish the intended reading order across all regions.</step>
+    </phase_1_page_survey>
+
+    <!-- Phase 2: Symbol-Level Transcription -->
+    <phase_2_symbol_transcription>
+        <purpose>Read and transcribe each mathematical expression character by character, applying morphological and contextual analysis.</purpose>
+
+        <morphological_analysis>
+            <step>For each expression, identify individual characters by their stroke formation patterns.</step>
+            <step>Build a character model for this writer: How does this hand form 'x'? How does it form '2'? How does it form '='? Collect exemplars from clear instances.</step>
+            <step>For ambiguous characters, consult the symbol_disambiguation pairs in the dictionary. Apply mathematical context to resolve.</step>
+            <step>Pay special attention to subscripts vs. adjacent characters — in handwriting, the only difference may be slight vertical offset and reduced size.</step>
+            <step>Distinguish superscripts (exponents) from adjacent characters. In handwritten math, exponents are typically smaller and elevated, but may not be clearly so.</step>
+        </morphological_analysis>
+
+        <contextual_verification>
+            <step>After initial character-level reading, verify each expression makes mathematical sense.</step>
+            <step>Check operator-operand patterns: Does each operator have appropriate operands on both sides?</step>
+            <step>Verify balanced delimiters: Are parentheses, brackets, and absolute value bars properly paired?</step>
+            <step>Check variable consistency: Are the same variables used throughout a solution chain? If a new variable appears, is it introduced properly?</step>
+            <step>Verify dimensional consistency: In geometry problems, are units (cm, mi, degrees) used consistently?</step>
+        </contextual_verification>
+
+        <latex_conversion>
+            <step>Convert each verified expression to valid LaTeX syntax.</step>
+            <step>Use standard LaTeX commands: \frac{}{} for fractions, \sqrt{} for radicals, ^{} for exponents, _{} for subscripts.</step>
+            <step>Use \angle for angle symbols, \triangle for triangle symbols, \sim for similarity, \cong for congruence.</step>
+            <step>Use \parallel for parallel lines notation.</step>
+            <step>For multi-line solution chains, use aligned environments to preserve the step structure.</step>
+            <step>Verify that the generated LaTeX compiles to the same visual expression you read from the page.</step>
+        </latex_conversion>
+    </phase_2_symbol_transcription>
+
+    <!-- Phase 3: Geometric Figure Extraction -->
+    <phase_3_figure_extraction>
+        <purpose>Extract all geometric figures with complete labeled information.</purpose>
+
+        <figure_identification>
+            <step>For each geometric figure identified in Phase 1, determine its precise type from the figure_types dictionary.</step>
+            <step>Identify the drawing medium (pencil, ink color) — figures are often in a different medium than the solution work.</step>
+        </figure_identification>
+
+        <label_extraction>
+            <step>Extract ALL vertex labels. Verify by counting: a triangle must have exactly 3 vertex labels; a quadrilateral must have 4.</step>
+            <step>Extract ALL side length labels. Note which side each measurement is associated with (between which two vertices).</step>
+            <step>Extract ALL angle measure labels. Note which angle each measurement is at (which vertex, or which arc).</step>
+            <step>Count and record congruence marks: single tick (|), double tick (||), triple tick (|||) on sides. These indicate equal-length groups.</step>
+            <step>Count and record angle arc marks: single arc, double arc, triple arc at angles. These indicate equal-angle groups.</step>
+            <step>Extract any parallel marks (arrows) on sides.</step>
+            <step>For coordinate planes: extract axis labels, scale, all plotted points with coordinates, all curve equations written on the graph.</step>
+        </label_extraction>
+
+        <figure_text_association>
+            <step>For each figure, identify which text blocks, equations, and solution chains reference it.</step>
+            <step>Verify associations by checking that variable names in the text match labels in the figure.</step>
+            <step>Record the spatial relationship: is the solution work to the right of the figure? Below it? Above it?</step>
+        </figure_text_association>
+    </phase_3_figure_extraction>
+
+    <!-- Phase 4: Solution Chain Analysis -->
+    <phase_4_solution_chain_analysis>
+        <purpose>Trace the logical progression of each solution, verifying mathematical correctness where possible.</purpose>
+
+        <chain_identification>
+            <step>For each worked example, identify the solution chain: the ordered sequence of equations/expressions from setup to answer.</step>
+            <step>Number each step in the chain sequentially.</step>
+            <step>For each step, identify the mathematical operation that transforms the previous step into the current one (e.g., "added 2 to both sides", "squared both sides", "cross-multiplied").</step>
+        </chain_identification>
+
+        <correctness_assessment>
+            <step>Where steps are clearly legible, verify that each transformation is algebraically valid.</step>
+            <step>Check that the final (boxed/highlighted) answer is consistent with the preceding steps.</step>
+            <step>If an error is detected, note it but still transcribe what is written — do not silently correct.</step>
+            <step>Flag any steps where the operation is unclear or where a step seems to skip intermediate work.</step>
+        </correctness_assessment>
+
+        <answer_extraction>
+            <step>Identify all boxed, circled, or otherwise emphasized final answers.</step>
+            <step>Record the visual emphasis method (red box, circle, underline, etc.).</step>
+            <step>Associate each answer with its parent solution chain and original problem statement.</step>
+        </answer_extraction>
+    </phase_4_solution_chain_analysis>
+
+    <!-- Phase 5: Cross-Reference and Coherence Check -->
+    <phase_5_cross_reference>
+        <purpose>Verify that all extracted elements form a coherent, internally consistent representation of the page.</purpose>
+
+        <cross_reference_checks>
+            <step>Verify that every variable used in solution work appears either in the problem statement or in an associated figure.</step>
+            <step>Verify that all figure labels referenced in text/equations actually exist in the figure.</step>
+            <step>Check that similar triangle correspondences (△ABC ~ △DEF) match the actual vertex-to-vertex mappings implied by the figures.</step>
+            <step>Verify that stated angle sums equal 180° for triangles and that proportion setups are consistent with figure measurements.</step>
+        </cross_reference_checks>
+
+        <completeness_check>
+            <step>Review the page for any content you may have missed: small annotations, marginal notes, page numbers, section numbers.</step>
+            <step>Verify that the reading order of elements in your output matches the logical/pedagogical flow of the page.</step>
+            <step>Ensure every distinct semantic region identified in Phase 1 has been transcribed in Phase 2-4.</step>
+        </completeness_check>
+    </phase_5_cross_reference>
+
+    <!-- Confidence Assessment -->
+    <confidence_assessment>
+        <confidence_levels>
+            <level name="HIGH">Clear handwriting, unambiguous symbols, verified mathematical correctness, all labels legible.</level>
+            <level name="MEDIUM">Most content legible with minor ambiguities resolved by context. Some characters uncertain but mathematically plausible.</level>
+            <level name="LOW">Significant portions difficult to read. Multiple symbols ambiguous even with context. Mathematical flow unclear.</level>
+        </confidence_levels>
+
+        <element_confidence>
+            <step>Assign confidence to each transcribed expression (HIGH/MEDIUM/LOW).</step>
+            <step>For uncertain symbols, provide alternative readings: e.g., "x=18 [or possibly x=13, first digit unclear]".</step>
+            <step>Mark illegible portions with [...] and estimate the number of missing characters/expressions.</step>
+            <step>For geometric figures, note any labels that are partially obscured or ambiguous.</step>
+        </element_confidence>
+    </confidence_assessment>
+
+    <!-- Final verification -->
+    <final_verification>
+        <step>Review every transcribed element and confirm it comes from the target image only.</step>
+        <step>Ensure no content from example images has been included.</step>
+        <step>Verify that confidence scores accurately reflect transcription certainty.</step>
+        <step>Confirm that the output follows the response_format structure completely.</step>
+        <step>Verify that all LaTeX expressions are syntactically valid.</step>
+        <step>Confirm that the pedagogical reading order is preserved in the common_spine.</step>
+    </final_verification>
+
+</handwriting_math_verification_process>

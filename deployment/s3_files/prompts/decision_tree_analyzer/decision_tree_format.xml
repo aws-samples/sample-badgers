@@ -1,108 +1,83 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + decision_tree -->
 
 <response_format>
-    <response extraction_type="decision_tree">
+    <response analyzer="decision_tree"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>decision_tree</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_DECISION_TREES_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per decision tree found -->
-        <elements>
-            <element type="decision_tree">
-                <type>Decision Tree</type>
-                <summary>
-                    <title>{DECISION_TREE_TITLE_OR_CAPTION}</title>
-                    <purpose>{HIGH_LEVEL_PURPOSE_OR_OBJECTIVE}</purpose>
-                    <scope>{DOMAIN_OR_CONTEXT_E.G._CLINICAL_BUSINESS_DIAGNOSTIC}</scope>
-                    <tree_type>{BINARY_PROBABILISTIC_CONVERSATIONAL_CLINICAL_PROTOCOL_ETC}</tree_type>
-                    <tree_summary>{SUMMARY_OF_TREE_LOGIC}</tree_summary>
-                </summary>
-                <content>
-                    <decision_flow>
-                        <entry_point>
-                            <node_id>start</node_id>
-                            <content>{STARTING_CONDITION_OR_INITIAL_STATE}</content>
-                        </entry_point>
 
-                        <nodes>
-                            <node>
-                                <node_id>{UNIQUE_IDENTIFIER}</node_id>
-                                <node_type>decision|process|outcome|reference</node_type>
-                                <content>{NODE_TEXT_OR_DESCRIPTION}</content>
-                                <shape>{DIAMOND_RECTANGLE_CIRCLE_OVAL_ETC}</shape>
-                                <color>{IF_COLOR_CODED}</color>
-                                <!-- For decision nodes -->
-                                <condition>{DECISION_CRITERIA_OR_QUESTION}</condition>
-                                <!-- For process nodes -->
-                                <action>{PROCESS_OR_PROCEDURE_DESCRIPTION}</action>
-                                <!-- For outcome nodes -->
-                                <result>{FINAL_OUTCOME_OR_ENDPOINT}</result>
-                                <!-- For reference nodes -->
-                                <reference>{EXTERNAL_FIGURE_OR_PROCEDURE_REFERENCE}</reference>
-                                <!-- For probabilistic nodes -->
-                                <probability>{PROBABILITY_VALUE_IF_APPLICABLE}</probability>
-                            </node>
-                            <!-- Repeat for all nodes -->
-                        </nodes>
-
-                        <pathways>
-                            <pathway>
-                                <pathway_id>{UNIQUE_IDENTIFIER}</pathway_id>
-                                <from_node>{SOURCE_NODE_ID}</from_node>
-                                <to_node>{TARGET_NODE_ID}</to_node>
-                                <condition>{YES_NO_PROBABILITY_USER_RESPONSE_ETC}</condition>
-                                <condition_value>{SPECIFIC_CONDITION_VALUE}</condition_value>
-                                <pathway_type>conditional|probabilistic|sequential|loop_back</pathway_type>
-                                <probability>{IF_PROBABILISTIC_PATHWAY}</probability>
-                                <label>{PATHWAY_LABEL_OR_DESCRIPTION}</label>
-                            </pathway>
-                            <!-- Repeat for all pathways -->
-                        </pathways>
-
-                        <pathway_analysis>
-                            <complete_paths>
-                                <path>
-                                    <path_id>{UNIQUE_IDENTIFIER}</path_id>
-                                    <description>{SCENARIO_DESCRIPTION}</description>
-                                    <node_sequence>{COMMA_SEPARATED_NODE_IDS}</node_sequence>
-                                    <conditions>{CONDITIONS_THAT_LEAD_TO_THIS_PATH}</conditions>
-                                    <final_outcome>{END_RESULT}</final_outcome>
-                                </path>
-                                <!-- Repeat for all complete pathways -->
-                            </complete_paths>
-
-                            <decision_points>
-                                <decision_point>
-                                    <node_id>{DECISION_NODE_ID}</node_id>
-                                    <critical_factor>{WHAT_DETERMINES_THE_DECISION}</critical_factor>
-                                    <alternatives>{NUMBER_OF_POSSIBLE_OUTCOMES}</alternatives>
-                                </decision_point>
-                                <!-- Repeat for all major decision points -->
-                            </decision_points>
-
-                            <loop_structures>
-                                <loop>
-                                    <description>{LOOP_DESCRIPTION}</description>
-                                    <trigger_condition>{WHAT_CAUSES_LOOP_BACK}</trigger_condition>
-                                    <loop_target>{NODE_ID_TO_RETURN_TO}</loop_target>
-                                </loop>
-                                <!-- Repeat for all loop structures -->
-                            </loop_structures>
-
-                            <cross_references>
-                                <reference>
-                                    <node_id>{NODE_WITH_REFERENCE}</node_id>
-                                    <reference_target>{EXTERNAL_FIGURE_TABLE_PROCEDURE}</reference_target>
-                                    <reference_purpose>{WHY_REFERENCED}</reference_purpose>
-                                </reference>
-                                <!-- Repeat for all cross-references -->
-                            </cross_references>
-                        </pathway_analysis>
-                    </decision_flow>
-                </content>
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Decision tree title/caption -->
+            <element id="elem_001" tag="Caption" order="1" page="{PAGE}">
+                <text>{DECISION_TREE_TITLE_OR_CAPTION}</text>
             </element>
-        </elements>
+            <!-- The tree as a Figure for accessibility -->
+            <element id="elem_002" tag="Figure" order="2" page="{PAGE}">
+                <alt_text>{NATURAL_LANGUAGE_DESCRIPTION_OF_DECISION_TREE_LOGIC}</alt_text>
+                <caption>{CAPTION_TEXT_IF_ANY}</caption>
+            </element>
+            <!-- Any surrounding body text -->
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{BODY_TEXT_ON_PAGE}</text>
+            </element>
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <specialized type="decision_tree">
+            <elements>
+                <element type="decision_tree">
+                    <type>Decision Tree</type>
+                    <summary>
+                        <title>{DECISION_TREE_TITLE_OR_CAPTION}</title>
+                        <purpose>{HIGH_LEVEL_PURPOSE_OR_OBJECTIVE}</purpose>
+                        <scope>{DOMAIN_OR_CONTEXT}</scope>
+                        <tree_type>{BINARY_PROBABILISTIC_CONVERSATIONAL_CLINICAL_PROTOCOL_ETC}</tree_type>
+                        <tree_summary>{SUMMARY_OF_TREE_LOGIC}</tree_summary>
+                    </summary>
+                    <content>
+                        <decision_flow>
+                            <entry_point>
+                                <node_id>start</node_id>
+                                <content>{STARTING_CONDITION_OR_INITIAL_STATE}</content>
+                            </entry_point>
+                            <nodes>
+                                <node>
+                                    <node_id>{UNIQUE_NODE_ID}</node_id>
+                                    <node_type>{decision|action|outcome|condition}</node_type>
+                                    <content>{NODE_TEXT}</content>
+                                    <branches>
+                                        <branch>
+                                            <condition>{CONDITION_TEXT}</condition>
+                                            <target_node>{TARGET_NODE_ID}</target_node>
+                                        </branch>
+                                    </branches>
+                                </node>
+                            </nodes>
+                            <outcomes>
+                                <outcome>
+                                    <node_id>{OUTCOME_NODE_ID}</node_id>
+                                    <result>{OUTCOME_TEXT}</result>
+                                    <path>{SEQUENCE_OF_DECISIONS_LEADING_HERE}</path>
+                                </outcome>
+                            </outcomes>
+                        </decision_flow>
+                    </content>
+                    <context>{ROLE_OF_DECISION_TREE_IN_DOCUMENT}</context>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

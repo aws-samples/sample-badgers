@@ -41,7 +41,6 @@
             "war_map_tasks_extraction.xml",
             "war_map_format.xml",
             "war_map_help.xml",
-            "war_map_conversation_example.xml",
             "war_map_verification_process.xml"
         ],
         "examples_path": "prompts",

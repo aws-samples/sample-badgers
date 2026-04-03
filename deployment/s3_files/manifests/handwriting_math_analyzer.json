@@ -1,0 +1,131 @@
+{
+    "tool": {
+        "name": "analyze_handwriting_math_tool",
+        "description": "Specialized tool for recognizing, transcribing, and semantically interpreting handwritten mathematical content from educational documents. ONLY use for: handwritten equations, algebraic work, geometric figures with labels, function graphs, solution chains, worked examples, math lecture notes, homework, exams, and any mathematical notation written by hand. Extracts LaTeX, solution logic, geometric figure properties (vertices, sides, angles, congruence marks), and color-coded annotations. NOT for: printed/typed math, plain handwritten text without math, diagrams without mathematical content, or tables. If no handwritten mathematical content is found, returns that no content was detected.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "image_path": {
+                    "type": "string",
+                    "description": "Absolute file path to the image containing potential handwritten mathematical content to analyze. Supports common image formats (PNG, JPG, etc.)"
+                },
+                "aws_profile": {
+                    "type": "string",
+                    "description": "Optional AWS profile name for Bedrock authentication. If not provided, uses default AWS credentials"
+                },
+                "session_id": {
+                    "type": "string",
+                    "description": "Runtime session ID"
+                },
+                "audit_mode": {
+                    "type": "boolean",
+                    "description": "When true, includes confidence scoring and human review flags in the analysis output"
+                }
+            },
+            "required": [
+                "image_path",
+                "session_id"
+            ]
+        }
+    },
+    "analyzer": {
+        "name": "handwriting_math_analyzer",
+        "description": "Analyzes handwritten mathematical content to extract LaTeX transcriptions, solution chains, geometric figures, and pedagogical structure",
+        "enhancement_eligible": true,
+        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_files": [
+            "../shared/gestalt_perception_foundation.xml",
+            "handwriting_math_gestalt.xml",
+            "handwriting_math_context.xml",
+            "handwriting_math_format.xml",
+            "handwriting_math_help.xml",
+            "handwriting_math_job_role.xml",
+            "handwriting_math_rules.xml",
+            "handwriting_math_tasks.xml",
+            "handwriting_math_dictionary.xml",
+            "handwriting_math_verification.xml"
+        ],
+        "examples_path": "prompts",
+        "max_examples": 3,
+        "analysis_text": "handwritten mathematical content",
+        "expected_output_tokens": 8000,
+        "model_selections": {
+            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "fallback_list": [
+                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                "us.amazon.nova-premier-v1:0"
+            ]
+        },
+        "output_extension": "xml"
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": true,
+        "last_modified": "2026-04-01T00:00:00.000000+00:00",
+        "analyzer_type": "standard"
+    },
+    "evaluation": {
+        "likert_labels": [
+            "Failed",
+            "Major errors",
+            "Partial success",
+            "Minor issues",
+            "Perfect"
+        ],
+        "pass_threshold": 3,
+        "questions": {
+            "core": [
+                {
+                    "id": "overall_accuracy",
+                    "text": "Overall accuracy of the analysis",
+                    "type": "likert"
+                },
+                {
+                    "id": "element_identification",
+                    "text": "Were all visual elements correctly identified?",
+                    "type": "likert"
+                },
+                {
+                    "id": "contextual_understanding",
+                    "text": "Was the content understood within its surrounding context?",
+                    "type": "likert"
+                },
+                {
+                    "id": "issues_noted",
+                    "text": "What elements were missed or incorrectly represented?",
+                    "type": "text"
+                }
+            ],
+            "tool_specific": [
+                {
+                    "id": "latex_accuracy",
+                    "text": "Were handwritten expressions accurately converted to valid LaTeX?",
+                    "type": "likert"
+                },
+                {
+                    "id": "solution_chain_completeness",
+                    "text": "Were solution chains fully traced from problem statement through final answer?",
+                    "type": "likert"
+                },
+                {
+                    "id": "geometric_figure_extraction",
+                    "text": "Were geometric figures extracted with all labels, measurements, and congruence marks?",
+                    "type": "likert"
+                },
+                {
+                    "id": "color_semantics",
+                    "text": "Were ink color roles correctly identified and recorded?",
+                    "type": "likert"
+                },
+                {
+                    "id": "symbol_disambiguation",
+                    "text": "Were ambiguous handwritten symbols correctly resolved using context?",
+                    "type": "likert"
+                }
+            ]
+        }
+    }
+}

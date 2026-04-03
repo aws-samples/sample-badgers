@@ -1,22 +1,38 @@
 """
-PDF Accessibility Remediation Lambda Handler
+PDF Accessibility Tagger — Lambda Handler
+==========================================
+Wraps the final_form tagging pipeline for Lambda container deployment.
 
-Full pipeline: PDF -> analyze pages -> apply PDF/UA tags -> output tagged PDF
+Pipeline: S3 download → parse correlation XML → resolve bboxes →
+          wrap content stream → build structure tree → save → S3 upload
+
+Event schema matches the existing remediation_analyzer handler for
+drop-in compatibility.
 """
 
-import base64
 import json
 import logging
 import os
 import tempfile
-import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List
 
-from pdf_accessibility_tagger import PDFAccessibilityTagger, AccessibilityReport
-from cell_grid_resolver import resolve_elements_via_grid
-from diagnostic_visualizer import capture_page_diagnostics
+import fitz
+from pikepdf import Pdf
+
+from utils.pdf_accessibility_models import TagRegion, VALID_TAGS
+from utils.spine_parser import parse_correlation_xml
+
 from pdf_syntax_repair import repair_pdf as syntax_repair_pdf, RepairResult
+
+from utils import (
+    map_tag,
+    resolve_text_bboxes,
+    resolve_figure_bboxes,
+    wrap_content_stream_fixed,
+    build_structure_tree,
+)
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -24,63 +40,38 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
 def lambda_handler(event, context):
-    """Lambda handler for PDF Accessibility Remediation."""
+    """Lambda entry point for PDF accessibility tagging."""
     try:
-        if hasattr(context, "client_context") and context.client_context:
-            gateway_id = context.client_context.custom.get(
-                "bedrockAgentCoreGatewayId", "unknown"
-            )
-            tool_name = context.client_context.custom.get(
-                "bedrockAgentCoreToolName", "unknown"
-            )
-            logger.info(
-                "Gateway invocation - Gateway: %s, Tool: %s", gateway_id, tool_name
-            )
-
-        # Config source detection (matches other analyzer pattern)
-        config_bucket = os.environ.get("CONFIG_BUCKET")
-        analyzer_name = os.environ.get("ANALYZER_NAME", "remediation_analyzer")
-
-        if os.environ.get("AWS_EXECUTION_ENV") and config_bucket:
-            logger.info(
-                "Using S3 config: bucket=%s, analyzer=%s", config_bucket, analyzer_name
-            )
-        else:
-            logger.info("Using local config")
-
         body = json.loads(event["body"]) if "body" in event else event
 
         session_id = body.get("session_id", "no_session")
         pdf_path = body.get("pdf_path")
         title = body.get("title", "Accessible Document")
         lang = body.get("lang", "en-US")
-        render_dpi = body.get("dpi", 150)
         correlation_uri = body.get("correlation_uri")
-        page_b64_uris = body.get("page_b64_uris", {})
 
-        logger.info("Processing request for session: %s", session_id)
-        logger.info("PDF path: %s", pdf_path)
-        if correlation_uri:
-            logger.info("Correlation URI provided: %s", correlation_uri)
+        logger.info("Session: %s, PDF: %s", session_id, pdf_path)
 
         if not pdf_path:
             return _error_response("Missing required parameter: pdf_path")
+        if not correlation_uri:
+            return _error_response("Missing required parameter: correlation_uri")
 
         local_pdf = _download_from_s3(pdf_path)
-        logger.info("Downloaded PDF to: %s", local_pdf)
+        local_xml = _download_from_s3(correlation_uri)
 
         result = process_pdf(
             pdf_path=local_pdf,
+            xml_path=local_xml,
             title=title,
             lang=lang,
-            render_dpi=render_dpi,
-            aws_profile=body.get("aws_profile"),
-            correlation_uri=correlation_uri,
-            page_b64_uris=page_b64_uris,
             session_id=session_id,
         )
 
+        # Upload outputs to S3 if configured
         output_bucket = os.environ.get("OUTPUT_BUCKET")
+        analyzer_name = os.environ.get("ANALYZER_NAME", "remediation_analyzer")
+
         if output_bucket and result.get("output_pdf"):
             s3_uri = _upload_to_s3(
                 local_path=result["output_pdf"],
@@ -92,27 +83,6 @@ def lambda_handler(event, context):
             result["s3_output_uri"] = s3_uri
             logger.info("Uploaded tagged PDF to: %s", s3_uri)
 
-            # Upload accessibility report as companion JSON
-            if result.get("accessibility_report"):
-                report_path = result["output_pdf"].replace(".pdf", "_report.json")
-                with open(report_path, "w", encoding="utf-8") as f:
-                    json.dump(result["accessibility_report"], f, indent=2)
-                report_s3_uri = _upload_to_s3(
-                    local_path=report_path,
-                    bucket=output_bucket,
-                    analyzer_name=analyzer_name,
-                    session_id=session_id,
-                    original_key=pdf_path.replace(".pdf", "_report.json"),
-                )
-                result["s3_report_uri"] = report_s3_uri
-                logger.info("Uploaded accessibility report to: %s", report_s3_uri)
-
-        # Include compliance verdict at top level for easy routing
-        report_data = result.get("accessibility_report", {})
-        compliance = report_data.get("post_remediation", {}).get(
-            "compliance_level", "not_assessed"
-        )
-
         return {
             "statusCode": 200,
             "body": json.dumps(
@@ -120,7 +90,6 @@ def lambda_handler(event, context):
                     "result": result,
                     "success": True,
                     "session_id": session_id,
-                    "compliance": compliance,
                 }
             ),
         }
@@ -132,29 +101,16 @@ def lambda_handler(event, context):
 
 def process_pdf(
     pdf_path: str,
-    title: str,
-    lang: str,
-    render_dpi: int,
-    aws_profile: Optional[str] = None,
-    correlation_uri: Optional[str] = None,
-    page_b64_uris: Optional[dict[str, str]] = None,
+    xml_path: str,
+    title: str = "Accessible Document",
+    lang: str = "en-US",
     session_id: str = "",
-) -> dict[str, Any]:
-    """Full PDF remediation pipeline.
+) -> Dict[str, Any]:
+    """Full tagging pipeline: XML parse → bbox resolve → content stream → structure tree.
 
-    When correlation_uri is provided, uses the correlation content spine
-    for element metadata and resolves coordinates via PyMuPDF text search
-    (text elements) and targeted vision model calls (figures only).
-    Falls back to full vision model analysis when no correlation data exists.
-
-    When page_b64_uris is provided, uses pre-processed base64 images from S3
-    instead of rendering from the PDF. Falls back to rendering + ImageProcessor
-    optimization if no b64 URI exists for a given page.
+    Returns dict with output_pdf path and diagnostics.
     """
-    import fitz
-    from PIL import Image
-
-    work_dir = Path(tempfile.mkdtemp(prefix="pdf_remediation_"))
+    work_dir = Path(tempfile.mkdtemp(prefix="pdf_tagger_"))
 
     # --- Syntax repair pass (fix corrupt xref, streams, etc.) ---
     repair_result: RepairResult | None = None
@@ -179,246 +135,126 @@ def process_pdf(
                 f"Repair error: {e}"
             ) from e
 
-    doc = fitz.open(pdf_path)
-    num_pages = len(doc)
-    logger.info("Processing %d pages at %d DPI", num_pages, render_dpi)
+    # 1. Parse correlation XML
+    with open(xml_path, encoding="utf-8") as f:
+        xml_content = f.read()
 
-    # Load correlation data if available
-    correlation_pages = {}
-    if correlation_uri:
-        try:
-            correlation_xml = _download_from_s3(correlation_uri)
-            with open(correlation_xml, "r", encoding="utf-8") as f:
-                correlation_pages = _parse_correlation_xml(f.read())
+    tree, page_elems = parse_correlation_xml(xml_content)
+    logger.info(
+        "Correlation: tree=%s, %d page(s)",
+        "yes" if tree else "no",
+        len(page_elems),
+    )
+
+    # Get correlation elements (handle page key mismatch)
+    # For single-page correlation XMLs, all elements share one key
+    all_corr_elems = []
+    for pg_elems in page_elems.values():
+        all_corr_elems.extend(pg_elems)
+
+    text_elems = [e for e in all_corr_elems if e["type"] != "figure"]
+    fig_elems = [e for e in all_corr_elems if e["type"] == "figure"]
+
+    # 2. Open PDF with both fitz (for text search) and pikepdf (for writing)
+    fitz_doc = fitz.open(pdf_path)
+    pdf = Pdf.open(pdf_path)
+    num_pages = len(fitz_doc)
+
+    merged_mcid_map: Dict[int, TagRegion] = {}
+    mcid_counter = 0
+
+    for page_idx in range(num_pages):
+        fitz_page = fitz_doc[page_idx]
+
+        # Resolve bboxes for this page
+        resolved_text = resolve_text_bboxes(fitz_page, text_elems)
+        resolved_figs = resolve_figure_bboxes(fitz_page, fig_elems)
+        resolved = resolved_text + resolved_figs
+
+        matched = [
+            e
+            for e in resolved
+            if e["source"] not in ("fallback_stacked", "fallback_figure")
+        ]
+        if not matched:
+            logger.info("Page %d: no matches, skipping", page_idx + 1)
+            continue
+
+        logger.info(
+            "Page %d: %d resolved (%d matched, %d fallback)",
+            page_idx + 1,
+            len(resolved),
+            len(matched),
+            len(resolved) - len(matched),
+        )
+
+        # Build TagRegion objects
+        regions = _build_regions(resolved, fitz_page, page_idx)
+        regions = {page_idx: regions.get(page_idx, [])}
+
+        # Wrap content stream with BDC/EMC
+        new_content, mcid_map, mcid_counter = wrap_content_stream_fixed(
+            pdf,
+            fitz_doc,
+            regions,
+            page_num=page_idx,
+            mcid_start=mcid_counter,
+        )
+
+        if new_content and mcid_map:
+            pdf.pages[page_idx]["/Contents"] = pdf.make_stream(new_content)
+            merged_mcid_map.update(mcid_map)
             logger.info(
-                "Loaded correlation data for %d page(s)", len(correlation_pages)
-            )
-        except Exception as e:
-            logger.warning("Failed to load correlation data, falling back: %s", e)
-            correlation_pages = {}
-
-    analyzer = None  # Lazy-init only if needed
-
-    all_results: list[dict[str, Any]] = []
-    page_elements: dict[int, list[dict[str, Any]]] = {}
-
-    for page_num in range(num_pages):
-        logger.info("Analyzing page %d/%d", page_num + 1, num_pages)
-
-        page = doc[page_num]
-
-        # Check if we have correlation data for this page (1-indexed in XML)
-        corr_elements = correlation_pages.get(page_num + 1)
-
-        if corr_elements:
-            logger.info(
-                "Using correlation-guided path for page %d (%d elements)",
-                page_num + 1,
-                len(corr_elements),
-            )
-            # Resolve text element coordinates from PDF text layer
-            text_elements = [e for e in corr_elements if e["type"] != "figure"]
-            figure_elements = [e for e in corr_elements if e["type"] == "figure"]
-
-            resolved = _resolve_text_bboxes(page, text_elements)
-
-            # Separate successfully resolved from fallback-stacked
-            text_resolved = [
-                e for e in resolved if e.get("source") != "fallback_stacked"
-            ]
-            text_unresolved = [
-                e for e in resolved if e.get("source") == "fallback_stacked"
-            ]
-
-            if text_unresolved:
-                logger.info(
-                    "%d/%d text elements unresolved via text search, "
-                    "routing to cell grid resolver",
-                    len(text_unresolved),
-                    len(text_elements),
-                )
-
-            # Combine unresolved text + ALL figures for a single grid call
-            grid_candidates = list(text_unresolved)
-            for fig in figure_elements:
-                grid_candidates.append(
-                    {
-                        "id": fig.get("id", ""),
-                        "type": "figure",
-                        "text": fig.get("caption", ""),
-                        "alt_text": fig.get("alt_text", ""),
-                        "order": fig.get("order", 0),
-                    }
-                )
-
-            if grid_candidates:
-                # Try pre-processed b64 first, fall back to render + optimize
-                b64_uri = (page_b64_uris or {}).get(str(page_num))
-                if b64_uri:
-                    try:
-                        local_b64 = _download_from_s3(b64_uri)
-                        with open(local_b64, "r", encoding="utf-8") as f:
-                            b64_str = f.read().strip()
-                        image_data = base64.b64decode(b64_str)
-                        logger.info(
-                            "Using pre-processed b64 for page %d (%d bytes)",
-                            page_num,
-                            len(image_data),
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to load b64 for page %d, falling back: %s",
-                            page_num,
-                            e,
-                        )
-                        b64_uri = None  # trigger fallback below
-
-                if not b64_uri:
-                    # Render from PDF and optimize via ImageProcessor
-                    zoom = render_dpi / 72.0
-                    mat = fitz.Matrix(zoom, zoom)
-                    pix = page.get_pixmap(matrix=mat, alpha=False)
-                    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-                    img_path = work_dir / f"page_{page_num}.png"
-                    img.save(img_path)
-
-                    with open(img_path, "rb") as f:
-                        raw_data = f.read()
-
-                    if analyzer is None:
-                        analyzer = _initialize_analyzer(aws_profile)
-
-                    image_data = analyzer.image_processor.optimize_image(raw_data)
-                    logger.info(
-                        "Rendered + optimized page %d: %d -> %d bytes",
-                        page_num,
-                        len(raw_data),
-                        len(image_data),
-                    )
-
-                if analyzer is None:
-                    analyzer = _initialize_analyzer(aws_profile)
-
-                logger.info(
-                    "Cell grid resolver: locating %d elements (%d text + %d figures)",
-                    len(grid_candidates),
-                    len(text_unresolved),
-                    len(figure_elements),
-                )
-                grid_resolved = resolve_elements_via_grid(
-                    image_data,
-                    grid_candidates,
-                    analyzer,
-                    aws_profile,
-                    resolved_anchors=text_resolved,
-                )
-                text_resolved.extend(grid_resolved)
-
-            # Capture diagnostics (if enabled via ENABLE_DIAGNOSTICS env var)
-            capture_page_diagnostics(
-                page_image_data=image_data,
-                page_number=page_num + 1,  # 1-indexed
-                correlation_elements=corr_elements,
-                resolved_elements=text_resolved,
-                grid_cols=10,
-                grid_rows=14,
-                gridded_image=None,
-                pdf_path=pdf_path,
-                session_id=session_id,
+                "Page %d: %d MCIDs, %d bytes content stream",
+                page_idx + 1,
+                len(mcid_map),
+                len(new_content),
             )
 
-            elements = text_resolved
+    # 3. Build structure tree ONCE with all merged MCIDs
+    total_mcids = len(merged_mcid_map)
+    total_elems = 0
+    if merged_mcid_map:
+        result_info = build_structure_tree(
+            pdf,
+            merged_mcid_map,
+            page_num=0,
+            structure_element_tree=tree,
+        )
+        if isinstance(result_info, int):
+            total_elems = result_info
         else:
-            # Fallback: full vision model analysis (original behavior)
-            logger.info(
-                "No correlation data for page %d, using full analysis", page_num + 1
-            )
-            zoom = render_dpi / 72.0
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
+            total_elems = len(result_info)
 
-            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            img_path = work_dir / f"page_{page_num}.png"
-            img.save(img_path)
+    # 4. Set metadata
+    try:
+        with pdf.open_metadata() as meta:
+            meta["dc:title"] = title
+            meta["dc:language"] = [lang]
+            meta["pdfuaid:part"] = "1"
+    except Exception as e:
+        logger.warning("Metadata write failed: %s", e)
 
-            with open(img_path, "rb") as f:
-                image_data = f.read()
-
-            if analyzer is None:
-                analyzer = _initialize_analyzer(aws_profile)
-
-            analysis_result = analyzer.analyze(image_data, aws_profile)
-
-            try:
-                elements = _extract_json_from_response(analysis_result)
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.warning("Failed to parse analysis for page %d: %s", page_num, e)
-                elements = []
-
-        page_elements[page_num] = elements
-        all_results.append({"page": page_num, "elements": elements})
-        logger.info("Found %d elements on page %d", len(elements), page_num)
-
-    doc.close()
-
-    output_pdf = work_dir / "tagged_output.pdf"
-
-    with PDFAccessibilityTagger(pdf_path) as tagger:
-        # Log pre-remediation audit
-        logger.info("Pre-remediation compliance: %s", tagger.report.pre_level.value)
-        for check in tagger.report.pre_checks:
-            level = "PASS" if check.passed else "FAIL"
-            logger.info("  [%s] %s: %s", level, check.name, check.message)
-
-        for page_num, elements in page_elements.items():
-            for elem in elements:
-                if not elem.get("bbox"):
-                    continue
-
-                bbox = elem["bbox"]
-                tag = _map_element_type_to_pdf_tag(elem.get("type", "P"))
-                alt_text = elem.get("alt_text", "")
-                text_content = elem.get("content", "")
-
-                if tag == "Figure" and not alt_text:
-                    alt_text = text_content[:200] if text_content else "Figure"
-
-                tagger.add_region_normalized(
-                    page=page_num,
-                    bbox_normalized=(
-                        bbox.get("x0", 0),
-                        bbox.get("y0", 0),
-                        bbox.get("x1", 1),
-                        bbox.get("y1", 1),
-                    ),
-                    tag=tag,
-                    alt_text=alt_text,
-                    text_content=text_content,
-                    order=elem.get("order", 0),
-                    element_id=elem.get("id", ""),
-                    source=elem.get("source", ""),
-                )
-
-        output_path, report = tagger.save(str(output_pdf), title=title, lang=lang)
-
-    # Log post-remediation audit
-    logger.info("Post-remediation compliance: %s", report.post_level.value)
-    for check in report.post_checks:
-        level = "PASS" if check.passed else "FAIL"
-        logger.info("  [%s] %s: %s", level, check.name, check.message)
+    # 5. Save
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_path = str(work_dir / f"tagged_{ts}.pdf")
+    pdf.save(output_path)
+    pdf.close()
+    fitz_doc.close()
 
     logger.info(
-        "Created tagged PDF: %s (elements: %d, overlays: %d)",
-        output_pdf,
-        report.total_elements_tagged,
-        report.invisible_text_overlays_added,
+        "Tagged PDF saved: %s (%d MCIDs, %d StructElems, %d pages)",
+        output_path,
+        total_mcids,
+        total_elems,
+        num_pages,
     )
 
     return {
-        "output_pdf": str(output_pdf),
+        "output_pdf": output_path,
         "pages_processed": num_pages,
-        "analysis": all_results,
-        "correlation_used": bool(correlation_pages),
+        "total_mcids": total_mcids,
+        "total_struct_elems": total_elems,
         "syntax_repair": {
             "applied": repair_result.any_repair_applied if repair_result else False,
             "pass1_ok": repair_result.pass1_ok if repair_result else False,
@@ -426,457 +262,56 @@ def process_pdf(
             "size_delta": repair_result.size_delta if repair_result else 0,
             "logs": repair_result.logs if repair_result else [],
         },
-        "accessibility_report": report.to_dict(),
     }
 
 
-def _parse_correlation_xml(xml_content: str) -> dict[int, list[dict[str, Any]]]:
-    """Parse correlation XML into a page-indexed dict of elements.
+# ============================================================================
+# Helpers
+# ============================================================================
 
-    Returns:
-        Dict mapping page number (1-indexed) to list of element dicts with
-        keys: id, type, order, text, alt_text, caption.
-    """
-    pages: dict[int, list[dict[str, Any]]] = {}
 
-    try:
-        root = ET.fromstring(xml_content)
-    except ET.ParseError as e:
-        logger.warning("Failed to parse correlation XML: %s", e)
-        return pages
+def _build_regions(
+    resolved_elements: List[Dict],
+    fitz_page,
+    page_idx: int,
+) -> Dict[int, List[TagRegion]]:
+    """Convert resolved bbox dicts into TagRegion objects keyed by page index."""
+    w, h = fitz_page.rect.width, fitz_page.rect.height
+    regions: Dict[int, List[TagRegion]] = {}
 
-    # Get page number from root attribute
-    page_num = int(root.get("page", "1"))
+    for elem in resolved_elements:
+        bbox = elem["bbox"]
+        x0 = bbox["x0"] * w
+        x1 = bbox["x1"] * w
+        y0 = (1 - bbox["y1"]) * h
+        y1 = (1 - bbox["y0"]) * h
 
-    elements = []
-    for elem in root.iter("element"):
-        elem_id = elem.get("id", "")
-        elem_type = elem.get("type", "paragraph")
-        elem_order = int(elem.get("order", "0"))
+        tag = elem.get("tag") or map_tag(elem.get("type", "P"))
+        if tag not in VALID_TAGS:
+            tag = "P"
 
-        # Extract text content
-        text_node = elem.find("text")
-        text = (
-            text_node.text.strip() if text_node is not None and text_node.text else ""
+        region = TagRegion(
+            tag=tag,
+            bbox=(x0, y0, x1, y1),
+            alt_text=elem.get("alt_text", ""),
+            text_content=elem.get("content", ""),
+            order=elem.get("order", 0),
+            page=page_idx,
+            element_id=elem.get("id", ""),
+            source=elem.get("source", ""),
+            enrichment_title=elem.get("enrichment_title") or None,
+            enrichment_description=elem.get("enrichment_description") or None,
+            enrichment_actual_text=elem.get("enrichment_actual_text") or None,
+            enrichment_tags=elem.get("enrichment_tags") or None,
+            enrichment_related=elem.get("enrichment_related") or None,
         )
+        regions.setdefault(page_idx, []).append(region)
 
-        # Extract alt_text (for figures)
-        alt_node = elem.find("alt_text")
-        alt_text = (
-            alt_node.text.strip() if alt_node is not None and alt_node.text else ""
-        )
-
-        # Extract caption (for figures)
-        caption_node = elem.find("caption")
-        caption = (
-            caption_node.text.strip()
-            if caption_node is not None and caption_node.text
-            else ""
-        )
-
-        elements.append(
-            {
-                "id": elem_id,
-                "type": elem_type,
-                "order": elem_order,
-                "text": text,
-                "alt_text": alt_text,
-                "caption": caption,
-            }
-        )
-
-    if elements:
-        pages[page_num] = elements
-        logger.info("Parsed %d elements for page %d", len(elements), page_num)
-
-    return pages
-
-
-def _resolve_text_bboxes(
-    page: Any, text_elements: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
-    """Resolve bounding boxes for text elements using PyMuPDF text search.
-
-    Uses page.search_for() to find exact text positions in the PDF text layer.
-    Returns elements in the same format expected by the tagger.
-    """
-    resolved = []
-
-    page_width = page.rect.width
-    page_height = page.rect.height
-
-    for elem in text_elements:
-        text = elem.get("text", "")
-        if not text:
-            continue
-
-        elem_id = elem.get("id", "")
-
-        # Search for the text in the PDF page
-        rects = page.search_for(text)
-
-        if rects:
-            # Use the first match; normalize to 0-1 range
-            rect = rects[0]
-            resolved.append(
-                {
-                    "type": elem["type"],
-                    "order": elem["order"],
-                    "alt_text": elem.get("alt_text", ""),
-                    "content": text,
-                    "id": elem_id,
-                    "bbox": {
-                        "x0": rect.x0 / page_width,
-                        "y0": 1
-                        - (rect.y1 / page_height),  # Flip Y for normalized coords
-                        "x1": rect.x1 / page_width,
-                        "y1": 1 - (rect.y0 / page_height),
-                    },
-                    "source": "pymupdf_text_search",
-                }
-            )
-            logger.debug("Text bbox resolved for '%s': %s", text[:40], rect)
-        else:
-            # Try partial match with first 50 chars
-            partial = text[:50]
-            rects = page.search_for(partial)
-            if rects:
-                rect = rects[0]
-                resolved.append(
-                    {
-                        "type": elem["type"],
-                        "order": elem["order"],
-                        "alt_text": elem.get("alt_text", ""),
-                        "content": text,
-                        "id": elem_id,
-                        "bbox": {
-                            "x0": rect.x0 / page_width,
-                            "y0": 1 - (rect.y1 / page_height),
-                            "x1": rect.x1 / page_width,
-                            "y1": 1 - (rect.y0 / page_height),
-                        },
-                        "source": "pymupdf_partial_search",
-                    }
-                )
-                logger.debug("Partial text bbox resolved for '%s'", partial[:40])
-            else:
-                # No text layer match — still include the element so the tagger
-                # can insert an invisible text overlay at a fallback position
-                logger.warning(
-                    "Could not resolve bbox for text: '%s' — "
-                    "will use full-page fallback for invisible overlay",
-                    text[:60],
-                )
-                resolved.append(
-                    {
-                        "type": elem["type"],
-                        "order": elem["order"],
-                        "alt_text": elem.get("alt_text", ""),
-                        "content": text,
-                        "id": elem_id,
-                        "bbox": {
-                            "x0": 0.02,
-                            "y0": max(0.02, 1.0 - (elem["order"] * 0.05)),
-                            "x1": 0.98,
-                            "y1": min(0.98, 1.0 - (elem["order"] * 0.05) + 0.04),
-                        },
-                        "source": "fallback_stacked",
-                    }
-                )
-
-    logger.info(
-        "Resolved %d/%d text element bboxes via PyMuPDF",
-        len(resolved),
-        len(text_elements),
-    )
-    return resolved
-
-
-def _resolve_figure_bboxes(
-    analyzer: Any,
-    image_data: bytes,
-    figure_elements: list[dict[str, Any]],
-    aws_profile: Optional[str] = None,  # noqa: ARG001
-) -> list[dict[str, Any]]:
-    """Resolve bounding boxes for figure elements using a targeted vision model call.
-
-    Sends the page image with a focused prompt listing only the figures
-    to locate, using descriptions from the correlation data.
-    Uses the analyzer's bedrock_client directly with a custom prompt
-    rather than the full analysis pipeline.
-    """
-    if not figure_elements:
-        return []
-
-    # Build a targeted prompt for figure coordinate extraction
-    figure_descriptions = []
-    for i, elem in enumerate(figure_elements):
-        desc = (
-            elem.get("caption") or elem.get("alt_text") or f"Figure {elem.get('id', i)}"
-        )
-        figure_descriptions.append(f"  {i + 1}. id=\"{elem.get('id', '')}\": {desc}")
-
-    system_prompt = (
-        "You are a precise visual element locator. Given a page image and a list of "
-        "figure descriptions, return the bounding box coordinates for each figure. "
-        "Coordinates must be normalized to 0-1 range where (0,0) is bottom-left and "
-        "(1,1) is top-right. Return ONLY a JSON array."
-    )
-
-    user_text = (
-        "Locate the following figures in this page image and return their "
-        "bounding box coordinates as normalized values (0-1 range).\n\n"
-        "Figures to locate:\n" + "\n".join(figure_descriptions) + "\n\n"
-        "Return a JSON array where each object has:\n"
-        '  {"id": "elem_XXX", "bbox": {"x0": float, "y0": float, "x1": float, "y1": float}}\n'
-        "Return ONLY the JSON array, no other text."
-    )
-
-    image_b64 = base64.b64encode(image_data).decode("utf-8")
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": image_b64,
-                    },
-                },
-                {"type": "text", "text": user_text},
-            ],
-        }
-    ]
-
-    try:
-        bedrock_client = analyzer.bedrock_client
-        model_id = analyzer.config.get(
-            "model_id", "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
-        )
-
-        resolver_max_tokens = analyzer.global_settings.get("resolver_max_tokens", 4000)
-
-        payload = bedrock_client.create_anthropic_payload(
-            system_prompt=system_prompt,
-            messages=messages,
-            max_tokens=resolver_max_tokens,
-            temperature=0.1,
-        )
-
-        response = bedrock_client.invoke_model(
-            model_id=model_id,
-            payload=payload,
-        )
-
-        # Extract text from response
-        result_text = ""
-        for block in response.get("content", []):
-            if block.get("type") == "text":
-                result_text = block.get("text", "")
-                break
-
-        if not result_text:
-            logger.warning("Empty response from figure bbox model call")
-            return []
-
-        bbox_results = _extract_json_from_response(result_text)
-
-        # Build a lookup from the model response
-        bbox_lookup = {}
-        for item in bbox_results:
-            if item.get("id") and item.get("bbox"):
-                bbox_lookup[item["id"]] = item["bbox"]
-
-        resolved = []
-        for elem in figure_elements:
-            elem_id = elem.get("id", "")
-            bbox = bbox_lookup.get(elem_id)
-
-            if bbox:
-                resolved.append(
-                    {
-                        "type": "figure",
-                        "order": elem["order"],
-                        "alt_text": elem.get("alt_text", ""),
-                        "content": elem.get("caption", ""),
-                        "id": elem_id,
-                        "bbox": bbox,
-                        "source": "vision_model_targeted",
-                    }
-                )
-            else:
-                logger.warning("No bbox returned for figure %s", elem_id)
-
-        logger.info(
-            "Resolved %d/%d figure bboxes via targeted vision model",
-            len(resolved),
-            len(figure_elements),
-        )
-        return resolved
-
-    except Exception as e:
-        logger.error("Failed to resolve figure bboxes: %s", e)
-        return []
-
-
-def _initialize_analyzer(aws_profile: Optional[str] = None):
-    """Initialize the analyzer foundation.
-
-    Args:
-        aws_profile: AWS profile name for BedrockClient credentials
-    """
-    from foundation.analyzer_foundation import AnalyzerFoundation
-    from foundation.configuration_manager import ConfigurationManager
-    from foundation.prompt_loader import PromptLoader
-    from foundation.image_processor import ImageProcessor
-    from foundation.bedrock_client import BedrockClient
-    from foundation.message_chain_builder import MessageChainBuilder
-    from foundation.response_processor import ResponseProcessor
-
-    config_bucket = os.environ.get("CONFIG_BUCKET")
-    analyzer_name = os.environ.get("ANALYZER_NAME", "remediation_analyzer")
-
-    if os.environ.get("AWS_EXECUTION_ENV") and config_bucket:
-        from foundation.s3_config_loader import load_manifest_from_s3
-
-        manifest = load_manifest_from_s3(config_bucket, analyzer_name)
-        config = manifest.get("analyzer", manifest)
-        config_source = "s3"
-    else:
-        config = {
-            "prompt_files": [
-                "remediation_job_role.xml",
-                "remediation_context.xml",
-                "remediation_coordinate_system.xml",
-                "remediation_element_types.xml",
-                "remediation_rules.xml",
-                "remediation_output_format.xml",
-            ],
-            "max_examples": 0,
-            "analysis_text": "PDF page elements for accessibility tagging",
-        }
-        config_source = "local"
-
-    analyzer = object.__new__(AnalyzerFoundation)
-    analyzer.analyzer_type = analyzer_name
-    analyzer.s3_bucket = config_bucket if config_source == "s3" else None
-    analyzer.logger = logging.getLogger(f"foundation.{analyzer_name}")
-    analyzer.config = config
-    analyzer.global_settings = {
-        "max_tokens": int(os.environ.get("MAX_TOKENS", "8000")),
-        "resolver_max_tokens": int(os.environ.get("RESOLVER_MAX_TOKENS", "4000")),
-        "temperature": float(os.environ.get("TEMPERATURE", "0.1")),
-        "max_image_size": int(os.environ.get("MAX_IMAGE_SIZE", "20971520")),
-        "max_dimension": int(os.environ.get("MAX_DIMENSION", "2048")),
-        "jpeg_quality": int(os.environ.get("JPEG_QUALITY", "85")),
-        "cache_enabled": os.environ.get("CACHE_ENABLED", "True") == "True",
-        "throttle_delay": float(os.environ.get("THROTTLE_DELAY", "1.0")),
-        "aws_region": os.environ.get("AWS_REGION", "us-west-2"),
-    }
-
-    analyzer.config_manager = ConfigurationManager()
-
-    if config_source == "s3":
-        analyzer.prompt_loader = PromptLoader(
-            config_source="s3", s3_bucket=config_bucket, analyzer_name=analyzer_name
-        )
-    else:
-        analyzer.prompt_loader = PromptLoader(config_source="local")
-
-    analyzer.image_processor = ImageProcessor()
-    analyzer.bedrock_client = BedrockClient(
-        aws_region=analyzer.global_settings.get("aws_region", "us-west-2"),
-    )
-    analyzer.aws_profile = aws_profile
-    analyzer.message_builder = MessageChainBuilder()
-    analyzer.response_processor = ResponseProcessor()
-    analyzer._configure_components()
-
-    return analyzer
-
-
-def _extract_json_from_response(response: str) -> list[dict[str, Any]]:
-    """Extract JSON array from model response.
-
-    Handles formats:
-    - <analysis>...</analysis>[{...}]
-    - ```json[{...}]```
-    - Raw JSON array
-    """
-    import re
-
-    # Remove analysis wrapper if present
-    if "</analysis>" in response:
-        response = response.split("</analysis>", 1)[1]
-
-    # Remove markdown code blocks if present
-    response = re.sub(r"```json\s*", "", response)
-    response = re.sub(r"```\s*$", "", response)
-
-    # Strip whitespace
-    response = response.strip()
-
-    # Parse JSON
-    parsed = json.loads(response)
-
-    # Ensure it's a list
-    if not isinstance(parsed, list):
-        raise ValueError(f"Expected JSON array, got {type(parsed)}")
-
-    return parsed
-
-
-def _map_element_type_to_pdf_tag(element_type: str) -> str:
-    """Map analyzer element types to valid PDF structure tags."""
-    mapping = {
-        "H1": "H1",
-        "H2": "H2",
-        "H3": "H3",
-        "H4": "H4",
-        "H5": "H5",
-        "H6": "H6",
-        "P": "P",
-        "Figure": "Figure",
-        "Table": "Table",
-        "Caption": "Caption",
-        "L": "L",
-        "LI": "LI",
-        "Link": "Link",
-        "Note": "Note",
-        "TOC": "TOC",
-        "TOCI": "TOCI",
-        "Quote": "Quote",
-        "BlockQuote": "BlockQuote",
-        "Formula": "Formula",
-        "Artifact": "Artifact",
-        # Lowercase variants from correlation XML / vision model
-        "h1": "H1",
-        "h2": "H2",
-        "h3": "H3",
-        "h4": "H4",
-        "h5": "H5",
-        "h6": "H6",
-        "heading": "H1",
-        "paragraph": "P",
-        "image": "Figure",
-        "figure": "Figure",
-        "table": "Table",
-        "list": "L",
-        "list_item": "LI",
-        "footer": "NonStruct",
-        "header": "NonStruct",
-        "caption": "Caption",
-        "blockquote": "BlockQuote",
-        "code": "Code",
-        "formula": "Formula",
-    }
-    return mapping.get(element_type, "P")
+    return regions
 
 
 def _download_from_s3(s3_uri: str) -> str:
-    """Download file from S3 to temp location."""
+    """Download file from S3 to temp location. Pass through local paths."""
     import boto3
 
     if not s3_uri.startswith("s3://"):
@@ -888,7 +323,7 @@ def _download_from_s3(s3_uri: str) -> str:
 
     ext = Path(key).suffix or ".pdf"
     fd, temp_path = tempfile.mkstemp(suffix=ext)
-    os.close(fd)  # Close the file descriptor immediately
+    os.close(fd)
 
     s3.download_file(bucket, key, temp_path)
     return temp_path
@@ -901,29 +336,21 @@ def _upload_to_s3(
     session_id: str,
     original_key: str,
 ) -> str:
-    """Upload file to S3 output bucket.
-
-    Output path: {analyzer_name}/results/{session_id}/{original_name}_{timestamp}.{ext}
-    Matches the path convention used by save_result_to_s3 in the foundation.
-    """
+    """Upload file to S3 output bucket."""
     import boto3
-    from datetime import datetime
 
     s3 = boto3.client("s3")
 
     original_name = Path(original_key).stem
     ext = Path(local_path).suffix or Path(original_key).suffix or ".pdf"
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    output_key = (
-        f"{analyzer_name}/results/{session_id}/{original_name}_{timestamp}{ext}"
-    )
+    output_key = f"{session_id}/{analyzer_name}/{original_name}_{timestamp}{ext}"
 
     s3.upload_file(local_path, bucket, output_key)
-
     return f"s3://{bucket}/{output_key}"
 
 
-def _error_response(message: str) -> dict[str, Any]:
+def _error_response(message: str) -> Dict[str, Any]:
     """Return error response."""
     return {
         "statusCode": 500,

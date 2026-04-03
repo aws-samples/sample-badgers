@@ -1,3 +1,14 @@
+<!--
+CHECKPOINT_05D — FULL TEXT RULES
+==================================
+Updated to support hierarchical correlation pipeline.
+
+CHANGES FROM PREVIOUS:
+  - Added: inline element identification rule
+  - Added: heading hierarchy accuracy rule
+  - Added: footnote reference pairing rule
+  - All original rules preserved unchanged
+-->
 <full_text_rules>
     <rule>Extract ALL text from the page, regardless of its perceived importance or relevance.</rule>
     <rule>Maintain the original reading order of the text as it would be read by a human.</rule>
@@ -16,4 +27,14 @@
         - Small text at page bottom with reference marks = footnote
     </rule>
     <rule>Decorative elements, watermarks, and purely visual content with no informational value should be typed as "artifact" or omitted entirely.</rule>
+
+    <!-- NEW RULES for downstream correlation pipeline -->
+    <rule>Heading level accuracy is critical. The downstream pipeline uses heading levels to build the PDF/UA section hierarchy. Assign heading levels based on document structure:
+        - h1 for the document title or main heading (typically one per page)
+        - h2 for major section headings
+        - h3 for subsection headings within an h2 section
+        - h4 for further subdivisions
+        Do not skip heading levels (e.g., h1 directly to h3). When uncertain, prefer the higher level (h2 over h3).</rule>
+    <rule>When a paragraph contains mathematical formulas, equations, footnote reference markers, hyperlinks, or other semantically distinct inline content, still extract the full paragraph text in the text tag. The downstream correlator will use the elements analyzer to identify which fragments are inline elements. Your job is to ensure the complete text is captured verbatim.</rule>
+    <rule>When a footnote reference marker appears in the text (superscript number, asterisk, dagger), extract it as part of the paragraph text. The corresponding footnote body should be extracted as a separate footnote element with a ref attribute pointing to the paragraph that contains the reference marker.</rule>
 </full_text_rules>

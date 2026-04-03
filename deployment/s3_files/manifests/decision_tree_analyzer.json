@@ -41,7 +41,6 @@
             "decision_tree_tasks.xml",
             "decision_tree_format.xml",
             "decision_tree_help.xml",
-            "decision_tree_conversation_example.xml",
             "decision_tree_verification.xml",
             "decision_tree_notes.xml"
         ],

@@ -1,205 +1,179 @@
 <!-- You must respond using the format within the <response_format/> xml tags. -->
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + media_rights -->
 
 <response_format>
-    <response extraction_type="media_rights">
+    <response analyzer="media_rights"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
         <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <analyzer_name>media_rights</analyzer_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
             <element_count>{NUMBER_OF_CONTRACTS_OR_CONTRACT_PAGES_DETECTED}</element_count>
+            <confidence>{high|medium|low}</confidence>
         </metadata>
-        <!-- If element_count is 0, omit <elements> section entirely -->
-        <!-- Include one <element> per contract or contract page found -->
-        <elements>
-            <element type="media_rights_contract">
-                <type>Media Rights Contract</type>
 
-                <contract_identification>
-                    <contract_type>{CONTENT_LICENSE|TALENT_AGREEMENT|SYNC_LICENSE|DISTRIBUTION_AGREEMENT|DIGITAL_RIGHTS_UGC|OTHER}</contract_type>
-                    <document_title>{EXACT_TITLE_AS_SHOWN}</document_title>
-                    <template_notice>{ANY_DISCLAIMER_OR_TEMPLATE_NOTICE_TEXT}</template_notice>
-                    <effective_date>{DATE_OR_BLANK_INDICATOR}</effective_date>
-                </contract_identification>
-
-                <parties>
-                    <party>
-                        <defined_name>{SHORT_NAME_e.g._Licensor_Producer_Publisher}</defined_name>
-                        <legal_name>{FULL_NAME_OR_BLANK}</legal_name>
-                        <role>{ROLE_IN_AGREEMENT}</role>
-                        <entity_type>{ORGANIZATIONAL_TYPE_OR_BLANK}</entity_type>
-                        <jurisdiction>{JURISDICTION_OF_FORMATION_OR_BLANK}</jurisdiction>
-                        <principal_office>{ADDRESS_OR_BLANK}</principal_office>
-                    </party>
-                    <!-- Repeat for each party -->
-                </parties>
-
-                <recitals>
-                    <recital>{VERBATIM_TEXT_OF_EACH_WHEREAS_CLAUSE}</recital>
-                    <!-- Repeat for each recital -->
-                </recitals>
-
-                <defined_terms>
-                    <term>
-                        <name>{DEFINED_TERM_NAME}</name>
-                        <definition>{VERBATIM_DEFINITION}</definition>
-                        <section_reference>{WHERE_DEFINED_e.g._Section_1.1}</section_reference>
-                    </term>
-                    <!-- Repeat for each defined term -->
-                </defined_terms>
-
-                <rights_grant>
-                    <grant_nature>{EXCLUSIVE|NON_EXCLUSIVE|OTHER}</grant_nature>
-                    <transferability>{TRANSFERABLE|NON_TRANSFERABLE|CONDITIONAL}</transferability>
-                    <specific_rights>
-                        <right>{EACH_SPECIFIC_RIGHT_GRANTED_e.g._reproduce_distribute_perform}</right>
-                        <!-- Repeat for each right -->
-                    </specific_rights>
-                    <licensed_media>
-                        <medium>{EACH_LICENSED_PLATFORM_OR_MEDIA_TYPE}</medium>
-                        <!-- Repeat for each medium -->
-                    </licensed_media>
-                    <territory>{TERRITORY_SPECIFICATION_OR_BLANK}</territory>
-                    <sublicensing>{SUBLICENSING_TERMS_AND_RESTRICTIONS}</sublicensing>
-                    <reservation_of_rights>{VERBATIM_RESERVATION_LANGUAGE}</reservation_of_rights>
-                    <holdbacks>
-                        <holdback>{EACH_HOLDBACK_PROVISION}</holdback>
-                    </holdbacks>
-                    <ai_digital_likeness>
-                        <provision>{AI_AND_DIGITAL_LIKENESS_TERMS_IF_PRESENT}</provision>
-                    </ai_digital_likeness>
-                    <merchandising>{MERCHANDISING_RIGHTS_TERMS_IF_PRESENT}</merchandising>
-                    <promotional_use>{PROMOTIONAL_USE_ALLOWANCES}</promotional_use>
-                </rights_grant>
-
-                <financial_terms>
-                    <fixed_compensation>
-                        <amount>{DOLLAR_AMOUNT_OR_BLANK}</amount>
-                        <payment_schedule>{PAYMENT_TIMING_AND_INSTALLMENTS}</payment_schedule>
-                    </fixed_compensation>
-                    <revenue_share>
-                        <percentage>{PERCENTAGE_OR_BLANK}</percentage>
-                        <revenue_base>{DEFINITION_OF_REVENUE_BASE_e.g._Net_Revenue_Gross_Receipts}</revenue_base>
-                        <approved_deductions>{ENUMERATED_DEDUCTIONS}</approved_deductions>
-                    </revenue_share>
-                    <minimum_guarantee>
-                        <amount>{MG_AMOUNT_OR_BLANK}</amount>
-                        <recoupment_terms>{HOW_MG_IS_RECOUPED}</recoupment_terms>
-                    </minimum_guarantee>
-                    <residuals_royalties>
-                        <structure>{RESIDUAL_OR_ROYALTY_STRUCTURE}</structure>
-                        <guild_reference>{CBA_OR_GUILD_REFERENCE_IF_ANY}</guild_reference>
-                    </residuals_royalties>
-                    <distribution_fee>
-                        <percentage>{FEE_PERCENTAGE_OR_BLANK}</percentage>
-                    </distribution_fee>
-                    <recoupable_expenses>
-                        <expense_category>{EACH_RECOUPABLE_EXPENSE_TYPE}</expense_category>
-                        <!-- Repeat for each category -->
-                    </recoupable_expenses>
-                    <most_favored_nations>{MFN_PROVISION_IF_PRESENT}</most_favored_nations>
-                    <contingent_compensation>{NET_PROFITS_OR_BONUS_STRUCTURE}</contingent_compensation>
-                    <per_diem_travel>{PER_DIEM_AND_TRAVEL_TERMS}</per_diem_travel>
-                    <reporting>
-                        <frequency>{REPORTING_FREQUENCY}</frequency>
-                        <deadline>{DAYS_AFTER_PERIOD_END}</deadline>
-                        <audit_rights>{AUDIT_PROVISION_DETAILS}</audit_rights>
-                    </reporting>
-                </financial_terms>
-
-                <term_and_termination>
-                    <initial_term>
-                        <duration>{TERM_LENGTH_OR_BLANK}</duration>
-                        <commencement>{WHEN_TERM_BEGINS}</commencement>
-                    </initial_term>
-                    <renewal>
-                        <mechanism>{RENEWAL_TERMS}</mechanism>
-                        <notice_period>{NOTICE_REQUIRED_FOR_RENEWAL}</notice_period>
-                    </renewal>
-                    <termination_triggers>
-                        <trigger>{EACH_TERMINATION_TRIGGER_WITH_DETAILS}</trigger>
-                        <!-- Repeat for each trigger -->
-                    </termination_triggers>
-                    <cure_period>{CURE_PERIOD_DURATION_AND_TERMS}</cure_period>
-                    <post_termination>
-                        <obligation>{EACH_POST_TERMINATION_OBLIGATION}</obligation>
-                        <!-- Repeat for each obligation -->
-                    </post_termination>
-                    <reversion_of_rights>{REVERSION_TERMS}</reversion_of_rights>
-                    <sell_off_period>{SELL_OFF_DURATION_AND_CONDITIONS}</sell_off_period>
-                    <survival>{SECTIONS_THAT_SURVIVE_TERMINATION}</survival>
-                </term_and_termination>
-
-                <obligations_and_restrictions>
-                    <delivery_requirements>{DELIVERY_SPECS_AND_TIMELINES}</delivery_requirements>
-                    <exclusivity_restrictions>{EXCLUSIVITY_PERIODS_AND_SCOPE}</exclusivity_restrictions>
-                    <morals_clause>{MORALS_CLAUSE_TEXT_IF_PRESENT}</morals_clause>
-                    <approval_rights>
-                        <approval>{EACH_APPROVAL_OR_CONSULTATION_RIGHT}</approval>
-                    </approval_rights>
-                    <content_standards>{COMMUNITY_GUIDELINES_AND_COMPLIANCE_REQUIREMENTS}</content_standards>
-                    <dmca_compliance>{DMCA_AND_TAKEDOWN_PROVISIONS}</dmca_compliance>
-                    <content_moderation>{MODERATION_RIGHTS_AND_APPEAL_PROCESS}</content_moderation>
-                    <data_portability>{DATA_ACCESS_AND_PORTABILITY_TERMS}</data_portability>
-                    <publicity_obligations>{PROMOTIONAL_AND_PUBLICITY_REQUIREMENTS}</publicity_obligations>
-                </obligations_and_restrictions>
-
-                <credit_and_attribution>
-                    <screen_credit>{CREDIT_SPECIFICATION_POSITION_SIZE_CARD}</screen_credit>
-                    <paid_advertising>{PAID_AD_CREDIT_OBLIGATIONS}</paid_advertising>
-                    <music_credit>{END_TITLE_CREDIT_FORMAT}</music_credit>
-                    <credit_remedies>{REMEDY_FOR_CREDIT_FAILURE}</credit_remedies>
-                </credit_and_attribution>
-
-                <legal_protections>
-                    <representations_warranties>
-                        <party_warranties party="{PARTY_NAME}">
-                            <warranty>{EACH_REPRESENTATION_OR_WARRANTY}</warranty>
-                        </party_warranties>
-                        <!-- Repeat for each party -->
-                    </representations_warranties>
-                    <indemnification>
-                        <type>{MUTUAL|ONE_SIDED}</type>
-                        <scope>{INDEMNIFICATION_SCOPE_AND_COVERAGE}</scope>
-                    </indemnification>
-                    <liability_limitation>
-                        <cap>{LIABILITY_CAP_AMOUNT_OR_FORMULA}</cap>
-                        <exclusions>{EXCLUDED_DAMAGE_TYPES}</exclusions>
-                    </liability_limitation>
-                    <governing_law>{GOVERNING_LAW_JURISDICTION}</governing_law>
-                    <dispute_resolution>{ARBITRATION_MEDIATION_OR_LITIGATION_DETAILS}</dispute_resolution>
-                    <force_majeure>{FORCE_MAJEURE_PROVISION_AND_ENUMERATED_EVENTS}</force_majeure>
-                    <entire_agreement>{ENTIRE_AGREEMENT_AND_AMENDMENT_CLAUSE}</entire_agreement>
-                </legal_protections>
-
-                <exhibits_and_attachments>
-                    <exhibit>
-                        <reference>{EXHIBIT_LETTER_OR_NUMBER}</reference>
-                        <described_contents>{WHAT_THE_EXHIBIT_CONTAINS}</described_contents>
-                    </exhibit>
-                    <!-- Repeat for each referenced exhibit -->
-                </exhibits_and_attachments>
-
-                <signature_blocks>
-                    <signature>
-                        <party>{PARTY_NAME}</party>
-                        <signatory_title>{AUTHORIZED_SIGNATORY_TITLE}</signatory_title>
-                        <date_field>{DATE_OR_BLANK}</date_field>
-                    </signature>
-                    <!-- Repeat for each signature block -->
-                </signature_blocks>
-
-                <extraction_notes>
-                    <unfilled_terms>
-                        <unfilled_term>{EACH_BLANK_FIELD_REQUIRING_NEGOTIATION_WITH_SECTION_REF}</unfilled_term>
-                    </unfilled_terms>
-                    <truncated_text>
-                        <truncation>{ANY_TEXT_CUT_OFF_AT_PAGE_BOUNDARIES}</truncation>
-                    </truncated_text>
-                    <cross_references>
-                        <reference>{REFERENCES_TO_OTHER_SECTIONS_OR_DOCUMENTS}</reference>
-                    </cross_references>
-                </extraction_notes>
-
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <!-- Contract title -->
+            <element id="elem_001" tag="H1" order="1" page="{PAGE}">
+                <text>{DOCUMENT_TITLE}</text>
             </element>
-        </elements>
+            <!-- Each major section of the contract as a text element -->
+            <element id="elem_002" tag="H2" order="2" page="{PAGE}">
+                <text>{SECTION_HEADING}</text>
+            </element>
+            <element id="elem_003" tag="P" order="3" page="{PAGE}">
+                <text>{FULL_VERBATIM_SECTION_TEXT}</text>
+            </element>
+            <!-- Signature blocks -->
+            <element id="elem_004" tag="P" order="4" page="{PAGE}">
+                <text>{SIGNATURE_BLOCK_TEXT}</text>
+            </element>
+            <!-- Include ALL visible text in reading order -->
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <specialized type="media_rights">
+            <elements>
+                <element type="media_rights_contract">
+                    <type>Media Rights Contract</type>
+
+                    <contract_identification>
+                        <contract_type>{CONTENT_LICENSE|TALENT_AGREEMENT|SYNC_LICENSE|DISTRIBUTION_AGREEMENT|DIGITAL_RIGHTS_UGC|OTHER}</contract_type>
+                        <document_title>{EXACT_TITLE_AS_SHOWN}</document_title>
+                        <template_notice>{ANY_DISCLAIMER_OR_TEMPLATE_NOTICE_TEXT}</template_notice>
+                        <effective_date>{DATE_OR_BLANK_INDICATOR}</effective_date>
+                    </contract_identification>
+
+                    <parties>
+                        <party>
+                            <defined_name>{SHORT_NAME}</defined_name>
+                            <legal_name>{FULL_NAME_OR_BLANK}</legal_name>
+                            <role>{ROLE_IN_AGREEMENT}</role>
+                            <entity_type>{ORGANIZATIONAL_TYPE_OR_BLANK}</entity_type>
+                            <jurisdiction>{JURISDICTION_OR_BLANK}</jurisdiction>
+                            <principal_office>{ADDRESS_OR_BLANK}</principal_office>
+                        </party>
+                    </parties>
+
+                    <recitals>
+                        <recital>{VERBATIM_TEXT_OF_EACH_WHEREAS_CLAUSE}</recital>
+                    </recitals>
+
+                    <defined_terms>
+                        <term>
+                            <n>{DEFINED_TERM_NAME}</n>
+                            <definition>{VERBATIM_DEFINITION}</definition>
+                            <section_reference>{WHERE_DEFINED}</section_reference>
+                        </term>
+                    </defined_terms>
+
+                    <rights_grant>
+                        <grant_nature>{EXCLUSIVE|NON_EXCLUSIVE|OTHER}</grant_nature>
+                        <transferability>{TRANSFERABLE|NON_TRANSFERABLE|CONDITIONAL}</transferability>
+                        <specific_rights>
+                            <right>{EACH_SPECIFIC_RIGHT_GRANTED}</right>
+                        </specific_rights>
+                        <licensed_media>
+                            <medium>{EACH_LICENSED_PLATFORM_OR_MEDIA_TYPE}</medium>
+                        </licensed_media>
+                        <territory>{TERRITORY_SPECIFICATION_OR_BLANK}</territory>
+                        <sublicensing>{SUBLICENSING_TERMS}</sublicensing>
+                        <reservation_of_rights>{RESERVATION_LANGUAGE}</reservation_of_rights>
+                        <holdbacks>
+                            <holdback>{EACH_HOLDBACK_PROVISION}</holdback>
+                        </holdbacks>
+                        <ai_digital_likeness>
+                            <provision>{AI_AND_DIGITAL_LIKENESS_TERMS_IF_PRESENT}</provision>
+                        </ai_digital_likeness>
+                        <merchandising>{MERCHANDISING_RIGHTS_TERMS}</merchandising>
+                        <promotional_use>{PROMOTIONAL_USE_ALLOWANCES}</promotional_use>
+                    </rights_grant>
+
+                    <financial_terms>
+                        <fixed_compensation>
+                            <amount>{DOLLAR_AMOUNT_OR_BLANK}</amount>
+                            <payment_schedule>{PAYMENT_TIMING}</payment_schedule>
+                        </fixed_compensation>
+                        <revenue_share>
+                            <percentage>{PERCENTAGE_OR_BLANK}</percentage>
+                            <revenue_base>{DEFINITION_OF_REVENUE_BASE}</revenue_base>
+                            <approved_deductions>{ENUMERATED_DEDUCTIONS}</approved_deductions>
+                        </revenue_share>
+                        <minimum_guarantee>
+                            <amount>{MG_AMOUNT_OR_BLANK}</amount>
+                            <recoupment_terms>{HOW_MG_IS_RECOUPED}</recoupment_terms>
+                        </minimum_guarantee>
+                        <residuals_royalties>
+                            <structure>{RESIDUAL_OR_ROYALTY_STRUCTURE}</structure>
+                            <guild_reference>{CBA_OR_GUILD_REFERENCE}</guild_reference>
+                        </residuals_royalties>
+                        <reporting>
+                            <frequency>{REPORTING_FREQUENCY}</frequency>
+                            <deadline>{DAYS_AFTER_PERIOD_END}</deadline>
+                            <audit_rights>{AUDIT_PROVISION_DETAILS}</audit_rights>
+                        </reporting>
+                    </financial_terms>
+
+                    <term_and_termination>
+                        <initial_term>
+                            <duration>{TERM_LENGTH_OR_BLANK}</duration>
+                            <commencement>{WHEN_TERM_BEGINS}</commencement>
+                        </initial_term>
+                        <renewal>
+                            <mechanism>{RENEWAL_TERMS}</mechanism>
+                            <notice_period>{NOTICE_REQUIRED}</notice_period>
+                        </renewal>
+                        <termination_triggers>
+                            <trigger>{EACH_TERMINATION_TRIGGER}</trigger>
+                        </termination_triggers>
+                        <cure_period>{CURE_PERIOD_TERMS}</cure_period>
+                        <post_termination>
+                            <obligation>{EACH_POST_TERMINATION_OBLIGATION}</obligation>
+                        </post_termination>
+                        <reversion_of_rights>{REVERSION_TERMS}</reversion_of_rights>
+                        <survival>{SECTIONS_THAT_SURVIVE}</survival>
+                    </term_and_termination>
+
+                    <legal_protections>
+                        <representations_warranties>
+                            <party_warranties party="{PARTY_NAME}">
+                                <warranty>{EACH_WARRANTY}</warranty>
+                            </party_warranties>
+                        </representations_warranties>
+                        <indemnification>
+                            <type>{MUTUAL|ONE_SIDED}</type>
+                            <scope>{INDEMNIFICATION_SCOPE}</scope>
+                        </indemnification>
+                        <governing_law>{GOVERNING_LAW_JURISDICTION}</governing_law>
+                        <dispute_resolution>{ARBITRATION_MEDIATION_OR_LITIGATION}</dispute_resolution>
+                        <force_majeure>{FORCE_MAJEURE_PROVISION}</force_majeure>
+                    </legal_protections>
+
+                    <signature_blocks>
+                        <signature>
+                            <party>{PARTY_NAME}</party>
+                            <signatory_title>{AUTHORIZED_SIGNATORY_TITLE}</signatory_title>
+                            <date_field>{DATE_OR_BLANK}</date_field>
+                        </signature>
+                    </signature_blocks>
+
+                    <extraction_notes>
+                        <unfilled_terms>
+                            <unfilled_term>{EACH_BLANK_FIELD_WITH_SECTION_REF}</unfilled_term>
+                        </unfilled_terms>
+                        <truncated_text>
+                            <truncation>{TEXT_CUT_OFF_AT_PAGE_BOUNDARIES}</truncation>
+                        </truncated_text>
+                    </extraction_notes>
+                </element>
+            </elements>
+        </specialized>
+
     </response>
 </response_format>

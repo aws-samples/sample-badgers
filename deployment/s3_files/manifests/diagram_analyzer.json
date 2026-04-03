@@ -42,7 +42,6 @@
             "diagrams_tasks_extraction.xml",
             "diagrams_format.xml",
             "diagrams_help.xml",
-            "diagrams_conversation_example.xml",
             "diagrams_two_step_verfication_process.xml"
         ],
         "examples_path": "prompts",
