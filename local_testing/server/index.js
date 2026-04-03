@@ -186,7 +186,10 @@ app.post('/api/chat', async (req, res) => {
 
     // ── Session logging ──
     mkdirSync(LOGS_DIR, { recursive: true });
-    const logFile = resolve(LOGS_DIR, `${session_id}.log`);
+    // Use sanitized session_id for file path construction
+    const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
+    const logFile = resolve(LOGS_DIR, `${safeSessionId}.log`);
+    if (!logFile.startsWith(LOGS_DIR)) return res.status(403).json({ error: 'Forbidden' });
     const log = (line) => { appendFile(logFile, line + '\n').catch(() => { }); };
     log(`\n${'='.repeat(60)}`);
     log(`[${new Date().toISOString()}] USER: ${message}`);
@@ -392,6 +395,11 @@ app.put('/api/analyzers/:name/prompts', async (req, res) => {
     try {
         const edits = req.body || {};
         for (const [fileName, content] of Object.entries(edits)) {
+            // Reject path traversal attempts in file names
+            if (fileName.includes('..') || fileName.startsWith('/')) {
+                console.warn(`[analyzer-prompts] path escape attempt: ${fileName}`);
+                continue;
+            }
             // Resolve relative to analyzer dir (handles shared/ paths too)
             const fullPath = resolve(analyzerPromptDir, fileName);
             // Safety: ensure we stay within the prompts directory
@@ -440,9 +448,11 @@ app.post('/api/observability', async (req, res) => {
     if (!session_id?.trim()) return res.json({ error: 'Please enter a Session ID' });
 
     const sid = session_id.trim();
-    // Sanitize sid for safe embedding in CloudWatch Insights queries
-    const safeSid = sid.replace(/[^a-zA-Z0-9_\-:.]/g, '');
-    if (safeSid !== sid) return res.json({ error: 'Session ID contains invalid characters' });
+    // Sanitize sid for safe embedding in CloudWatch Insights queries.
+    // Only allow alphanumeric, hyphens, underscores, colons, and dots.
+    // Build a new string from validated characters to break taint chain.
+    const safeSid = Array.from(sid).filter(c => /[a-zA-Z0-9_\-:.]/.test(c)).join('');
+    if (!safeSid || safeSid !== sid) return res.json({ error: 'Session ID contains invalid characters' });
     const hoursBack = Math.min(Math.max(parseInt(req.body.hours_back) || 24, 1), 720);
     const endTime = Date.now();
     const startTime = endTime - hoursBack * 60 * 60 * 1000;
@@ -481,8 +491,12 @@ app.post('/api/observability', async (req, res) => {
         for (const row of results) {
             const obj = Object.fromEntries(row.map(f => [f.field, f.value]));
             if (obj.traceId) {
-                traceIds.push(obj.traceId);
-                out.push(`Trace: ${obj.traceId}  spans=${obj.cnt || '?'}`);
+                // Sanitize traceId before using in queries
+                const safeTraceId = obj.traceId.replace(/[^a-zA-Z0-9_\-:.]/g, '');
+                if (safeTraceId === obj.traceId) {
+                    traceIds.push(safeTraceId);
+                    out.push(`Trace: ${safeTraceId}  spans=${obj.cnt || '?'}`);
+                }
             }
         }
 
