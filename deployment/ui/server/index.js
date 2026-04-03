@@ -261,7 +261,7 @@ app.get('/api/s3-configs', async (_req, res) => {
 // Read/write use a middleware-style approach to handle deep paths (Express 5 compat)
 const S3_CONFIG_PREFIX = '/api/s3-configs/';
 
-app.use(S3_CONFIG_PREFIX, async (req, res) => {
+app.use(S3_CONFIG_PREFIX, limiter, async (req, res) => {
     const relPath = decodeURIComponent(req.path.replace(/^\//, ''));
     if (!relPath || relPath.includes('..')) return res.status(400).json({ error: 'Invalid path' });
     const fullPath = resolve(S3_FILES_DIR, relPath);
