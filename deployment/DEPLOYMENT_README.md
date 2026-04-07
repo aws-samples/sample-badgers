@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | [Local Testing](../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](ui/DEPLOYMENT_UI_README.md) | 🔵 **Deployment** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Lambda Analyzers](lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | [UI](../ui/UI_README.md) | 🔵 **Deployment** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Lambda Analyzers](lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -64,6 +64,44 @@ Deploy everything:
 | `badgers-inference`         | Application Inference Profiles for cost tracking  |
 | `badgers-runtime-websocket` | AgentCore Runtime (Strands agent with WebSocket)  |
 | `badgers-custom-analyzers`  | Custom analyzers (optional, wizard-created)       |
+
+### Frontend Stacks (deployed separately)
+
+| Stack              | Purpose                                         |
+| ------------------ | ----------------------------------------------- |
+| `badgers-vpc`      | VPC with public/private subnets, NAT, flow logs |
+| `badgers-frontend` | ALB + Fargate + ACM + Route53 + Cognito auth    |
+
+Frontend stacks require a `frontend_config.json` file (not committed to git):
+
+```bash
+cp frontend_config.example.json frontend_config.json
+```
+
+Edit with your environment-specific values:
+
+```json
+{
+  "hosted_zone_id": "Z0123456789ABCDEFGHIJ",
+  "hosted_zone_name": "yourname.people.aws.dev",
+  "domain_name": "badgers.yourname.people.aws.dev",
+  "alb_ingress_prefix_list_id": "pl-xxxxxxxx",
+  "alb_ingress_cidrs": null
+}
+```
+
+Deploy:
+
+```bash
+./deploy_frontend.sh              # Build, push, deploy VPC + frontend
+./deploy_frontend.sh --skip-build # Redeploy without rebuilding assets
+```
+
+Destroy:
+
+```bash
+./destroy_frontend.sh
+```
 
 ## 🔧 Manual Deployment
 
@@ -191,6 +229,10 @@ Key outputs after deployment:
 deployment/
 ├── app.py                    # 🎯 CDK app entry point
 ├── deploy_from_scratch.sh    # 🚀 Full deployment orchestrator
+├── deploy_frontend.sh        # 🌐 Frontend deployment (VPC + ALB/Fargate)
+├── destroy_frontend.sh       # 🗑️ Frontend teardown
+├── frontend_config.json      # 🔧 Environment-specific frontend config (gitignored)
+├── frontend_config.example.json # 📋 Template for frontend_config.json
 ├── stacks/                   # 📦 CDK stack definitions
 ├── lambdas/
 │   ├── build_foundation_layer.sh    # Core framework layer
@@ -311,7 +353,7 @@ s3://{config-bucket}/
 
 ### Workflow
 
-1. **Create analyzer** via the 🧙 Create Analyzer tab in the [Local Testing UI](../local_testing/LOCAL_TESTING_README.md)
+1. **Create analyzer** via the 🧙 Create Analyzer tab in the [UI](../ui/UI_README.md)
    - Wizard uploads files to S3 under `custom-analyzers/` prefix
 
 2. **Sync to local** for CDK deployment:
@@ -337,7 +379,7 @@ The custom stack:
 | Base   | Read-only by default, toggle to enable with warning |
 | Custom | Always editable                                     |
 
-See the 🧙 Create Analyzer tab in the [Local Testing UI](../local_testing/LOCAL_TESTING_README.md) for detailed usage.
+See the 🧙 Create Analyzer tab in the [UI](../ui/UI_README.md) for detailed usage.
 
 ## 🔄 Redeploying
 
@@ -386,7 +428,8 @@ Gateway logs are automatically configured:
 > This permanently deletes all resources including S3 buckets and their contents.
 
 ```bash
-./destroy.sh
+./destroy_frontend.sh     # Frontend stacks first (if deployed)
+./destroy.sh              # Core stacks
 ```
 
 ## 🐛 Troubleshooting

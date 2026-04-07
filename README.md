@@ -1,7 +1,8 @@
+> [!WARNING]
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🧭 **Navigation:**</sub><br>
-<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [Local Testing](local_testing/LOCAL_TESTING_README.md) | [Deployment UI](deployment/ui/DEPLOYMENT_UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -24,13 +25,13 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 ## 📸 Screenshots
 
-| Local Testing — Home                                               | Local Testing — Chat                                               |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| ![Home Page](github-assets/badgers-local-testing-ui-home-page.png) | ![Chat Interface](github-assets/badgers-local-testing-ui-chat.png) |
+| Local Testing — Home                                                | Local Testing — Chat                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| ![Home Page](.github/assets/badgers-local-testing-ui-home-page.png) | ![Chat Interface](.github/assets/badgers-local-testing-ui-chat.png) |
 
-| Deployment UI — Stacks                                                      | Deployment UI — Config Editor                                       |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| ![Stack Information](github-assets/badgers-deploy-ui-stack-information.png) | ![Config Editor](github-assets/badgers-deploy-ui-config-editor.png) |
+| Deployment UI — Stacks                                                       | Deployment UI — Config Editor                                        |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| ![Stack Information](.github/assets/badgers-deploy-ui-stack-information.png) | ![Config Editor](.github/assets/badgers-deploy-ui-config-editor.png) |
 
 ## ⚙️ How It Works
 
@@ -151,6 +152,17 @@ This deploys 10 CloudFormation stacks:
 9. 🏃 Runtime (Strands agent container)
 10. 🧩 Custom Analyzers (optional, wizard-created)
 
+### Frontend (separate)
+
+The unified UI (ALB + Fargate + Cognito auth) is deployed independently:
+
+```bash
+cd deployment
+cp frontend_config.example.json frontend_config.json
+# Edit frontend_config.json with your hosted zone, domain, and prefix list
+./deploy_frontend.sh
+```
+
 ### Manual Steps
 
 See [deployment/DEPLOYMENT_README.md](deployment/DEPLOYMENT_README.md) for step-by-step instructions.
@@ -159,7 +171,8 @@ See [deployment/DEPLOYMENT_README.md](deployment/DEPLOYMENT_README.md) for step-
 
 ```bash
 cd deployment
-./destroy.sh
+./destroy.sh              # Core stacks
+./destroy_frontend.sh     # Frontend stacks (VPC + ALB/Fargate)
 ```
 
 ## 📁 Project Structure
@@ -172,9 +185,10 @@ cd deployment
 │   ├── runtime/               # AgentCore Runtime container
 │   ├── s3_files/              # Prompts, schemas, manifests
 │   └── badgers-foundation/    # Shared analyzer framework
-├── local_testing/             # Local dev/testing UI (React + Express)
-│   ├── src/                   # React components (chat, wizard, editor, pricing, etc.)
-│   └── server/                # Express API server
+├── ui/                        # BADGERS UI (React + Express, runs locally or deployed via Docker)
+│   ├── src/                   # React components (testing + admin tabs, role-gated)
+│   ├── server/                # Express API server (testing + admin routes, OIDC auth)
+│   └── Dockerfile             # Container image for AWS deployment
 └── pyproject.toml
 ```
 
@@ -414,7 +428,7 @@ cd local_testing
 npm run dev
 ```
 
-The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [Local Testing UI](local_testing/LOCAL_TESTING_README.md).
+The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [UI](ui/UI_README.md).
 
 **Option 2: Manual Creation**
 

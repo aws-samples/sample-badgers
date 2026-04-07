@@ -12,8 +12,7 @@
   - Deploy/destroy individual CDK stacks with streaming log output
   - S3 config file editor for manifests, prompts, and schemas
   - Vite dev server (port 5173) + Express API (port 3456)
-- `local_testing/LOCAL_TESTING_README.md` — documentation for the Local Testing UI
-- `deployment/ui/DEPLOYMENT_UI_README.md` — documentation for the Deployment UI
+- `ui/UI_README.md` — documentation for the BADGERS UI
 
 ### Removed
 - Gradio-based frontend (`frontend/`) replaced by `local_testing/` and `deployment/ui/`

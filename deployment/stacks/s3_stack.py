@@ -100,7 +100,7 @@ class S3Stack(Stack):
 
         # Apply resource-specific tags
         self._apply_resource_tags(
-            self.s3_kms_key, "s3-encryption-key", "KMS key for S3 bucket encryption"
+            self.s3_kms_key, "s3-encryption-alias", "KMS key for S3 bucket encryption"
         )
         self._apply_resource_tags(
             self.config_bucket,

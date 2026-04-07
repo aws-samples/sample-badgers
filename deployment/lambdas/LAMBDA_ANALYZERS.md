@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Local Testing](../../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](../ui/DEPLOYMENT_UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Analyzers** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Analyzers** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -311,7 +311,7 @@ cd frontend
 uv run python main.py
 ```
 
-The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [Local Testing UI](../../local_testing/LOCAL_TESTING_README.md).
+The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [UI](../../ui/UI_README.md).
 
 **Option 2: Manual Creation**
 

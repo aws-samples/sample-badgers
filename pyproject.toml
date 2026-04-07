@@ -25,7 +25,7 @@ dependencies = [
     "markdown2docx>=0.1.0",
     "mcp",
     "networkx",
-    "opencv-python>=4.12.0.88",
+    "opencv-python>=4.13.0.92",
     "pdfreader>=0.1.15",
     "pikepdf>=10.0.2",
     "pillow",
@@ -55,7 +55,7 @@ dependencies = [
     "urllib3>=2.6.2",
     "pip-audit>=2.10.0",
     "requests>=2.28.0",
-    "pyjwt>=2.8.0",
+    "pyjwt>=2.12.0",
     "uvicorn>=0.24.0",
     "itsdangerous>=2.2.0",
     "aws-cdk-mixins-preview==2.234.1a0",
@@ -87,9 +87,7 @@ disallow_untyped_defs = true
 disable = ["C0103", "R0903"]
 
 [tool.uv.workspace]
-members = [
-    ".kiro/skills/markdown_converter",
-]
+members = [".kiro/skills/markdown_converter"]
 
 [dependency-groups]
 dev = ["types-requests>=2.32.4.20260107"]

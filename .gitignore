@@ -76,6 +76,9 @@ env/
 ENV/
 __pycache__
 
+# Frontend config (environment-specific, use frontend_config.example.json as template)
+deployment/frontend_config.json
+
 # Custom analyzers - keep directory structure only
 deployment/custom_analyzers/*
 !deployment/custom_analyzers/.gitkeep
