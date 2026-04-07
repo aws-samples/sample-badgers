@@ -20,6 +20,8 @@ from stacks import (
     InferenceProfilesStack,
     CustomAnalyzersStack,
     XRayTransactionSearchStack,
+    VpcStack,
+    FrontendStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -256,6 +258,51 @@ if custom_analyzers_registry.exists():
         ),
         env=env,
         description="Custom analyzers created via the wizard UI",
+    )
+
+# --- Frontend infrastructure ---
+# Load frontend config (environment-specific, not committed to git)
+frontend_config_path = Path("./frontend_config.json")
+if frontend_config_path.exists():
+    with open(frontend_config_path, encoding="utf-8") as f:
+        frontend_config = json.load(f)
+
+    # VPC for ALB + Fargate
+    vpc_stack = VpcStack(
+        app,
+        f"{STACK_PREFIX}-vpc",
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="VPC for BADGERS frontend ALB and Fargate",
+    )
+
+    # Frontend: ALB + Fargate + ACM + Route53
+    frontend_stack = FrontendStack(
+        app,
+        f"{STACK_PREFIX}-frontend",
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        vpc=vpc_stack.vpc,
+        user_pool=cognito_stack.user_pool,
+        user_pool_domain=cognito_stack.user_pool_domain,
+        ecr_repository=ecr_stack.repository,
+        hosted_zone_id=frontend_config["hosted_zone_id"],
+        hosted_zone_name=frontend_config["hosted_zone_name"],
+        domain_name=frontend_config["domain_name"],
+        alb_ingress_prefix_list_id=frontend_config.get("alb_ingress_prefix_list_id"),
+        alb_ingress_cidrs=frontend_config.get("alb_ingress_cidrs"),
+        image_tag="frontend",
+        env=env,
+        description="BADGERS unified UI — ALB + Fargate + Cognito auth",
+    )
+    frontend_stack.add_dependency(vpc_stack)
+    frontend_stack.add_dependency(cognito_stack)
+    frontend_stack.add_dependency(ecr_stack)
+else:
+    print("Skipping frontend stacks — deployment/frontend_config.json not found")
+    print(
+        "  Copy frontend_config.example.json → frontend_config.json and fill in your values"
     )
 
 

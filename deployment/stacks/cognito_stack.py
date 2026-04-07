@@ -51,6 +51,25 @@ class CognitoStack(Stack):
             ),
             account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
             removal_policy=RemovalPolicy.DESTROY,
+            mfa=cognito.Mfa.REQUIRED,
+            mfa_second_factor=cognito.MfaSecondFactor(sms=False, otp=True),
+        )
+
+        # Cognito groups for role-based access (admin sees all tabs, tester sees testing tabs)
+        self.admin_group = cognito.CfnUserPoolGroup(
+            self,
+            "AdminGroup",
+            user_pool_id=self.user_pool.user_pool_id,
+            group_name="admin",
+            description="Full access — all UI tabs and admin API routes",
+        )
+
+        self.tester_group = cognito.CfnUserPoolGroup(
+            self,
+            "TesterGroup",
+            user_pool_id=self.user_pool.user_pool_id,
+            group_name="tester",
+            description="Testing access — testing UI tabs and API routes only",
         )
 
         # Resource Server for OAuth 2.0 scopes (required for client credentials)
