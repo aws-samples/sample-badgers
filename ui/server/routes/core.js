@@ -11,7 +11,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } fr
 import { CloudWatchLogsClient, StartQueryCommand, GetQueryResultsCommand } from '@aws-sdk/client-cloudwatch-logs';
 import multer from 'multer';
 
-export function mountTestingRoutes(app, PROJECT_ROOT) {
+export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
     const CONFIG_DIR = resolve(PROJECT_ROOT, 'unified-ui', 'config');
     const LOGS_DIR = resolve(PROJECT_ROOT, 'unified-ui', 'logs', 'chat_sessions');

@@ -167,6 +167,7 @@ class FrontendStack(Stack):
                 "NODE_ENV": "production",
                 "PORT": str(container_port),
                 "AWS_REGION": Stack.of(self).region,
+                "CORS_ALLOWED_ORIGIN": f"https://{domain_name}",
             },
             health_check=ecs.HealthCheck(
                 command=[
