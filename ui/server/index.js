@@ -2,21 +2,35 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { resolve, dirname } from 'path';
+import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { getUserFromOIDC } from './middleware/auth.js';
-import { mountTestingRoutes } from './routes/testing.js';
-import { mountAdminRoutes } from './routes/admin.js';
 
+// Load .env before any modules that read process.env
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const envPath = resolve(__dirname, '../config/.env');
+if (existsSync(envPath)) {
+    for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+        const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+        if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+}
+
+import { getUserFromOIDC, requireAuth } from './middleware/auth.js';
+import { mountCoreRoutes } from './routes/core.js';
+import { mountAdminRoutes } from './routes/admin.js';
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const DIST_DIR = resolve(__dirname, '../dist');
 
 const app = express();
-app.use(cors());
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGIN
+    ? [process.env.CORS_ALLOWED_ORIGIN]
+    : [];
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
 const limiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 app.use('/api/', limiter);
+app.use('/api/', requireAuth);
 
 // ── User identity ──
 
@@ -36,7 +50,7 @@ app.get('/api/me', async (req, res) => {
 
 // ── Mount route groups ──
 
-mountTestingRoutes(app, PROJECT_ROOT);
+mountCoreRoutes(app, PROJECT_ROOT);
 mountAdminRoutes(app, PROJECT_ROOT);
 
 // ── Static serving ──
