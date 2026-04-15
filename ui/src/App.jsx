@@ -37,8 +37,42 @@ export default function App() {
     const [tab, setTab] = useState('home')
     const [logs, setLogs] = useState([])
     const [running, setRunning] = useState(false)
+    const [branding, setBranding] = useState({})
+    const [theme, setTheme] = useState(() => localStorage.getItem('badgers-theme') || '')
     const dirtyRef = useRef(false)
     const abortRef = useRef(null)
+
+    function applyTheme(t) {
+        setTheme(t)
+        localStorage.setItem('badgers-theme', t)
+        document.documentElement.setAttribute('data-theme', t)
+    }
+
+    // Fetch branding from /api/env (retry if backend isn't ready yet)
+    useEffect(() => {
+        let cancelled = false
+        async function fetchEnv(retries = 10, delay = 500) {
+            for (let i = 0; i < retries; i++) {
+                if (cancelled) return
+                try {
+                    const res = await fetch('/api/env')
+                    if (!res.ok) throw new Error(res.status)
+                    const data = await res.json()
+                    if (data.branding) {
+                        setBranding(data.branding)
+                        document.title = data.branding.appName || 'BADGERS'
+                        const saved = localStorage.getItem('badgers-theme')
+                        applyTheme(saved || data.branding.theme || 'dark')
+                    }
+                    return
+                } catch {
+                    await new Promise(r => setTimeout(r, delay))
+                }
+            }
+        }
+        fetchEnv()
+        return () => { cancelled = true }
+    }, [])
 
     const testingTabs = TABS.filter(t => !t.adminOnly)
     const adminTabs = TABS.filter(t => t.adminOnly)
@@ -128,13 +162,14 @@ export default function App() {
 
     return (
         <div className="container">
-            <Header />
+            <Header branding={branding} theme={theme} onThemeChange={applyTheme} />
             <nav style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 52, flexShrink: 0 }}>Testing</span>
                     {testingTabs.map(({ id, label }) => (
                         <button key={id} onClick={() => switchTab(id)}
-                            style={tab === id ? { background: '#1f6feb', borderColor: '#1f6feb' } : { fontSize: 12 }}>
+                            className={tab === id ? 'tab-active' : ''}
+                            style={{ fontSize: 12 }}>
                             {label}
                         </button>
                     ))}
@@ -144,7 +179,8 @@ export default function App() {
                         <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 52, flexShrink: 0 }}>Deploy</span>
                         {adminTabs.map(({ id, label }) => (
                             <button key={id} onClick={() => switchTab(id)}
-                                style={tab === id ? { background: '#1f6feb', borderColor: '#1f6feb' } : { fontSize: 12 }}>
+                                className={tab === id ? 'tab-active' : ''}
+                                style={{ fontSize: 12 }}>
                                 {label}
                             </button>
                         ))}
@@ -153,7 +189,7 @@ export default function App() {
             </nav>
 
             {/* Testing tabs */}
-            {tab === 'home' && <Home onNavigate={switchTab} />}
+            {tab === 'home' && <Home onNavigate={switchTab} branding={branding} />}
             <div style={{ display: tab === 'chat' ? 'block' : 'none' }}><Chat /></div>
             {tab === 'editor' && <AnalyzerEditor dirtyRef={dirtyRef} />}
             {tab === 'wizard' && <AnalyzerWizard runSSE={runSSE} running={running} />}

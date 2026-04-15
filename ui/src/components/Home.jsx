@@ -1,11 +1,27 @@
 import React, { useState, useEffect } from 'react'
 
-export default function Home({ onNavigate }) {
+export default function Home({ onNavigate, branding = {} }) {
   const [env, setEnv] = useState(null)
 
   useEffect(() => {
-    fetch('/api/env').then(r => r.json()).then(setEnv).catch(() => {})
+    async function fetchEnv(retries = 10, delay = 500) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch('/api/env')
+          if (!res.ok) throw new Error(res.status)
+          setEnv(await res.json())
+          return
+        } catch {
+          await new Promise(r => setTimeout(r, delay))
+        }
+      }
+    }
+    fetchEnv()
   }, [])
+
+  const name = branding.appName || 'BADGERS'
+  const emoji = branding.appEmoji || '🦡'
+  const description = branding.appDescription || ''
 
   const tabs = [
     ['chat', '💬 Chat', 'Stream messages to the AgentCore Runtime via WebSocket'],
@@ -19,13 +35,7 @@ export default function Home({ onNavigate }) {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 8 }}>🦡 BADGERS Test Interface</h2>
-        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-          Test harness for BADGERS (Broad Agentic Document Generative Extraction &amp; Recognition System),
-          a vision-enabled AI system that processes documents using specialized analyzers.
-        </p>
-      </div>
+
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 8, marginBottom: 16 }}>
         {tabs.map(([key, name, desc]) => (

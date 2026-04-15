@@ -160,7 +160,7 @@ export default function S3ConfigEditor({ runSSE, running, dirtyRef }) {
                 return (
                   <div key={f} onClick={() => loadFile(f)} style={{
                     padding: '5px 12px 5px 28px', fontSize: 12, cursor: 'pointer',
-                    background: isActive ? 'rgba(31,111,235,0.15)' : 'transparent',
+                    background: isActive ? 'var(--accent-subtle)' : 'transparent',
                     color: isActive ? 'var(--accent)' : 'var(--text)',
                     borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
                   }}>{name}</div>
