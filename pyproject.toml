@@ -30,7 +30,7 @@ dependencies = [
     "pikepdf>=10.0.2",
     "pillow",
     "PyMuPDF",
-    "pypdf>=6.2.0",
+    "pypdf>=6.10.1",
     "pdf2image",
     "python-dotenv",
     "pyvis",
