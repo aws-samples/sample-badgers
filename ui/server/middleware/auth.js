@@ -1,11 +1,18 @@
 import jwt from 'jsonwebtoken';
 
 const IS_ECS = !!process.env.ECS_CONTAINER_METADATA_URI_V4;
-const LOCAL_DEV = process.env.BADGERS_LOCAL_DEV === 'true' && !IS_ECS;
 const LOCAL_ROLE = process.env.BADGERS_UI_ROLE || 'admin';
 const keyCache = new Map();
+let _localDevLogged = false;
 
-if (LOCAL_DEV) console.warn('[auth] ⚠️  BADGERS_LOCAL_DEV=true — bypassing OIDC auth. Do NOT use in production.');
+function isLocalDev() {
+    const val = process.env.BADGERS_LOCAL_DEV === 'true' && !IS_ECS;
+    if (val && !_localDevLogged) {
+        console.warn('[auth] ⚠️  BADGERS_LOCAL_DEV=true — bypassing OIDC auth. Do NOT use in production.');
+        _localDevLogged = true;
+    }
+    return val;
+}
 
 async function fetchALBPublicKey(kid, region) {
     if (keyCache.has(kid)) return keyCache.get(kid);
@@ -25,7 +32,7 @@ async function fetchALBPublicKey(kid, region) {
 export async function getUserFromOIDC(req) {
     const token = req.headers['x-amzn-oidc-data'];
     if (!token) {
-        if (LOCAL_DEV) {
+        if (isLocalDev()) {
             return {
                 email: 'local-dev',
                 name: 'Local Dev',

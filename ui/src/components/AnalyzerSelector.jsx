@@ -176,8 +176,8 @@ export default function AnalyzerSelector({ dirtyRef }) {
                   <div key={name} onClick={() => toggle(name)} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 12px', cursor: 'pointer',
-                    background: enabled ? 'rgba(31,111,235,0.08)' : 'var(--surface)',
-                    border: `1px solid ${enabled ? 'rgba(31,111,235,0.3)' : 'var(--border)'}`,
+                    background: enabled ? 'var(--accent-subtle)' : 'var(--surface)',
+                    border: `1px solid ${enabled ? 'var(--accent-border)' : 'var(--border)'}`,
                     borderRadius: 'var(--radius)',
                     opacity: enabled ? 1 : 0.6,
                     transition: 'all 0.15s',

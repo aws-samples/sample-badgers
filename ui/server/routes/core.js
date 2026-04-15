@@ -13,8 +13,8 @@ import multer from 'multer';
 
 export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
-    const CONFIG_DIR = resolve(PROJECT_ROOT, 'unified-ui', 'config');
-    const LOGS_DIR = resolve(PROJECT_ROOT, 'unified-ui', 'logs', 'chat_sessions');
+    const CONFIG_DIR = resolve(PROJECT_ROOT, 'ui', 'config');
+    const LOGS_DIR = resolve(PROJECT_ROOT, 'ui', 'logs', 'chat_sessions');
 
     // ── Load env config ──
 
@@ -30,6 +30,17 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     }
 
     const ENV = loadEnvFile();
+
+    // ── Load branding config (re-read on every request for hot reload) ──
+    const brandingPath = resolve(CONFIG_DIR, 'branding.json');
+    const BRANDING_DEFAULTS = { appName: 'BADGERS', appEmoji: '🦡', appSubtitle: 'Document analysis & deployment console', appDescription: '' };
+    function loadBranding() {
+        try {
+            if (existsSync(brandingPath)) return { ...BRANDING_DEFAULTS, ...JSON.parse(readFileSync(brandingPath, 'utf-8')) };
+        } catch { }
+        return BRANDING_DEFAULTS;
+    }
+
     const REGION = ENV.AWS_REGION || process.env.AWS_REGION || 'us-west-2';
     const RUNTIME_ARN = ENV.AGENTCORE_RUNTIME_WEBSOCKET_ARN || '';
     const GATEWAY_ID = ENV.AGENTCORE_GATEWAY_ID || '';
@@ -101,6 +112,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             gatewayId: GATEWAY_ID,
             configBucket: ENV.S3_CONFIG_BUCKET || '',
             outputBucket: ENV.S3_OUTPUT_BUCKET || '',
+            branding: loadBranding(),
         });
     });
 

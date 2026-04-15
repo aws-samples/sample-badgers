@@ -66,7 +66,7 @@ export default function AnalyzerWizard({ runSSE, running }) {
         {steps.map((s, i) => (
           <div key={i} style={{
             flex: 1, padding: '8px 12px', textAlign: 'center', fontSize: 12,
-            background: i === step ? 'rgba(31,111,235,0.15)' : 'var(--surface)',
+            background: i === step ? 'var(--accent-subtle)' : 'var(--surface)',
             border: `1px solid ${i === step ? 'var(--accent)' : 'var(--border)'}`,
             borderRadius: 'var(--radius)', color: i === step ? 'var(--accent)' : 'var(--text-dim)',
             cursor: i < step ? 'pointer' : 'default',

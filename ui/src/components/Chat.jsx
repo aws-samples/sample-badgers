@@ -173,7 +173,7 @@ function MyComposer() {
         }}
       />
       <ComposerPrimitive.Send style={{
-        background: '#1f6feb', border: '1px solid #1f6feb', color: '#fff',
+        background: 'var(--accent-bg)', border: '1px solid var(--accent-bg)', color: '#fff',
         padding: '6px 16px', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer',
       }}>
         Send

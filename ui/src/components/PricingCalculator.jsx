@@ -409,11 +409,13 @@ export default function PricingCalculator() {
     <div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button onClick={() => setTab('basic')}
-          style={tab === 'basic' ? { background: '#1f6feb', borderColor: '#1f6feb' } : { fontSize: 12 }}>
+          className={tab === 'basic' ? 'tab-active' : ''}
+          style={{ fontSize: 12 }}>
           📊 Basic Calculator
         </button>
         <button onClick={() => setTab('advanced')}
-          style={tab === 'advanced' ? { background: '#1f6feb', borderColor: '#1f6feb' } : { fontSize: 12 }}>
+          className={tab === 'advanced' ? 'tab-active' : ''}
+          style={{ fontSize: 12 }}>
           🔬 Advanced Calculator
         </button>
       </div>

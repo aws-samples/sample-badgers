@@ -1,5 +1,10 @@
-:root {
+/* ═══════════════════════════════════════════════════════════════
+   Theme: Dark (default)
+   ═══════════════════════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
     --bg: #0f1117;
+    --bg-gradient: #0f1117;
     --surface: #161b22;
     --surface-hover: #1c2129;
     --border: #30363d;
@@ -7,12 +12,64 @@
     --text-dim: #8b949e;
     --accent: #58a6ff;
     --accent-hover: #79b8ff;
+    --accent-bg: #1f6feb;
+    --accent-bg-hover: #388bfd;
+    --accent-subtle: rgba(31, 111, 235, 0.12);
+    --accent-border: rgba(31, 111, 235, 0.25);
     --green: #3fb950;
+    --green-subtle: rgba(63, 185, 80, 0.15);
+    --green-border: rgba(63, 185, 80, 0.3);
     --red: #f85149;
     --yellow: #d29922;
     --orange: #db6d28;
     --radius: 8px;
+    --thinking-bg: rgba(210, 153, 34, 0.06);
+    --thinking-border: rgba(210, 153, 34, 0.2);
+    --thinking-hover: rgba(210, 153, 34, 0.08);
+    --code-bg: rgba(255, 255, 255, 0.06);
+    --code-block-bg: rgba(0, 0, 0, 0.3);
+    --code-header-bg: rgba(255, 255, 255, 0.04);
+    --table-header-bg: rgba(255, 255, 255, 0.04);
+    color-scheme: dark;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Theme: AWS Purple — deep purple-to-teal gradient
+   ═══════════════════════════════════════════════════════════════ */
+[data-theme="purple"] {
+    --bg: #1a0e2e;
+    --bg-gradient: linear-gradient(160deg, #1a0e2e 0%, #2d1b4e 30%, #1e2a5a 60%, #1a3a5c 80%, #1a4a5a 100%);
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-hover: rgba(255, 255, 255, 0.10);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #f0f0f5;
+    --text-dim: #a8a8c0;
+    --accent: #7eb8ff;
+    --accent-hover: #a0d0ff;
+    --accent-bg: #5b4fc4;
+    --accent-bg-hover: #7060d8;
+    --accent-subtle: rgba(91, 79, 196, 0.18);
+    --accent-border: rgba(91, 79, 196, 0.35);
+    --green: #56d4a0;
+    --green-subtle: rgba(86, 212, 160, 0.15);
+    --green-border: rgba(86, 212, 160, 0.3);
+    --red: #ff6b6b;
+    --yellow: #f0c060;
+    --orange: #e8884c;
+    --radius: 8px;
+    --thinking-bg: rgba(240, 192, 96, 0.08);
+    --thinking-border: rgba(240, 192, 96, 0.2);
+    --thinking-hover: rgba(240, 192, 96, 0.12);
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --code-block-bg: rgba(0, 0, 0, 0.25);
+    --code-header-bg: rgba(255, 255, 255, 0.06);
+    --table-header-bg: rgba(255, 255, 255, 0.06);
+    color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base styles (theme-agnostic)
+   ═══════════════════════════════════════════════════════════════ */
 
 * {
     box-sizing: border-box;
@@ -22,9 +79,10 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
+    background: var(--bg-gradient, var(--bg));
     color: var(--text);
     line-height: 1.5;
+    min-height: 100vh;
 }
 
 button {
@@ -48,12 +106,12 @@ button:disabled {
 }
 
 button.primary {
-    background: #1f6feb;
-    border-color: #1f6feb;
+    background: var(--accent-bg);
+    border-color: var(--accent-bg);
 }
 
 button.primary:hover {
-    background: #388bfd;
+    background: var(--accent-bg-hover);
 }
 
 button.danger {
@@ -111,9 +169,21 @@ textarea {
 }
 
 .home-card:hover {
-    border-color: #1f6feb;
-    background: rgba(31, 111, 235, 0.06);
+    border-color: var(--accent-bg);
+    background: var(--accent-subtle);
 }
+
+/* ── Active tab button ── */
+button.tab-active {
+    background: var(--accent-bg);
+    border-color: var(--accent-bg);
+}
+
+button.tab-active:hover {
+    background: var(--accent-bg-hover);
+}
+
+/* ── Chat ── */
 
 .chat-message {
     padding: 10px 14px;
@@ -126,8 +196,8 @@ textarea {
 }
 
 .chat-message.user {
-    background: rgba(31, 111, 235, 0.12);
-    border: 1px solid rgba(31, 111, 235, 0.25);
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
 }
 
 .chat-message.assistant {
@@ -136,8 +206,8 @@ textarea {
 }
 
 .chat-message .thinking {
-    background: rgba(210, 153, 34, 0.08);
-    border: 1px solid rgba(210, 153, 34, 0.2);
+    background: var(--thinking-bg);
+    border: 1px solid var(--thinking-border);
     border-radius: 6px;
     padding: 8px 12px;
     margin: 8px 0;
@@ -150,13 +220,14 @@ textarea {
 }
 
 .chat-message p {
-    margin-bottom: 1rem
+    margin-bottom: 1rem;
 }
 
-/* ChainOfThought thinking block */
+/* ── Thinking block ── */
+
 .thinking-block {
-    background: rgba(210, 153, 34, 0.06);
-    border: 1px solid rgba(210, 153, 34, 0.2);
+    background: var(--thinking-bg);
+    border: 1px solid var(--thinking-border);
     border-radius: 6px;
     margin: 6px 0;
     overflow: hidden;
@@ -177,7 +248,7 @@ textarea {
 }
 
 .thinking-trigger:hover {
-    background: rgba(210, 153, 34, 0.08);
+    background: var(--thinking-hover);
 }
 
 .reasoning-text {
@@ -189,7 +260,8 @@ textarea {
     line-height: 1.5;
 }
 
-/* assistant-ui dark theme overrides */
+/* ── assistant-ui overrides ── */
+
 [data-aui-thread] {
     --aui-thread-background: var(--surface);
     --aui-composer-background: var(--bg);
@@ -217,11 +289,12 @@ textarea {
 }
 
 .aui-user-message-content {
-    background: rgba(31, 111, 235, 0.12) !important;
+    background: var(--accent-subtle) !important;
     color: var(--text) !important;
 }
 
-/* Loading dots animation */
+/* ── Loading dots ── */
+
 .loading-dots {
     display: flex;
     gap: 4px;
@@ -260,7 +333,8 @@ textarea {
     }
 }
 
-/* Markdown in chat messages */
+/* ── Markdown ── */
+
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {
@@ -288,7 +362,7 @@ textarea {
 }
 
 .markdown-body code {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--code-bg);
     padding: 1px 5px;
     border-radius: 4px;
     font-size: 12px;
@@ -296,7 +370,7 @@ textarea {
 }
 
 .markdown-body pre {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--code-block-bg);
     padding: 10px 12px;
     border-radius: 6px;
     overflow-x: auto;
@@ -342,23 +416,25 @@ textarea {
 }
 
 .markdown-body th {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--table-header-bg);
 }
 
-/* Attachment chips in composer */
+/* ── Attachment chips ── */
+
 .attachment-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: rgba(31, 111, 235, 0.1);
-    border: 1px solid rgba(31, 111, 235, 0.25);
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
     border-radius: 6px;
     padding: 3px 8px;
     font-size: 11px;
     color: var(--accent);
 }
 
-/* Code blocks with syntax highlighting */
+/* ── Code blocks ── */
+
 .code-block-wrapper {
     border-radius: 6px;
     overflow: hidden;
@@ -367,7 +443,7 @@ textarea {
 }
 
 .code-block-header {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--code-header-bg);
     padding: 4px 12px;
     font-size: 11px;
     color: var(--text-dim);
@@ -375,9 +451,27 @@ textarea {
 }
 
 .inline-code {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--code-bg);
     padding: 1px 5px;
     border-radius: 4px;
     font-size: 12px;
     font-family: 'SF Mono', Menlo, monospace;
+}
+
+/* ── Theme toggle ── */
+
+.theme-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
+}
+
+.theme-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text);
 }
