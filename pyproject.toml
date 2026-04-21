@@ -21,7 +21,7 @@ dependencies = [
     "gradio",
     "gradio_pdf",
     "jpype1",
-    "lxml>=6.0.2",
+    "lxml>=6.1.0",
     "markdown2docx>=0.1.0",
     "mcp",
     "networkx",
