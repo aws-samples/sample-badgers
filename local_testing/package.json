@@ -28,7 +28,7 @@
         "react-dom": "^19.1.0",
         "react-markdown": "^10.1.0",
         "react-shiki": "^0.9.2",
-        "ws": "^8.20.0"
+        "ws": "^8.20.1"
     },
     "devDependencies": {
         "@vitejs/plugin-react": "^4.5.2",
