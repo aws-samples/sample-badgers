@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { readFile, readdir, appendFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -158,10 +159,20 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         if (!isPdfMime || !isPdfMagic) return res.status(400).json({ error: 'Only PDF files are accepted' });
 
         const filename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const s3Key = `uploads/${Date.now()}_${filename}`;
+        // doc_id is the top level of the job-tracking hierarchy
+        // (doc_id -> job_id -> subtask_id). A fresh UUID per upload, so
+        // re-uploading the same file is treated as a new document.
+        const docId = randomUUID();
+        const s3Key = `uploads/${docId}/${filename}`;
         try {
-            await s3Client.send(new PutObjectCommand({ Bucket: UPLOAD_BUCKET, Key: s3Key, Body: req.file.buffer, ContentType: req.file.mimetype }));
-            res.json({ s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`, filename, size: req.file.size });
+            await s3Client.send(new PutObjectCommand({
+                Bucket: UPLOAD_BUCKET,
+                Key: s3Key,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype,
+                Metadata: { doc_id: docId },
+            }));
+            res.json({ s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`, docId, filename, size: req.file.size });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
