@@ -1,7 +1,7 @@
 {
     "tool": {
         "name": "classify_pdf_content_tool",
-        "description": "Classifies PDF page content to determine appropriate analyzer tools. Analyzes images to identify content types like text, tables, charts, diagrams, handwriting, etc.",
+        "description": "Classifies PDF page content to determine appropriate specialist tools. Analyzes images to identify content types like text, tables, charts, diagrams, handwriting, etc.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -27,10 +27,10 @@
             ]
         }
     },
-    "analyzer": {
+    "specialist": {
         "name": "classify_pdf_content",
-        "description": "Classifies PDF page content to determine appropriate analyzer tools",
-        "prompt_analyzer_prompt_base_path": "prompts",
+        "description": "Classifies PDF page content to determine appropriate specialist tools",
+        "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
             "../shared/gestalt_perception_foundation.xml",
             "classify_pdf_content_gestalt.xml",
@@ -60,6 +60,6 @@
         "dependencies": [
             "boto3"
         ],
-        "analyzer_type": "advanced"
+        "specialist_type": "advanced"
     }
 }

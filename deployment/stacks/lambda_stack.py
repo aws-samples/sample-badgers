@@ -22,11 +22,11 @@ if TYPE_CHECKING:
     from stacks.inference_profiles_stack import InferenceProfilesStack
 
 # Container-based functions (too large for layers)
-CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_analyzer"]
+CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist"]
 
 
-class LambdaAnalyzerStack(Stack):
-    """Stack for Lambda analyzer functions."""
+class LambdaSpecialistStack(Stack):
+    """Stack for Lambda specialist functions."""
 
     def __init__(
         self,
@@ -38,7 +38,7 @@ class LambdaAnalyzerStack(Stack):
         output_bucket: s3.Bucket,
         ecr_repository: ecr.Repository,
         inference_profiles_stack: Optional[InferenceProfilesStack] = None,
-        enabled_analyzers: Optional[set[str]] = None,
+        enabled_specialists: Optional[set[str]] = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -49,7 +49,7 @@ class LambdaAnalyzerStack(Stack):
         self.output_bucket = output_bucket
         self.ecr_repository = ecr_repository
         self.inference_profiles_stack = inference_profiles_stack
-        self.enabled_analyzers = enabled_analyzers
+        self.enabled_specialists = enabled_specialists
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -57,8 +57,8 @@ class LambdaAnalyzerStack(Stack):
         # Create Lambda layer
         self.create_layer()
 
-        # Create all analyzer Lambda functions
-        self.create_analyzer_functions()
+        # Create all specialist Lambda functions
+        self.create_specialist_functions()
 
         # Create container-based Lambda functions
         self.create_container_functions()
@@ -91,18 +91,18 @@ class LambdaAnalyzerStack(Stack):
 
         self.foundation_layer = lambda_.LayerVersion(
             self,
-            "AnalyzerFoundationLayer",
+            "SpecialistFoundationLayer",
             code=lambda_.Code.from_asset(str(layer_path)),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-            description="Analyzer foundation with Strands, Bedrock client, and utilities",
-            layer_version_name="analyzer-foundation",
+            description="Specialist foundation with Strands, Bedrock client, and utilities",
+            layer_version_name="specialist-foundation",
         )
 
         # Apply resource-specific tags to layer
         self._apply_resource_tags(
             self.foundation_layer,
             "lambda-foundation-layer",
-            "Analyzer foundation layer with Strands and Bedrock client",
+            "Specialist foundation layer with Strands and Bedrock client",
         )
 
         # Pillow layer (external)
@@ -169,45 +169,45 @@ class LambdaAnalyzerStack(Stack):
                 pdf_processing_layer_path,
             )
 
-    def create_analyzer_functions(self):
-        """Create analyzer Lambda functions (filtered by enabled_analyzers if set)."""
-        # Get list of analyzers from lambdas/code directory
+    def create_specialist_functions(self):
+        """Create specialist Lambda functions (filtered by enabled_specialists if set)."""
+        # Get list of specialists from lambdas/code directory
         lambdas_dir = Path("./lambdas/code")
 
         if not lambdas_dir.exists():
             raise FileNotFoundError(f"Lambdas directory not found: {lambdas_dir}")
 
-        analyzer_dirs = sorted([d for d in lambdas_dir.iterdir() if d.is_dir()])
+        specialist_dirs = sorted([d for d in lambdas_dir.iterdir() if d.is_dir()])
 
         self.functions = {}
         logger = logging.getLogger(__name__)
 
-        for analyzer_dir in analyzer_dirs:
-            analyzer_name = analyzer_dir.name
+        for specialist_dir in specialist_dirs:
+            specialist_name = specialist_dir.name
             # Skip container-based functions
-            if analyzer_name in CONTAINER_FUNCTIONS:
+            if specialist_name in CONTAINER_FUNCTIONS:
                 continue
-            # Skip disabled analyzers
+            # Skip disabled specialists
             if (
-                self.enabled_analyzers is not None
-                and analyzer_name not in self.enabled_analyzers
+                self.enabled_specialists is not None
+                and specialist_name not in self.enabled_specialists
             ):
-                logger.info("Skipping disabled analyzer: %s", analyzer_name)
+                logger.info("Skipping disabled specialist: %s", specialist_name)
                 continue
-            function = self.create_analyzer_function(analyzer_name, analyzer_dir)
-            self.functions[analyzer_name] = function
+            function = self.create_specialist_function(specialist_name, specialist_dir)
+            self.functions[specialist_name] = function
 
-    def create_analyzer_function(
-        self, analyzer_name: str, code_dir: Path
+    def create_specialist_function(
+        self, specialist_name: str, code_dir: Path
     ) -> lambda_.Function:
-        """Create a single analyzer Lambda function."""
+        """Create a single specialist Lambda function."""
         # Load schema for description
-        schema_path = Path(f"./s3_files/schemas/{analyzer_name}.json")
-        description = self.get_tool_description(schema_path, analyzer_name)
+        schema_path = Path(f"./s3_files/schemas/{specialist_name}.json")
+        description = self.get_tool_description(schema_path, specialist_name)
 
         # Environment variables
         environment = {
-            "ANALYZER_NAME": analyzer_name,
+            "SPECIALIST_NAME": specialist_name,
             "BEDROCK_READ_TIMEOUT": "900",
             "CACHE_ENABLED": "True",
             "FAIL_AFTER_ERROR": "False",
@@ -234,7 +234,7 @@ class LambdaAnalyzerStack(Stack):
             )
 
         # Add poppler paths for pdf_to_images_converter
-        if analyzer_name == "pdf_to_images_converter":
+        if specialist_name == "pdf_to_images_converter":
             environment["PATH"] = "/opt/bin:/var/lang/bin:/usr/local/bin:/usr/bin:/bin"
             environment["LD_LIBRARY_PATH"] = "/opt/lib:/var/lang/lib:/lib64:/usr/lib64"
             environment["FONTCONFIG_PATH"] = "/opt/etc/fonts"
@@ -242,15 +242,15 @@ class LambdaAnalyzerStack(Stack):
 
         # Determine layers for this function
         layers = [self.foundation_layer, self.pillow_layer]
-        if analyzer_name == "pdf_to_images_converter":
+        if specialist_name == "pdf_to_images_converter":
             layers.append(self.poppler_layer)
 
         # Attach PDF processing layer to functions that need PDF manipulation
-        # NOTE: Container functions (remediation_analyzer) are built via
+        # NOTE: Container functions (remediation_specialist) are built via
         # _create_ecr_container_function and never reach this code path.
         # They bundle their own deps in the Docker image.
         pdf_processing_functions: list[str] = []
-        if self.pdf_processing_layer and analyzer_name in pdf_processing_functions:
+        if self.pdf_processing_layer and specialist_name in pdf_processing_functions:
             layers.append(self.pdf_processing_layer)
 
         # Enhancement layer removed — runs in container Lambda instead.
@@ -259,8 +259,8 @@ class LambdaAnalyzerStack(Stack):
         # Create function
         function = lambda_.Function(
             self,
-            f"Function-{analyzer_name}",
-            function_name=f"badgers_{analyzer_name}",
+            f"Function-{specialist_name}",
+            function_name=f"badgers_{specialist_name}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="lambda_handler.lambda_handler",
             code=lambda_.Code.from_asset(str(code_dir)),
@@ -276,7 +276,7 @@ class LambdaAnalyzerStack(Stack):
         # Apply resource-specific tags
         self._apply_resource_tags(
             function,
-            f"lambda-{analyzer_name}",
+            f"lambda-{specialist_name}",
             description[:256] if len(description) > 256 else description,
         )
 
@@ -286,19 +286,19 @@ class LambdaAnalyzerStack(Stack):
         """Create container-based Lambda functions from pre-built ECR images.
 
         Images must be pre-built and pushed to the shared ECR repository with
-        function-specific tags (e.g., image_enhancer, remediation_analyzer).
+        function-specific tags (e.g., image_enhancer, remediation_specialist).
 
         Run: cd lambdas && ./build_container_lambdas.sh <ecr_repo_uri>
         """
         logger = logging.getLogger(__name__)
 
         for func_name in CONTAINER_FUNCTIONS:
-            # Skip disabled analyzers
+            # Skip disabled specialists
             if (
-                self.enabled_analyzers is not None
-                and func_name not in self.enabled_analyzers
+                self.enabled_specialists is not None
+                and func_name not in self.enabled_specialists
             ):
-                logger.info("Skipping disabled container analyzer: %s", func_name)
+                logger.info("Skipping disabled container specialist: %s", func_name)
                 continue
             # Check if image exists in ECR (tag = func_name)
             # CDK will fail at deploy time if image doesn't exist
@@ -316,7 +316,7 @@ class LambdaAnalyzerStack(Stack):
         description = self.get_tool_description(schema_path, func_name)
 
         environment = {
-            "ANALYZER_NAME": func_name,
+            "SPECIALIST_NAME": func_name,
             "BEDROCK_READ_TIMEOUT": "900",
             "CACHE_ENABLED": "True",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
@@ -371,10 +371,10 @@ class LambdaAnalyzerStack(Stack):
 
         return function
 
-    def get_tool_description(self, schema_path: Path, analyzer_name: str) -> str:
+    def get_tool_description(self, schema_path: Path, specialist_name: str) -> str:
         """Get tool description from schema file."""
         if not schema_path.exists():
-            return f"Analyzer for {analyzer_name.replace('_', ' ')}"
+            return f"Specialist for {specialist_name.replace('_', ' ')}"
 
         try:
             with open(schema_path, encoding="utf-8") as f:
@@ -388,10 +388,10 @@ class LambdaAnalyzerStack(Stack):
                 return description
         except Exception as e:
             logging.getLogger(__name__).debug(
-                "Could not load schema description for %s: %s", analyzer_name, e
+                "Could not load schema description for %s: %s", specialist_name, e
             )
 
-        return f"Analyzer for {analyzer_name.replace('_', ' ')}"
+        return f"Specialist for {specialist_name.replace('_', ' ')}"
 
     def create_outputs(self):
         """Create CloudFormation outputs."""
@@ -400,7 +400,7 @@ class LambdaAnalyzerStack(Stack):
             self,
             "LayerArn",
             value=self.foundation_layer.layer_version_arn,
-            description="Analyzer foundation layer ARN",
+            description="Specialist foundation layer ARN",
             export_name=f"{Stack.of(self).stack_name}-LayerArn",
         )
 
@@ -431,7 +431,7 @@ class LambdaAnalyzerStack(Stack):
             self,
             "FunctionCount",
             value=str(len(self.functions)),
-            description="Total number of analyzer functions",
+            description="Total number of specialist functions",
         )
 
         CfnOutput(
@@ -449,5 +449,5 @@ class LambdaAnalyzerStack(Stack):
             self,
             "AllFunctionArns",
             value=json.dumps(function_arns, indent=2),
-            description="All analyzer function ARNs (JSON)",
+            description="All specialist function ARNs (JSON)",
         )

@@ -1,7 +1,7 @@
 [
     {
         "name": "pdf_to_images_converter",
-        "description": "Convert PDF documents to optimized images for AI analysis. Returns S3 paths to pre-encoded base64 image files (one per page) that can be passed directly to analyzer tools via image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
+        "description": "Convert PDF documents to optimized images for AI analysis. Returns S3 paths to pre-encoded base64 image files (one per page) that can be passed directly to specialist tools via image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -31,7 +31,7 @@
             "properties": {
                 "result": {
                     "type": "string",
-                    "description": "JSON object with: images (array of S3 paths like s3://bucket/temp/session/page_001.b64), page_count (number of pages), session_id (unique identifier). Pass these S3 paths to analyzer tools via image_path."
+                    "description": "JSON object with: images (array of S3 paths like s3://bucket/temp/session/page_001.b64), page_count (number of pages), session_id (unique identifier). Pass these S3 paths to specialist tools via image_path."
                 },
                 "success": {
                     "type": "boolean",

@@ -60,10 +60,10 @@ class CredentialsNotConfiguredError(Exception):
     """Raised when AWS credentials are not properly configured."""
 
 
-# Absolute path to analyzer configuration - single source of truth
+# Absolute path to specialist configuration - single source of truth
 # Resolved relative to this config.py file location
 _CONFIG_DIR = Path(__file__).parent
-ANALYZER_CONFIG_PATH = str(_CONFIG_DIR / "analyzer_config.json")
+SPECIALIST_CONFIG_PATH = str(_CONFIG_DIR / "specialist_config.json")
 
 
 @dataclass

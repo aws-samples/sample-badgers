@@ -21,17 +21,17 @@ class S3ConfigError(Exception):
 
 @lru_cache(maxsize=128)
 def load_manifest_from_s3(
-    bucket: str, analyzer_name: str, custom: bool = False
+    bucket: str, specialist_name: str, custom: bool = False
 ) -> Dict[str, Any]:
     """
-    Load analyzer manifest from S3 with caching.
+    Load specialist manifest from S3 with caching.
 
     Cache persists across Lambda warm invocations for performance.
 
     Args:
         bucket: S3 bucket name
-        analyzer_name: Name of the analyzer (e.g., 'full_text_analyzer')
-        custom: Whether this is a custom analyzer (uses custom_analyzers/ prefix)
+        specialist_name: Name of the specialist (e.g., 'full_text_specialist')
+        custom: Whether this is a custom specialist (uses custom_specialists/ prefix)
 
     Returns:
         Manifest dictionary
@@ -42,16 +42,16 @@ def load_manifest_from_s3(
     try:
         s3 = boto3.client("s3")
         if custom:
-            key = f"custom-analyzers/manifests/{analyzer_name}.json"
+            key = f"custom-specialists/manifests/{specialist_name}.json"
         else:
-            key = f"manifests/{analyzer_name}.json"
+            key = f"manifests/{specialist_name}.json"
 
         logger.info("Loading manifest from s3://%s/%s", bucket, key)
         response = s3.get_object(Bucket=bucket, Key=key)
         content = response["Body"].read().decode("utf-8")
 
         manifest = json.loads(content)
-        logger.info("Loaded manifest for %s (%d bytes)", analyzer_name, len(content))
+        logger.info("Loaded manifest for %s (%d bytes)", specialist_name, len(content))
 
         return manifest
 
@@ -68,7 +68,7 @@ def load_manifest_from_s3(
 
 @lru_cache(maxsize=256)
 def load_prompt_from_s3(
-    bucket: str, analyzer_name: str, prompt_file: str, custom: bool = False
+    bucket: str, specialist_name: str, prompt_file: str, custom: bool = False
 ) -> str:
     """
     Load prompt file from S3 with caching.
@@ -77,9 +77,9 @@ def load_prompt_from_s3(
 
     Args:
         bucket: S3 bucket name
-        analyzer_name: Name of the analyzer
+        specialist_name: Name of the specialist
         prompt_file: Relative path to prompt file
-        custom: Whether this is a custom analyzer (uses custom-analyzers/ prefix)
+        custom: Whether this is a custom specialist (uses custom-specialists/ prefix)
 
     Returns:
         Prompt content as string
@@ -90,9 +90,9 @@ def load_prompt_from_s3(
     try:
         s3 = boto3.client("s3")
         if custom:
-            key = f"custom-analyzers/prompts/{analyzer_name}/{prompt_file}"
+            key = f"custom-specialists/prompts/{specialist_name}/{prompt_file}"
         else:
-            key = f"prompts/{analyzer_name}/{prompt_file}"
+            key = f"prompts/{specialist_name}/{prompt_file}"
 
         logger.debug("Loading prompt from s3://%s/%s", bucket, key)
         response = s3.get_object(Bucket=bucket, Key=key)

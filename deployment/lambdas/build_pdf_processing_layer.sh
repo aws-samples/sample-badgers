@@ -73,7 +73,7 @@ Usage:
   import pikepdf
 
 Attach to: Non-container Lambda functions that need PDF manipulation.
-Note: remediation_analyzer is a container Lambda and bundles its own deps.
+Note: remediation_specialist is a container Lambda and bundles its own deps.
 
 Version: $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 EOF

@@ -81,9 +81,9 @@ deployment/frontend_config.json
 .favicon
 logo.png
 
-# Custom analyzers - keep directory structure only
-deployment/custom_analyzers/*
-!deployment/custom_analyzers/.gitkeep
+# Custom specialists - keep directory structure only
+deployment/custom_specialists/*
+!deployment/custom_specialists/.gitkeep
 
 # Hidden dot-directories (repo-wide)
 .**/

@@ -1,42 +1,42 @@
  n#!/bin/bash
-# Update foundation layer version for all analyzer Lambdas
+# Update foundation layer version for all specialist Lambdas
 # Usage: ./update_layer_version.sh <layer_arn>
 
 set -e
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <layer_arn>"
-    echo "Example: $0 'arn:aws:lambda:us-west-2:123456789012:layer:analyzer-foundation:88'"
+    echo "Example: $0 'arn:aws:lambda:us-west-2:123456789012:layer:specialist-foundation:88'"
     exit 1
 fi
 
 LAYER_ARN=$1
 REGION=${AWS_REGION:-us-west-2}
 
-echo "Updating all analyzer Lambdas to layer:"
+echo "Updating all specialist Lambdas to layer:"
 echo "${LAYER_ARN}"
 echo "Region: ${REGION}"
 echo ""
 
-# Get all Lambda functions with 'analyzer' in the name
+# Get all Lambda functions with 'specialist' in the name
 FUNCTIONS=$(aws lambda list-functions \
     --region ${REGION} \
-    --query "Functions[?contains(FunctionName, 'analyzer')].FunctionName" \
+    --query "Functions[?contains(FunctionName, 'specialist')].FunctionName" \
     --output text)
 
 if [ -z "$FUNCTIONS" ]; then
-    echo "No analyzer Lambda functions found"
+    echo "No specialist Lambda functions found"
     exit 1
 fi
 
-echo "Found analyzer functions:"
+echo "Found specialist functions:"
 echo "$FUNCTIONS" | tr '\t' '\n'
 echo ""
 
 # Update each function
 for FUNCTION in $FUNCTIONS; do
     # Skip container-based functions
-    if [[ $FUNCTION == "remediation_analyzer" ]]; then
+    if [[ $FUNCTION == "remediation_specialist" ]]; then
         echo "Skipping ${FUNCTION} (container-based)..."
         continue
     fi
@@ -56,7 +56,7 @@ for FUNCTION in $FUNCTIONS; do
 
     if [ -n "$CURRENT_LAYERS" ]; then
         for LAYER in $CURRENT_LAYERS; do
-            if [[ $LAYER == *"foundation"* ]] || [[ $LAYER == *"analyzer-foundation"* ]] || [[ $LAYER == *"badgers-foundation"* ]]; then
+            if [[ $LAYER == *"foundation"* ]] || [[ $LAYER == *"specialist-foundation"* ]] || [[ $LAYER == *"badgers-foundation"* ]]; then
                 NEW_LAYERS="${NEW_LAYERS} ${LAYER_ARN}"
                 FOUND_FOUNDATION=true
             else
@@ -87,4 +87,4 @@ for FUNCTION in $FUNCTIONS; do
 done
 
 echo ""
-echo "All analyzer Lambdas updated successfully"
+echo "All specialist Lambdas updated successfully"

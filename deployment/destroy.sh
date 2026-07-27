@@ -46,13 +46,13 @@ fi
 
 # Destroy in reverse dependency order
 # Dependency graph:
-#   custom-analyzers -> gateway, lambda, iam, s3 (via Fn.import_value)
+#   custom-specialists -> gateway, lambda, iam, s3 (via Fn.import_value)
 #   runtime-websocket -> ecr, gateway, cognito, memory, inference-profiles
 #   gateway -> lambda, cognito
 #   lambda -> ecr, inference-profiles, iam, s3
 #   iam -> s3
 STACKS=(
-    "${STACK_PREFIX}-custom-analyzers"
+    "${STACK_PREFIX}-custom-specialists"
     "${STACK_PREFIX}-runtime-websocket"
     "${STACK_PREFIX}-xray"
     "${STACK_PREFIX}-gateway"

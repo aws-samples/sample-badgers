@@ -16,7 +16,7 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         { id: 'iam', name: 'IAM Roles', description: 'Lambda execution role with Bedrock/S3 permissions' },
         { id: 'ecr', name: 'ECR Registry', description: 'Container image registry' },
         { id: 'inference-profiles', name: 'Inference Profiles', description: 'Cost tracking profiles per model' },
-        { id: 'lambda', name: 'Lambda Analyzers', description: 'Serverless analyzer functions + layers' },
+        { id: 'lambda', name: 'Lambda Specialists', description: 'Serverless specialist functions + layers' },
         { id: 'xray', name: 'X-Ray Tracing', description: 'Transaction search for AgentCore tracing' },
         { id: 'gateway', name: 'AgentCore Gateway', description: 'MCP Gateway with Lambda targets' },
         { id: 'memory', name: 'AgentCore Memory', description: 'Session persistence' },

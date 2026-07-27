@@ -12,13 +12,13 @@ from stacks import (
     S3Stack,
     IAMStack,
     CognitoStack,
-    LambdaAnalyzerStack,
+    LambdaSpecialistStack,
     AgentCoreECRStack,
     AgentCoreGatewayStack,
     AgentCoreRuntimeWebSocketStack,
     AgentCoreMemoryStack,
     InferenceProfilesStack,
-    CustomAnalyzersStack,
+    CustomSpecialistsStack,
     XRayTransactionSearchStack,
     VpcStack,
     FrontendStack,
@@ -117,25 +117,25 @@ inference_profiles_stack = InferenceProfilesStack(
     description="Application Inference Profiles for cost tracking and usage monitoring",
 )
 
-# Load deployment config for selective analyzer deployment
-enabled_analyzers = None
+# Load deployment config for selective specialist deployment
+enabled_specialists = None
 deployment_config_path = Path("./deployment_config.json")
 if deployment_config_path.exists():
     with open(deployment_config_path, encoding="utf-8") as f:
         deployment_config = json.load(f)
-    analyzers_config = deployment_config.get("analyzers", {})
-    enabled_analyzers = {
-        name for name, cfg in analyzers_config.items() if cfg.get("enabled", True)
+    specialists_config = deployment_config.get("specialists", {})
+    enabled_specialists = {
+        name for name, cfg in specialists_config.items() if cfg.get("enabled", True)
     }
     disabled = {
-        name for name, cfg in analyzers_config.items() if not cfg.get("enabled", True)
+        name for name, cfg in specialists_config.items() if not cfg.get("enabled", True)
     }
     if disabled:
-        print(f"Disabled analyzers: {', '.join(sorted(disabled))}")
-    print(f"Enabled analyzers: {len(enabled_analyzers)} of {len(analyzers_config)}")
+        print(f"Disabled specialists: {', '.join(sorted(disabled))}")
+    print(f"Enabled specialists: {len(enabled_specialists)} of {len(specialists_config)}")
 
 # Lambda functions and layer
-lambda_stack = LambdaAnalyzerStack(
+lambda_stack = LambdaSpecialistStack(
     app,
     f"{STACK_PREFIX}-lambda",
     deployment_tags=deployment_tags,
@@ -144,9 +144,9 @@ lambda_stack = LambdaAnalyzerStack(
     output_bucket=s3_stack.output_bucket,
     ecr_repository=ecr_stack.repository,
     inference_profiles_stack=inference_profiles_stack,
-    enabled_analyzers=enabled_analyzers,
+    enabled_specialists=enabled_specialists,
     env=env,
-    description="Lambda analyzers for BADGERS",
+    description="Lambda specialists for BADGERS",
 )
 lambda_stack.add_dependency(ecr_stack)
 lambda_stack.add_dependency(inference_profiles_stack)
@@ -224,14 +224,14 @@ lambda_stack.add_dependency(s3_stack)  # Lambda needs S3 bucket names
 # The Gateway stack creates the MCP endpoint
 # Runtime automatically authenticates via AgentCore Identity
 
-# Custom Analyzers Stack (optional - only deployed if custom analyzers exist)
-# Custom analyzers are created via the wizard UI and saved locally
-custom_analyzers_registry = Path("./custom_analyzers/analyzer_registry.json")
-if custom_analyzers_registry.exists():
+# Custom Specialists Stack (optional - only deployed if custom specialists exist)
+# Custom specialists are created via the wizard UI and saved locally
+custom_specialists_registry = Path("./custom_specialists/specialist_registry.json")
+if custom_specialists_registry.exists():
     # Use Fn.import_value to reference exports - no explicit dependencies needed
-    custom_analyzers_stack = CustomAnalyzersStack(
+    custom_specialists_stack = CustomSpecialistsStack(
         app,
-        f"{STACK_PREFIX}-custom-analyzers",
+        f"{STACK_PREFIX}-custom-specialists",
         deployment_id=deployment_id,
         deployment_tags=deployment_tags,
         config_bucket_name=cdk.Fn.import_value(f"{STACK_PREFIX}-s3-ConfigBucketName"),
@@ -257,7 +257,7 @@ if custom_analyzers_registry.exists():
             f"{STACK_PREFIX}-inference-profiles-ClaudeOpus45ProfileArn"
         ),
         env=env,
-        description="Custom analyzers created via the wizard UI",
+        description="Custom specialists created via the wizard UI",
     )
 
 # --- Frontend infrastructure ---

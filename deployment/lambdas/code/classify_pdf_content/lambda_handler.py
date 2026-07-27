@@ -34,13 +34,13 @@ def lambda_handler(event, context):
 
         # Determine config source
         config_bucket = os.environ.get("CONFIG_BUCKET")
-        analyzer_name = os.environ.get("ANALYZER_NAME", "classify_pdf_content")
+        specialist_name = os.environ.get("SPECIALIST_NAME", "classify_pdf_content")
 
         # Auto-detect: use S3 if in Lambda and CONFIG_BUCKET is set
         if os.environ.get("AWS_EXECUTION_ENV") and config_bucket:
             config_source = "s3"
             logger.info(
-                "Using S3 config: bucket=%s, analyzer=%s", config_bucket, analyzer_name
+                "Using S3 config: bucket=%s, specialist=%s", config_bucket, specialist_name
             )
         else:
             config_source = "local"
@@ -82,13 +82,13 @@ def lambda_handler(event, context):
 
         # Load configuration
         if config_source == "s3":
-            config = _load_config_from_s3(config_bucket, analyzer_name)
+            config = _load_config_from_s3(config_bucket, specialist_name)
         else:
             config = _load_config_from_local()
 
-        # Initialize analyzer
-        analyzer = _initialize_analyzer(
-            config, config_source, config_bucket, analyzer_name
+        # Initialize specialist
+        specialist = _initialize_specialist(
+            config, config_source, config_bucket, specialist_name
         )
 
         # Classify each image
@@ -105,7 +105,7 @@ def lambda_handler(event, context):
                 image_data = _get_image_data({"image_path": image_path})
 
             # Run classification
-            result = analyzer.analyze(image_data, body.get("aws_profile"), audit_mode)
+            result = specialist.analyze(image_data, body.get("aws_profile"), audit_mode)
 
             classifications.append(
                 {
@@ -129,7 +129,7 @@ def lambda_handler(event, context):
             try:
                 s3_uri = save_result_to_s3(
                     result=result,
-                    analyzer_name=analyzer_name,
+                    specialist_name=specialist_name,
                     output_bucket=output_bucket,
                     session_id=session_id,
                     image_path=image_paths[0] if image_paths else None,
@@ -216,27 +216,27 @@ def _get_image_data(body: dict) -> bytes:
     )
 
 
-def _load_config_from_s3(bucket: str, analyzer_name: str) -> dict:
-    """Load analyzer configuration from S3."""
+def _load_config_from_s3(bucket: str, specialist_name: str) -> dict:
+    """Load specialist configuration from S3."""
     from foundation.s3_config_loader import load_manifest_from_s3
     from typing import Any
 
-    manifest: dict[str, Any] = load_manifest_from_s3(bucket, analyzer_name)
-    config: dict[str, Any] = manifest.get("analyzer", manifest)
+    manifest: dict[str, Any] = load_manifest_from_s3(bucket, specialist_name)
+    config: dict[str, Any] = manifest.get("specialist", manifest)
 
-    logger.info("Loaded config from S3 for %s", analyzer_name)
+    logger.info("Loaded config from S3 for %s", specialist_name)
     return config
 
 
 def _load_config_from_local() -> dict:
-    """Load analyzer configuration from local filesystem."""
+    """Load specialist configuration from local filesystem."""
     from typing import Any
 
     manifest_path = Path("/var/task/manifest.json")
     with open(manifest_path, encoding="utf-8") as f:
         manifest: dict[str, Any] = json.load(f)
 
-    config: dict[str, Any] = manifest["analyzer"]
+    config: dict[str, Any] = manifest["specialist"]
 
     # Resolve all paths relative to /var/task
     config["prompt_base_path"] = str(Path("/var/task") / config["prompt_base_path"])
@@ -246,14 +246,14 @@ def _load_config_from_local() -> dict:
     return config
 
 
-def _initialize_analyzer(
+def _initialize_specialist(
     config: dict,
     config_source: str,
     s3_bucket: str | None = None,
-    analyzer_name: str | None = None,
+    specialist_name: str | None = None,
 ):
-    """Initialize the analyzer foundation with appropriate config source."""
-    from foundation.analyzer_foundation import AnalyzerFoundation
+    """Initialize the specialist foundation with appropriate config source."""
+    from foundation.specialist_foundation import SpecialistFoundation
     from foundation.configuration_manager import ConfigurationManager
     from foundation.prompt_loader import PromptLoader
     from foundation.image_processor import ImageProcessor
@@ -261,13 +261,13 @@ def _initialize_analyzer(
     from foundation.message_chain_builder import MessageChainBuilder
     from foundation.response_processor import ResponseProcessor
 
-    # Create analyzer instance
-    analyzer = object.__new__(AnalyzerFoundation)
-    analyzer.analyzer_type = analyzer_name or "classify_pdf_content"
-    analyzer.s3_bucket = s3_bucket if config_source == "s3" else None
-    analyzer.logger = logging.getLogger(f"foundation.{analyzer.analyzer_type}")
-    analyzer.config = config
-    analyzer.global_settings = {
+    # Create specialist instance
+    specialist = object.__new__(SpecialistFoundation)
+    specialist.specialist_type = specialist_name or "classify_pdf_content"
+    specialist.s3_bucket = s3_bucket if config_source == "s3" else None
+    specialist.logger = logging.getLogger(f"foundation.{specialist.specialist_type}")
+    specialist.config = config
+    specialist.global_settings = {
         "max_tokens": int(os.environ.get("MAX_TOKENS", "8000")),
         "temperature": float(os.environ.get("TEMPERATURE", "0.1")),
         "max_image_size": int(os.environ.get("MAX_IMAGE_SIZE", "20971520")),
@@ -279,21 +279,21 @@ def _initialize_analyzer(
     }
 
     # Initialize components
-    analyzer.config_manager = ConfigurationManager()
+    specialist.config_manager = ConfigurationManager()
 
     # Initialize prompt loader with S3 support
     if config_source == "s3":
-        analyzer.prompt_loader = PromptLoader(
-            config_source="s3", s3_bucket=s3_bucket, analyzer_name=analyzer_name
+        specialist.prompt_loader = PromptLoader(
+            config_source="s3", s3_bucket=s3_bucket, specialist_name=specialist_name
         )
     else:
-        analyzer.prompt_loader = PromptLoader(config_source="local")
+        specialist.prompt_loader = PromptLoader(config_source="local")
 
-    analyzer.image_processor = ImageProcessor()
-    analyzer.bedrock_client = BedrockClient()
-    analyzer.message_builder = MessageChainBuilder()
-    analyzer.response_processor = ResponseProcessor()
-    analyzer._configure_components()
+    specialist.image_processor = ImageProcessor()
+    specialist.bedrock_client = BedrockClient()
+    specialist.message_builder = MessageChainBuilder()
+    specialist.response_processor = ResponseProcessor()
+    specialist._configure_components()
 
-    logger.info("Initialized analyzer with %s config", config_source)
-    return analyzer
+    logger.info("Initialized specialist with %s config", config_source)
+    return specialist

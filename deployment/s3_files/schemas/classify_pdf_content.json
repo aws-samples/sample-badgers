@@ -19,7 +19,7 @@
                 },
                 "config_path": {
                     "type": "string",
-                    "description": "Path to analyzer configuration file. Default: ./config/analyzer_config.json"
+                    "description": "Path to specialist configuration file. Default: ./config/specialist_config.json"
                 }
             },
             "required": [
@@ -31,7 +31,7 @@
             "properties": {
                 "result": {
                     "type": "string",
-                    "description": "JSON string with classification results: page numbers, content types, confidence scores, and recommended analyzer tools"
+                    "description": "JSON string with classification results: page numbers, content types, confidence scores, and recommended specialist tools"
                 },
                 "success": {
                     "type": "boolean",

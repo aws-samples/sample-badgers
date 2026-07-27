@@ -3,14 +3,14 @@ import { useUser } from './hooks/useUser.js'
 import Header from './components/Header.jsx'
 import Home from './components/Home.jsx'
 import Chat from './components/Chat.jsx'
-import AnalyzerEditor from './components/AnalyzerEditor.jsx'
-import AnalyzerWizard from './components/AnalyzerWizard.jsx'
+import SpecialistEditor from './components/SpecialistEditor.jsx'
+import SpecialistWizard from './components/SpecialistWizard.jsx'
 import Evaluator from './components/Evaluator.jsx'
 import PricingCalculator from './components/PricingCalculator.jsx'
 import Observability from './components/Observability.jsx'
 import ChatLog from './components/ChatLog.jsx'
 import StackList from './components/StackList.jsx'
-import AnalyzerSelector from './components/AnalyzerSelector.jsx'
+import SpecialistSelector from './components/SpecialistSelector.jsx'
 import S3ConfigEditor from './components/S3ConfigEditor.jsx'
 import ConfigEditor from './components/ConfigEditor.jsx'
 import LogPanel from './components/LogPanel.jsx'
@@ -19,15 +19,15 @@ const TABS = [
     // Testing tabs — all roles
     { id: 'home', label: '🏠 Home' },
     { id: 'chat', label: '💬 Chat' },
-    { id: 'editor', label: '✏️ Edit Analyzer' },
-    { id: 'wizard', label: '🧙 Create Analyzer' },
+    { id: 'editor', label: '✏️ Edit Specialist' },
+    { id: 'wizard', label: '🧙 Create Specialist' },
     { id: 'evaluator', label: '🧪 Evaluations' },
     { id: 'pricing', label: '💰 Pricing' },
     { id: 'observability', label: '📊 Observability' },
     { id: 'chatlog', label: '📝 Chat Log' },
     // Admin tabs
     { id: 'stacks', label: '📦 Stacks', adminOnly: true },
-    { id: 'analyzers', label: '🔬 Analyzers', adminOnly: true },
+    { id: 'specialists', label: '🔬 Specialists', adminOnly: true },
     { id: 's3configs', label: '📄 S3 Configs', adminOnly: true },
     { id: 'config', label: '⚙️ Deploy Tags', adminOnly: true },
 ]
@@ -191,8 +191,8 @@ export default function App() {
             {/* Testing tabs */}
             {tab === 'home' && <Home onNavigate={switchTab} branding={branding} />}
             <div style={{ display: tab === 'chat' ? 'block' : 'none' }}><Chat /></div>
-            {tab === 'editor' && <AnalyzerEditor dirtyRef={dirtyRef} />}
-            {tab === 'wizard' && <AnalyzerWizard runSSE={runSSE} running={running} />}
+            {tab === 'editor' && <SpecialistEditor dirtyRef={dirtyRef} />}
+            {tab === 'wizard' && <SpecialistWizard runSSE={runSSE} running={running} />}
             {tab === 'evaluator' && <Evaluator />}
             {tab === 'pricing' && <PricingCalculator />}
             {tab === 'observability' && <Observability />}
@@ -200,7 +200,7 @@ export default function App() {
 
             {/* Admin tabs */}
             {role === 'admin' && tab === 'stacks' && <StackList runSSE={runSSE} runSSEGet={runSSEGet} running={running} />}
-            {role === 'admin' && tab === 'analyzers' && <AnalyzerSelector dirtyRef={dirtyRef} />}
+            {role === 'admin' && tab === 'specialists' && <SpecialistSelector dirtyRef={dirtyRef} />}
             {role === 'admin' && tab === 's3configs' && <S3ConfigEditor runSSE={runSSE} running={running} dirtyRef={dirtyRef} />}
             {role === 'admin' && tab === 'config' && <ConfigEditor dirtyRef={dirtyRef} />}
 
