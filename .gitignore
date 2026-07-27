@@ -78,6 +78,8 @@ __pycache__
 
 # Frontend config (environment-specific, use frontend_config.example.json as template)
 deployment/frontend_config.json
+.favicon
+logo.png
 
 # Custom analyzers - keep directory structure only
 deployment/custom_analyzers/*
