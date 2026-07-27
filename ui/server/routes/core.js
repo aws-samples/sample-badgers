@@ -29,7 +29,19 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         return env;
     }
 
-    const ENV = loadEnvFile();
+    // process.env wins over the local .env file. In production the ECS task
+    // injects every value from SSM Parameter Store into process.env, so nothing
+    // is read from disk; the .env file is a local-development convenience only.
+    const ENV = new Proxy(
+        { ...loadEnvFile() },
+        {
+            get(fileEnv, key) {
+                const fromProcess = process.env[key];
+                if (fromProcess !== undefined && fromProcess !== '') return fromProcess;
+                return fileEnv[key];
+            },
+        }
+    );
 
     // ── Load branding config (re-read on every request for hot reload) ──
     const brandingPath = resolve(CONFIG_DIR, 'branding.json');
