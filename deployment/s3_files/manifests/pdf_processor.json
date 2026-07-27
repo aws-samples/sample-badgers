@@ -2,7 +2,7 @@
     "tools": [
         {
             "name": "pdf_to_images_converter",
-            "description": "Convert PDF documents to optimized images suitable for AI analysis. This utility tool processes PDF files by converting each page to high-quality images that can then be analyzed using the existing analyzer tools (diagram, table, handwriting, etc.). Supports various output formats and optimization settings for different use cases.",
+            "description": "Convert PDF documents to optimized images suitable for AI analysis. This utility tool processes PDF files by converting each page to high-quality images that can then be analyzed using the existing specialist tools (diagram, table, handwriting, etc.). Supports various output formats and optimization settings for different use cases.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -66,8 +66,8 @@
                     },
                     "config_path": {
                         "type": "string",
-                        "description": "Path to analyzer configuration file",
-                        "default": "./config/analyzer_config.json"
+                        "description": "Path to specialist configuration file",
+                        "default": "./config/specialist_config.json"
                     }
                 },
                 "required": [
@@ -87,8 +87,8 @@
                     },
                     "config_path": {
                         "type": "string",
-                        "description": "Path to analyzer configuration file",
-                        "default": "./config/analyzer_config.json"
+                        "description": "Path to specialist configuration file",
+                        "default": "./config/specialist_config.json"
                     }
                 },
                 "required": [
@@ -98,7 +98,7 @@
         },
         {
             "name": "execute_analysis_tasks_tool",
-            "description": "Execute analysis tasks using appropriate analyzer tools. Takes a task queue and executes each task by calling the recommended analyzer tool. This is step 4 in the PDF analysis workflow after building the task queue.",
+            "description": "Execute analysis tasks using appropriate specialist tools. Takes a task queue and executes each task by calling the recommended specialist tool. This is step 4 in the PDF analysis workflow after building the task queue.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -116,8 +116,8 @@
                     },
                     "config_path": {
                         "type": "string",
-                        "description": "Path to analyzer configuration file",
-                        "default": "./config/analyzer_config.json"
+                        "description": "Path to specialist configuration file",
+                        "default": "./config/specialist_config.json"
                     }
                 },
                 "required": [
@@ -127,7 +127,7 @@
             }
         },
         {
-            "name": "intelligent_pdf_analyzer",
+            "name": "intelligent_pdf_specialist",
             "description": "Intelligent PDF analysis system that automatically analyzes PDF documents using vision-capable LLMs to classify content and route pages to appropriate specialized analysis tools. This orchestrator tool provides end-to-end automated PDF analysis without manual tool selection.",
             "inputSchema": {
                 "type": "object",
@@ -157,8 +157,8 @@
                     },
                     "config_path": {
                         "type": "string",
-                        "description": "Path to analyzer configuration file.",
-                        "default": "./config/analyzer_config.json"
+                        "description": "Path to specialist configuration file.",
+                        "default": "./config/specialist_config.json"
                     }
                 },
                 "required": [
@@ -167,8 +167,8 @@
             }
         },
         {
-            "name": "streaming_pdf_analyzer",
-            "description": "Streaming version of the intelligent PDF analyzer that provides real-time progress updates via Server-Sent Events (SSE). This tool performs the same comprehensive PDF analysis as the standard intelligent analyzer but streams progress updates as each processing phase completes: PDF conversion, content classification, task queue building, individual task execution, and result aggregation. Perfect for UI applications that need to show live progress and receive partial results immediately rather than waiting for complete processing.",
+            "name": "streaming_pdf_specialist",
+            "description": "Streaming version of the intelligent PDF specialist that provides real-time progress updates via Server-Sent Events (SSE). This tool performs the same comprehensive PDF analysis as the standard intelligent specialist but streams progress updates as each processing phase completes: PDF conversion, content classification, task queue building, individual task execution, and result aggregation. Perfect for UI applications that need to show live progress and receive partial results immediately rather than waiting for complete processing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -197,8 +197,8 @@
                     },
                     "config_path": {
                         "type": "string",
-                        "description": "Path to analyzer configuration file.",
-                        "default": "./config/analyzer_config.json"
+                        "description": "Path to specialist configuration file.",
+                        "default": "./config/specialist_config.json"
                     }
                 },
                 "required": [
@@ -207,12 +207,12 @@
             }
         }
     ],
-    "analyzer": {
+    "specialist": {
         "name": "pdf_processor",
         "description": "Vision-LLM powered PDF analysis orchestrator",
         "enable_enhancement": true,
         "enhancement_debug_mode": false,
-        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
             "classification_context.xml",
             "classification_rules.xml",
@@ -247,7 +247,7 @@
             "boto3",
             "pdf2image"
         ],
-        "enabled_in_config": "analyzer_config.json:analyzers.pdf_processor",
-        "analyzer_type": "advanced"
+        "enabled_in_config": "specialist_config.json:specialists.pdf_processor",
+        "specialist_type": "advanced"
     }
 }

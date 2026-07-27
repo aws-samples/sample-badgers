@@ -173,7 +173,7 @@ class AgentCoreGatewayStack(Stack):
             self,
             "BadgersGateway",
             gateway_name=f"badgers-gtwy-{self.deployment_id}",
-            description="MCP Gateway for BADGERS analyzers with full observability",
+            description="MCP Gateway for BADGERS specialists with full observability",
             role=self.gateway_role,
             protocol_configuration=agentcore.McpProtocolConfiguration(
                 instructions="Use these tools to analyze PDF documents, extract content, and process images.",
@@ -203,10 +203,10 @@ class AgentCoreGatewayStack(Stack):
             if child_id == "DefaultPolicy" or child_id.startswith("OverflowPolicy"):
                 policy_dependencies.append(child)
 
-        for analyzer_name, lambda_function in self.lambda_functions.items():
+        for specialist_name, lambda_function in self.lambda_functions.items():
             # Create short target name by stripping analyze_ prefix and _tool suffix
             # This keeps MCP tool names shorter: ${target_name}__${tool_name}
-            short_name = analyzer_name
+            short_name = specialist_name
             if short_name.startswith("analyze_"):
                 short_name = short_name[8:]  # Remove "analyze_"
             if short_name.endswith("_tool"):
@@ -216,13 +216,13 @@ class AgentCoreGatewayStack(Stack):
             target_name = short_name.replace("_", "-")[:50]
 
             target = self.gateway.add_lambda_target(
-                f"Target-{analyzer_name}",
+                f"Target-{specialist_name}",
                 gateway_target_name=target_name,
-                description=f"Lambda target for {analyzer_name}",
+                description=f"Lambda target for {specialist_name}",
                 lambda_function=lambda_function,
                 tool_schema=agentcore.ToolSchema.from_s3_file(
                     bucket=self.config_bucket,
-                    object_key=f"schemas/{analyzer_name}.json",
+                    object_key=f"schemas/{specialist_name}.json",
                 ),
             )
 

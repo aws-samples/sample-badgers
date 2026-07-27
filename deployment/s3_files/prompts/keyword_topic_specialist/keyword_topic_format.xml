@@ -1,0 +1,84 @@
+<!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + keyword_topic -->
+<!-- NOTE: The specialized block for keyword_topic outputs JSON, not XML. -->
+<!-- The common_spine is still XML. The JSON goes inside specialized as CDATA. -->
+
+<response_format>
+    <response specialist="keyword_topic"
+             schema_version="1.0"
+             page="{PAGE_NUMBER}"
+             session_id="{SESSION_ID}">
+
+        <metadata>
+            <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
+            <specialist_name>keyword_topic</specialist_name>
+            <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
+            <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
+            <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
+            <element_count>0</element_count>
+            <confidence>{high|medium|low}</confidence>
+        </metadata>
+
+        <!--
+        The keyword/topic specialist consumes pre-extracted text (typically from
+        full_text or correlation output), so it may not see the raw page image.
+        If it does, populate the common_spine with visible text. If it's working
+        from upstream XML, the common_spine may reference the source elements.
+        -->
+        <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
+            <element id="elem_001" tag="P" order="1" page="{PAGE}">
+                <text>{SOURCE_TEXT_ANALYZED}</text>
+            </element>
+        </common_spine>
+
+        <topical_analysis>{TOPICS_IDENTIFIED_IN_CONTENT}</topical_analysis>
+
+        <!--
+        Specialized output is JSON. The model should output the JSON block
+        after the XML envelope. The downstream parser extracts it from
+        the specialized CDATA section.
+        -->
+        <specialized type="keyword_topic">
+            <format>JSON</format>
+            <grounding_requirements>
+                <requirement>Every topic and primary keyword MUST include source_excerpt and excerpt_element_id</requirement>
+                <requirement>source_excerpt: exact verbatim text from document supporting this assignment</requirement>
+                <requirement>excerpt_element_id: element ID (e.g. "elem_010") from source XML</requirement>
+                <requirement>confidence: "high" if excerpt directly mentions concept, "medium" if implied, "low" if inferred</requirement>
+            </grounding_requirements>
+            <json_output><![CDATA[
+{
+  "page_number": "Page number visible on the page or inferred from context",
+  "primary_keywords": [
+    {
+      "keyword": "string - the search phrase",
+      "intent": "informational | commercial | transactional | navigational",
+      "prominence": "high | medium | low",
+      "competition": "high | medium | low",
+      "content_fit": "strong | partial | opportunity",
+      "source_excerpt": "exact verbatim text supporting this keyword",
+      "excerpt_element_id": "elem_XXX",
+      "confidence": "high | medium | low"
+    }
+  ],
+  "topics": [
+    {
+      "topic": "string - topic name",
+      "relevance": "primary | secondary | tertiary",
+      "source_excerpt": "exact verbatim text supporting this topic",
+      "excerpt_element_id": "elem_XXX",
+      "confidence": "high | medium | low"
+    }
+  ],
+  "semantic_clusters": [
+    {
+      "cluster_name": "string",
+      "keywords": ["keyword1", "keyword2"],
+      "relationship": "description of how these relate"
+    }
+  ]
+}
+            ]]></json_output>
+        </specialized>
+
+    </response>
+</response_format>

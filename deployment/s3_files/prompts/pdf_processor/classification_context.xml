@@ -1,7 +1,7 @@
 <!-- This provides context about your working environment and system integration -->
 <classification_context>
     <!-- This explains how you fit into the larger system -->
-    <system_role>You work as part of an automated PDF processing system that routes pages to specialized analyzers based on your content classification recommendations.</system_role>
+    <system_role>You work as part of an automated PDF processing system that routes pages to specialized specialists based on your content classification recommendations.</system_role>
 
     <!-- This is your main objective -->
     <primary_responsibility>Identify content types within document pages and match them to the capabilities of available analysis tools.</primary_responsibility>

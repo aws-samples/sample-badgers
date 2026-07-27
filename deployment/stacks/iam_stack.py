@@ -35,20 +35,20 @@ class IAMStack(Stack):
         # Lambda execution role
         self.lambda_role = iam.Role(
             self,
-            "LambdaAnalyzerExecutionRole",
-            role_name=f"lambda-analyzer-role-{deployment_id}",
+            "LambdaSpecialistExecutionRole",
+            role_name=f"lambda-specialist-role-{deployment_id}",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            description="Execution role for Lambda analyzer functions with Bedrock and S3 access",
+            description="Execution role for Lambda specialist functions with Bedrock and S3 access",
         )
 
         # Apply resource-specific tags
         self._apply_resource_tags(
             self.lambda_role,
             "lambda-execution-role",
-            "IAM execution role for Lambda analyzer functions",
+            "IAM execution role for Lambda specialist functions",
         )
 
-        # Bedrock permissions - scoped to specific models used by analyzers
+        # Bedrock permissions - scoped to specific models used by specialists
         # For inference profiles, we need permissions on BOTH the inference profile
         # AND the underlying foundation models that requests can be routed to
         self.lambda_role.add_to_policy(
@@ -74,7 +74,7 @@ class IAMStack(Stack):
         )
 
         # Application inference profiles - created by InferenceProfilesStack for cost tracking
-        # These wrap the system-defined profiles above and are passed to analyzers via env vars
+        # These wrap the system-defined profiles above and are passed to specialists via env vars
         # when running in AgentCore Runtime
         self.lambda_role.add_to_policy(
             iam.PolicyStatement(

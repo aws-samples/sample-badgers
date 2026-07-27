@@ -3,10 +3,10 @@ import { useState, useEffect, useMemo } from 'react'
 const FIXED_IMAGE_TOKENS = 1600
 
 const DEFAULT_INCLUDED = new Set([
-  'charts_analyzer', 'classify_pdf_content', 'correlation_analyzer',
-  'diagram_analyzer', 'elements_analyzer', 'general_visual_analysis',
-  'handwriting_analyzer', 'keyword_topic_analyzer', 'pdf_processor',
-  'robust_elements_analyzer', 'table_analyzer',
+  'charts_specialist', 'classify_pdf_content', 'correlation_specialist',
+  'diagram_specialist', 'elements_specialist', 'general_visual_analysis',
+  'handwriting_specialist', 'keyword_topic_specialist', 'pdf_processor',
+  'robust_elements_specialist', 'table_specialist',
 ])
 
 function fmt(n, decimals = 0) {
@@ -208,25 +208,25 @@ function BasicCalculator({ config }) {
 function AdvancedCalculator({ config }) {
   const models = Object.values(config.models || {})
   const modelNames = models.map(m => m.name)
-  const analyzers = config.analyzer_defaults || {}
-  const analyzerNames = Object.keys(analyzers).sort()
+  const specialists = config.specialist_defaults || {}
+  const specialistNames = Object.keys(specialists).sort()
 
   const [numPages, setNumPages] = useState(100)
   const [numDocs, setNumDocs] = useState(1)
   const [included, setIncluded] = useState(() => {
     const m = {}
-    analyzerNames.forEach(n => m[n] = DEFAULT_INCLUDED.has(n))
+    specialistNames.forEach(n => m[n] = DEFAULT_INCLUDED.has(n))
     return m
   })
   const [modelOverrides, setModelOverrides] = useState(() => {
     const m = {}
-    analyzerNames.forEach(n => m[n] = analyzers[n]?.default_model || 'Claude Sonnet 4.5')
+    specialistNames.forEach(n => m[n] = specialists[n]?.default_model || 'Claude Sonnet 4.5')
     return m
   })
   const [result, setResult] = useState(null)
 
   const toggleInclude = (name) => setIncluded(p => ({ ...p, [name]: !p[name] }))
-  const setAnalyzerModel = (name, val) => setModelOverrides(p => ({ ...p, [name]: val }))
+  const setSpecialistModel = (name, val) => setModelOverrides(p => ({ ...p, [name]: val }))
 
   const getModelPricing = (name) => {
     const m = models.find(x => x.name === name) || models[0] || {}
@@ -234,24 +234,24 @@ function AdvancedCalculator({ config }) {
   }
 
   const calculate = () => {
-    const selected = analyzerNames.filter(n => included[n])
+    const selected = specialistNames.filter(n => included[n])
     const breakdown = []
     let totalInputTokens = 0, totalOutputTokens = 0
     let totalInputCost = 0, totalOutputCost = 0
 
     for (const name of selected) {
-      const a = analyzers[name]
+      const a = specialists[name]
       const promptTokens = a.prompt_tokens || 0
       const outputTokens = a.expected_output_tokens || 0
       const inputPerPage = promptTokens + FIXED_IMAGE_TOKENS
-      const analyzerInput = inputPerPage * numPages
-      const analyzerOutput = outputTokens * numPages
+      const specialistInput = inputPerPage * numPages
+      const specialistOutput = outputTokens * numPages
       const [inpM, outM] = getModelPricing(modelOverrides[name])
-      const inpCost = (analyzerInput / 1e6) * inpM
-      const outCost = (analyzerOutput / 1e6) * outM
+      const inpCost = (specialistInput / 1e6) * inpM
+      const outCost = (specialistOutput / 1e6) * outM
 
-      totalInputTokens += analyzerInput
-      totalOutputTokens += analyzerOutput
+      totalInputTokens += specialistInput
+      totalOutputTokens += specialistOutput
       totalInputCost += inpCost
       totalOutputCost += outCost
 
@@ -274,9 +274,9 @@ function AdvancedCalculator({ config }) {
   const reset = () => {
     setNumPages(100); setNumDocs(1); setResult(null)
     const inc = {}, mdl = {}
-    analyzerNames.forEach(n => {
+    specialistNames.forEach(n => {
       inc[n] = DEFAULT_INCLUDED.has(n)
-      mdl[n] = analyzers[n]?.default_model || 'Claude Sonnet 4.5'
+      mdl[n] = specialists[n]?.default_model || 'Claude Sonnet 4.5'
     })
     setIncluded(inc); setModelOverrides(mdl)
   }
@@ -284,7 +284,7 @@ function AdvancedCalculator({ config }) {
   return (
     <div>
       <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 8 }}>
-        Calculate costs based on actual deployed analyzer prompts. Toggle analyzers on/off and set per-analyzer models.
+        Calculate costs based on actual deployed specialist prompts. Toggle specialists on/off and set per-specialist models.
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12, fontStyle: 'italic' }}>
         Image tokens fixed at {FIXED_IMAGE_TOKENS} (all images normalized to max 2048px)
@@ -299,24 +299,24 @@ function AdvancedCalculator({ config }) {
         </div>
       </div>
 
-      {/* Analyzer table */}
+      {/* Specialist table */}
       <div className="card" style={{ padding: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>🔧 Analyzer Configuration</div>
+        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 8 }}>🔧 Specialist Configuration</div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>
-          Toggle Include to add/remove analyzers. Change Model to override the default.
+          Toggle Include to add/remove specialists. Change Model to override the default.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr 80px 80px', gap: '4px 8px', alignItems: 'center', fontSize: 11 }}>
           <div style={{ fontWeight: 600, color: 'var(--text-dim)' }}>On</div>
-          <div style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Analyzer</div>
+          <div style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Specialist</div>
           <div style={{ fontWeight: 600, color: 'var(--text-dim)' }}>Model</div>
           <div style={{ fontWeight: 600, color: 'var(--text-dim)', textAlign: 'right' }}>Prompt</div>
           <div style={{ fontWeight: 600, color: 'var(--text-dim)', textAlign: 'right' }}>Output</div>
-          {analyzerNames.map(name => {
-            const a = analyzers[name]
+          {specialistNames.map(name => {
+            const a = specialists[name]
             return [
               <input key={name + '-chk'} type="checkbox" checked={!!included[name]} onChange={() => toggleInclude(name)} />,
               <span key={name + '-name'} style={{ fontFamily: 'SF Mono, Menlo, monospace', fontSize: 11 }}>{name}</span>,
-              <select key={name + '-mdl'} value={modelOverrides[name]} onChange={e => setAnalyzerModel(name, e.target.value)}
+              <select key={name + '-mdl'} value={modelOverrides[name]} onChange={e => setSpecialistModel(name, e.target.value)}
                 style={{ fontSize: 11, padding: '2px 4px' }}>
                 {modelNames.map(n => <option key={n} value={n}>{n}</option>)}
               </select>,
@@ -335,24 +335,24 @@ function AdvancedCalculator({ config }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>
               <ResultCard label="Input Tokens" value={fmt(result.totalInputTokens)} />
               <ResultCard label="Output Tokens" value={fmt(result.totalOutputTokens)} />
-              <ResultCard label="Analyzers Selected" value={result.selected} />
+              <ResultCard label="Specialists Selected" value={result.selected} />
               <ResultCard label="Input Cost" value={`$${result.inputCost.toFixed(4)}`} />
               <ResultCard label="Output Cost" value={`$${result.outputCost.toFixed(4)}`} />
               <ResultCard label="Total Cost" value={`$${result.total.toFixed(4)}`} />
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-              {result.selected} analyzers × {fmt(numPages)} pages = {fmt(result.totalInputTokens + result.totalOutputTokens)} total tokens.
+              {result.selected} specialists × {fmt(numPages)} pages = {fmt(result.totalInputTokens + result.totalOutputTokens)} total tokens.
               Cost/page: ${result.costPerPage.toFixed(6)} | Cost/doc: ${result.costPerDoc.toFixed(4)} | Total: ${result.total.toFixed(4)}
             </div>
 
             {/* Breakdown table */}
-            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>📊 Analyzer Breakdown</div>
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>📊 Specialist Breakdown</div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['Analyzer', 'Model', 'Prompt', 'Image', 'Output', 'Input $', 'Output $', 'Total $'].map(h =>
-                      <th key={h} style={{ padding: '4px 6px', textAlign: h === 'Analyzer' || h === 'Model' ? 'left' : 'right', color: 'var(--text-dim)' }}>{h}</th>
+                    {['Specialist', 'Model', 'Prompt', 'Image', 'Output', 'Input $', 'Output $', 'Total $'].map(h =>
+                      <th key={h} style={{ padding: '4px 6px', textAlign: h === 'Specialist' || h === 'Model' ? 'left' : 'right', color: 'var(--text-dim)' }}>{h}</th>
                     )}
                   </tr>
                 </thead>

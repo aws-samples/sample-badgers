@@ -223,7 +223,7 @@ main() {
     else
         log_warn "build_pdf_processing_layer.sh not found, checking for existing pdf-processing-layer.zip"
         if [ ! -f "pdf-processing-layer.zip" ]; then
-            log_warn "PDF processing lambda layer not found - this is OK for container-based remediation_analyzer (bundles its own deps)"
+            log_warn "PDF processing lambda layer not found - this is OK for container-based remediation_specialist (bundles its own deps)"
         fi
     fi
     cd "$CDK_DIR"

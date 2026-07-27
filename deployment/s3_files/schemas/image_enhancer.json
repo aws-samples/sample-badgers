@@ -1,7 +1,7 @@
 [
     {
         "name": "enhance_image_tool",
-        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling analyzers when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent analyzers.",
+        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent specialists.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -54,7 +54,7 @@
                     "properties": {
                         "s3_output_uri": {
                             "type": "string",
-                            "description": "S3 URI of the enhanced image - pass this to subsequent analyzers"
+                            "description": "S3 URI of the enhanced image - pass this to subsequent specialists"
                         },
                         "operations_applied": {
                             "type": "array",

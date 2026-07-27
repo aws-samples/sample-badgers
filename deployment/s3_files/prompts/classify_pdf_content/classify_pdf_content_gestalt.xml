@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Gestalt Perception for PDF Content Classification -->
-<gestalt_perception analyzer="classify_pdf_content">
+<gestalt_perception specialist="classify_pdf_content">
 
     <prescan>
         <instruction>Before classifying content, perceive the page holistically:</instruction>

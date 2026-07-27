@@ -2,7 +2,7 @@
 # Build and push container Lambda images to the badgers ECR repository
 # Usage: ./build_container_lambdas.sh <deployment_id>
 #
-# This script builds the image_enhancer and remediation_analyzer containers
+# This script builds the image_enhancer and remediation_specialist containers
 # and pushes them to the shared badgers-<deployment_id> ECR repository.
 
 set -e
@@ -27,7 +27,7 @@ echo "Logging into ECR..."
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
 # Container functions to build
-CONTAINERS=("image_enhancer" "remediation_analyzer")
+CONTAINERS=("image_enhancer" "remediation_specialist")
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     CONTAINER_DIR="./containers/${CONTAINER}"
@@ -48,8 +48,8 @@ for CONTAINER in "${CONTAINERS[@]}"; do
     echo "=========================================="
 
     # Copy foundation and config modules for containers that need them
-    # (remediation_analyzer is self-contained — no foundation/config dependency)
-    if [ "$CONTAINER" != "remediation_analyzer" ]; then
+    # (remediation_specialist is self-contained — no foundation/config dependency)
+    if [ "$CONTAINER" != "remediation_specialist" ]; then
         echo "Copying foundation and config modules to build context..."
         if [ -d "./layer/python/foundation" ]; then
             rm -rf "${CONTAINER_DIR}/foundation"
@@ -79,7 +79,7 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         "${CONTAINER_DIR}"
 
     # Clean up foundation and config copies (if they were added)
-    if [ "$CONTAINER" != "remediation_analyzer" ]; then
+    if [ "$CONTAINER" != "remediation_specialist" ]; then
         rm -rf "${CONTAINER_DIR}/foundation"
         rm -rf "${CONTAINER_DIR}/config"
     fi

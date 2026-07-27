@@ -1,7 +1,7 @@
 """
-Prompt loading and caching functionality for analyzer system.
+Prompt loading and caching functionality for specialist system.
 
-Handles loading, combining, and caching of prompt files for different analyzer types.
+Handles loading, combining, and caching of prompt files for different specialist types.
 Supports both local file system and S3-based loading.
 """
 
@@ -25,7 +25,7 @@ class PromptLoader:
         self,
         config_source: str = "local",
         s3_bucket: Optional[str] = None,
-        analyzer_name: Optional[str] = None,
+        specialist_name: Optional[str] = None,
         custom: bool = False,
     ):
         """
@@ -34,20 +34,20 @@ class PromptLoader:
         Args:
             config_source: 'local' or 's3'
             s3_bucket: S3 bucket name (required if config_source='s3')
-            analyzer_name: Analyzer name (required if config_source='s3')
-            custom: Whether this is a custom analyzer (affects S3 paths)
+            specialist_name: Specialist name (required if config_source='s3')
+            custom: Whether this is a custom specialist (affects S3 paths)
         """
         self.logger = logging.getLogger(__name__)
         self.config_source = config_source
         self.s3_bucket = s3_bucket
-        self.analyzer_name = analyzer_name
+        self.specialist_name = specialist_name
         self.custom = custom
 
         if config_source == "s3":
             if not s3_bucket:
                 raise PromptLoadError("s3_bucket required when config_source='s3'")
-            if not analyzer_name:
-                raise PromptLoadError("analyzer_name required when config_source='s3'")
+            if not specialist_name:
+                raise PromptLoadError("specialist_name required when config_source='s3'")
 
             # Import S3 loader only when needed
             from foundation.s3_config_loader import (
@@ -61,14 +61,14 @@ class PromptLoader:
             self._S3ConfigError = S3ConfigError
 
             self.logger.info(
-                "Initialized S3 prompt loader: bucket=%s, analyzer=%s",
+                "Initialized S3 prompt loader: bucket=%s, specialist=%s",
                 s3_bucket,
-                analyzer_name,
+                specialist_name,
             )
 
     def load_system_prompt(
         self,
-        analyzer_config: Dict[str, Any],
+        specialist_config: Dict[str, Any],
         placeholders: Optional[Dict[str, str]] = None,
         audit_mode: bool = False,
     ) -> str:
@@ -76,7 +76,7 @@ class PromptLoader:
         Load and compose the complete system prompt.
 
         Args:
-            analyzer_config: Configuration dictionary for the analyzer
+            specialist_config: Configuration dictionary for the specialist
             placeholders: Optional dictionary of placeholder replacements (e.g., {"PIXEL_WIDTH": "1024"})
             audit_mode: Whether to include confidence assessment instructions
 
@@ -87,21 +87,21 @@ class PromptLoader:
             # Step 1: Load all core system files
             core_prompt_files = self.load_core_system_files()
 
-            # Step 2: Load and compose analyzer-specific prompts
-            # Get the prompt base path from config (could be prompt_base_path or prompt_analyzer_prompt_base_path)
+            # Step 2: Load and compose specialist-specific prompts
+            # Get the prompt base path from config (could be prompt_base_path or prompt_specialist_prompt_base_path)
             prompt_base_key = None
-            for key in ["prompt_base_path", "prompt_analyzer_prompt_base_path"]:
-                if key in analyzer_config:
+            for key in ["prompt_base_path", "prompt_specialist_prompt_base_path"]:
+                if key in specialist_config:
                     prompt_base_key = key
                     break
 
             if not prompt_base_key:
-                raise PromptLoadError("No prompt base path found in analyzer config")
+                raise PromptLoadError("No prompt base path found in specialist config")
 
-            analyzer_prompt_base_path = analyzer_config[prompt_base_key]
-            composed_analyzer_prompt = self.load_prompt_files(
-                analyzer_prompt_base_path,
-                analyzer_config["prompt_files"],
+            specialist_prompt_base_path = specialist_config[prompt_base_key]
+            composed_specialist_prompt = self.load_prompt_files(
+                specialist_prompt_base_path,
+                specialist_config["prompt_files"],
             )
 
             # Step 3: Start with the wrapper template
@@ -134,7 +134,7 @@ class PromptLoader:
                 "{core_rules}", core_prompt_files["core_rules_rules"]
             )
             system_prompt = system_prompt.replace(
-                "{composed_prompt}", composed_analyzer_prompt
+                "{composed_prompt}", composed_specialist_prompt
             )
 
             # Step 4.5: Inject audit mode content if enabled
@@ -163,7 +163,7 @@ class PromptLoader:
 
             self.logger.info(
                 "Loaded system prompt for %s: %d characters",
-                analyzer_config.get("name", "unknown"),
+                specialist_config.get("name", "unknown"),
                 len(system_prompt),
             )
 
@@ -221,7 +221,7 @@ class PromptLoader:
         for file_path in files:
             try:
                 content = self._load_prompt_from_s3(
-                    self.s3_bucket, self.analyzer_name, file_path, self.custom
+                    self.s3_bucket, self.specialist_name, file_path, self.custom
                 )
                 if content.strip():
                     combined_prompt += content + "\n\n"

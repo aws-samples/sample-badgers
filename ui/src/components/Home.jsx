@@ -25,9 +25,9 @@ export default function Home({ onNavigate, branding = {} }) {
 
   const tabs = [
     ['chat', '💬 Chat', 'Stream messages to the AgentCore Runtime via WebSocket'],
-    ['editor', '✏️ Edit Analyzer', 'Modify analyzer prompts and configuration in S3'],
-    ['wizard', '🧙 Create Analyzer', 'Build new analyzers with the guided wizard'],
-    ['evaluator', '🧪 Evaluations', 'Review and score analyzer output quality'],
+    ['editor', '✏️ Edit Specialist', 'Modify specialist prompts and configuration in S3'],
+    ['wizard', '🧙 Create Specialist', 'Build new specialists with the guided wizard'],
+    ['evaluator', '🧪 Evaluations', 'Review and score specialist output quality'],
     ['pricing', '💰 Pricing', 'Estimate Bedrock costs for document workloads'],
     ['observability', '📊 Observability', 'View agent execution traces from CloudWatch'],
     ['chatlog', '📝 Chat Log', 'Browse historical chat sessions'],

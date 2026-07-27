@@ -85,7 +85,7 @@ export default function Evaluator() {
     } catch { setContent('Error loading content') }
     // Load tool-specific eval questions from manifest
     try {
-      const r = await fetch(`/api/eval/manifest-eval/${result.analyzer}`)
+      const r = await fetch(`/api/eval/manifest-eval/${result.specialist}`)
       const data = await r.json()
       const qs = data.evaluation?.questions?.tool_specific || []
       setToolQuestions(qs)
@@ -112,7 +112,7 @@ export default function Evaluator() {
     try {
       await fetch(`/api/eval/sessions/${selected}/ratings`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result_file: currentResult.filename, analyzer: currentResult.analyzer, responses }),
+        body: JSON.stringify({ result_file: currentResult.filename, specialist: currentResult.specialist, responses }),
       })
     } catch {}
   }
@@ -131,7 +131,7 @@ export default function Evaluator() {
     try {
       const r = await fetch(`/api/eval/sessions/${selected}/ratings`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ result_file: currentResult.filename, analyzer: currentResult.analyzer, responses }),
+        body: JSON.stringify({ result_file: currentResult.filename, specialist: currentResult.specialist, responses }),
       })
       const data = await r.json()
       setSaveMsg(data.ok ? '✅ Saved' : `❌ ${data.error || 'Failed'}`)
@@ -175,7 +175,7 @@ export default function Evaluator() {
       {currentResult && (
         <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-dim)' }}>
           <span style={{ marginRight: 16 }}>File: <code>{currentResult.filename}</code></span>
-          <span>Analyzer: <code>{currentResult.analyzer}</code></span>
+          <span>Specialist: <code>{currentResult.specialist}</code></span>
         </div>
       )}
 

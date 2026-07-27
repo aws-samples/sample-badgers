@@ -247,9 +247,9 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         catch { res.json({ content: 'Session not found' }); }
     });
 
-    // ── Analyzers ──
+    // ── Specialists ──
 
-    app.get('/api/analyzers', async (_req, res) => {
+    app.get('/api/specialists', async (_req, res) => {
         const manifestDir = resolve(DEPLOY_DIR, 's3_files', 'manifests');
         try {
             const names = (await readdir(manifestDir)).filter(f => f.endsWith('.json')).map(f => f.replace('.json', '')).sort();
@@ -257,18 +257,18 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         } catch { res.json([]); }
     });
 
-    app.get('/api/analyzers/:name/prompts', async (req, res) => {
+    app.get('/api/specialists/:name/prompts', async (req, res) => {
         const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
         const manifestPath = resolve(DEPLOY_DIR, 's3_files', 'manifests', `${name}.json`);
         const promptsBase = resolve(DEPLOY_DIR, 's3_files', 'prompts');
         if (!manifestPath.startsWith(resolve(DEPLOY_DIR, 's3_files', 'manifests'))) return res.status(403).json({ error: 'Forbidden' });
         try {
             const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
-            const promptFiles = manifest.analyzer?.prompt_files || [];
-            const analyzerPromptDir = resolve(promptsBase, name);
+            const promptFiles = manifest.specialist?.prompt_files || [];
+            const specialistPromptDir = resolve(promptsBase, name);
             const result = {};
             for (const relPath of promptFiles) {
-                const fullPath = resolve(analyzerPromptDir, relPath);
+                const fullPath = resolve(specialistPromptDir, relPath);
                 const fileName = relPath.replace(/^\.\.\//, '');
                 try { result[fileName] = await readFile(fullPath, 'utf-8'); } catch { }
             }
@@ -276,16 +276,16 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         } catch (e) { res.json({}); }
     });
 
-    app.put('/api/analyzers/:name/prompts', async (req, res) => {
+    app.put('/api/specialists/:name/prompts', async (req, res) => {
         const name = req.params.name.replace(/[^a-zA-Z0-9_-]/g, '');
         const promptsBase = resolve(DEPLOY_DIR, 's3_files', 'prompts');
-        const analyzerPromptDir = resolve(promptsBase, name);
-        if (!analyzerPromptDir.startsWith(promptsBase)) return res.status(403).json({ error: 'Forbidden' });
+        const specialistPromptDir = resolve(promptsBase, name);
+        if (!specialistPromptDir.startsWith(promptsBase)) return res.status(403).json({ error: 'Forbidden' });
         try {
             const edits = req.body || {};
             for (const [fileName, content] of Object.entries(edits)) {
                 if (fileName.includes('..') || fileName.startsWith('/')) continue;
-                const fullPath = resolve(analyzerPromptDir, fileName);
+                const fullPath = resolve(specialistPromptDir, fileName);
                 if (!fullPath.startsWith(promptsBase)) continue;
                 await writeFile(fullPath, content, 'utf-8');
             }
@@ -450,8 +450,8 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
                     if (obj.Key.endsWith('.xml') && !obj.Key.includes('/evaluations/')) {
                         const parts = obj.Key.split('/');
                         const filename = parts[parts.length - 1];
-                        const analyzer = parts.length >= 3 ? parts[1] : filename.split('_')[0] + '_analyzer';
-                        results.push({ key: obj.Key, filename, analyzer, size: obj.Size });
+                        const specialist = parts.length >= 3 ? parts[1] : filename.split('_')[0] + '_specialist';
+                        results.push({ key: obj.Key, filename, specialist, size: obj.Size });
                     }
                 }
                 token = resp.NextContinuationToken;
@@ -480,10 +480,10 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         } catch (e) { res.json({ content: `Error: ${e.message}` }); }
     });
 
-    app.get('/api/eval/manifest-eval/:analyzer', async (req, res) => {
+    app.get('/api/eval/manifest-eval/:specialist', async (req, res) => {
         if (!CONFIG_BUCKET) return res.json({ evaluation: null });
-        const name = req.params.analyzer.replace(/[^a-zA-Z0-9_-]/g, '');
-        for (const prefix of ['manifests', 'custom-analyzers/manifests']) {
+        const name = req.params.specialist.replace(/[^a-zA-Z0-9_-]/g, '');
+        for (const prefix of ['manifests', 'custom-specialists/manifests']) {
             try { const manifest = await s3GetJson(CONFIG_BUCKET, `${prefix}/${name}.json`); return res.json({ evaluation: manifest.evaluation || null }); } catch { }
         }
         res.json({ evaluation: null });
@@ -492,14 +492,14 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     app.put('/api/eval/sessions/:sid/ratings', async (req, res) => {
         if (!OUTPUT_BUCKET) return res.json({ ok: false });
         const sid = req.params.sid.replace(/[^a-zA-Z0-9_-]/g, '');
-        const { result_file, analyzer, responses } = req.body;
+        const { result_file, specialist, responses } = req.body;
         try {
             const evalKey = `${sid}/evaluations/session_evaluation.json`;
             let existing = { evaluations: [] };
             try { existing = await s3GetJson(OUTPUT_BUCKET, evalKey); } catch { }
             if (!existing.evaluations) existing.evaluations = [];
             const now = new Date();
-            const entry = { result_file, analyzer, responses, evaluated_at: now.toISOString(), evaluated_at_readable: now.toISOString().slice(0, 16) };
+            const entry = { result_file, specialist, responses, evaluated_at: now.toISOString(), evaluated_at_readable: now.toISOString().slice(0, 16) };
             const idx = existing.evaluations.findIndex(e => e.result_file === result_file);
             if (idx >= 0) existing.evaluations[idx] = entry; else existing.evaluations.push(entry);
             existing.last_updated = now.toISOString();

@@ -1,7 +1,7 @@
 """
-Foundation layer for analyzer system.
+Foundation layer for specialist system.
 
-This package provides core components for all analyzer tools including:
+This package provides core components for all specialist tools including:
 - Configuration management
 - Prompt loading and caching
 - Image processing
@@ -16,7 +16,7 @@ from .image_processor import ImageProcessor, ImageProcessingError
 from .bedrock_client import BedrockClient, BedrockError
 from .message_chain_builder import MessageChainBuilder, MessageChainError
 from .response_processor import ResponseProcessor, ResponseProcessingError
-from .analyzer_foundation import AnalyzerFoundation, AnalysisError
+from .specialist_foundation import SpecialistFoundation, AnalysisError
 
 __all__ = [
     "ConfigurationManager",
@@ -31,6 +31,6 @@ __all__ = [
     "MessageChainError",
     "ResponseProcessor",
     "ResponseProcessingError",
-    "AnalyzerFoundation",
+    "SpecialistFoundation",
     "AnalysisError",
 ]

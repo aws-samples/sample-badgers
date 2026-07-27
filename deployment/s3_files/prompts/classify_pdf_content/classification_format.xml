@@ -2,14 +2,14 @@
 <!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + classification -->
 
 <response_format>
-    <response analyzer="classification"
+    <response specialist="classification"
              schema_version="1.0"
              page="{PAGE_NUMBER}"
              session_id="{SESSION_ID}">
 
         <metadata>
             <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
-            <analyzer_name>classification</analyzer_name>
+            <specialist_name>classification</specialist_name>
             <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
@@ -42,7 +42,7 @@
         <!--
         ============================================================
         SPECIALIZED — page content classification and quality assessment.
-        This guides downstream analyzer selection.
+        This guides downstream specialist selection.
         ============================================================
         -->
         <specialized type="classification">

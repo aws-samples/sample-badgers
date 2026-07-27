@@ -14,9 +14,9 @@ function groupByDir(files) {
 
 const DIR_DESC = {
   'agent_config': 'Agent model, temperature, thinking mode, and operating environment guardrails',
-  'manifests': 'Per-analyzer config: model selections, extended thinking budgets, fallback chains',
-  'schemas': 'JSON schemas defining input/output contracts for each analyzer tool',
-  'prompts': 'System and user prompt templates that drive each analyzer',
+  'manifests': 'Per-specialist config: model selections, extended thinking budgets, fallback chains',
+  'schemas': 'JSON schemas defining input/output contracts for each specialist tool',
+  'prompts': 'System and user prompt templates that drive each specialist',
   'core_system_prompts': 'Shared prompt rules: audit mode, error handling, core extraction rules',
   'agent_system_prompt': 'Top-level system prompt for the Strands orchestration agent',
   'wrappers': 'XML wrapper templates that compose the final prompt sent to models',
