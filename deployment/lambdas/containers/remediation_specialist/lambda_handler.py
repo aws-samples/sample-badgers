@@ -21,6 +21,7 @@ from typing import Any, Dict, List
 import fitz
 from pikepdf import Pdf
 
+from foundation import job_state
 from utils.pdf_accessibility_models import TagRegion, VALID_TAGS
 from utils.spine_parser import parse_correlation_xml
 
@@ -41,6 +42,11 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 def lambda_handler(event, context):
     """Lambda entry point for PDF accessibility tagging."""
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
     try:
         body = json.loads(event["body"]) if "body" in event else event
 
@@ -52,9 +58,35 @@ def lambda_handler(event, context):
 
         logger.info("Session: %s, PDF: %s", session_id, pdf_path)
 
+        # Read specialist_name up here, ahead of the validation returns, so the
+        # job tracking identifiers exist on every failure path.
+        specialist_name = os.environ.get("SPECIALIST_NAME", "remediation_specialist")
+
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        # This specialist remediates a whole PDF, so its subtask is keyed off the
+        # source document rather than a page.
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, pdf_path)
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(pdf_path),
+            session_id=session_id,
+        )
+
         if not pdf_path:
+            job_state.mark_failed(
+                job_id, subtask, "Missing required parameter: pdf_path"
+            )
             return _error_response("Missing required parameter: pdf_path")
         if not correlation_uri:
+            job_state.mark_failed(
+                job_id, subtask, "Missing required parameter: correlation_uri"
+            )
             return _error_response("Missing required parameter: correlation_uri")
 
         local_pdf = _download_from_s3(pdf_path)
@@ -68,20 +100,32 @@ def lambda_handler(event, context):
             session_id=session_id,
         )
 
-        # Upload outputs to S3 if configured
+        # Upload the tagged PDF. The remediated document *is* the deliverable, so
+        # an unconfigured bucket or a missing output file means the request was
+        # not satisfied. Fail loudly rather than returning a success the caller
+        # cannot act on, which would also invite the orchestrator to retry a tool
+        # that cannot deliver here.
         output_bucket = os.environ.get("OUTPUT_BUCKET")
-        specialist_name = os.environ.get("SPECIALIST_NAME", "remediation_specialist")
-
-        if output_bucket and result.get("output_pdf"):
-            s3_uri = _upload_to_s3(
-                local_path=result["output_pdf"],
-                bucket=output_bucket,
-                specialist_name=specialist_name,
-                session_id=session_id,
-                original_key=pdf_path,
+        if not output_bucket:
+            raise RuntimeError(
+                "OUTPUT_BUCKET is not configured; the tagged PDF cannot be "
+                "persisted."
             )
-            result["s3_output_uri"] = s3_uri
-            logger.info("Uploaded tagged PDF to: %s", s3_uri)
+        if not result.get("output_pdf"):
+            raise RuntimeError(
+                "PDF remediation produced no output document; nothing to persist."
+            )
+
+        s3_uri = _upload_to_s3(
+            local_path=result["output_pdf"],
+            bucket=output_bucket,
+            specialist_name=specialist_name,
+            session_id=session_id,
+            original_key=pdf_path,
+        )
+        result["s3_output_uri"] = s3_uri
+        logger.info("Uploaded tagged PDF to: %s", s3_uri)
+        job_state.mark_complete(job_id, subtask, s3_uri)
 
         return {
             "statusCode": 200,
@@ -96,6 +140,7 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
+        job_state.mark_failed(job_id, subtask, str(e))
         return _error_response(str(e))
 
 

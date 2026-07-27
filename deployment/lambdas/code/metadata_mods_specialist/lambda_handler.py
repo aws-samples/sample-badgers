@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from foundation.s3_result_saver import save_result_to_s3
+from foundation import job_state
 
 # Configure logging from environment variable
 logger = logging.getLogger()
@@ -16,6 +17,11 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 def lambda_handler(event, context):
     """Lambda handler for Metadata Mods Specialist using S3-based configuration."""
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
     try:
         # Log Gateway context information
         if hasattr(context, "client_context") and context.client_context:
@@ -49,6 +55,19 @@ def lambda_handler(event, context):
         # Extract and log session_id from AgentCore Runtime
         session_id = body.get("session_id", "no_session")
         logger.info("Processing request for runtime session_id: %s", session_id)
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, body.get("image_path"))
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(body.get("image_path")),
+            session_id=session_id,
+        )
 
         # Extract audit_mode flag
         audit_mode = body.get("audit_mode", False)
@@ -84,21 +103,26 @@ def lambda_handler(event, context):
         logger.info("Result length: %d characters", len(result))
 
         # Save result to S3
+        # Persisting the result is part of succeeding. If the artifact cannot be
+        # written the pipeline has not satisfied the request, so fail loudly
+        # instead of returning a result the caller cannot retrieve -- a false
+        # success also encourages the orchestrator to keep calling a tool that
+        # cannot deliver.
         output_bucket = os.environ.get("OUTPUT_BUCKET")
-        if output_bucket:
-            try:
-                s3_uri = save_result_to_s3(
-                    result=result,
-                    specialist_name=specialist_name,
-                    output_bucket=output_bucket,
-                    session_id=session_id,
-                    image_path=body.get("image_path"),
-                )
-                result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
-            except Exception as e:
-                logger.error(
-                    "Failed to save result to S3: %s", e
-                )  # Don't fail the request if S3 save fails
+        if not output_bucket:
+            raise RuntimeError(
+                "OUTPUT_BUCKET is not configured; the analysis result cannot be "
+                "persisted."
+            )
+        s3_uri = save_result_to_s3(
+            result=result,
+            specialist_name=specialist_name,
+            output_bucket=output_bucket,
+            session_id=session_id,
+            image_path=body.get("image_path"),
+        )
+        result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
+        job_state.mark_complete(job_id, subtask, s3_uri)
 
         return {
             "statusCode": 200,
@@ -109,6 +133,7 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
+        job_state.mark_failed(job_id, subtask, str(e))
         return {
             "statusCode": 500,
             "body": json.dumps({"result": str(e), "success": False}),

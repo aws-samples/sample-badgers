@@ -10,6 +10,7 @@ from foundation.lambda_error_handler import (
     ValidationError,
 )
 from foundation.s3_result_saver import save_result_to_s3
+from foundation import job_state
 
 # Configure logging from environment variable
 logger = logging.getLogger()
@@ -19,6 +20,11 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 def lambda_handler(event, context):
     """Lambda handler for PDF content classification using S3-based configuration."""
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
     try:
         # Log Gateway context information
         if hasattr(context, "client_context") and context.client_context:
@@ -40,7 +46,9 @@ def lambda_handler(event, context):
         if os.environ.get("AWS_EXECUTION_ENV") and config_bucket:
             config_source = "s3"
             logger.info(
-                "Using S3 config: bucket=%s, specialist=%s", config_bucket, specialist_name
+                "Using S3 config: bucket=%s, specialist=%s",
+                config_bucket,
+                specialist_name,
             )
         else:
             config_source = "local"
@@ -79,6 +87,25 @@ def lambda_handler(event, context):
                 message="image_paths must be a JSON array",
                 details={"type": type(image_paths).__name__},
             )
+
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        #
+        # Unlike the single-image specialists this runs after image_paths is
+        # resolved: the subtask key is derived from the first image so it lines
+        # up with the S3 key the result is written to below.
+        first_image = image_paths[0] if image_paths else None
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, first_image)
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(first_image),
+            session_id=session_id,
+        )
 
         # Load configuration
         if config_source == "s3":
@@ -124,19 +151,26 @@ def lambda_handler(event, context):
         result = json.dumps(classifications, indent=2)
 
         # Save result to S3
+        # Persisting the result is part of succeeding. If the artifact cannot be
+        # written the pipeline has not satisfied the request, so fail loudly
+        # instead of returning a result the caller cannot retrieve -- a false
+        # success also encourages the orchestrator to keep calling a tool that
+        # cannot deliver.
         output_bucket = os.environ.get("OUTPUT_BUCKET")
-        if output_bucket:
-            try:
-                s3_uri = save_result_to_s3(
-                    result=result,
-                    specialist_name=specialist_name,
-                    output_bucket=output_bucket,
-                    session_id=session_id,
-                    image_path=image_paths[0] if image_paths else None,
-                )
-                result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
-            except Exception as e:
-                logger.error("Failed to save result to S3: %s", e)
+        if not output_bucket:
+            raise RuntimeError(
+                "OUTPUT_BUCKET is not configured; the analysis result cannot be "
+                "persisted."
+            )
+        s3_uri = save_result_to_s3(
+            result=result,
+            specialist_name=specialist_name,
+            output_bucket=output_bucket,
+            session_id=session_id,
+            image_path=first_image,
+        )
+        result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
+        job_state.mark_complete(job_id, subtask, s3_uri)
 
         return {
             "statusCode": 200,
@@ -150,6 +184,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
+        job_state.mark_failed(job_id, subtask, str(e))
         return create_error_response(e)
 
 

@@ -10,6 +10,11 @@ COPY pdf_syntax_repair.py ${LAMBDA_TASK_ROOT}/
 # Copy the utils package (all tagging modules)
 COPY utils/ ${LAMBDA_TASK_ROOT}/utils/
 
+# Copy the shared foundation package (job_state for DynamoDB job tracking).
+# The build scripts stage this directory into the build context from
+# ./layer/python/foundation before docker build.
+COPY foundation/ ${LAMBDA_TASK_ROOT}/foundation/
+
 # Copy the Lambda handler
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 

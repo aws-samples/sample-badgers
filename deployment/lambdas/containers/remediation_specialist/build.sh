@@ -85,8 +85,22 @@ if [ ! -d "$SCRIPT_DIR/utils" ]; then
     exit 1
 fi
 
+# Stage the shared foundation package into the build context. The handler imports
+# foundation.job_state to record its subtask state in DynamoDB, and Docker cannot
+# COPY from outside the build context, so it has to be copied in first.
+FOUNDATION_SRC="$SCRIPT_DIR/../../layer/python/foundation"
+if [ ! -d "$FOUNDATION_SRC" ]; then
+    echo "ERROR: foundation module not found at $FOUNDATION_SRC"
+    echo "       Run build_foundation_layer.sh first."
+    exit 1
+fi
+echo "==> Staging foundation module into build context"
+rm -rf "$SCRIPT_DIR/foundation"
+cp -r "$FOUNDATION_SRC" "$SCRIPT_DIR/foundation"
+
 # Clean __pycache__
 find "$SCRIPT_DIR/utils" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+find "$SCRIPT_DIR/foundation" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 echo "==> Building Docker image: ${IMAGE_NAME}:${IMAGE_TAG}"
 docker build --platform linux/amd64 -t "${IMAGE_NAME}:${IMAGE_TAG}" .
