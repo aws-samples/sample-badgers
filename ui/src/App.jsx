@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { useAuth } from 'react-oidc-context'
 import { useUser } from './hooks/useUser.js'
 import Header from './components/Header.jsx'
 import Home from './components/Home.jsx'
@@ -32,7 +33,15 @@ const TABS = [
     { id: 'config', label: '⚙️ Deploy Tags', adminOnly: true },
 ]
 
+// Cognito OIDC values baked in at build time (see generate_ui_env.sh).
+const COGNITO_DOMAIN = import.meta.env.VITE_COGNITO_DOMAIN
+const COGNITO_CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID
+// Auth is only enforced when the bundle was built with Cognito config. Local
+// dev builds without it fall through to the server's local-dev bypass.
+const AUTH_ENABLED = Boolean(import.meta.env.VITE_COGNITO_AUTHORITY && COGNITO_CLIENT_ID)
+
 export default function App() {
+    const auth = useAuth()
     const { role, loading } = useUser()
     const [tab, setTab] = useState('home')
     const [logs, setLogs] = useState([])
@@ -158,11 +167,70 @@ export default function App() {
         setTab(t)
     }
 
+    function handleLogout() {
+        auth.removeUser()
+        if (COGNITO_DOMAIN && COGNITO_CLIENT_ID) {
+            const logoutUri = `${window.location.origin}/`
+            window.location.href =
+                `${COGNITO_DOMAIN}/logout?client_id=${COGNITO_CLIENT_ID}` +
+                `&logout_uri=${encodeURIComponent(logoutUri)}`
+        }
+    }
+
+    // ── Auth gates (only when the bundle carries Cognito config) ──
+    if (AUTH_ENABLED && auth.isLoading) {
+        return (
+            <div className="container" style={{ paddingTop: 60, textAlign: 'center', color: 'var(--text-dim)' }}>
+                Signing in...
+            </div>
+        )
+    }
+
+    if (AUTH_ENABLED && auth.error) {
+        return (
+            <div className="container" style={{ paddingTop: 60, display: 'flex', justifyContent: 'center' }}>
+                <div className="card" style={{ padding: 24, maxWidth: 420, textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+                    <div style={{ fontSize: 14, marginBottom: 12 }}>Authentication error</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
+                        {auth.error.message}
+                    </div>
+                    <button className="primary" onClick={() => auth.signinRedirect()}>Try again</button>
+                </div>
+            </div>
+        )
+    }
+
+    if (AUTH_ENABLED && !auth.isAuthenticated) {
+        return (
+            <div className="container" style={{ paddingTop: 60, display: 'flex', justifyContent: 'center' }}>
+                <div className="card" style={{ width: 360, padding: 32, textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, marginBottom: 4 }}>🔒</div>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>
+                        {branding.appName || 'BADGERS'}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', margin: '8px 0 20px' }}>
+                        Sign in to continue
+                    </div>
+                    <button className="primary" style={{ width: '100%', padding: '8px 0', fontSize: 13 }}
+                        onClick={() => auth.signinRedirect()}>
+                        Sign In with Cognito
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     if (loading) return <div className="container" style={{ paddingTop: 60, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
 
     return (
         <div className="container">
-            <Header branding={branding} theme={theme} onThemeChange={applyTheme} />
+            <Header
+                branding={branding}
+                theme={theme}
+                onThemeChange={applyTheme}
+                onLogout={AUTH_ENABLED ? handleLogout : undefined}
+            />
             <nav style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 52, flexShrink: 0 }}>Testing</span>

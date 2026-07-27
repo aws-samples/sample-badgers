@@ -1,7 +1,7 @@
 import { execFile, spawn } from 'child_process';
 import { readFile, writeFile, readdir, stat } from 'fs/promises';
 import { resolve } from 'path';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin } from '../auth.js';
 
 export function mountAdminRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
