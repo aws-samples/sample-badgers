@@ -104,9 +104,11 @@ iam_stack = IAMStack(
     config_bucket=s3_stack.config_bucket,
     source_bucket=s3_stack.source_bucket,
     output_bucket=s3_stack.output_bucket,
+    jobs_table=dynamodb_stack.jobs_table,
     env=env,
     description="IAM roles for BADGERS",
 )
+iam_stack.add_dependency(dynamodb_stack)
 
 # ECR repository for AgentCore Runtime container (and container Lambdas)
 ecr_stack = AgentCoreECRStack(
@@ -155,6 +157,7 @@ lambda_stack = LambdaSpecialistStack(
     execution_role=iam_stack.lambda_role,
     config_bucket=s3_stack.config_bucket,
     output_bucket=s3_stack.output_bucket,
+    jobs_table=dynamodb_stack.jobs_table,
     ecr_repository=ecr_stack.repository,
     inference_profiles_stack=inference_profiles_stack,
     enabled_specialists=enabled_specialists,
@@ -163,6 +166,7 @@ lambda_stack = LambdaSpecialistStack(
 )
 lambda_stack.add_dependency(ecr_stack)
 lambda_stack.add_dependency(inference_profiles_stack)
+lambda_stack.add_dependency(dynamodb_stack)
 
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing)
 # This is a singleton per account/region — if already enabled, destroy this stack

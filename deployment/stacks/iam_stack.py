@@ -4,6 +4,7 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     Tags,
+    aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_s3 as s3,
 )
@@ -22,6 +23,7 @@ class IAMStack(Stack):
         config_bucket: s3.Bucket,
         source_bucket: s3.Bucket,
         output_bucket: s3.Bucket,
+        jobs_table: dynamodb.ITable,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -141,6 +143,30 @@ class IAMStack(Stack):
 
         # S3 output bucket read/write access
         output_bucket.grant_read_write(self.lambda_role)
+
+        # DynamoDB jobs table access for job state tracking.
+        # Specialists upsert their own subtask row (RUNNING -> COMPLETE/FAILED)
+        # via foundation.job_state. Without this grant those calls fail at the
+        # API and job tracking is silently lost.
+        #
+        # Scoped to exactly the four operations job_state performs rather than
+        # using grant_read_write_data, which would also allow DeleteItem, Scan
+        # and the Batch* operations. Specialists never delete or scan; the base
+        # table alone is enough because job_state.query filters on the job_id
+        # partition key and never reads a GSI.
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="DynamoDBJobState",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                ],
+                resources=[jobs_table.table_arn],
+            )
+        )
 
         # S3 access for specific buckets (config and output only)
         # Additional bucket access should be granted explicitly

@@ -11,6 +11,7 @@ from aws_cdk import (
     CfnOutput,
     Duration,
     aws_lambda as lambda_,
+    aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_s3 as s3,
     aws_ecr as ecr,
@@ -36,6 +37,7 @@ class LambdaSpecialistStack(Stack):
         execution_role: iam.Role,
         config_bucket: s3.Bucket,
         output_bucket: s3.Bucket,
+        jobs_table: dynamodb.ITable,
         ecr_repository: ecr.Repository,
         inference_profiles_stack: Optional[InferenceProfilesStack] = None,
         enabled_specialists: Optional[set[str]] = None,
@@ -47,6 +49,7 @@ class LambdaSpecialistStack(Stack):
         self.execution_role = execution_role
         self.config_bucket = config_bucket
         self.output_bucket = output_bucket
+        self.jobs_table = jobs_table
         self.ecr_repository = ecr_repository
         self.inference_profiles_stack = inference_profiles_stack
         self.enabled_specialists = enabled_specialists
@@ -213,6 +216,7 @@ class LambdaSpecialistStack(Stack):
             "FAIL_AFTER_ERROR": "False",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
+            "JOBS_TABLE_NAME": self.jobs_table.table_name,
             "JPEG_QUALITY": "85",
             "MAX_DIMENSIONS": "2048",
             "MAX_IMAGE_SIZE": "20971520",
@@ -321,6 +325,7 @@ class LambdaSpecialistStack(Stack):
             "CACHE_ENABLED": "True",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
+            "JOBS_TABLE_NAME": self.jobs_table.table_name,
             "MAX_TOKENS": "16000",
             "TEMPERATURE": "0.1",
         }
