@@ -21,7 +21,8 @@ from stacks import (
     CustomSpecialistsStack,
     XRayTransactionSearchStack,
     VpcStack,
-    FrontendStack,
+    DynamoDBStack,
+    ECSStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -84,6 +85,16 @@ cognito_stack = CognitoStack(
     description="Cognito authentication for AgentCore Gateway",
 )
 
+# DynamoDB jobs table for specialist job tracking
+dynamodb_stack = DynamoDBStack(
+    app,
+    f"{STACK_PREFIX}-dynamodb",
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    env=env,
+    description="DynamoDB jobs table for BADGERS specialist job tracking",
+)
+
 # IAM roles and policies
 iam_stack = IAMStack(
     app,
@@ -132,7 +143,9 @@ if deployment_config_path.exists():
     }
     if disabled:
         print(f"Disabled specialists: {', '.join(sorted(disabled))}")
-    print(f"Enabled specialists: {len(enabled_specialists)} of {len(specialists_config)}")
+    print(
+        f"Enabled specialists: {len(enabled_specialists)} of {len(specialists_config)}"
+    )
 
 # Lambda functions and layer
 lambda_stack = LambdaSpecialistStack(
@@ -260,50 +273,58 @@ if custom_specialists_registry.exists():
         description="Custom specialists created via the wizard UI",
     )
 
-# --- Frontend infrastructure ---
-# Load frontend config (environment-specific, not committed to git)
-frontend_config_path = Path("./frontend_config.json")
-if frontend_config_path.exists():
-    with open(frontend_config_path, encoding="utf-8") as f:
-        frontend_config = json.load(f)
+# --- UI infrastructure (ECS Express Gateway) ---
+# No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
+# service provisions and manages its own load balancer and HTTPS endpoint.
 
-    # VPC for ALB + Fargate
-    vpc_stack = VpcStack(
-        app,
-        f"{STACK_PREFIX}-vpc",
-        deployment_id=deployment_id,
-        deployment_tags=deployment_tags,
-        env=env,
-        description="VPC for BADGERS frontend ALB and Fargate",
-    )
+# VPC with private subnets and AWS service VPC endpoints
+vpc_stack = VpcStack(
+    app,
+    f"{STACK_PREFIX}-vpc",
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    env=env,
+    description="VPC for the BADGERS UI ECS service",
+)
 
-    # Frontend: ALB + Fargate + ACM + Route53
-    frontend_stack = FrontendStack(
-        app,
-        f"{STACK_PREFIX}-frontend",
-        deployment_id=deployment_id,
-        deployment_tags=deployment_tags,
-        vpc=vpc_stack.vpc,
-        user_pool=cognito_stack.user_pool,
-        user_pool_domain=cognito_stack.user_pool_domain,
-        ecr_repository=ecr_stack.repository,
-        hosted_zone_id=frontend_config["hosted_zone_id"],
-        hosted_zone_name=frontend_config["hosted_zone_name"],
-        domain_name=frontend_config["domain_name"],
-        alb_ingress_prefix_list_id=frontend_config.get("alb_ingress_prefix_list_id"),
-        alb_ingress_cidrs=frontend_config.get("alb_ingress_cidrs"),
-        image_tag="frontend",
-        env=env,
-        description="BADGERS unified UI — ALB + Fargate + Cognito auth",
-    )
-    frontend_stack.add_dependency(vpc_stack)
-    frontend_stack.add_dependency(cognito_stack)
-    frontend_stack.add_dependency(ecr_stack)
-else:
-    print("Skipping frontend stacks — deployment/frontend_config.json not found")
-    print(
-        "  Copy frontend_config.example.json → frontend_config.json and fill in your values"
-    )
+# Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
+ecs_stack = ECSStack(
+    app,
+    f"{STACK_PREFIX}-ecs",
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    config_bucket_arn=s3_stack.config_bucket.bucket_arn,
+    output_bucket_arn=s3_stack.output_bucket.bucket_arn,
+    source_bucket_arn=s3_stack.source_bucket.bucket_arn,
+    config_bucket_name=s3_stack.config_bucket.bucket_name,
+    output_bucket_name=s3_stack.output_bucket.bucket_name,
+    source_bucket_name=s3_stack.source_bucket.bucket_name,
+    jobs_table_arn=dynamodb_stack.jobs_table.table_arn,
+    kms_key_arn=s3_stack.s3_kms_key.key_arn,
+    private_subnet_ids=vpc_stack.private_subnet_ids,
+    ui_task_sg_id=vpc_stack.ui_task_sg.security_group_id,
+    cognito_user_pool_id=cognito_stack.user_pool.user_pool_id,
+    cognito_ui_client_id=cognito_stack.ui_client.user_pool_client_id,
+    ecr_repository_uri=ecr_stack.repository.repository_uri,
+    agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
+    agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
+    image_tag="frontend",
+    env=env,
+    description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
+)
+ecs_stack.add_dependency(vpc_stack)
+ecs_stack.add_dependency(cognito_stack)
+ecs_stack.add_dependency(ecr_stack)
+ecs_stack.add_dependency(s3_stack)
+ecs_stack.add_dependency(dynamodb_stack)
+ecs_stack.add_dependency(gateway_stack)
+ecs_stack.add_dependency(runtime_websocket_stack)
 
+# ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
+if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):
+    from cdk_nag import AwsSolutionsChecks
+
+    cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+    print("cdk-nag: AwsSolutionsChecks enabled")
 
 app.synth()

@@ -12,7 +12,8 @@ from .inference_profiles_stack import InferenceProfilesStack
 from .custom_specialists_stack import CustomSpecialistsStack
 from .xray_transaction_search_stack import XRayTransactionSearchStack
 from .vpc_stack import VpcStack
-from .frontend_stack import FrontendStack
+from .dynamodb_stack import DynamoDBStack
+from .ecs_stack import ECSStack
 
 __all__ = [
     "S3Stack",
@@ -27,5 +28,6 @@ __all__ = [
     "CustomSpecialistsStack",
     "XRayTransactionSearchStack",
     "VpcStack",
-    "FrontendStack",
+    "DynamoDBStack",
+    "ECSStack",
 ]
