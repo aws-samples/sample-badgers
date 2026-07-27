@@ -6,7 +6,7 @@ const THEMES = [
     { id: 'purple', label: '🟣 AWS Purple' },
 ]
 
-export default function Header({ branding = {}, theme = 'dark', onThemeChange }) {
+export default function Header({ branding = {}, theme = 'dark', onThemeChange, onLogout }) {
     const { email, role, loading } = useUser()
     const name = branding.appName || ''
     const emoji = branding.appEmoji || '🦡'
@@ -55,6 +55,15 @@ export default function Header({ branding = {}, theme = 'dark', onThemeChange })
                     }}>
                         {role}
                     </span>
+                    {onLogout && (
+                        <button
+                            onClick={onLogout}
+                            style={{ fontSize: 11, padding: '3px 10px' }}
+                            title="Sign out"
+                        >
+                            Sign out
+                        </button>
+                    )}
                 </div>
             )}
         </div>
