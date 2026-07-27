@@ -1,99 +1,107 @@
 [
-    {
-        "name": "analyze_remediation_tool",
-        "description": "PDF accessibility remediation tool that processes entire PDF documents to apply PDF/UA tags and build a structure tree for Section 508 compliance. Uses correlation XML for guided element resolution and content stream tagging.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "pdf_path": {
-                    "type": "string",
-                    "description": "S3 URI to the PDF document to remediate"
-                },
-                "session_id": {
-                    "type": "string",
-                    "description": "Runtime session ID for tracking"
-                },
-                "title": {
-                    "type": "string",
-                    "description": "Document title for PDF metadata (default: 'Accessible Document')"
-                },
-                "lang": {
-                    "type": "string",
-                    "description": "Document language code (default: 'en-US')"
-                },
-                "correlation_uri": {
-                    "type": "string",
-                    "description": "S3 URI to correlation XML content spine for guided element resolution"
-                }
-            },
-            "required": [
-                "pdf_path",
-                "session_id",
-                "correlation_uri"
-            ]
+  {
+    "name": "analyze_remediation_tool",
+    "description": "PDF accessibility remediation tool that processes entire PDF documents to apply PDF/UA tags and build a structure tree for Section 508 compliance. Uses correlation XML for guided element resolution and content stream tagging.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pdf_path": {
+          "type": "string",
+          "description": "S3 URI to the PDF document to remediate"
         },
-        "outputSchema": {
-            "type": "object",
-            "properties": {
-                "result": {
-                    "type": "object",
-                    "description": "Remediation result containing tagged PDF path and tagging statistics",
-                    "properties": {
-                        "output_pdf": {
-                            "type": "string",
-                            "description": "Local path to the tagged PDF output"
-                        },
-                        "pages_processed": {
-                            "type": "integer",
-                            "description": "Number of pages processed"
-                        },
-                        "total_mcids": {
-                            "type": "integer",
-                            "description": "Total marked content IDs inserted into content streams"
-                        },
-                        "total_struct_elems": {
-                            "type": "integer",
-                            "description": "Total structure elements built in the structure tree"
-                        },
-                        "syntax_repair": {
-                            "type": "object",
-                            "description": "PDF syntax repair pass results",
-                            "properties": {
-                                "applied": {
-                                    "type": "boolean",
-                                    "description": "Whether any repair was applied"
-                                },
-                                "pass1_ok": {
-                                    "type": "boolean",
-                                    "description": "Whether pass 1 (xref/stream repair) succeeded"
-                                },
-                                "pass2_ok": {
-                                    "type": "boolean",
-                                    "description": "Whether pass 2 (linearization cleanup) succeeded"
-                                },
-                                "size_delta": {
-                                    "type": "integer",
-                                    "description": "Byte size change from repair"
-                                },
-                                "logs": {
-                                    "type": "array",
-                                    "description": "Repair log messages"
-                                }
-                            }
-                        },
-                        "s3_output_uri": {
-                            "type": "string",
-                            "description": "S3 URI of the uploaded tagged PDF (when OUTPUT_BUCKET is configured)"
-                        }
-                    }
-                },
-                "success": {
-                    "type": "boolean"
-                },
-                "session_id": {
-                    "type": "string"
-                }
-            }
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID for tracking"
+        },
+        "title": {
+          "type": "string",
+          "description": "Document title for PDF metadata (default: 'Accessible Document')"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Document language code (default: 'en-US')"
+        },
+        "correlation_uri": {
+          "type": "string",
+          "description": "S3 URI to correlation XML content spine for guided element resolution"
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the analysis run this invocation belongs to. Pass through the job_id supplied in the orchestrator context. Omit only when no analysis run is active."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document being analysed. Pass through the doc_id supplied in the orchestrator context."
         }
+      },
+      "required": [
+        "pdf_path",
+        "session_id",
+        "correlation_uri"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object",
+          "description": "Remediation result containing tagged PDF path and tagging statistics",
+          "properties": {
+            "output_pdf": {
+              "type": "string",
+              "description": "Local path to the tagged PDF output"
+            },
+            "pages_processed": {
+              "type": "integer",
+              "description": "Number of pages processed"
+            },
+            "total_mcids": {
+              "type": "integer",
+              "description": "Total marked content IDs inserted into content streams"
+            },
+            "total_struct_elems": {
+              "type": "integer",
+              "description": "Total structure elements built in the structure tree"
+            },
+            "syntax_repair": {
+              "type": "object",
+              "description": "PDF syntax repair pass results",
+              "properties": {
+                "applied": {
+                  "type": "boolean",
+                  "description": "Whether any repair was applied"
+                },
+                "pass1_ok": {
+                  "type": "boolean",
+                  "description": "Whether pass 1 (xref/stream repair) succeeded"
+                },
+                "pass2_ok": {
+                  "type": "boolean",
+                  "description": "Whether pass 2 (linearization cleanup) succeeded"
+                },
+                "size_delta": {
+                  "type": "integer",
+                  "description": "Byte size change from repair"
+                },
+                "logs": {
+                  "type": "array",
+                  "description": "Repair log messages"
+                }
+              }
+            },
+            "s3_output_uri": {
+              "type": "string",
+              "description": "S3 URI of the uploaded tagged PDF (when OUTPUT_BUCKET is configured)"
+            }
+          }
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      }
     }
+  }
 ]

@@ -1,43 +1,51 @@
 [
-    {
-        "name": "analyze_edu_transcript_tool",
-        "description": "Analyze educational transcripts of various sorts.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "image_path": {
-                    "type": "string",
-                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image."
-                },
-                "image_data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data. Use this OR image_path, not both."
-                },
-                "aws_profile": {
-                    "type": "string",
-                    "description": "Optional AWS profile name for Bedrock authentication."
-                },
-                "session_id": {
-                    "type": "string",
-                    "description": "Runtime session ID"
-                }
-            },
-            "required": [
-                "session_id"
-            ]
+  {
+    "name": "analyze_edu_transcript_tool",
+    "description": "Analyze educational transcripts of various sorts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) or absolute file path to the image."
         },
-        "outputSchema": {
-            "type": "object",
-            "properties": {
-                "result": {
-                    "type": "string",
-                    "description": "Analysis result"
-                },
-                "success": {
-                    "type": "boolean",
-                    "description": "Whether analysis completed successfully"
-                }
-            }
+        "image_data": {
+          "type": "string",
+          "description": "Base64-encoded image data. Use this OR image_path, not both."
+        },
+        "aws_profile": {
+          "type": "string",
+          "description": "Optional AWS profile name for Bedrock authentication."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID"
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the analysis run this invocation belongs to. Pass through the job_id supplied in the orchestrator context. Omit only when no analysis run is active."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document being analysed. Pass through the doc_id supplied in the orchestrator context."
         }
+      },
+      "required": [
+        "session_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "Analysis result"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether analysis completed successfully"
+        }
+      }
     }
+  }
 ]
