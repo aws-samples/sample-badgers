@@ -19,6 +19,7 @@ import boto3
 
 from agentic_enhancer import EnhancementUtilities
 from enhancement_tools import load_image, save_image
+from foundation import job_state
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -27,6 +28,11 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
     """Lambda handler for agentic image enhancement."""
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
     try:
         body = json.loads(event["body"]) if "body" in event else event
 
@@ -37,7 +43,27 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         output_quality = int(body.get("output_quality", 85))
         skip_upscale = body.get("skip_upscale", True)
 
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        # Identity comes from image_path only: image_data is an inline payload
+        # and would make a useless (and enormous) sort key.
+        specialist_name = os.environ.get("SPECIALIST_NAME", "image_enhancer")
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, body.get("image_path"))
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(body.get("image_path")),
+            session_id=session_id,
+        )
+
         if not image_source:
+            job_state.mark_failed(
+                job_id, subtask, "Missing required: image_path or image_data"
+            )
             return _error_response("Missing required: image_path or image_data")
 
         # Load image
@@ -93,7 +119,15 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         os.close(fd)
         save_image(winner_image, output_path, quality=output_quality)
 
-        # Upload to S3 or return base64
+        # Upload to S3 or return base64.
+        #
+        # Unlike the other specialists this one has a genuine inline delivery
+        # mode: with no OUTPUT_BUCKET it returns the enhanced image in the
+        # response body, so nothing is missing and the caller still gets the
+        # deliverable. Deployed Lambdas always receive OUTPUT_BUCKET from
+        # LambdaSpecialistStack, so the base64 branch is a local-run affordance.
+        # An _upload_to_s3 failure is not caught here and so still fails the
+        # invocation via the outer handler.
         output_bucket = os.environ.get("OUTPUT_BUCKET")
         if output_bucket:
             s3_uri = _upload_to_s3(output_path, output_bucket, session_id, image_source)
@@ -102,6 +136,8 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
             s3_uri = None
             with open(output_path, "rb") as f:
                 base64_data = base64.b64encode(f.read()).decode("utf-8")
+
+        job_state.mark_complete(job_id, subtask, s3_uri or "")
 
         # Format response (backward compatible + new fields)
         response_data = {
@@ -131,6 +167,7 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
+        job_state.mark_failed(job_id, subtask, str(e))
         return _error_response(str(e))
 
 

@@ -14,6 +14,7 @@ import boto3
 
 from foundation.bedrock_client import BedrockClient
 from foundation.s3_config_loader import load_manifest_from_s3
+from foundation import job_state
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -24,6 +25,11 @@ def lambda_handler(
     event: dict[str, Any], context: Any
 ) -> dict[str, Any]:  # noqa: ARG001
     """Lambda handler for Correlation Specialist."""
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
     try:
         body = json.loads(event["body"]) if "body" in event else event
 
@@ -35,19 +41,47 @@ def lambda_handler(
 
         logger.info("Correlating page %s for session %s", page_number, session_id)
         logger.info("Full text URI: %s", full_text_uri)
-        logger.info("Other specialists: %s", [a["specialist_name"] for a in specialist_uris])
+        logger.info(
+            "Other specialists: %s", [a["specialist_name"] for a in specialist_uris]
+        )
+
+        # Read specialist_name before the validation returns below so the job
+        # tracking identifiers exist on every failure path, not only the ones
+        # that get as far as loading config.
+        specialist_name = os.environ.get("SPECIALIST_NAME", "correlation_specialist")
+
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        # The subtask is keyed off the source page image so the row lines up
+        # with the page this correlation covers.
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, source_image_path)
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(source_image_path),
+            session_id=session_id,
+        )
 
         if not full_text_uri:
+            job_state.mark_failed(job_id, subtask, "full_text_uri is required")
             return _error_response("full_text_uri is required")
 
         if not specialist_uris:
+            job_state.mark_failed(
+                job_id,
+                subtask,
+                "specialist_uris must contain at least one other specialist result",
+            )
             return _error_response(
                 "specialist_uris must contain at least one other specialist result"
             )
 
         # Load configuration from manifest
         config_bucket = os.environ.get("CONFIG_BUCKET", "")
-        specialist_name = os.environ.get("SPECIALIST_NAME", "correlation_specialist")
         config = _load_config_from_s3(config_bucket, specialist_name)
 
         s3 = boto3.client("s3")
@@ -164,6 +198,7 @@ def lambda_handler(
         # Save to S3
         output_bucket = os.environ.get("OUTPUT_BUCKET")
         if not output_bucket:
+            job_state.mark_failed(job_id, subtask, "OUTPUT_BUCKET not configured")
             return _error_response("OUTPUT_BUCKET not configured")
 
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -172,6 +207,11 @@ def lambda_handler(
         # Verify we have content before writing
         if not unified_document or len(unified_document.strip()) == 0:
             logger.error("correlation_specialist output is empty after processing!")
+            job_state.mark_failed(
+                job_id,
+                subtask,
+                "correlation_specialist output is empty after processing",
+            )
             return _error_response(
                 "correlation_specialist output is empty after processing"
             )
@@ -190,7 +230,10 @@ def lambda_handler(
         )
 
         correlation_specialist_uri = f"s3://{output_bucket}/{s3_key}"
-        logger.info("Saved correlation_specialist output to %s", correlation_specialist_uri)
+        logger.info(
+            "Saved correlation_specialist output to %s", correlation_specialist_uri
+        )
+        job_state.mark_complete(job_id, subtask, correlation_specialist_uri)
 
         return {
             "statusCode": 200,
@@ -206,6 +249,7 @@ def lambda_handler(
 
     except Exception as e:
         logger.error("Error: %s", e, exc_info=True)
+        job_state.mark_failed(job_id, subtask, str(e))
         return _error_response(str(e))
 
 

@@ -47,18 +47,22 @@ for CONTAINER in "${CONTAINERS[@]}"; do
     echo "URI: ${FULL_URI}"
     echo "=========================================="
 
-    # Copy foundation and config modules for containers that need them
-    # (remediation_specialist is self-contained — no foundation/config dependency)
-    if [ "$CONTAINER" != "remediation_specialist" ]; then
-        echo "Copying foundation and config modules to build context..."
-        if [ -d "./layer/python/foundation" ]; then
-            rm -rf "${CONTAINER_DIR}/foundation"
-            cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
-        else
-            echo "Error: foundation module not found at ./layer/python/foundation"
-            exit 1
-        fi
+    # Copy the foundation module into every container build context. Both
+    # containers now import foundation.job_state to record their subtask state in
+    # DynamoDB, so remediation_specialist is no longer self-contained.
+    echo "Copying foundation module to build context..."
+    if [ -d "./layer/python/foundation" ]; then
+        rm -rf "${CONTAINER_DIR}/foundation"
+        cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
+    else
+        echo "Error: foundation module not found at ./layer/python/foundation"
+        exit 1
+    fi
 
+    # config is only needed by the containers that load specialist manifests;
+    # remediation_specialist reads none.
+    if [ "$CONTAINER" != "remediation_specialist" ]; then
+        echo "Copying config module to build context..."
         if [ -d "./layer/python/config" ]; then
             rm -rf "${CONTAINER_DIR}/config"
             cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
@@ -66,8 +70,6 @@ for CONTAINER in "${CONTAINERS[@]}"; do
             echo "Error: config module not found at ./layer/python/config"
             exit 1
         fi
-    else
-        echo "Skipping foundation/config copy (self-contained container)"
     fi
 
     # Build for x86_64 (Lambda runtime)

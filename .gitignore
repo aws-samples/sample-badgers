@@ -4,6 +4,13 @@ deployment/cdk.out/
 layer/
 *.zip
 
+# Shared modules staged into container build contexts by the build scripts.
+# Docker cannot COPY from outside the build context, so foundation/ and config/
+# are copied in before `docker build`. The originals live in
+# deployment/lambdas/layer/python/.
+deployment/lambdas/containers/*/foundation/
+deployment/lambdas/containers/*/config/
+
 # GIT
 ../.pre-commit-config.yaml
 
