@@ -1,32 +1,28 @@
 #!/usr/bin/env bash
-# Generate ui/.env from the badgers-cognito CDK stack outputs.
+# Generate ui/.env from the Cognito CDK stack outputs.
 #
 # The generated values are baked into the Vite bundle at build time (Vite only
 # exposes variables prefixed with VITE_), so this must run AFTER the Cognito
 # stack is deployed and BEFORE the UI image is built.
 #
 # Usage:
-#   ./deployment/scripts/generate_ui_env.sh
-#   AWS_REGION=us-west-2 STACK_PREFIX=badgers ./deployment/scripts/generate_ui_env.sh
+#   DEPLOYMENT_ID=dev ./deployment/scripts/generate_ui_env.sh
+#   DEPLOYMENT_ID=dev STACK_SUFFIX=a1b ./deployment/scripts/generate_ui_env.sh
+#
+# STACK_SUFFIX is read from .deploy-state/{DEPLOYMENT_ID}.json when not supplied.
 
 set -euo pipefail
 
-AWS_REGION="${AWS_REGION:-us-west-2}"
-STACK_PREFIX="${STACK_PREFIX:-badgers}"
-STACK_NAME="${STACK_PREFIX}-cognito"
-
-# Resolve repo root from this script's location so it can be run from anywhere.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+
+load_suffix
+STACK_NAME="$(_sn Cognito)"
 
 echo "==> Reading Cognito outputs from ${STACK_NAME} (${AWS_REGION})..."
 
 get_output() {
-    aws cloudformation describe-stacks \
-        --stack-name "${STACK_NAME}" \
-        --region "${AWS_REGION}" \
-        --query "Stacks[0].Outputs[?OutputKey=='${1}'].OutputValue" \
-        --output text 2>/dev/null || echo ""
+    stack_output "${STACK_NAME}" "$1"
 }
 
 AUTHORITY=$(get_output "Authority")

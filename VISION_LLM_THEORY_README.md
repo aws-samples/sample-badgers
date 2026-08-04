@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](README.md) | 🔵 **Vision LLM Theory** | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](README.md) | 🔵 **Vision LLM Theory** | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -125,7 +125,7 @@ The strongest semantic relationships emerge from the noise—title connects to i
 
 ## 🎯 Why This Matters for BADGERS
 
-BADGERS leverages these vision LLM capabilities through specialized analyzers:
+BADGERS leverages these vision LLM capabilities through specialized specialists:
 
 | Capability             | Traditional OCR         | Vision LLM (BADGERS)        |
 | ---------------------- | ----------------------- | --------------------------- |

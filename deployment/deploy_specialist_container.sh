@@ -4,9 +4,11 @@
 
 set -e
 
-STACK_PREFIX="badgers"
+
 REGION="${AWS_REGION:-us-west-2}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
 
 # Parse arguments
 _AWS_PROFILE_ARG=""
@@ -25,12 +27,12 @@ done
 # Get deployment ID from stack tags (same approach as sync_s3_files.sh)
 echo "Fetching deployment ID from CDK outputs..."
 CONFIG_BUCKET=$(aws cloudformation describe-stacks \
-    --stack-name "${STACK_PREFIX}-s3" \
+    --stack-name "$(_sn S3)" \
     --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
     --output text $_AWS_PROFILE_ARG 2>/dev/null || echo "")
 
 if [[ -z "$CONFIG_BUCKET" ]]; then
-    echo "Error: Could not fetch config bucket from stack ${STACK_PREFIX}-s3"
+    echo "Error: Could not fetch config bucket from stack $(_sn S3)"
     exit 1
 fi
 

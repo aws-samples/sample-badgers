@@ -143,6 +143,15 @@ class VpcStack(Stack):
             ).subnets
         ]
 
+        # ECS Express Mode picks the load balancer scheme from the subnets it is given:
+        # public subnets get an internet-facing ALB (and public IPs on the tasks),
+        # subnets with no internet gateway get an internal one. The UI needs the public
+        # set to be reachable from a browser — see UI_PUBLIC_ACCESS in app.py.
+        self.public_subnet_ids = [
+            s.subnet_id
+            for s in self.vpc.select_subnets(subnet_type=ec2.SubnetType.PUBLIC).subnets
+        ]
+
         self._apply_resource_tags(
             self.vpc, "ui-vpc", "VPC for the BADGERS UI ECS service"
         )
@@ -168,6 +177,13 @@ class VpcStack(Stack):
             value=",".join(self.private_subnet_ids),
             description="Comma-separated private subnet IDs",
             export_name=f"{Stack.of(self).stack_name}-PrivateSubnetIds",
+        )
+        CfnOutput(
+            self,
+            "PublicSubnetIds",
+            value=",".join(self.public_subnet_ids),
+            description="Comma-separated public subnet IDs",
+            export_name=f"{Stack.of(self).stack_name}-PublicSubnetIds",
         )
 
         # ── CDK Nag suppressions ───────────────────────────────────

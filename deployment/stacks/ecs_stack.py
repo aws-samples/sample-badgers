@@ -26,7 +26,8 @@ The task execution role gets ssm:GetParameters on the prefix so ECS can inject
 values before the container starts.
 
 The task role is scoped to exactly what the UI server calls:
-  - bedrock-agentcore:InvokeAgentRuntime  (presigned WebSocket to the runtime)
+  - bedrock-agentcore:InvokeAgentRuntime                   (HTTP invoke)
+  - bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream (presigned wss:// chat)
   - bedrock-agentcore:ListGatewayTargets  (tool listing)
   - dynamodb Query/GetItem/DeleteItem on the jobs table (+ GSI)
   - s3 Get/Put/List on the config, source and output buckets
@@ -86,6 +87,7 @@ class ECSStack(Stack):
         ecr_repository_uri: str,
         agentcore_runtime_websocket_arn: str,
         agentcore_gateway_id: str,
+        stack_suffix: str,
         image_tag: str = "frontend",
         ws_timeout_minutes: str = "30",
         **kwargs,
@@ -192,11 +194,20 @@ class ECSStack(Stack):
             description="Runtime permissions for the BADGERS UI ECS container",
         )
 
-        # AgentCore — invoke the runtime (presigned WebSocket) and list gateway tools
+        # AgentCore — invoke the runtime (presigned WebSocket) and list gateway tools.
+        #
+        # The WebSocket path is a distinct action: InvokeAgentRuntime covers the HTTP
+        # request/response API, while a presigned wss:// handshake to /runtimes/{arn}/ws
+        # authorizes against InvokeAgentRuntimeWithWebSocketStream. Granting only the
+        # former makes the handshake fail with 403 AccessDeniedException before the
+        # upgrade, which never reaches the container and so never appears in its logs.
         self.task_role.add_to_policy(
             iam.PolicyStatement(
                 sid="InvokeAgentCoreRuntime",
-                actions=["bedrock-agentcore:InvokeAgentRuntime"],
+                actions=[
+                    "bedrock-agentcore:InvokeAgentRuntime",
+                    "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream",
+                ],
                 resources=[
                     f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:runtime/*"
                 ],
@@ -346,6 +357,18 @@ class ECSStack(Stack):
                     ecs.CfnExpressGatewayService.KeyValuePairProperty(
                         name="PORT",
                         value=str(CONTAINER_PORT),
+                    ),
+                    # The admin Stacks tab builds CloudFormation stack names, which
+                    # carry the per-deployment suffix. DEPLOYMENT_ID is the composite
+                    # "{id}-{suffix}" used for resource names and the SSM prefix;
+                    # STACK_SUFFIX is the bare suffix used in stack names.
+                    ecs.CfnExpressGatewayService.KeyValuePairProperty(
+                        name="DEPLOYMENT_ID",
+                        value=deployment_id,
+                    ),
+                    ecs.CfnExpressGatewayService.KeyValuePairProperty(
+                        name="STACK_SUFFIX",
+                        value=stack_suffix,
                     ),
                 ],
                 secrets=[

@@ -1,10 +1,19 @@
 #!/bin/bash
+# Targeted cleanup for a stuck AgentCore Runtime stack: deletes the runtime, then
+# the stack. ./destroy.sh does this as part of a full teardown; this is for when
+# only the runtime stack is wedged.
+#
+# Usage: DEPLOYMENT_ID=dev ./cleanup-stack.sh
 set -e
 
-REGION="us-west-2"
-STACK_NAME="badgers-runtime-websocket"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
 
-echo "=== Cleaning up badgers-runtime-websocket stack ==="
+REGION="${AWS_REGION}"
+STACK_NAME="$(_sn RuntimeWebSocket)"
+
+echo "=== Cleaning up ${STACK_NAME} ==="
 
 # Step 1: Get the Runtime ID from the stack
 echo "Step 1: Getting Runtime ID from CloudFormation stack..."

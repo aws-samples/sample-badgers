@@ -12,9 +12,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
 cd "$SCRIPT_DIR"
 
-STACK_PREFIX="badgers"
+# STACK_PREFIX and stack names come from scripts/common.sh (sourced above).
 
 # Colors
 RED='\033[0;31m'
@@ -157,14 +159,14 @@ deploy_specialist() {
     # Get deployment ID
     log_info "Fetching deployment ID..."
     DEPLOYMENT_ID=$(aws cloudformation describe-stacks \
-        --stack-name ${STACK_PREFIX}-s3 \
+        --stack-name "$(_sn S3)" \
         --query "Stacks[0].Tags[?Key=='deployment_id'].Value" \
         --output text 2>/dev/null || echo "")
 
     if [ -z "$DEPLOYMENT_ID" ] || [ "$DEPLOYMENT_ID" == "None" ]; then
         # Fallback: extract from bucket name
         CONFIG_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name ${STACK_PREFIX}-s3 \
+            --stack-name "$(_sn S3)" \
             --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
             --output text 2>/dev/null || echo "")
         if [ -n "$CONFIG_BUCKET" ]; then
@@ -183,7 +185,7 @@ deploy_specialist() {
     # Step 1: Sync S3 files
     log_info "Step 1/3: Syncing S3 files (prompts, manifest, schema)..."
     CONFIG_BUCKET=$(aws cloudformation describe-stacks \
-        --stack-name ${STACK_PREFIX}-s3 \
+        --stack-name "$(_sn S3)" \
         --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
         --output text)
 
@@ -205,13 +207,13 @@ deploy_specialist() {
     if [ -f "$SCRIPT_DIR/.venv/bin/activate" ]; then
         source "$SCRIPT_DIR/.venv/bin/activate"
     fi
-    $_CDK_CMD deploy ${STACK_PREFIX}-lambda $_CDK_CONTEXT --require-approval never --exclusively \
+    $_CDK_CMD deploy "$(_sn Lambda)" $_CDK_CONTEXT --require-approval never --exclusively \
         || handle_error "Deploy Lambda stack"
     log_success "Lambda stack deployed"
 
     # Step 3: Deploy Gateway stack
     log_info "Step 3/3: Deploying Gateway stack (wires target)..."
-    $_CDK_CMD deploy ${STACK_PREFIX}-gateway $_CDK_CONTEXT --require-approval never --exclusively \
+    $_CDK_CMD deploy "$(_sn Gateway)" $_CDK_CONTEXT --require-approval never --exclusively \
         || handle_error "Deploy Gateway stack"
     log_success "Gateway stack deployed"
 
@@ -244,8 +246,8 @@ fi
 # Confirm
 echo -e "  This will:"
 echo -e "    1. Upload S3 files (prompts, manifest, schema)"
-echo -e "    2. Deploy ${BOLD}badgers-lambda${NC} stack"
-echo -e "    3. Deploy ${BOLD}badgers-gateway${NC} stack"
+echo -e "    2. Deploy ${BOLD}$(_sn Lambda)${NC} stack"
+echo -e "    3. Deploy ${BOLD}$(_sn Gateway)${NC} stack"
 echo ""
 read -p "  Proceed? (Y/n): " -n 1 -r
 echo ""

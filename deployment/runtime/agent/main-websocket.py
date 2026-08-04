@@ -30,6 +30,15 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
 )
 
+# The foundation module is copied into the container build context by
+# build_and_push_websocket.sh (the same way build_container_lambdas.sh supplies it
+# to the container Lambdas). Guarded so the agent still imports outside that build
+# — job tracking then degrades to a no-op rather than breaking the runtime.
+try:
+    from foundation import job_state
+except ImportError:  # pragma: no cover - foundation is present in the container
+    job_state = None  # type: ignore[assignment]
+
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
@@ -257,16 +266,122 @@ DEFAULT_MODEL_CONFIG = {
 DEFAULT_SYSTEM_PROMPT = """You are an intelligent BADGERS assistant with access to specialized tools via AgentCore Gateway."""
 
 
+# =============================================================================
+# JOB TRACKING
+# =============================================================================
+
+
+class JobTrackingHook:
+    """Mints the job row and stamps job/doc identifiers onto specialist tool calls.
+
+    Job tracking uses a three-level hierarchy (see
+    deployment/stacks/dynamodb_stack.py):
+
+        doc_id  ->  job_id  ->  subtask_id
+
+    ``doc_id`` is minted by the UI server at upload time and arrives on the
+    request payload. ``subtask_id`` is derived by each specialist Lambda from its
+    own name plus the page it analysed. This hook supplies the middle level.
+
+    The agent is the only component that observes a tool invocation — the UI
+    server merely proxies a WebSocket — so ``job_id`` is minted here, lazily, on
+    the first specialist tool call of a turn. A conversational turn that calls no
+    specialist therefore creates no job record at all.
+
+    Identifiers are written directly into the tool input rather than requested of
+    the model in the system prompt. The model would otherwise have to invent and
+    then remember a UUID across turns, which is not something to depend on for
+    the integrity of a tracking record.
+
+    Stamping is limited to tools whose ``inputSchema`` declares ``job_id``, so
+    non-specialist tools never receive parameters they do not accept.
+    """
+
+    # Warn once rather than per turn if the foundation module never made it into
+    # the image. Tracking degrading silently is the failure mode worth shouting
+    # about, since nothing else in the request path changes when it happens.
+    _warned_unavailable = False
+
+    def __init__(self, *, doc_id: str = "", session_id: str = "") -> None:
+        self.doc_id = doc_id
+        self.session_id = session_id
+        self.job_id = ""
+
+        if job_state is None and not JobTrackingHook._warned_unavailable:
+            JobTrackingHook._warned_unavailable = True
+            log(
+                "foundation.job_state is not importable — job tracking is DISABLED. "
+                "The build did not copy deployment/badgers-foundation/foundation "
+                "into the container context.",
+                level="warning",
+            )
+
+    def register_hooks(self, registry: Any, **_kwargs: Any) -> None:
+        """Subscribe to the turn and tool-call lifecycle events."""
+        from strands.hooks import BeforeInvocationEvent, BeforeToolCallEvent
+
+        registry.add_callback(BeforeInvocationEvent, self._on_turn_start)
+        registry.add_callback(BeforeToolCallEvent, self._on_before_tool_call)
+
+    def _on_turn_start(self, _event: Any) -> None:
+        """Clear the current job so each turn mints at most one new job."""
+        self.job_id = ""
+
+    @staticmethod
+    def _declares_job_id(tool: Any) -> bool:
+        """True when the tool's input schema accepts a ``job_id`` parameter."""
+        try:
+            schema = tool.tool_spec.get("inputSchema") or {}
+        except Exception:  # tool_spec is a property and may raise
+            return False
+        # Gateway/MCP tool specs nest the JSON Schema under a "json" key; accept
+        # either shape so this keeps working for natively defined tools.
+        properties = (schema.get("json") or schema).get("properties") or {}
+        return "job_id" in properties
+
+    def _on_before_tool_call(self, event: Any) -> None:
+        """Stamp job_id/doc_id into the tool input, minting the job if needed."""
+        if job_state is None or not self._declares_job_id(event.selected_tool):
+            return
+
+        tool_name = event.tool_use.get("name", "unknown")
+
+        if not self.job_id:
+            self.job_id = uuid.uuid4().hex
+            log(
+                f"Minted job_id={self.job_id} "
+                f"(doc_id={self.doc_id or 'none'}, first tool: {tool_name})"
+            )
+            # Writes are no-ops when JOBS_TABLE_NAME is unset and never raise, so
+            # an untracked deployment still stamps identifiers harmlessly.
+            job_state.create_job(
+                self.job_id,
+                doc_id=self.doc_id,
+                session_id=self.session_id,
+                reason=f"first specialist tool call: {tool_name}",
+            )
+
+        # The executor reads tool_use back off the event after callbacks run, so
+        # mutating the input in place is what reaches the Lambda.
+        tool_input = event.tool_use.setdefault("input", {})
+        tool_input["job_id"] = self.job_id
+        if self.doc_id:
+            tool_input["doc_id"] = self.doc_id
+
+
 def load_config_from_s3() -> tuple[str, dict[str, Any]]:
     """Load system prompt and model config from S3."""
     import boto3
 
     try:
         region = os.environ.get("AWS_REGION", "us-west-2")
-        ssm = boto3.client("ssm", region_name=region)
-        bucket_name = ssm.get_parameter(Name="/badgers/config-bucket-name")[
-            "Parameter"
-        ]["Value"]
+        # Injected by the runtime stack. Previously read from the global SSM path
+        # /badgers/config-bucket-name, which two deployments would fight over.
+        bucket_name = os.environ.get("CONFIG_BUCKET_NAME", "")
+        if not bucket_name:
+            raise RuntimeError(
+                "CONFIG_BUCKET_NAME is not set; cannot locate the config bucket."
+            )
 
         s3 = boto3.client("s3", region_name=region)
         response = s3.get_object(
@@ -363,6 +478,7 @@ async def stream_agent_events(
     session_id: str,
     actor_id: str,
     runtime_session_id: str,
+    doc_id: str = "",
 ) -> AsyncIterator[dict[str, Any]]:
     """Stream agent events as they occur.
 
@@ -428,6 +544,10 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
             )
             session_manager = SanitizingSessionManager(inner_manager)
 
+        # Mints job_id on the first specialist tool call and stamps job_id/doc_id
+        # into the tool input for every specialist invocation in this turn.
+        job_hook = JobTrackingHook(doc_id=doc_id, session_id=session_id)
+
         # Create agent
         agent = Agent(
             system_prompt=enhanced_system_prompt,
@@ -435,6 +555,7 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
             tools=tools,
             model=model,
             session_manager=session_manager,
+            hooks=[job_hook],
             callback_handler=None,  # We handle events ourselves
         )
 
@@ -443,7 +564,18 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
 
         # Stream the agent response
         final_response = ""
+        announced_job_id = ""
         async for event in agent.stream_async(query):
+            # Surface the job id once it exists so the client can correlate this
+            # turn with its job record without polling for it.
+            if job_hook.job_id and job_hook.job_id != announced_job_id:
+                announced_job_id = job_hook.job_id
+                yield {
+                    "type": "job",
+                    "job_id": job_hook.job_id,
+                    "doc_id": doc_id,
+                }
+
             # Convert event to serializable dict
             if isinstance(event, dict):
                 event_data = event
@@ -583,10 +715,14 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
     session_id = f"session_{uuid.uuid4().hex}"
     actor_id = "default_user"
 
+    doc_id = ""
+
     if isinstance(payload, dict):
         query = str(payload.get("prompt", "Hello!"))
         session_id = str(payload.get("session_id") or f"session_{uuid.uuid4().hex}")
         actor_id = str(payload.get("actor_id", "default_user"))
+        # Top level of the job hierarchy, minted by the UI server at upload time.
+        doc_id = str(payload.get("doc_id") or "")
 
     log(f"Session: {session_id}, Query: {query[:100]}...")
 
@@ -610,6 +746,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 session_id=session_id,
                 actor_id=actor_id,
                 runtime_session_id=runtime_session_id,
+                doc_id=doc_id,
             ):
                 yield event
 
@@ -650,6 +787,8 @@ async def websocket_handler(websocket, context) -> None:
             session_id = data.get("session_id") or f"session_{uuid.uuid4().hex}"
             actor_id = data.get("actor_id", "default_user")
             runtime_session_id = context.session_id or f"ws-{uuid.uuid4().hex}"
+            # Top level of the job hierarchy, minted by the UI server at upload time.
+            doc_id = str(data.get("doc_id") or "")
 
             log(f"Session: {session_id}, Query: {query[:100]}...")
 
@@ -682,6 +821,7 @@ async def websocket_handler(websocket, context) -> None:
                         session_id=session_id,
                         actor_id=actor_id,
                         runtime_session_id=runtime_session_id,
+                        doc_id=doc_id,
                     ):
                         await websocket.send_json(event)
 

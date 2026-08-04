@@ -22,8 +22,10 @@ when present, otherwise Cognito-provided defaults are used.
 
 Contracts preserved for other stacks:
   - ``credentials_secret`` — consumed by AgentCoreRuntimeWebSocketStack
-  - export ``badgers-cognito-UserPoolId`` — consumed by AgentCoreGatewayStack
-  - export ``badgers-cognito-UserPoolClientId`` — the M2M gateway client id,
+  - export ``{stack_name}-UserPoolId`` — consumed by AgentCoreGatewayStack, which
+    receives this stack's name as ``cognito_stack_name`` (stack names carry a
+    per-deployment suffix, so the export name cannot be hardcoded)
+  - export ``{stack_name}-UserPoolClientId`` — the M2M gateway client id,
     used as ``allowed_clients`` on the Gateway JWT authorizer
 """
 

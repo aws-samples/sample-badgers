@@ -187,6 +187,11 @@ function MyComposer() {
 class S3AttachmentAdapter {
   accept = 'application/pdf'
 
+  // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
+  // The server mints it per upload; we hold the most recent one so subsequent
+  // turns can attribute their jobs to the document being discussed.
+  lastDocId = ''
+
   async add({ file }) {
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
       throw new Error('Only PDF files are supported')
@@ -209,6 +214,8 @@ class S3AttachmentAdapter {
     const data = await res.json()
 
     if (data.error) throw new Error(data.error)
+
+    if (data.docId) this.lastDocId = data.docId
 
     // Return the s3 URI as text content so the agent sees it
     return {
@@ -264,6 +271,9 @@ function ChatInner() {
           session_id: sessionId,
           audit_mode: auditMode,
           dynamic_tokens: dynamicTokens,
+          // Empty until a PDF has been uploaded in this session; the agent
+          // treats an absent doc_id as "not attributable to a document".
+          doc_id: attachmentAdapter.lastDocId,
         }),
         signal: abortSignal,
       })
@@ -297,7 +307,7 @@ function ChatInner() {
         if (content.length) yield { content }
       }
     },
-  }), [sessionId, auditMode, dynamicTokens])
+  }), [sessionId, auditMode, dynamicTokens, attachmentAdapter])
 
   const runtime = useLocalRuntime(adapter, {
     adapters: { attachments: attachmentAdapter },

@@ -1,11 +1,11 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../../README.md) | [Vision LLM Theory](../../../VISION_LLM_THEORY_README.md) | [UI](../../../ui/UI_README.md) | [Deployment](../../DEPLOYMENT_README.md) | [CDK Stacks](../../stacks/STACKS_README.md) | [Runtime](../../runtime/RUNTIME_README.md) | [S3 Files](../S3_FILES_README.md) | [Lambda Analyzers](../../lambdas/LAMBDA_ANALYZERS.md) | 🔵 **Prompting System**</sub>
+<sub>[Home](../../../README.md) | [Vision LLM Theory](../../../VISION_LLM_THEORY_README.md) | [UI](../../../ui/UI_README.md) | [Deployment](../../DEPLOYMENT_README.md) | [CDK Stacks](../../stacks/STACKS_README.md) | [Runtime](../../runtime/RUNTIME_README.md) | [S3 Files](../S3_FILES_README.md) | [Lambda Specialists](../../lambdas/LAMBDA_SPECIALISTS.md) | 🔵 **Prompting System**</sub>
 
 ---
 
 # 📝 Prompting System Architecture
 
-This document explains the design principles, structure, and rationale behind the modular prompting system used by all analyzers.
+This document explains the design principles, structure, and rationale behind the modular prompting system used by all specialists.
 
 ## 🎯 Core Design Principles
 
@@ -13,7 +13,7 @@ This document explains the design principles, structure, and rationale behind th
 
 Prompts are decomposed into discrete, single-purpose files rather than monolithic prompts. This enables:
 - 🔄 Independent iteration on specific aspects
-- ♻️ Reuse of common components across analyzers
+- ♻️ Reuse of common components across specialists
 - 🧪 Easier testing and debugging
 - 👥 Clear ownership of prompt sections
 
@@ -21,7 +21,7 @@ Prompts are decomposed into discrete, single-purpose files rather than monolithi
 
 The system composes final prompts from multiple files at runtime:
 ```
-Final System Prompt = Wrapper + Core Rules + Analyzer Prompts + Error Handlers
+Final System Prompt = Wrapper + Core Rules + Specialist Prompts + Error Handlers
 ```
 
 ### 3. 📋 XML as Prompt Structure
@@ -36,7 +36,7 @@ XML provides:
 ### 4. ⚙️ Configuration-Driven Assembly
 
 Manifests declare which prompt files to load, allowing:
-- 🔀 Different analyzers to share common files
+- 🔀 Different specialists to share common files
 - 🧪 Easy A/B testing of prompt variations
 - 🔄 Runtime prompt updates without code changes
 
@@ -49,7 +49,7 @@ Manifests declare which prompt files to load, allowing:
 |                    prompt_system_wrapper.xml                    |
 |  +-----------------------------------------------------------+  |
 |  | {core_rules}           <- core_rules/rules.xml            |  |
-|  | {composed_prompt}      <- [analyzer prompt files...]      |  |
+|  | {composed_prompt}      <- [specialist prompt files...]    |  |
 |  | {error_handler_general}<- error_handling/error_handler.xml|  |
 |  | {error_handler_not_found}<- error_handling/not_found_handler.xml |
 |  +-----------------------------------------------------------+  |
@@ -59,7 +59,7 @@ Manifests declare which prompt files to load, allowing:
 The `PromptLoader` class:
 1. 📂 Loads the wrapper template
 2. 🔧 Loads core system files (rules, error handlers)
-3. 📝 Loads and concatenates analyzer-specific prompt files
+3. 📝 Loads and concatenates specialist-specific prompt files
 4. 💉 Injects all content into wrapper placeholders
 5. 🔄 Replaces dynamic placeholders (e.g., `[[PIXEL_WIDTH]]`)
 
@@ -67,7 +67,7 @@ The `PromptLoader` class:
 
 ## 📚 Standard Prompt File Types
 
-Each analyzer typically includes these file types, each serving a specific purpose:
+Each specialist typically includes these file types, each serving a specific purpose:
 
 ### 👤 `*_job_role.xml` - Identity and Expertise
 
@@ -190,16 +190,16 @@ All format files follow a unified structure:
 ```
 
 **Key components**:
-- `extraction_type`: Identifies the analyzer type (e.g., "full_text", "table", "diagram")
+- `extraction_type`: Identifies the specialist type (e.g., "full_text", "table", "diagram")
 - `<metadata>`: Contains page number, example count, and element count
 - `<elements>`: Container for all extracted elements (omitted when element_count is 0)
 - `<element>`: Individual extracted items with type-specific attributes
 
-**Why it matters**: 🎯 Explicit format examples dramatically reduce structural errors. The model can pattern-match rather than invent structure. The unified structure enables consistent parsing across all analyzers.
+**Why it matters**: 🎯 Explicit format examples dramatically reduce structural errors. The model can pattern-match rather than invent structure. The unified structure enables consistent parsing across all specialists.
 
 **Special Case Formats**:
 
-Some analyzers use non-standard formats due to external requirements:
+Some specialists use non-standard formats due to external requirements:
 
 | Format File                     | Output Type        | Reason                              |
 | ------------------------------- | ------------------ | ----------------------------------- |
@@ -261,16 +261,16 @@ Defines element types and domain-specific terms.
 
 ---
 
-## 🔬 Full Text Analyzer Deep Dive
+## 🔬 Full Text Specialist Deep Dive
 
-The `full_text_analyzer` demonstrates the complete pattern. Here's how each file contributes:
+The `full_text_specialist` demonstrates the complete pattern. Here's how each file contributes:
 
 ### 📂 File Loading Order (from manifest)
 
 ```json
 {
-    "analyzer": {
-        "name": "full_text_analyzer",
+    "specialist": {
+        "name": "full_text_specialist",
         "prompt_files": [
             "full_text_job_role.xml",
             "full_text_context.xml",
@@ -319,7 +319,7 @@ Located at `core_system_prompts/`:
 
 ### ⚖️ `core_rules/rules.xml` - Universal Rules
 
-Applied to ALL analyzers via the wrapper:
+Applied to ALL specialists via the wrapper:
 
 ```xml
 <core_rules>
@@ -343,7 +343,7 @@ Applied to ALL analyzers via the wrapper:
 </core_rules>
 ```
 
-**Why universal rules exist**: 🛡️ These prevent common failure modes across all analyzers (preambles, markdown formatting, hallucination) without repeating them in every analyzer's prompts.
+**Why universal rules exist**: 🛡️ These prevent common failure modes across all specialists (preambles, markdown formatting, hallucination) without repeating them in every specialist's prompts.
 
 ### ❌ Error Handlers
 
@@ -384,16 +384,16 @@ s3_files/
 ├── core_system_prompts/
 │   ├── prompt_system_wrapper.xml      # Main wrapper template
 │   ├── core_rules/
-│   │   └── rules.xml                  # Universal rules for all analyzers
+│   │   └── rules.xml                  # Universal rules for all specialists
 │   └── error_handling/
 │       ├── error_handler.xml          # Standard error format
 │       └── not_found_handler.xml      # No elements found format
 ├── manifests/
-│   ├── full_text_analyzer.json        # Analyzer configurations
-│   ├── table_analyzer.json
+│   ├── full_text_specialist.json        # Specialist configurations
+│   ├── table_specialist.json
 │   └── ...
 ├── prompts/
-│   ├── full_text_analyzer/
+│   ├── full_text_specialist/
 │   │   ├── full_text_job_role.xml
 │   │   ├── full_text_context.xml
 │   │   ├── full_text_rules.xml
@@ -401,17 +401,17 @@ s3_files/
 │   │   ├── full_text_format.xml
 │   │   ├── full_text_help.xml
 │   │   └── full_text_dictionary.xml
-│   ├── table_analyzer/
+│   ├── table_specialist/
 │   └── ...
 └── schemas/
-    └── [analyzer_name].json           # Output validation schemas
+    └── [specialist_name].json           # Output validation schemas
 ```
 
 ---
 
 ## 📋 Manifest Structure
 
-Each analyzer has a manifest file in `manifests/` with this structure:
+Each specialist has a manifest file in `manifests/` with this structure:
 
 ```json
 {
@@ -429,16 +429,16 @@ Each analyzer has a manifest file in `manifests/` with this structure:
             "required": ["image_path", "session_id"]
         }
     },
-    "analyzer": {
-        "name": "full_text_analyzer",
-        "description": "Analyzer description",
+    "specialist": {
+        "name": "full_text_specialist",
+        "description": "Specialist description",
         "enhancement_eligible": true,
         "model_selections": {
             "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "fallback_list": ["us.anthropic.claude-haiku-4-5-20251001-v1:0"]
         },
         "max_retries": 3,
-        "prompt_analyzer_prompt_base_path": "prompts",
+        "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
             "full_text_job_role.xml",
             "full_text_context.xml",
@@ -459,7 +459,7 @@ Each analyzer has a manifest file in `manifests/` with this structure:
         "dependencies": ["boto3"],
         "wizard_managed": true,
         "last_modified": "2025-12-22T23:50:59.081758+00:00",
-        "analyzer_type": "standard"
+        "specialist_type": "standard"
     },
     "evaluation": {
         "likert_labels": ["Failed", "Major errors", "Partial success", "Minor issues", "Perfect"],
@@ -478,7 +478,7 @@ Each analyzer has a manifest file in `manifests/` with this structure:
 
 1. **🔧 Maintainability**: Change one aspect (e.g., output format) without touching other files
 2. **🧪 Testability**: Test individual prompt components in isolation
-3. **♻️ Reusability**: Share dictionaries or help files across similar analyzers
+3. **♻️ Reusability**: Share dictionaries or help files across similar specialists
 4. **📜 Versioning**: Track changes to specific prompt aspects over time
 5. **🧪 A/B Testing**: Swap individual files to test variations
 6. **🐛 Debugging**: Identify which prompt section causes issues

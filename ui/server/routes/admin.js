@@ -9,21 +9,33 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
     const S3_FILES_DIR = resolve(DEPLOY_DIR, 's3_files');
     const DEPLOY_CONFIG = resolve(DEPLOY_DIR, 'deployment_config.json');
 
-    const STACK_PREFIX = 'badgers';
+    // Stack names are BADGERS-{Name}-{suffix}. The suffix is per-deployment, so it
+    // cannot be baked in — the ECS stack injects STACK_SUFFIX into this container.
+    // `id` is the PascalCase stack name; `key` is the stable id used by the client
+    // and by the deploy/destroy routes.
+    const STACK_PREFIX = 'BADGERS';
+    const STACK_SUFFIX = process.env.STACK_SUFFIX || '';
     const STACKS = [
-        { id: 's3', name: 'S3 Buckets', description: 'Config + source + output buckets' },
-        { id: 'cognito', name: 'Cognito Auth', description: 'OAuth 2.0 user pool & credentials' },
-        { id: 'iam', name: 'IAM Roles', description: 'Lambda execution role with Bedrock/S3 permissions' },
-        { id: 'ecr', name: 'ECR Registry', description: 'Container image registry' },
-        { id: 'inference-profiles', name: 'Inference Profiles', description: 'Cost tracking profiles per model' },
-        { id: 'lambda', name: 'Lambda Specialists', description: 'Serverless specialist functions + layers' },
-        { id: 'xray', name: 'X-Ray Tracing', description: 'Transaction search for AgentCore tracing' },
-        { id: 'gateway', name: 'AgentCore Gateway', description: 'MCP Gateway with Lambda targets' },
-        { id: 'memory', name: 'AgentCore Memory', description: 'Session persistence' },
-        { id: 'runtime-websocket', name: 'AgentCore Runtime', description: 'Strands agent with WebSocket streaming' },
-        { id: 'vpc', name: 'VPC', description: 'VPC with public/private subnets for frontend ALB + Fargate' },
-        { id: 'frontend', name: 'Frontend', description: 'ALB + Fargate + ACM cert + Cognito auth for unified UI' },
+        { key: 's3', id: 'S3', name: 'S3 Buckets', description: 'Config + source + output buckets' },
+        { key: 'cognito', id: 'Cognito', name: 'Cognito Auth', description: 'User pool with UI (OIDC/PKCE) and Gateway (M2M) clients' },
+        { key: 'dynamodb', id: 'DynamoDB', name: 'DynamoDB Jobs', description: 'Jobs table for doc/job/subtask tracking' },
+        { key: 'iam', id: 'IAM', name: 'IAM Roles', description: 'Lambda execution role with Bedrock/S3/DynamoDB permissions' },
+        { key: 'ecr', id: 'ECR', name: 'ECR Registry', description: 'Container image registry' },
+        { key: 'inference-profiles', id: 'InferenceProfiles', name: 'Inference Profiles', description: 'Cost tracking profiles per model' },
+        { key: 'lambda', id: 'Lambda', name: 'Lambda Specialists', description: 'Serverless specialist functions + layers' },
+        { key: 'xray', id: 'XRay', name: 'X-Ray Tracing', description: 'Transaction search for AgentCore tracing' },
+        { key: 'gateway', id: 'Gateway', name: 'AgentCore Gateway', description: 'MCP Gateway with Lambda targets' },
+        { key: 'memory', id: 'Memory', name: 'AgentCore Memory', description: 'Session persistence' },
+        { key: 'runtime-websocket', id: 'RuntimeWebSocket', name: 'AgentCore Runtime', description: 'Strands agent with WebSocket streaming' },
+        { key: 'vpc', id: 'Vpc', name: 'VPC', description: 'Private subnets and VPC endpoints for the UI service' },
+        { key: 'ecs', id: 'ECS', name: 'UI (ECS)', description: 'Unified UI on an ECS Express Gateway service' },
+        { key: 'custom-specialists', id: 'CustomSpecialists', name: 'Custom Specialists', description: 'Wizard-created specialists (optional)' },
     ];
+
+    // BADGERS-{Name}-{suffix}
+    const stackName = (id) => `${STACK_PREFIX}-${id}-${STACK_SUFFIX}`;
+
+    const stackByKey = (key) => STACKS.find(s => s.key === key || s.id === key);
 
     // ── Helpers ──
 
@@ -35,7 +47,7 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         });
     }
 
-    function sseStream(res, cmd, args) {
+    function sseStream(res, cmd, args, extraEnv = {}) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -43,11 +55,14 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         const resolvedArgs = args.map(a => a.endsWith('.sh') && !a.startsWith('/') && !a.startsWith('./') ? `./${a}` : a);
         const proc = spawn(cmd, resolvedArgs, {
             cwd: DEPLOY_DIR,
+            // stdin is closed, so any interactive `read` in the script sees EOF.
+            // Scripts must be driven non-interactively (see BADGERS_ASSUME_YES).
             stdio: ['ignore', 'pipe', 'pipe'],
             env: {
                 ...process.env,
                 PATH: [`${process.env.HOME}/.local/bin`, `${process.env.HOME}/.cargo/bin`, '/usr/local/bin', '/opt/homebrew/bin', process.env.PATH].join(':'),
                 TERM: 'dumb',
+                ...extraEnv,
             },
         });
         res.write(`data: ${JSON.stringify({ type: 'stdout', text: `▶ Running: ${cmd} ${resolvedArgs.join(' ')}\n` })}\n\n`);
@@ -118,37 +133,58 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
             ]);
             const cfStacks = JSON.parse(result).StackSummaries || [];
             res.json(STACKS.map(s => {
-                const cf = cfStacks.find(c => c.StackName === `${STACK_PREFIX}-${s.id}`);
-                return { ...s, stackName: `${STACK_PREFIX}-${s.id}`, status: cf ? cf.StackStatus : 'NOT_DEPLOYED', lastUpdated: cf ? cf.LastUpdatedTime || cf.CreationTime : null };
+                const name = stackName(s.id);
+                const cf = cfStacks.find(c => c.StackName === name);
+                return { ...s, stackName: name, status: cf ? cf.StackStatus : 'NOT_DEPLOYED', lastUpdated: cf ? cf.LastUpdatedTime || cf.CreationTime : null };
             }));
-        } catch { res.json(STACKS.map(s => ({ ...s, stackName: `${STACK_PREFIX}-${s.id}`, status: 'UNKNOWN', lastUpdated: null }))); }
+        } catch { res.json(STACKS.map(s => ({ ...s, stackName: stackName(s.id), status: 'UNKNOWN', lastUpdated: null }))); }
     });
 
     app.get('/api/stacks/:stackId/outputs', requireAdmin, async (req, res) => {
-        const stackName = `${STACK_PREFIX}-${req.params.stackId}`;
+        const entry = stackByKey(req.params.stackId);
+        if (!entry) return res.status(404).json({ error: `Unknown stack ${req.params.stackId}` });
+        const name = stackName(entry.id);
         try {
-            const result = await execPromise('aws', ['cloudformation', 'describe-stacks', '--stack-name', stackName, '--output', 'json']);
+            const result = await execPromise('aws', ['cloudformation', 'describe-stacks', '--stack-name', name, '--output', 'json']);
             const outputs = (JSON.parse(result).Stacks?.[0]?.Outputs || []).map(o => ({ key: o.OutputKey, value: o.OutputValue, description: o.Description || '' }));
             res.json(outputs);
-        } catch { res.status(404).json({ error: `Stack ${stackName} not found` }); }
+        } catch { res.status(404).json({ error: `Stack ${name} not found` }); }
     });
 
+    // Resolve a client-supplied stack key to its real, suffixed stack name.
+    function resolveStackName(stackId) {
+        if (!stackId) return null;
+        const entry = stackByKey(stackId);
+        return entry ? stackName(entry.id) : null;
+    }
+
     app.post('/api/deploy', requireAdmin, (req, res) => {
-        const { stackId, deploymentId } = req.body;
-        const stackName = stackId ? `${STACK_PREFIX}-${stackId}` : '--all';
-        const args = ['run', 'cdk', 'deploy', stackName, '--require-approval', 'never'];
-        if (deploymentId) args.push('-c', `deployment_id=${deploymentId}`);
+        const { stackId } = req.body;
+        const target = resolveStackName(stackId);
+        if (stackId && !target) return res.status(400).json({ error: `Unknown stack ${stackId}` });
+        const args = ['run', 'cdk', 'deploy', target || '--all', '--require-approval', 'never'];
         sseStream(res, 'uv', args);
     });
 
     app.post('/api/destroy', requireAdmin, (req, res) => {
-        const stackName = req.body.stackId ? `${STACK_PREFIX}-${req.body.stackId}` : '--all';
-        sseStream(res, 'uv', ['run', 'cdk', 'destroy', stackName, '--force']);
+        const target = resolveStackName(req.body.stackId);
+        if (req.body.stackId && !target) {
+            return res.status(400).json({ error: `Unknown stack ${req.body.stackId}` });
+        }
+        sseStream(res, 'uv', ['run', 'cdk', 'destroy', target || '--all', '--force']);
     });
 
     app.post('/api/sync-s3', requireAdmin, (_req, res) => { sseStream(res, 'bash', ['sync_s3_files.sh']); });
-    app.post('/api/deploy-all', requireAdmin, (_req, res) => { sseStream(res, 'bash', ['deploy_from_scratch.sh', '--force']); });
-    app.get('/api/deploy-all', requireAdmin, (_req, res) => { sseStream(res, 'bash', ['deploy_from_scratch.sh', '--force']); });
+
+    // Full deploy runs the root deploy.sh in non-interactive mode (option 9).
+    // BADGERS_ASSUME_YES skips its confirmation prompts, which would otherwise block
+    // on a stream with no tty attached.
+    const fullDeploy = (_req, res) => sseStream(
+        res, 'bash', [resolve(PROJECT_ROOT, 'deploy.sh'), '9'],
+        { BADGERS_ASSUME_YES: '1' },
+    );
+    app.post('/api/deploy-all', requireAdmin, fullDeploy);
+    app.get('/api/deploy-all', requireAdmin, fullDeploy);
 
     app.get('/api/deployment-config', requireAdmin, async (_req, res) => {
         try { res.json(JSON.parse(await readFile(DEPLOY_CONFIG, 'utf-8'))); }
