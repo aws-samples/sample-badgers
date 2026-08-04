@@ -26,11 +26,15 @@
 | ECS                | `ecs_stack.py`                         | Unified UI on an ECS Express Gateway service               |
 | Custom Specialists | `custom_specialists_stack.py`          | *(Optional)* Wizard-created specialists                    |
 
-Stack names follow `BADGERS-{Name}-{suffix}`, where the suffix is generated once per
-`DEPLOYMENT_ID` by `deploy.sh` and persisted in `.deploy-state/{DEPLOYMENT_ID}.json`. The
-ECS stack therefore deploys as, for example, `BADGERS-ECS-a1b`. Resource names inside the
-stacks carry both parts (`badgers-config-dev-a1b`), so several deployments can coexist in
-one account and region. See
+Stack names follow `BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}`, where the suffix is generated
+once per `DEPLOYMENT_ID` by `deploy.sh` and persisted in
+`.deploy-state/{DEPLOYMENT_ID}.json`. The ECS stack therefore deploys as, for example,
+`BADGERS-ECS-dev-a1b`. Resource names inside the stacks carry both parts
+(`badgers-config-dev-a1b`), so several deployments can coexist in one account and region.
+
+Both parts appear in the stack name so each stack is self-describing: tooling can recover a
+deployment's identity from the name alone, and a mistyped `DEPLOYMENT_ID` matches no stacks
+rather than resolving another deployment's. See
 [Stack and Resource Naming](../DEPLOYMENT_README.md#-stack-and-resource-naming).
 
 ## Dependency Graph
@@ -209,10 +213,10 @@ export STACK_SUFFIX=a1b        # from .deploy-state/dev.json
 uv run cdk deploy --all
 
 # Deploy specific stack
-uv run cdk deploy BADGERS-Lambda-a1b
+uv run cdk deploy BADGERS-Lambda-dev-a1b
 
 # Synthesize one stack (note: synth takes stack ids, not --all)
-uv run cdk synth BADGERS-ECS-a1b
+uv run cdk synth BADGERS-ECS-dev-a1b
 ```
 
 Set `CDK_NAG=1` to run `AwsSolutionsChecks` at synth time.

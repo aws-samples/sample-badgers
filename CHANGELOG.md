@@ -1,5 +1,84 @@
 # Changelog
 
+## [3.1.0] - 2026-08-04
+### Changed
+- **BREAKING: stack names now include the `DEPLOYMENT_ID`.** `BADGERS-{Name}-{suffix}`
+  becomes `BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}`, e.g. `BADGERS-S3-a1b` →
+  `BADGERS-S3-dev-a1b`. Stacks deployed under the previous naming cannot be adopted or
+  updated in place and must be torn down and redeployed.
+  - The suffix alone was enough for uniqueness but not for identity: with suffix-only
+    names a mistyped `DEPLOYMENT_ID` still resolved real stacks, while every resource name
+    derived from it pointed at something that did not exist. In one case that combination
+    scheduled a live deployment's in-use KMS key for deletion while reporting success.
+  - Tooling now reads a deployment's identity off the stack name, which removed the need
+    to recover it by parsing a bucket name out of a stack output.
+- **`deploy.sh` no longer reads `DEPLOYMENT_ID` from the environment.** It unsets the
+  variable and always chooses interactively, listing every deployment in `.deploy-state/`
+  — complete and in progress — newest activity first, with an option to start a new one.
+  A value left exported in the shell could otherwise target another deployment silently.
+  New ids are validated against `^[a-z][a-z0-9-]{0,15}$`, the rule S3 bucket naming imposes.
+- **`destroy.sh` chooses its target interactively, discovered from CloudFormation** rather
+  than from `.deploy-state/`, because a state file can be deleted while the stacks are
+  still live. An explicitly passed `DEPLOYMENT_ID` is validated and checked against what
+  exists, and refused if nothing matches.
+
+### Added
+- **Option 12, Resume** — runs only outstanding steps, skipping completed ones *before*
+  calling them so their "already complete, re-run?" prompts never fire. A step counts as
+  complete only when every state key it writes is set, so a partially finished step is
+  re-entered rather than skipped.
+- **A network-exposure prompt in step 8.** ECS Express Mode derives the load balancer
+  scheme from the subnets it is given, and the first Express service in a VPC fixes that
+  scheme for the VPC. The prompt is asked up front for options 9 and 12 so the rest of the
+  run is unattended. `UI_PUBLIC_ACCESS` answers it without prompting; default is public.
+  Previously the UI was always placed on private subnets, which produced an internal load
+  balancer whose public URL resolved but never answered.
+- **`UI_PUBLIC_ACCESS` and `vpc_stack.public_subnet_ids`**, matching the media-contracts
+  toggle. Defaults to `true`.
+- **A full manual console teardown procedure** in the deployment guide: the two resources
+  that must be removed before any stack, the 14-stack deletion order with per-stack notes,
+  why parallel deletion fails, `DELETE_FAILED` remediation, and the resources no teardown
+  removes.
+
+### Fixed
+- **Step 8 now forces the image rollout.** The ECS stack pins a static image tag, so
+  pushing a new image to that tag left the template unchanged, `cdk deploy` reported no
+  changes, and the service kept serving the old image. Step 8 now calls
+  `update-express-gateway-service` with the container spec after the `cdk deploy`, as
+  media-contracts does, then polls `rolloutState`.
+- **The UI task role was missing `bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream`.**
+  The presigned WebSocket path authorizes against a different action than
+  `InvokeAgentRuntime`, so chat failed with a 403 at the handshake — before reaching the
+  container, which is why nothing appeared in its logs. The permission was inherited from
+  media-contracts, which invokes over HTTP.
+- **`/api/env` is exempt from the `/api/` auth middleware.** It is the ALB health check
+  path and the SPA reads it for branding before login, so a blanket `requireAuth` mount
+  made every health check 401 and the task was killed for failing them. Media-contracts
+  applies auth per route and leaves this endpoint open; BADGERS took the health check path
+  without the exemption.
+- **`destroy.sh` used `delete-service` on an Express Gateway Service**, which rejects it
+  outright. It now uses `delete-express-gateway-service`, which also removes the load
+  balancer the service created.
+- **`destroy.sh` printed a success banner over a failed teardown.** It now re-verifies
+  after the VPC auto-fix and, if stacks remain, lists them, states that the KMS key was
+  left alone, and exits non-zero.
+- **KMS key deletion is gated on the teardown succeeding.** It was previously scheduled
+  even when `cdk destroy` had failed and every stack was still standing.
+- **The X-Ray decision is resolved before every `cdk deploy`,** not just in step 2.
+  `RuntimeWebSocket` depends on the XRay stack and `cdk deploy` includes a stack's
+  dependencies, so deploying the Runtime or ECS stack directly reintroduced the stack and
+  attempted a CloudWatch Logs resource policy against a non-adjustable quota of 10.
+  `preflight_xray` also no longer resets an explicitly set `BADGERS_SKIP_XRAY`.
+- **`build_container_lambdas.sh` was called without its required argument** in step 4, and
+  needed the composite `{id}-{suffix}` to derive the right ECR repository.
+- **The menu reported `exit 0` for failed steps**, having read `$?` after an intervening
+  command. It now captures the step's status directly.
+- **Step 8 marked itself complete on a rollout timeout.** The poll loop could exhaust its
+  window without ever reaching `COMPLETED` and still record success.
+- **A completed deployment was unreachable from the deploy menu.** The chooser filtered to
+  unfinished deployments, and starting a "new" one refuses an id that already has state, so
+  there was no way to re-run a single step against a finished deployment.
+
 ## [3.0.0] - 2026-07-30
 ### Changed
 - **BREAKING: stack and resource names now follow the media-contracts (MC) convention.**
