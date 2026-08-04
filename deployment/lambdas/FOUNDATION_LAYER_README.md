@@ -1,16 +1,16 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Analyzers](LAMBDA_ANALYZERS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 # 🧠 Foundation Lambda Layer
 
-The Foundation Layer is a reusable AWS Lambda layer containing the core framework, dependencies, and shared utilities for all analyzer tools. It implements the "foundation + specialization" pattern where common functionality lives in the layer while analyzer-specific logic remains in individual Lambda functions.
+The Foundation Layer is a reusable AWS Lambda layer containing the core framework, dependencies, and shared utilities for all specialist tools. It implements the "foundation + specialization" pattern where common functionality lives in the layer while specialist-specific logic remains in individual Lambda functions.
 
 ## 🏗️ Architecture
 
 ```
 layer/python/
 ├── foundation/                    # 🧠 Core framework modules
-│   ├── analyzer_foundation.py     # 🎯 Main orchestrator class
+│   ├── specialist_foundation.py     # 🎯 Main orchestrator class
 │   ├── bedrock_client.py          # 🤖 AWS Bedrock integration
 │   ├── configuration_manager.py   # ⚙️ Config loading and validation
 │   ├── image_processor.py         # 🖼️ Image optimization and encoding
@@ -19,6 +19,7 @@ layer/python/
 │   ├── response_processor.py      # 📤 Response extraction and validation
 │   ├── s3_config_loader.py        # ☁️ S3-based configuration loading
 │   ├── s3_result_saver.py         # 💾 Result persistence to S3
+│   ├── job_state.py               # 📋 DynamoDB job/subtask state writer
 │   └── lambda_error_handler.py    # ❌ Standardized error handling
 ├── config/                        # ⚙️ Configuration utilities
 ├── prompts/core_system_prompts/   # 📝 Shared prompt components
@@ -33,11 +34,11 @@ layer/python/
 
 ## 🧩 Core Modules
 
-### 🎯 AnalyzerFoundation (`analyzer_foundation.py`)
+### 🎯 SpecialistFoundation (`specialist_foundation.py`)
 
-The main orchestrator class that all analyzers use. Coordinates the complete analysis workflow:
+The main orchestrator class that all specialists use. Coordinates the complete analysis workflow:
 
-1. **⚙️ Configuration Loading** - Loads analyzer config from local manifest or central config
+1. **⚙️ Configuration Loading** - Loads specialist config from local manifest or central config
 2. **🖼️ Image Processing** - Optimizes and encodes target images
 3. **📝 Prompt Composition** - Loads and combines system prompts with placeholders
 4. **🎓 Example Loading** - Loads few-shot example images if configured
@@ -46,11 +47,11 @@ The main orchestrator class that all analyzers use. Coordinates the complete ana
 7. **📤 Response Processing** - Extracts and validates results
 
 ```python
-from foundation import AnalyzerFoundation
+from foundation import SpecialistFoundation
 
-class MyAnalyzer:
+class MySpecialist:
     def __init__(self):
-        self.foundation = AnalyzerFoundation("my_analyzer")
+        self.foundation = SpecialistFoundation("my_specialist")
 
     def analyze(self, image_path, aws_profile=None):
         return self.foundation.analyze(image_path, aws_profile)
@@ -70,7 +71,7 @@ Manages AWS Bedrock interactions with:
 Handles configuration loading and validation:
 - 📂 Loads from JSON config files or S3
 - ✅ Validates required fields and types
-- 🔄 Supports both central config and per-analyzer manifests
+- 🔄 Supports both central config and per-specialist manifests
 - 💾 Caches loaded configurations
 
 ### 🖼️ ImageProcessor (`image_processor.py`)
@@ -86,7 +87,7 @@ Image optimization for Bedrock vision models:
 
 Composes system prompts from multiple files:
 - 📂 Loads core system files (rules, error handlers)
-- 📄 Loads analyzer-specific prompt files
+- 📄 Loads specialist-specific prompt files
 - 🎁 Injects content into wrapper template
 - 🔄 Supports placeholder replacement (e.g., `[[PIXEL_WIDTH]]`)
 - ☁️ Works with both local filesystem and S3
@@ -108,20 +109,58 @@ Processes Bedrock responses:
 - ❌ Handles empty/error responses
 - 🔍 Extracts structured data (JSON/XML)
 
+### 📋 job_state (`job_state.py`)
+
+The single writer for DynamoDB job records. Every writer goes through this module — the
+orchestrator runtime, the built-in specialist Lambdas, and generated custom specialists —
+so the record shape stays defined in one place.
+
+Key derivation:
+```python
+job_state.image_identifier("s3://b/pages/page_1.png")   # -> "page_1"
+job_state.subtask_id("table_specialist", "s3://b/pages/page_1.png")
+# -> "table_specialist#page_1"
+```
+
+Writes:
+| Function                                         | Effect                                                               |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| `create_job(job_id, doc_id, session_id, reason)` | Conditional put of the job-level row (`subtask_id` = `orchestrator`) |
+| `mark_running(job_id, subtask, ...)`             | Upserts the subtask and sets `RUNNING`                               |
+| `mark_complete(job_id, subtask, s3_key)`         | Sets `COMPLETE` and records the output key                           |
+| `mark_failed(job_id, subtask, error)`            | Sets `FAILED` and records the reason                                 |
+
+Reads: `get_record(job_id, subtask)`, `get_job_records(job_id)`.
+
+Two behaviors this module guarantees:
+- **Never raises.** Failures are logged as warnings. A tracking outage does not fail an
+  analysis.
+- **No-ops when unconfigured.** Every call returns early when `JOBS_TABLE_NAME` is unset,
+  read at call time rather than import time because the Lambda environment may be
+  populated after the module is first imported.
+
+Because `mark_running` uses `update_item` (an upsert), no `PENDING` row needs to exist
+first. See [Lambda Specialists](LAMBDA_SPECIALISTS.md#-job-tracking) for the hierarchy and
+the calling pattern.
+
+> The AgentCore Runtime image is not built on this layer, but it imports this same module.
+> `build_and_push_websocket.sh` copies `badgers-foundation/foundation/` into the runtime
+> build context so `create_job` comes from one implementation.
+
 ---
 
 ## ✨ What the Layer Enables
 
-### 1. 📦 Minimal Analyzer Code
+### 1. 📦 Minimal Specialist Code
 
-Individual analyzers only need ~50 lines of code:
+Individual specialists only need ~50 lines of code:
 
 ```python
-from foundation import AnalyzerFoundation
+from foundation import SpecialistFoundation
 
-class FullTextAnalyzer:
+class FullTextSpecialist:
     def __init__(self):
-        self.foundation = AnalyzerFoundation("full_text")
+        self.foundation = SpecialistFoundation("full_text")
 
     def analyze_full_text(self, image_path, aws_profile=None):
         return self.foundation.analyze(image_path, aws_profile)
@@ -129,7 +168,7 @@ class FullTextAnalyzer:
 
 ### 2. 🎯 Consistent Behavior
 
-All analyzers automatically get:
+All specialists automatically get:
 - 🔄 Retry logic with exponential backoff
 - 🛡️ Model fallback chains
 - 🖼️ Image optimization
@@ -139,7 +178,7 @@ All analyzers automatically get:
 
 ### 3. ⚙️ Configuration-Driven
 
-New analyzers require only:
+New specialists require only:
 - 📋 A manifest.json with model and prompt configuration
 - 📝 Prompt XML files defining the analysis task
 - 🔌 A thin wrapper calling the foundation
@@ -147,9 +186,9 @@ New analyzers require only:
 ### 4. 🚀 Efficient Deployment
 
 - 📦 Layer deployed once (~50MB compressed)
-- 🪶 Individual analyzers are tiny (~10-20KB)
+- 🪶 Individual specialists are tiny (~10-20KB)
 - ⚡ Fast cold starts
-- 🔄 Independent analyzer updates
+- 🔄 Independent specialist updates
 
 ---
 
@@ -167,7 +206,11 @@ New analyzers require only:
 
 ---
 
-> **Note:** The `remediation_analyzer` container Lambda is self-contained and does not depend on the Foundation Layer. It bundles its own dependencies (pikepdf, pymupdf, etc.) in its Docker image. Only `image_enhancer` among the container Lambdas uses the foundation framework.
+> **Note:** The container Lambdas do not attach the Foundation Layer — they bundle their
+> own dependencies in their Docker images. `image_enhancer` uses the full foundation
+> framework; `remediation_specialist` is otherwise self-contained (pikepdf, pymupdf, etc.)
+> but both import `foundation.job_state` to record their subtask state, so
+> `build_container_lambdas.sh` copies the `foundation/` module into each build context.
 
 ## 🛠️ Build and Deploy
 
@@ -184,6 +227,20 @@ cd deployment/lambdas
 # Layer ARN saved to layer_arn.txt
 ```
 
+### ⚠️ Build order matters
+
+`layer/` is a generated, gitignored directory. `build_foundation_layer.sh` populates
+`layer/python/foundation/` by copying `../badgers-foundation/foundation/*.py`, which is the
+tracked source of truth.
+
+`build_container_lambdas.sh` copies the module from `layer/python/foundation/`, so a stale
+or missing `layer/` produces container images without the current foundation code. If a
+container Lambda fails on `from foundation import job_state`, rebuild the layer first:
+
+```bash
+./build_foundation_layer.sh && ./build_container_lambdas.sh
+```
+
 The layer is compatible with:
 - **🐍 Runtime**: Python 3.12
 - **💻 Architectures**: x86_64, arm64
@@ -195,7 +252,7 @@ The layer is compatible with:
 
 ```bash
 aws lambda update-function-configuration \
-    --function-name my-analyzer \
+    --function-name my-specialist \
     --layers $(cat layer_arn.txt)
 ```
 

@@ -1,12 +1,21 @@
 #!/bin/bash
-# Updates frontend/.env with CDK stack outputs after deployment
+# Updates ui/config/.env with CDK stack outputs after deployment.
+#
+# This file is a local-development convenience only. The deployed UI reads every
+# value from SSM Parameter Store, injected as container secrets by the ECS stack.
+#
+# Note: this does NOT write the Cognito values. Those are baked into the Vite
+# bundle at build time -- see scripts/generate_ui_env.sh.
+#
 # Usage: ./update_frontend_env.sh [--profile PROFILE]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../frontend/config/.env"
-STACK_PREFIX="badgers"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
+ENV_FILE="$SCRIPT_DIR/../ui/config/.env"
+
 
 # Parse arguments
 _AWS_PROFILE_ARG=""
@@ -35,11 +44,12 @@ get_output() {
 }
 
 # Fetch the values we need
-RUNTIME_WEBSOCKET_ARN=$(get_output "${STACK_PREFIX}-runtime-websocket" "RuntimeArn")
-GATEWAY_ID=$(get_output "${STACK_PREFIX}-gateway" "GatewayId")
-S3_UPLOAD_BUCKET=$(get_output "${STACK_PREFIX}-s3" "SourceBucketName")
-S3_OUTPUT_BUCKET=$(get_output "${STACK_PREFIX}-s3" "OutputBucketName")
-S3_CONFIG_BUCKET=$(get_output "${STACK_PREFIX}-s3" "ConfigBucketName")
+RUNTIME_WEBSOCKET_ARN=$(get_output "$(_sn RuntimeWebSocket)" "RuntimeArn")
+GATEWAY_ID=$(get_output "$(_sn Gateway)" "GatewayId")
+S3_UPLOAD_BUCKET=$(get_output "$(_sn S3)" "SourceBucketName")
+S3_OUTPUT_BUCKET=$(get_output "$(_sn S3)" "OutputBucketName")
+S3_CONFIG_BUCKET=$(get_output "$(_sn S3)" "ConfigBucketName")
+JOBS_TABLE_NAME=$(get_output "$(_sn DynamoDB)" "JobsTableName")
 
 # Validate we got required values
 if [[ -z "$RUNTIME_WEBSOCKET_ARN" || -z "$GATEWAY_ID" || -z "$S3_UPLOAD_BUCKET" || -z "$S3_OUTPUT_BUCKET" || -z "$S3_CONFIG_BUCKET" ]]; then
@@ -72,6 +82,10 @@ AWS_PROFILE=$AWS_PROFILE
 S3_UPLOAD_BUCKET=$S3_UPLOAD_BUCKET
 S3_OUTPUT_BUCKET=$S3_OUTPUT_BUCKET
 S3_CONFIG_BUCKET=$S3_CONFIG_BUCKET
+
+# DynamoDB jobs table (doc_id -> job_id -> subtask_id).
+# Without this the /api/jobs endpoints return 503.
+JOBS_TABLE_NAME=$JOBS_TABLE_NAME
 
 # =============================================================================
 # AgentCore Configuration
@@ -113,4 +127,5 @@ echo "  AGENTCORE_GATEWAY_ID=$GATEWAY_ID"
 echo "  S3_UPLOAD_BUCKET=$S3_UPLOAD_BUCKET"
 echo "  S3_OUTPUT_BUCKET=$S3_OUTPUT_BUCKET"
 echo "  S3_CONFIG_BUCKET=$S3_CONFIG_BUCKET"
+echo "  JOBS_TABLE_NAME=${JOBS_TABLE_NAME:-<not deployed>}"
 echo "  (AWS_REGION and AWS_PROFILE preserved)"

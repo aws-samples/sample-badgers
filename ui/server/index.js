@@ -103,9 +103,20 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Every /api/* route requires a verified Cognito bearer token. Mounted before
-// the route groups so no individual handler can be reached unauthenticated.
-app.use('/api/', requireAuth);
+// Every /api/* route requires a verified Cognito bearer token except /api/env, which
+// must answer unauthenticated: it is the ALB health check path (health_check_path in
+// deployment/stacks/ecs_stack.py), and the SPA reads it for branding before login.
+// This matches the media-contracts reference implementation, which passes requireAuth
+// into mountRoutes and applies it per route, leaving /api/env open. Mounted before the
+// route groups so no other handler can be reached unauthenticated.
+//
+// originalUrl is used rather than req.path because Express strips the '/api' mount
+// prefix from req.url inside path-mounted middleware.
+const PUBLIC_API_PATHS = new Set(['/api/env']);
+app.use('/api/', (req, res, next) => {
+    if (PUBLIC_API_PATHS.has(req.originalUrl.split('?')[0])) return next();
+    return requireAuth(req, res, next);
+});
 
 // ── User identity ──
 app.get('/api/me', async (req, res) => {

@@ -28,9 +28,11 @@ export TYPEGUARD_DISABLE=1
 export PYTHONWARNINGS="ignore::UserWarning:aws_cdk"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
 cd "$SCRIPT_DIR"
 
-STACK_PREFIX="badgers"
+
 
 echo ""
 echo "=========================================="
@@ -48,14 +50,14 @@ fi
 # Get deployment ID from existing stack
 log_info "Getting deployment ID from existing stacks..."
 DEPLOYMENT_ID=$(aws cloudformation describe-stacks \
-    --stack-name ${STACK_PREFIX}-s3 \
+    --stack-name "$(_sn S3)" \
     --query "Stacks[0].Tags[?Key=='deployment_id'].Value" \
     --output text 2>/dev/null || echo "")
 
 if [ -z "$DEPLOYMENT_ID" ] || [ "$DEPLOYMENT_ID" == "None" ]; then
     # Try to extract from bucket name
     CONFIG_BUCKET=$(aws cloudformation describe-stacks \
-        --stack-name ${STACK_PREFIX}-s3 \
+        --stack-name "$(_sn S3)" \
         --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
         --output text 2>/dev/null || echo "")
     if [ -n "$CONFIG_BUCKET" ]; then
@@ -86,7 +88,7 @@ fi
 
 # Deploy custom specialists stack (exclusively - don't update dependencies)
 log_info "Deploying custom specialists stack..."
-$_CDK_CMD deploy ${STACK_PREFIX}-custom-specialists $_CDK_CONTEXT --require-approval never --exclusively || handle_error "Deploy custom specialists stack"
+$_CDK_CMD deploy "$(_sn CustomSpecialists)" $_CDK_CONTEXT --require-approval never --exclusively || handle_error "Deploy custom specialists stack"
 
 echo ""
 echo "=========================================="

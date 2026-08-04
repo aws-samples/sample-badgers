@@ -1,6 +1,6 @@
 # PDF Accessibility Tagger
 
-Automated PDF/UA remediation pipeline. Takes an untagged PDF and a correlation XML (from the BADGERS analyzer system), and produces a fully tagged accessible PDF with structure tree, alt text, and PDF/UA metadata.
+Automated PDF/UA remediation pipeline. Takes an untagged PDF and a correlation XML (from the BADGERS specialist system), and produces a fully tagged accessible PDF with structure tree, alt text, and PDF/UA metadata.
 
 ## Why This Works
 
@@ -31,7 +31,7 @@ A screen reader sees one `<P>` and reads the full paragraph as a single unit, re
 
 ```mermaid
 flowchart TD
-    A[Correlation XML<br/>from BADGERS analyzers] --> B[Spine Parser<br/>XML → StructureElement tree<br/>+ flat element list<br/>+ enrichment extraction]
+    A[Correlation XML<br/>from BADGERS specialists] --> B[Spine Parser<br/>XML → StructureElement tree<br/>+ flat element list<br/>+ enrichment extraction]
     C[Source PDF] --> D[Bbox Resolver<br/>element text → page coordinates<br/>via fitz line matching]
     B --> D
     D --> E[Content Stream Wrapper<br/>PDF operators → BDC/EMC<br/>with unique MCIDs]
@@ -50,7 +50,7 @@ Reads the unified_document XML (badgers schema v1.0) and produces:
 
 2. **Flat element list** — each leaf element with `id`, `type`, `tag`, `text`, `order`, and enrichment data. This feeds the bbox resolver.
 
-3. **Enrichment extraction** — normalizes all analyzer-specific enrichment blocks (chart, table, diagram, war_map, code_block, handwriting, handwriting_math, decision_tree) into a uniform `{title, description, actual_text, tags, related}` dict per element.
+3. **Enrichment extraction** — normalizes all specialist-specific enrichment blocks (chart, table, diagram, war_map, code_block, handwriting, handwriting_math, decision_tree) into a uniform `{title, description, actual_text, tags, related}` dict per element.
 
 ## Stage 2: Bbox Resolver
 
@@ -190,7 +190,7 @@ Each pass is fault-tolerant. Controlled by `ENABLE_SYNTAX_REPAIR` env var (defau
 
 `container/` has a complete Lambda container setup:
 - `Dockerfile` — Lambda Python 3.12 base, pikepdf/PyMuPDF/Pillow/boto3
-- `lambda_handler.py` — S3 download → pipeline → S3 upload, same event schema as the old remediation_analyzer
+- `lambda_handler.py` — S3 download → pipeline → S3 upload, same event schema as the old remediation_specialist
 - `build.sh` — builds Docker image, pushes to ECR, updates Lambda function. Auto-copies shared modules (`spine_parser.py`, `pdf_accessibility_models.py`, `pdf_syntax_repair.py`) and `utils/` into the build context.
 
 ## File Map
@@ -220,7 +220,7 @@ final_form/
 │   └── pdf_accessibility_models.py  # TagRegion, StructureElement, VALID_TAGS
 ├── inputs/                    # Test fixtures
 │   ├── ECON320/               # Real-world test PDF + correlation XML
-│   ├── unified_output_sample.xml   # Synthetic all-analyzer sample
+│   ├── unified_output_sample.xml   # Synthetic all-specialist sample
 │   ├── unified_output_sample.pdf   # Generated test PDF from sample
 │   └── generate_test_pdf.py        # Generates test PDF from sample XML
 └── outputs/                   # Tagged PDFs + debug panels

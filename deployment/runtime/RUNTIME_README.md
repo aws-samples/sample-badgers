@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | 🔵 **Runtime** | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Analyzers](../lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | 🔵 **Runtime** | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -29,7 +29,7 @@ runtime/
 ./build_and_push_websocket.sh
 
 # Then deploy Runtime stack
-cd .. && cdk deploy badgers-runtime-websocket
+cd .. && DEPLOYMENT_ID=dev uv run cdk deploy "BADGERS-RuntimeWebSocket-${STACK_SUFFIX}"
 ```
 
 ## Container Details

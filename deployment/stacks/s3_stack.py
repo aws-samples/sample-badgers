@@ -173,21 +173,13 @@ class S3Stack(Stack):
             export_name=f"{Stack.of(self).stack_name}-S3KmsKeyArn",
         )
 
-        # SSM Parameter for agent runtime to discover the config bucket
-        self.config_bucket_param = ssm.StringParameter(
-            self,
-            "ConfigBucketNameParam",
-            parameter_name="/badgers/config-bucket-name",
-            string_value=self.config_bucket.bucket_name,
-            description="Config bucket name for agent system prompt",
-        )
-
-        CfnOutput(
-            self,
-            "ConfigBucketParamName",
-            value=self.config_bucket_param.parameter_name,
-            description="SSM parameter path for config bucket name",
-        )
+        # No SSM parameter is published here. This stack used to write a global
+        # /badgers/config-bucket-name for the agent runtime to discover, but that path
+        # is not deployment-scoped: with a per-deployment stack suffix, a second
+        # deployment would silently overwrite the first deployment's value and point
+        # its agent at the wrong bucket. The runtime now receives CONFIG_BUCKET_NAME
+        # directly as a container environment variable, and the UI reads the
+        # deployment-scoped parameter published by the ECS stack.
 
     def _apply_common_tags(self) -> None:
         """Apply common deployment tags to all resources in this stack."""

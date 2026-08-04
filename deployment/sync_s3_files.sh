@@ -6,7 +6,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 S3_FILES_DIR="$SCRIPT_DIR/s3_files"
-STACK_PREFIX="badgers"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
 
 # Parse arguments
 _AWS_PROFILE_ARG=""
@@ -26,12 +27,12 @@ echo "Fetching S3 bucket name from CDK outputs..."
 
 # Get bucket name from stack output
 S3_BUCKET=$(aws cloudformation describe-stacks \
-    --stack-name "${STACK_PREFIX}-s3" \
+    --stack-name "$(_sn S3)" \
     --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
     --output text $_AWS_PROFILE_ARG 2>/dev/null || echo "")
 
 if [[ -z "$S3_BUCKET" ]]; then
-    echo "Error: Could not fetch S3 bucket name from stack ${STACK_PREFIX}-s3"
+    echo "Error: Could not fetch S3 bucket name from stack $(_sn S3)"
     exit 1
 fi
 

@@ -10,6 +10,8 @@ import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { BedrockAgentCoreControlClient, ListGatewayTargetsCommand } from '@aws-sdk/client-bedrock-agentcore-control';
 import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { CloudWatchLogsClient, StartQueryCommand, GetQueryResultsCommand } from '@aws-sdk/client-cloudwatch-logs';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import multer from 'multer';
 
 export function mountCoreRoutes(app, PROJECT_ROOT) {
@@ -66,8 +68,13 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     const OUTPUT_BUCKET = ENV.S3_OUTPUT_BUCKET || '';
     const CONFIG_BUCKET = ENV.S3_CONFIG_BUCKET || '';
     const WS_TIMEOUT_MIN = parseInt(ENV.WS_TIMEOUT_MINUTES, 10) || 30;
+    // Resolved per request, not captured at mount time: routes are mounted before
+    // index.js awaits loadSSMConfig(), so a value that only arrives from SSM would
+    // otherwise be missed.
+    const jobsTable = () => ENV.JOBS_TABLE_NAME || '';
     const s3Client = new S3Client({ region: REGION, credentials });
     const cwLogsClient = new CloudWatchLogsClient({ region: REGION, credentials });
+    const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION, credentials }));
     const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
     console.log(`Region: ${REGION}`);
@@ -181,8 +188,11 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     // ── Chat (WebSocket to AgentCore Runtime, SSE to frontend) ──
 
     app.post('/api/chat', async (req, res) => {
-        const { message, session_id, audit_mode, dynamic_tokens } = req.body;
+        const { message, session_id, audit_mode, dynamic_tokens, doc_id } = req.body;
         if (!session_id || !/^[a-zA-Z0-9_-]+$/.test(session_id)) return res.status(400).json({ error: 'Invalid session_id' });
+        // doc_id is a server-minted UUID from /api/upload. Validate rather than
+        // trust it: it reaches DynamoDB as a key attribute on the job record.
+        if (doc_id && !/^[a-zA-Z0-9-]{1,64}$/.test(doc_id)) return res.status(400).json({ error: 'Invalid doc_id' });
 
         mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -219,7 +229,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
             ws.on('open', () => {
                 send('status', 'Thinking...');
-                ws.send(JSON.stringify({ prompt: message, session_id, actor_id: 'local_testing_user', audit_mode: audit_mode || false, dynamic_tokens_enabled: dynamic_tokens || false }));
+                ws.send(JSON.stringify({ prompt: message, session_id, actor_id: 'local_testing_user', audit_mode: audit_mode || false, dynamic_tokens_enabled: dynamic_tokens || false, doc_id: doc_id || '' }));
             });
 
             ws.on('message', (raw) => {
@@ -234,6 +244,14 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
                     }
                     if (data.reasoningText) return;
                     if ('data' in data && typeof data.data === 'string') return;
+                    // The agent emits this once per turn, when it mints a job_id on
+                    // the first specialist tool call. Logging it is what makes a
+                    // chat session traceable back to its job record.
+                    if (data.type === 'job') {
+                        log(`[job] job_id=${data.job_id} doc_id=${data.doc_id || 'none'}`);
+                        res.write(`data: ${JSON.stringify({ type: 'job', job_id: data.job_id, doc_id: data.doc_id || '' })}\n\n`);
+                        return;
+                    }
                     if (data.current_tool_use) { send('status', `Using ${data.current_tool_use.name || 'tool'}`); log(`[tool] ${data.current_tool_use.name || 'unknown'}`); }
                     else if (data.init_event_loop || data.start_event_loop) { send('status', 'Thinking...'); }
                     if (data.complete || data.force_stop || data.type === 'error' || (data.result != null)) {
@@ -253,6 +271,116 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     });
 
     // ── Chat Sessions ──
+
+    // ── Job tracking (doc_id -> job_id -> subtask_id) ──
+
+    // Job status is computed here rather than stored. Nothing rolls subtask
+    // outcomes up into the job row: a roll-up write would race the page fan-out
+    // (BADGERS invokes the same specialist once per page), and "did this job
+    // succeed" when 9 of 10 pages worked is a reporting question, not a fact about
+    // the record. Deriving it on read keeps that policy in exactly one place.
+    const ORCHESTRATOR_SUBTASK = 'orchestrator';
+
+    function summarizeJob(items) {
+        const jobRow = items.find(i => i.subtask_id === ORCHESTRATOR_SUBTASK) || null;
+        const subtasks = items.filter(i => i.subtask_id !== ORCHESTRATOR_SUBTASK);
+
+        const counts = { PENDING: 0, RUNNING: 0, COMPLETE: 0, FAILED: 0 };
+        for (const s of subtasks) {
+            if (s.status in counts) counts[s.status]++;
+        }
+
+        // FAILED wins over RUNNING: a partial failure is the thing an operator
+        // needs to see, even while other pages are still in flight.
+        let status = 'PENDING';
+        if (subtasks.length === 0) status = jobRow ? 'PENDING' : 'UNKNOWN';
+        else if (counts.FAILED > 0) status = counts.FAILED === subtasks.length ? 'FAILED' : 'PARTIAL';
+        else if (counts.RUNNING > 0 || counts.PENDING > 0) status = 'RUNNING';
+        else if (counts.COMPLETE === subtasks.length) status = 'COMPLETE';
+
+        return {
+            status,
+            doc_id: jobRow?.doc_id || subtasks.find(s => s.doc_id)?.doc_id || '',
+            session_id: jobRow?.session_id || '',
+            reason: jobRow?.reason || '',
+            started_at: jobRow?.started_at || '',
+            counts,
+            total: subtasks.length,
+            subtasks: subtasks
+                .map(s => ({
+                    subtask_id: s.subtask_id,
+                    specialist: s.specialist || '',
+                    image_identifier: s.image_identifier || '',
+                    status: s.status || '',
+                    // Populated on FAILED only; this is the "why" for a failed task.
+                    error: s.error || '',
+                    result_s3_key: s.result_s3_key || '',
+                    started_at: s.started_at || '',
+                    completed_at: s.completed_at || '',
+                }))
+                .sort((a, b) => a.subtask_id.localeCompare(b.subtask_id)),
+        };
+    }
+
+    app.get('/api/jobs/:jobId', async (req, res) => {
+        const table = jobsTable();
+        if (!table) return res.status(503).json({ error: 'JOBS_TABLE_NAME not configured' });
+        const { jobId } = req.params;
+        if (!/^[a-zA-Z0-9-]{1,64}$/.test(jobId)) return res.status(400).json({ error: 'Invalid job id' });
+        try {
+            const items = [];
+            let key;
+            do {
+                const page = await ddbClient.send(new QueryCommand({
+                    TableName: table,
+                    KeyConditionExpression: 'job_id = :jid',
+                    ExpressionAttributeValues: { ':jid': jobId },
+                    ExclusiveStartKey: key,
+                }));
+                items.push(...(page.Items || []));
+                key = page.LastEvaluatedKey;
+            } while (key);
+
+            if (items.length === 0) return res.status(404).json({ error: 'Job not found' });
+            res.json({ job_id: jobId, ...summarizeJob(items) });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // Every job recorded against one document, newest first, via the doc-index GSI.
+    app.get('/api/jobs', async (req, res) => {
+        const table = jobsTable();
+        if (!table) return res.status(503).json({ error: 'JOBS_TABLE_NAME not configured' });
+        const docId = req.query.doc_id;
+        if (!docId || !/^[a-zA-Z0-9-]{1,64}$/.test(docId)) return res.status(400).json({ error: 'A valid doc_id query parameter is required' });
+        try {
+            const page = await ddbClient.send(new QueryCommand({
+                TableName: table,
+                IndexName: 'doc-index',
+                KeyConditionExpression: 'doc_id = :did',
+                ExpressionAttributeValues: { ':did': docId },
+                ScanIndexForward: false,
+            }));
+            const items = page.Items || [];
+
+            // The GSI returns job and subtask rows interleaved; group them so each
+            // job is summarized the same way the single-job route reports it.
+            // Note: doc-index projects a subset of attributes, so session_id and
+            // reason come back empty here. Fetch /api/jobs/:jobId for the full row.
+            const byJob = new Map();
+            for (const item of items) {
+                if (!byJob.has(item.job_id)) byJob.set(item.job_id, []);
+                byJob.get(item.job_id).push(item);
+            }
+            res.json({
+                doc_id: docId,
+                jobs: [...byJob.entries()].map(([job_id, rows]) => ({ job_id, ...summarizeJob(rows) })),
+            });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
 
     app.get('/api/chat-sessions', async (_req, res) => {
         try {

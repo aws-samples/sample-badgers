@@ -28,6 +28,7 @@ class AgentCoreGatewayStack(Stack):
         deployment_tags: dict[str, str],
         lambda_functions: dict[str, lambda_.Function],
         config_bucket: s3.Bucket,
+        cognito_stack_name: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -36,6 +37,9 @@ class AgentCoreGatewayStack(Stack):
         self.deployment_tags = deployment_tags
         self.lambda_functions = lambda_functions
         self.config_bucket = config_bucket
+        # Stack names carry a per-deployment suffix, so the Cognito export names
+        # cannot be hardcoded here.
+        self.cognito_stack_name = cognito_stack_name
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -163,8 +167,10 @@ class AgentCoreGatewayStack(Stack):
     def create_gateway(self) -> agentcore.Gateway:
         """Create AgentCore Gateway with Cognito authentication."""
         # Import Cognito outputs
-        user_pool_id = Fn.import_value("badgers-cognito-UserPoolId")
-        user_pool_client_id = Fn.import_value("badgers-cognito-UserPoolClientId")
+        user_pool_id = Fn.import_value(f"{self.cognito_stack_name}-UserPoolId")
+        user_pool_client_id = Fn.import_value(
+            f"{self.cognito_stack_name}-UserPoolClientId"
+        )
 
         # Construct OIDC discovery URL
         discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration"

@@ -3,21 +3,26 @@
 
 set -e
 
-# Try to get config bucket from frontend .env first (faster)
-if [ -f "../frontend/.env" ]; then
-    CONFIG_BUCKET=$(grep "^S3_UPLOAD_BUCKET=" ../frontend/.env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/common.sh"
+load_suffix
+
+# Try the local UI env first (faster than a CloudFormation lookup).
+UI_ENV="${SCRIPT_DIR}/../ui/config/.env"
+if [ -f "${UI_ENV}" ]; then
+    CONFIG_BUCKET=$(grep "^S3_CONFIG_BUCKET=" "${UI_ENV}" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 fi
 
 # Fall back to CloudFormation if not found
 if [ -z "$CONFIG_BUCKET" ]; then
     CONFIG_BUCKET=$(aws cloudformation describe-stacks \
-        --stack-name badgers-s3 \
+        --stack-name "$(_sn S3)" \
         --query 'Stacks[0].Outputs[?OutputKey==`ConfigBucketName`].OutputValue' \
         --output text 2>/dev/null)
 fi
 
 if [ -z "$CONFIG_BUCKET" ] || [ "$CONFIG_BUCKET" == "None" ]; then
-    echo "❌ Could not find config bucket. Is badgers-s3 stack deployed?"
+    echo "❌ Could not find config bucket. Is $(_sn S3) deployed?"
     exit 1
 fi
 
@@ -58,4 +63,4 @@ aws s3 sync "s3://${CONFIG_BUCKET}/custom-specialists/schemas/" \
 echo "✅ Custom specialists synced successfully"
 echo ""
 echo "Next steps:"
-echo "  cdk deploy badgers-custom-specialists"
+echo "  cdk deploy $(_sn CustomSpecialists)"

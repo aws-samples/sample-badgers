@@ -103,8 +103,8 @@ export default function StackList({ runSSE, runSSEGet, running }) {
           />
           <button className="primary" disabled={running}
             onClick={() => {
-              if (confirm('Deploy all stacks from scratch? This runs the full deploy_from_scratch.sh script.'))
-                runSSEGet('/api/deploy-test')
+              if (confirm('Deploy all stacks from scratch? This runs the full deploy.sh workflow.'))
+                runSSEGet('/api/deploy-all')
             }}>
             🚀 Deploy All
           </button>

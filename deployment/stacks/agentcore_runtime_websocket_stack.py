@@ -10,6 +10,7 @@ from aws_cdk import (
     CfnOutput,
     Tags,
     aws_bedrockagentcore as agentcore,
+    aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_logs as logs,
 )
@@ -38,6 +39,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         memory_id: str,
         s3_kms_key_arn: str,
         inference_profiles_stack: "InferenceProfilesStack",
+        jobs_table: dynamodb.ITable,
         image_tag: str = "websocket",
         **kwargs,
     ) -> None:
@@ -55,6 +57,10 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         self.source_bucket_name = source_bucket_name
         self.memory_id = memory_id
         self.s3_kms_key_arn = s3_kms_key_arn
+        # The agent mints job_id on the first specialist tool call of a turn and
+        # writes the job-level row itself, so the runtime needs table access of its
+        # own — the specialist Lambdas only write their own subtask rows.
+        self.jobs_table = jobs_table
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -250,6 +256,18 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             )
         )
 
+        # Scoped to PutItem alone: the agent's only write is job_state.create_job,
+        # a conditional put of the job-level row. Subtask rows are written by the
+        # specialist Lambdas under their own role (see iam_stack.py).
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="DynamoDBJobState",
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:PutItem"],
+                resources=[self.jobs_table.table_arn],
+            )
+        )
+
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="AgentCoreMemoryAccess",
@@ -286,7 +304,12 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         runtime = agentcore.CfnRuntime(
             self,
             "BadgersRuntimeWebSocket",
-            agent_runtime_name=f"badgers_runtime_ws_{self.deployment_id}",
+            # AgentCore runtime names must match [a-zA-Z][a-zA-Z0-9_]{0,47} — no
+            # hyphens. deployment_id is "{DEPLOYMENT_ID}-{STACK_SUFFIX}", so the
+            # separator has to be normalised here.
+            agent_runtime_name=(
+                f"badgers_runtime_ws_{self.deployment_id.replace('-', '_')}"
+            ),
             agent_runtime_artifact=agentcore.CfnRuntime.AgentRuntimeArtifactProperty(
                 container_configuration=agentcore.CfnRuntime.ContainerConfigurationProperty(
                     container_uri=ecr_image_uri
@@ -304,6 +327,12 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                 "COGNITO_CREDENTIALS_SECRET_ARN": self.cognito_credentials_secret_arn,
                 "AGENTCORE_MEMORY_ID": self.memory_id,
                 "OUTPUT_BUCKET_NAME": self.output_bucket_name,
+                # Injected directly rather than discovered from a well-known SSM
+                # path, which was not deployment-scoped.
+                "CONFIG_BUCKET_NAME": self.config_bucket_name,
+                # foundation.job_state reads this at call time; when it is absent
+                # every write becomes a no-op and tracking is simply off.
+                "JOBS_TABLE_NAME": self.jobs_table.table_name,
                 # Inference profile ARNs for cost tracking
                 "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
                 "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
