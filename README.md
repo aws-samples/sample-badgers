@@ -139,18 +139,20 @@ Use cases: research acceleration, compliance automation, content management, acc
 ### Quick Start
 
 ```bash
-DEPLOYMENT_ID=dev ./deploy.sh
+./deploy.sh
 ```
 
-`deploy.sh` is an interactive menu. It is resumable and every step is idempotent, so
-re-run it after a failure and it picks up where it stopped. Pick option **9** for a full
-deployment, or run a single step non-interactively:
+That is the whole command. `deploy.sh` asks which deployment to work on — listing anything
+it finds in `.deploy-state/`, or offering to start a new one — and then presents a menu.
+It is resumable and every step is idempotent, so re-run it after a failure and it picks up
+where it stopped.
 
-```bash
-DEPLOYMENT_ID=dev ./deploy.sh 9    # full deployment
-DEPLOYMENT_ID=dev ./deploy.sh 6    # just rebuild and redeploy the Runtime
-DEPLOYMENT_ID=dev ./deploy.sh 10   # show status
-```
+> `DEPLOYMENT_ID` is **not** read from the environment. It is always chosen interactively,
+> because a value left exported in your shell silently targets another deployment's stacks.
+
+Pick option **9** for a full deployment, or **12** to run only what is still outstanding.
+You can jump straight to one option — `./deploy.sh 6` — and the deployment is still chosen
+interactively first.
 
 The eight steps:
 
@@ -163,37 +165,61 @@ The eight steps:
 | 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                          |
 | 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime             |
 | 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image           |
-| 8   | UI — Deploy        | ECS Express Gateway service, waits for rollout                          |
+| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it           |
+
+Plus **9** full deployment, **12** resume, **10** status, **11** reset state (deletes
+nothing in AWS), **0** exit.
+
+Step 8 asks once whether the UI should be publicly reachable. That answer is fixed for the
+life of the VPC — see
+[Network exposure](deployment/DEPLOYMENT_README.md#network-exposure--asked-once-fixed-for-the-vpcs-lifetime).
+
+For the full procedure, prerequisites in depth, and every environment variable, see the
+[Deployment Guide](deployment/DEPLOYMENT_README.md).
 
 ### Deployment Identity
 
-`DEPLOYMENT_ID` is a label you choose. `deploy.sh` generates a short random
-`STACK_SUFFIX` once and persists both in `.deploy-state/{DEPLOYMENT_ID}.json`:
+`DEPLOYMENT_ID` is a short label you choose — lowercase, starting with a letter, 16
+characters or fewer. `deploy.sh` generates a three-character random `STACK_SUFFIX` once and
+persists both in `.deploy-state/{DEPLOYMENT_ID}.json`:
 
-- **Stack names** are `BADGERS-{Name}-{suffix}` — for example `BADGERS-S3-a1b`
+- **Stack names** are `BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}` — for example
+  `BADGERS-S3-dev-a1b`
 - **Resource names** carry both parts — for example `badgers-config-dev-a1b`, and SSM
   parameters under `/badgers-dev-a1b/`
 
 Because both are unique per deployment, several deployments can coexist in one account
-and region. The state file also tracks which steps completed, which is what makes the
-script resumable.
+and region. Stack names include the deployment id as well as the suffix so each stack is
+self-describing — tooling reads a deployment's identity off the stack name, and a mistyped
+id matches no stacks instead of resolving someone else's. The state file also tracks which
+steps completed, which is what makes the script resumable.
 
 ### Cleanup
 
 ```bash
-DEPLOYMENT_ID=dev ./destroy.sh
+./destroy.sh
 ```
 
-Requires you to type the `DEPLOYMENT_ID` to confirm. It empties the S3 buckets, deletes
-the ECS service and the AgentCore runtime **before** the VPC (CloudFormation cannot
-delete a VPC while any ENI is still attached), destroys every stack in reverse dependency
-order, and schedules the KMS key for deletion so its alias is freed for redeployment.
+Like `deploy.sh` it asks what to tear down, but it discovers deployments from
+**CloudFormation** rather than from `.deploy-state/` — a state file can be deleted while the
+stacks are still live. You are then required to type the `DEPLOYMENT_ID` to confirm.
+
+It empties the S3 buckets, deletes the ECS Express service and the AgentCore runtime
+**before** the VPC (CloudFormation cannot delete a VPC while any ENI is still attached),
+sweeps leftover ENIs, destroys every stack in reverse dependency order, verifies they are
+gone, and only then schedules the KMS key for deletion so its alias is freed for
+redeployment. A teardown that leaves stacks standing exits non-zero and says so rather than
+reporting success.
 
 If a VPC stack still gets stuck on a lingering ENI:
 
 ```bash
-DEPLOYMENT_ID=dev ./destroy.sh --vpc-cleanup-only
+DEPLOYMENT_ID=dev STACK_SUFFIX=a1b ./destroy.sh --vpc-cleanup-only
 ```
+
+To tear down by hand when the script cannot run, follow
+[Manual Teardown in the Console](deployment/DEPLOYMENT_README.md#️-manual-teardown-in-the-console)
+— the stack deletion order matters, and two resources have to be removed before any stack.
 
 ## 📁 Project Structure
 
@@ -457,7 +483,7 @@ The Specialist Creation Wizard is available as the 🧙 Create Specialist tab in
 3. 📐 Create schema in `deployment/s3_files/schemas/{specialist_name}.json`
 4. ⚡ Create Lambda code in `deployment/lambdas/code/{specialist_name}/lambda_handler.py`
 5. 📝 Register in `deployment/stacks/lambda_stack.py`
-6. 🚀 Redeploy: `cdk deploy BADGERS-Lambda-{suffix} BADGERS-Gateway-{suffix}`
+6. 🚀 Redeploy: `cdk deploy BADGERS-Lambda-{id}-{suffix} BADGERS-Gateway-{id}-{suffix}`
 
 ---
 

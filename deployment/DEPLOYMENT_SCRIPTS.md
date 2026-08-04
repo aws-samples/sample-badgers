@@ -3,9 +3,13 @@
 The two entry points live at the repository root. Everything under `deployment/` is a
 helper invoked either by them or directly for targeted work.
 
-All scripts resolve stack names through `deployment/scripts/common.sh`, which reads
-`STACK_SUFFIX` from `.deploy-state/{DEPLOYMENT_ID}.json`. They therefore all need
-`DEPLOYMENT_ID` set, and `deploy.sh` must have run at least once to create that file.
+All scripts resolve stack names through `deployment/scripts/common.sh`, which composes
+`BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}` and reads `STACK_SUFFIX` from
+`.deploy-state/{DEPLOYMENT_ID}.json`.
+
+The two root entry points choose the deployment interactively. Every helper under
+`deployment/` needs `DEPLOYMENT_ID` set in the environment, and `deploy.sh` must have run at
+least once to create the state file.
 
 ## deploy.sh (repo root)
 
@@ -14,40 +18,86 @@ Interactive deployment menu, resumable and idempotent. Step completion is record
 it stopped rather than starting over.
 
 ```bash
-DEPLOYMENT_ID=dev ./deploy.sh        # menu
-DEPLOYMENT_ID=dev ./deploy.sh 9      # full deployment, non-interactive
-DEPLOYMENT_ID=dev ./deploy.sh 10     # status only
-DEPLOYMENT_ID=dev ./deploy.sh 11     # reset state (keeps the suffix, deletes nothing in AWS)
+./deploy.sh           # choose a deployment, then the menu
+./deploy.sh 9         # choose a deployment, then run option 9 (full deployment)
+./deploy.sh resume    # choose a deployment, then run only outstanding steps
 ```
 
-Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
-5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service.
+**`DEPLOYMENT_ID` is unset on startup and never read from the environment.** The script
+scans `.deploy-state/` and offers every deployment it finds — complete and in progress —
+newest activity first, plus `n` to start a new one. A new id must match
+`^[a-z][a-z0-9-]{0,15}$` and must not already have state; pick it from the list instead.
 
-Set `BADGERS_ASSUME_YES=1` to answer every confirmation with yes. This is required when
-running without a terminal — the UI's Deploy All button relies on it, because its output
-stream leaves stdin closed and an interactive prompt would otherwise read EOF and skip
-the step.
+Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
+5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, 12 resume,
+10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), 0 exit.
+
+**9 vs 12** — both reach a complete deployment. Option 9 runs all eight steps and stops at
+each completed one to ask whether to re-run. Option 12 skips completed steps before calling
+them, so those prompts never fire, and starts at the first outstanding step.
+
+Behaviour worth knowing:
+
+- **Step 8 failure clears `ui_image_pushed`.** An ECS rollout usually fails because of
+  something in the image, and redeploying the stack alone will not pick up a code change,
+  so resume rebuilds in step 7 first. When the cause was external, that rebuild is a no-op.
+- **Step 8 forces the image rollout** with `update-express-gateway-service` after the
+  `cdk deploy`, because the stack pins a static image tag and pushing to that tag leaves
+  the template unchanged.
+- **The X-Ray decision is resolved before every `cdk deploy`**, not just in step 2 —
+  `RuntimeWebSocket` depends on the XRay stack and `cdk deploy` includes dependencies.
+
+Environment variables:
+
+| Variable                                         | Effect                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step. |
+| `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                           |
+| `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                              |
+| `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                  |
+| `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                              |
 
 ## destroy.sh (repo root)
 
 Full teardown. Requires typing the `DEPLOYMENT_ID` to confirm.
 
 ```bash
-DEPLOYMENT_ID=dev ./destroy.sh
-DEPLOYMENT_ID=dev ./destroy.sh --vpc-cleanup-only
-KMS_WAIT_DAYS=30 DEPLOYMENT_ID=dev ./destroy.sh
+./destroy.sh                                                   # choose from what is deployed
+DEPLOYMENT_ID=dev ./destroy.sh                                 # explicit, validated against AWS
+KMS_WAIT_DAYS=30 ./destroy.sh                                  # longer KMS window
+DEPLOYMENT_ID=dev STACK_SUFFIX=a1b ./destroy.sh --vpc-cleanup-only
 ```
 
-Order matters and the script enforces it: empty the buckets, delete the ECS service and
-the AgentCore runtime and wait for their ENIs to release, then destroy the stacks in
-reverse dependency order. CloudFormation cannot delete a VPC while an ENI is attached,
-which is why the compute goes first. It then schedules the KMS key for deletion (7 days
-by default, which frees the alias sooner than the 30-day default), verifies every stack
-is gone, and if the VPC stack is `DELETE_FAILED` retries with `--retain-resources` and
-cleans up what was retained.
+With no `DEPLOYMENT_ID` it **discovers deployments from CloudFormation**, not from
+`.deploy-state/` — a state file can be deleted while the stacks are still live, so the
+stacks are authoritative. Identity is parsed out of the stack names, so it works even for a
+partial deployment. Passing `DEPLOYMENT_ID` explicitly is validated against the naming rules
+and against what exists; if nothing matches `BADGERS-*-{id}-{suffix}` it refuses rather than
+running a teardown that does nothing.
+
+Order matters and the script enforces it: empty the buckets, delete the ECS Express service
+and the AgentCore runtime and wait for their ENIs to release, then destroy the stacks in
+reverse dependency order. CloudFormation cannot delete a VPC while an ENI is attached, which
+is why the compute goes first.
+
+- The ECS service is deleted with **`delete-express-gateway-service`**. `delete-service`
+  rejects it with *"has ResourceManagementType=ECS use DeleteExpressGatewayService"*.
+- AgentCore calls target **`bedrock-agentcore-control`**. The `bedrock-agentcore` service
+  only exposes `InvokeAgentRuntime`, so control-plane calls aimed there fail silently.
+- If the VPC stack is `DELETE_FAILED` it retries with `--retain-resources`, sweeps ENIs
+  again, then re-verifies.
+- The KMS key is scheduled **only after** the stacks are confirmed gone (7 days by default,
+  which frees the alias sooner than the 30-day maximum). Scheduling it after a failed
+  teardown would mark a live deployment's in-use key for deletion.
+- A teardown leaving stacks standing prints `❌ Teardown incomplete`, lists them, states
+  that the KMS key was left alone, and **exits non-zero**.
 
 `--vpc-cleanup-only` runs just the ENI sweep: deletes interface endpoints, then deletes
 or force-detaches whatever ENIs remain. Use it when a previous teardown left a VPC behind.
+It skips discovery, so it needs both `DEPLOYMENT_ID` and `STACK_SUFFIX`.
+
+For tearing down by hand, see
+[Manual Teardown in the Console](DEPLOYMENT_README.md#️-manual-teardown-in-the-console).
 
 ## deploy_specialist.sh
 
