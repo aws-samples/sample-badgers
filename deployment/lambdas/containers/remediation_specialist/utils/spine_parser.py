@@ -11,7 +11,15 @@ Used by lambda_handler.py to replace the old _parse_correlation_xml.
 """
 
 import logging
-import xml.etree.ElementTree as ET
+
+# Parsing goes through defusedxml, which hardens the stdlib parser against XXE
+# and entity-expansion attacks. The correlation XML is downloaded from S3, so it
+# is externally sourced input and must not be fed to xml.etree directly.
+import defusedxml.ElementTree as ET
+
+# defusedxml does not re-export the Element type, only the parsing entry points.
+# Import it from the stdlib for type annotations only -- never for parsing.
+from xml.etree.ElementTree import Element  # nosec B405 - type annotation only
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.pdf_accessibility_models import (
@@ -64,7 +72,7 @@ def parse_correlation_xml(
 
 
 def _parse_v2(
-    root: ET.Element,
+    root: Element,
 ) -> Tuple[Optional[StructureElement], Dict[int, List[Dict[str, Any]]]]:
     """Parse schema v2.0 — hierarchical content_tree."""
 
@@ -98,7 +106,7 @@ def _parse_v2(
 
 
 def _parse_node_v2(
-    xml_node: ET.Element,
+    xml_node: Element,
     parent: StructureElement,
     default_page: int,
     flat_elements: List[Dict[str, Any]],
@@ -135,7 +143,7 @@ def _parse_node_v2(
 
 
 def _parse_element_v2(
-    xml_node: ET.Element,
+    xml_node: Element,
     parent: StructureElement,
     default_page: int,
     flat_elements: List[Dict[str, Any]],
@@ -249,11 +257,19 @@ def _extract_enrichments(enrichments_node) -> Dict[str, Any]:
     for xref in enrichments_node.findall("cross_reference"):
         rel_node = xref.find("relationship")
         ev_node = xref.find("evidence")
-        result["related"].append({
-            "element_id": xref.get("target", ""),
-            "relationship": rel_node.text.strip() if rel_node is not None and rel_node.text else xref.get("type", ""),
-            "evidence": ev_node.text.strip() if ev_node is not None and ev_node.text else "",
-        })
+        result["related"].append(
+            {
+                "element_id": xref.get("target", ""),
+                "relationship": (
+                    rel_node.text.strip()
+                    if rel_node is not None and rel_node.text
+                    else xref.get("type", "")
+                ),
+                "evidence": (
+                    ev_node.text.strip() if ev_node is not None and ev_node.text else ""
+                ),
+            }
+        )
 
     # ── keyword_topic ──
     kt = enrichments_node.find("keyword_topic")
@@ -277,7 +293,12 @@ def _extract_enrichments(enrichments_node) -> Dict[str, Any]:
         for dp in chart.findall(".//data_points/point"):
             x_node = dp.find("x")
             y_node = dp.find("y")
-            if x_node is not None and x_node.text and y_node is not None and y_node.text:
+            if (
+                x_node is not None
+                and x_node.text
+                and y_node is not None
+                and y_node.text
+            ):
                 series.append(f"{x_node.text.strip()}: {y_node.text.strip()}")
         if series:
             result["actual_text"] = "; ".join(series)
@@ -366,9 +387,21 @@ def _extract_enrichments(enrichments_node) -> Dict[str, Any]:
             prob_ref = chain.get("problem_ref", "")
             ans_ref = chain.get("answer_ref", "")
             if prob_ref:
-                result["related"].append({"element_id": prob_ref, "relationship": "problem_ref", "evidence": ""})
+                result["related"].append(
+                    {
+                        "element_id": prob_ref,
+                        "relationship": "problem_ref",
+                        "evidence": "",
+                    }
+                )
             if ans_ref:
-                result["related"].append({"element_id": ans_ref, "relationship": "answer_ref", "evidence": ""})
+                result["related"].append(
+                    {
+                        "element_id": ans_ref,
+                        "relationship": "answer_ref",
+                        "evidence": "",
+                    }
+                )
 
     # ── war_map ──
     wm = enrichments_node.find("war_map")
@@ -388,8 +421,11 @@ def _extract_enrichments(enrichments_node) -> Dict[str, Any]:
         forces = []
         for force in wm.findall(".//military_forces/force"):
             aff = force.get("affiliation", "")
-            units = [u.find("designation").text.strip() for u in force.findall("unit")
-                     if u.find("designation") is not None and u.find("designation").text]
+            units = [
+                u.find("designation").text.strip()
+                for u in force.findall("unit")
+                if u.find("designation") is not None and u.find("designation").text
+            ]
             if aff and units:
                 forces.append(f"{aff}: {', '.join(units)}")
         if forces and not result["actual_text"]:
@@ -416,17 +452,23 @@ def _extract_figure_reference(specialized_node, result: dict):
     caption_n = fig_ref.find("caption")
     fig_id_n = fig_ref.find("figure_id") or fig_ref.find("table_id")
     if ref_text_n is not None and ref_text_n.text:
-        result["related"].append({
-            "element_id": fig_id_n.text.strip() if fig_id_n is not None and fig_id_n.text else "",
-            "relationship": "referenced_by_text",
-            "evidence": ref_text_n.text.strip(),
-        })
+        result["related"].append(
+            {
+                "element_id": (
+                    fig_id_n.text.strip()
+                    if fig_id_n is not None and fig_id_n.text
+                    else ""
+                ),
+                "relationship": "referenced_by_text",
+                "evidence": ref_text_n.text.strip(),
+            }
+        )
     if caption_n is not None and caption_n.text and not result.get("title"):
         result["title"] = caption_n.text.strip()
 
 
 def _parse_inline_v2(
-    xml_node: ET.Element,
+    xml_node: Element,
     parent: StructureElement,
 ) -> None:
     """Parse an inline element within a parent element."""
@@ -457,7 +499,7 @@ def _parse_inline_v2(
 
 
 def _parse_v1(
-    root: ET.Element,
+    root: Element,
 ) -> Tuple[Optional[StructureElement], Dict[int, List[Dict[str, Any]]]]:
     """Parse schema v1.0 — flat content_spine.
 

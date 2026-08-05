@@ -12,6 +12,13 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 
 class S3Stack(Stack):
     """Stack for S3 buckets."""
@@ -45,6 +52,21 @@ class S3Stack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        # Access logging bucket -- receives S3 server access logs from the three
+        # data buckets below (AwsSolutions-S1).
+        # Uses SSE-S3 rather than KMS: S3 server access log delivery does not
+        # support SSE-KMS on the destination bucket.
+        self.logging_bucket = s3.Bucket(
+            self,
+            "LoggingBucket",
+            bucket_name=f"{id_prefix}-access-logs-{deployment_id}",
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            enforce_ssl=True,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+        )
+
         # Config bucket for manifests and prompts
         self.config_bucket = s3.Bucket(
             self,
@@ -58,6 +80,8 @@ class S3Stack(Stack):
             enforce_ssl=True,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            server_access_logs_bucket=self.logging_bucket,
+            server_access_logs_prefix="config/",
         )
 
         # Source bucket for PDF uploads
@@ -73,6 +97,8 @@ class S3Stack(Stack):
             enforce_ssl=True,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            server_access_logs_bucket=self.logging_bucket,
+            server_access_logs_prefix="source/",
         )
 
         # Output bucket for analysis results and temp files
@@ -88,6 +114,8 @@ class S3Stack(Stack):
             enforce_ssl=True,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True,
+            server_access_logs_bucket=self.logging_bucket,
+            server_access_logs_prefix="output/",
             lifecycle_rules=[
                 s3.LifecycleRule(
                     id="DeleteTempAfter1Day",
@@ -97,6 +125,12 @@ class S3Stack(Stack):
                 )
             ],
         )
+
+        # Note: LoggingBucket deliberately has no server_access_logs_bucket of
+        # its own -- it IS the log destination, and self-logging would create a
+        # recursive write loop. No AwsSolutions-S1 suppression is needed: the
+        # rule exempts buckets that are the target of another bucket's
+        # LoggingConfiguration, and reports LoggingBucket as Compliant.
 
         # Apply resource-specific tags
         self._apply_resource_tags(

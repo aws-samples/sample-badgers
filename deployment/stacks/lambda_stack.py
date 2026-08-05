@@ -19,6 +19,13 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 if TYPE_CHECKING:
     from stacks.inference_profiles_stack import InferenceProfilesStack
 
@@ -242,7 +249,11 @@ class LambdaSpecialistStack(Stack):
             environment["PATH"] = "/opt/bin:/var/lang/bin:/usr/local/bin:/usr/bin:/bin"
             environment["LD_LIBRARY_PATH"] = "/opt/lib:/var/lang/lib:/lib64:/usr/lib64"
             environment["FONTCONFIG_PATH"] = "/opt/etc/fonts"
-            environment["FONTCONFIG_CACHE"] = "/tmp/fontconfig-cache"
+            # /tmp is the only writable location in a Lambda execution
+            # environment and is isolated per environment, so this is the
+            # required location for the fontconfig cache -- not a shared
+            # temp-directory weakness.
+            environment["FONTCONFIG_CACHE"] = "/tmp/fontconfig-cache"  # nosec B108
 
         # Determine layers for this function
         layers = [self.foundation_layer, self.pillow_layer]
@@ -283,6 +294,28 @@ class LambdaSpecialistStack(Stack):
             f"lambda-{specialist_name}",
             description[:256] if len(description) > 256 else description,
         )
+
+        if _HAVE_CDK_NAG:
+            NagSuppressions.add_resource_suppressions(
+                function,
+                [
+                    {
+                        "id": "AwsSolutions-L1",
+                        "reason": (
+                            "Runtime is pinned to Python 3.12 to match the shared "
+                            "Lambda layers, which declare "
+                            "compatible_runtimes=[PYTHON_3_12] and ship "
+                            "runtime-specific native artifacts (poppler binaries, "
+                            "pymupdf/pikepdf/numpy wheels). Bumping this function "
+                            "alone would break layer compatibility -- the runtime and "
+                            "all three layers must be rebuilt and revalidated "
+                            "together. Python 3.12 is a supported runtime and is not "
+                            "deprecated. Deferred maintenance: revisit when the layers "
+                            "are next rebuilt."
+                        ),
+                    }
+                ],
+            )
 
         return function
 

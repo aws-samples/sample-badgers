@@ -17,6 +17,13 @@ from aws_cdk import (
 from aws_cdk.mixins_preview.aws_bedrockagentcore import mixins as agentcore_mixins
 from constructs import Construct
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 if TYPE_CHECKING:
     from .inference_profiles_stack import InferenceProfilesStack
 
@@ -82,6 +89,89 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             self.runtime,
             "agentcore-runtime-websocket",
             "AgentCore Runtime for BADGERS with WebSocket streaming",
+        )
+
+        self._add_nag_suppressions()
+
+    def _add_nag_suppressions(self) -> None:
+        """Document the wildcard permissions AwsSolutions-IAM5 flags on the
+        AgentCore Runtime execution role.
+
+        AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
+        names the exact resource it applies to and why the wildcard is needed.
+        """
+        if not _HAVE_CDK_NAG:
+            return
+
+        NagSuppressions.add_resource_suppressions(
+            self.agent_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference requires bedrock:InvokeModel on the "
+                        "foundation model in every destination Region the inference "
+                        "profile can route to, so the Region field is wildcarded. The "
+                        "model ID itself is pinned exactly -- no model wildcard. See "
+                        "https://docs.aws.amazon.com/bedrock/latest/userguide/"
+                        "geographic-cross-region-inference.html"
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-5-20251101-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference profiles are resolved per Region, so "
+                        "the Region field is wildcarded while the profile ID stays "
+                        "pinned. Scoped to this account."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-opus-4-5-20251101-v1:0",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "AgentCore Runtime log group names embed a runtime ID that is "
+                        "generated at deploy time, so the target is prefix-scoped to "
+                        "/aws/bedrock-agentcore/runtimes/ within this account and "
+                        "Region."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/bedrock-agentcore/runtimes/*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Each target is prefix-scoped to a specific resource whose "
+                        "child keys are created at runtime and cannot be enumerated at "
+                        "deploy time: AgentCore memory records under one memory ID, "
+                        "workload identities under the default directory, S3 object "
+                        "keys in the three named buckets, and SSM parameters under the "
+                        "/badgers/ prefix. All are scoped to this account and Region."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock-agentcore:us-east-1:<AWS::AccountId>:memory/<badgersmemory.MemoryId>/*",
+                        "Resource::arn:aws:bedrock-agentcore:us-east-1:<AWS::AccountId>:workload-identity-directory/default/workload-identity/*",
+                        "Resource::arn:aws:s3:::<ConfigBucket2112C5EC>/*",
+                        "Resource::arn:aws:s3:::<OutputBucket7114EB27>/*",
+                        "Resource::arn:aws:s3:::<SourceBucketDDD2130A>/*",
+                        "Resource::arn:aws:ssm:us-east-1:<AWS::AccountId>:parameter/badgers/*",
+                    ],
+                },
+            ],
+            apply_to_children=True,
         )
 
     def _apply_common_tags(self) -> None:
