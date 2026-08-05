@@ -16,6 +16,13 @@ try:
 except ImportError:
     import aws_cdk_aws_bedrock_agentcore_alpha as agentcore
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 
 class AgentCoreGatewayStack(Stack):
     """Stack for AgentCore Gateway with Lambda tool targets and logging."""
@@ -64,6 +71,8 @@ class AgentCoreGatewayStack(Stack):
             "agentcore-gateway",
             "MCP Gateway for BADGERS tools",
         )
+
+        self._add_nag_suppressions()
 
         # Outputs
         CfnOutput(
@@ -115,6 +124,59 @@ class AgentCoreGatewayStack(Stack):
         """Apply resource-specific name and description tags."""
         Tags.of(resource).add("resource_name", name)
         Tags.of(resource).add("resource_description", description)
+
+    def _add_nag_suppressions(self) -> None:
+        """Document the wildcard permissions AwsSolutions-IAM5 flags on the
+        gateway execution role.
+
+        AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
+        names the exact resource it applies to and why the wildcard is needed.
+        """
+        if not _HAVE_CDK_NAG:
+            return
+
+        NagSuppressions.add_resource_suppressions(
+            self.gateway_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "The AgentCore Gateway construct grants lambda:InvokeFunction "
+                        "with a :* version suffix on each target function so the "
+                        "Gateway can invoke any published version or alias. The "
+                        "function ARNs themselves are resolved references to the "
+                        "specific specialist Lambdas -- the wildcard covers only the "
+                        "version qualifier."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ContainerFunctionimageenhancer2AFB4983.Arn>:*",
+                        "Resource::<ContainerFunctionremediationspecialistB67CD8CB.Arn>:*",
+                        "Resource::<FunctionchartsspecialistA6AA9F82.Arn>:*",
+                        "Resource::<FunctionclassifypdfcontentEC92FE26.Arn>:*",
+                        "Resource::<FunctioncorrelationspecialistE250ACCF.Arn>:*",
+                        "Resource::<FunctiondiagramspecialistB1D3C809.Arn>:*",
+                        "Resource::<Functionelementsspecialist2A88D0C1.Arn>:*",
+                        "Resource::<FunctionfulltextspecialistB95E9182.Arn>:*",
+                        "Resource::<Functionpdftoimagesconverter2E10A5D5.Arn>:*",
+                        "Resource::<FunctionscientificspecialistCB1826B1.Arn>:*",
+                        "Resource::<Functiontablespecialist6D08F0B2.Arn>:*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "The Gateway reads tool schemas from the config bucket. The /* "
+                        "suffix is required because schema object keys are per-"
+                        "specialist and are resolved at runtime; the bucket ARN is a "
+                        "resolved reference, not a wildcard."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                    ],
+                },
+            ],
+            apply_to_children=True,
+        )
 
     def create_gateway_role(self) -> iam.Role:
         """Create IAM role for gateway execution."""

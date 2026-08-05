@@ -207,45 +207,6 @@ def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> lis
 
     pdf_data = _decrypt_pdf_if_needed(pdf_data)
     # Convert PDF to PIL images
-    # Test if decrypted PDF has text at all
-    text_result = subprocess.run(
-        ["/opt/bin/pdftotext", "-", "-"], input=pdf_data, capture_output=True
-    )
-    logger.info("pdftotext output length: %d bytes", len(text_result.stdout))
-    logger.info("pdftotext stderr: %s", text_result.stderr.decode())
-
-    # Run pdftoppm directly and check stderr
-    import tempfile, os
-
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(pdf_data)
-        tmp_pdf = f.name
-    ppm_result = subprocess.run(
-        [
-            "/opt/bin/pdftoppm",
-            "-jpeg",
-            "-r",
-            "128",
-            "-f",
-            "1",
-            "-l",
-            "1",
-            tmp_pdf,
-            "/tmp/debug_page",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    logger.info(
-        "pdftoppm returncode: %d, stderr: %s", ppm_result.returncode, ppm_result.stderr
-    )
-    debug_size = (
-        os.path.getsize("/tmp/debug_page-1.jpg")
-        if os.path.exists("/tmp/debug_page-1.jpg")
-        else 0
-    )
-    logger.info("Direct pdftoppm output size: %d bytes", debug_size)
-    os.unlink(tmp_pdf)
     pil_images = convert_from_bytes(pdf_data, dpi=dpi)
 
     base64_images = []

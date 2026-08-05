@@ -103,3 +103,7 @@ deployment/custom_specialists/*
 
 # Security scan reports
 .security-reports/
+
+# Local scanner configs (bandit / checkov exclusions) - not shared
+.checkov.yaml
+bandit.yaml

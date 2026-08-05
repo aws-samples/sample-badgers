@@ -7,3 +7,6 @@ Pillow>=10.0.0
 
 # AWS SDK
 boto3>=1.34.0
+
+# Hardened XML parsing (XXE protection) for S3-sourced correlation XML
+defusedxml>=0.7.1

@@ -10,6 +10,13 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 
 class IAMStack(Stack):
     """Stack for IAM roles and policies."""
@@ -205,6 +212,92 @@ class IAMStack(Stack):
             value=self.lambda_role.role_name,
             description="Lambda execution role name",
             export_name=f"{Stack.of(self).stack_name}-LambdaRoleName",
+        )
+
+        self._add_nag_suppressions()
+
+    def _add_nag_suppressions(self) -> None:
+        """Document the wildcard permissions AwsSolutions-IAM5 flags on the
+        specialist execution role.
+
+        AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
+        names the exact resource it applies to and why the wildcard is needed.
+        """
+        if not _HAVE_CDK_NAG:
+            return
+
+        NagSuppressions.add_resource_suppressions(
+            self.lambda_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference requires bedrock:InvokeModel on the "
+                        "foundation model in every destination Region the inference "
+                        "profile can route to, so the Region field is wildcarded. The "
+                        "model ID itself is pinned exactly -- no model wildcard. See "
+                        "https://docs.aws.amazon.com/bedrock/latest/userguide/"
+                        "geographic-cross-region-inference.html"
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference profiles are resolved per Region, so "
+                        "the Region field is wildcarded while the profile ID stays "
+                        "pinned. The application-inference-profile/* entry is scoped to "
+                        "this account -- profile IDs are generated at runtime and "
+                        "cannot be enumerated at deploy time."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:application-inference-profile/*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "CloudWatch Logs targets are prefix-scoped to this "
+                        "deployment's specialist log groups (badgers-* / badgers_*). "
+                        "Log group names embed the specialist name and log stream names "
+                        "are generated at runtime, so neither can be enumerated at "
+                        "deploy time. Scoped to this account and Region."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*:*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*:*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "S3 object access is scoped to these three specific buckets. "
+                        "The /* suffix is required because object keys are per-document "
+                        "and per-job values created at runtime and cannot be enumerated "
+                        "at deploy time. The bucket ARNs are resolved references, not "
+                        "wildcards."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                        "Resource::<OutputBucket7114EB27.Arn>/*",
+                        "Resource::<SourceBucketDDD2130A.Arn>/*",
+                    ],
+                },
+            ],
+            apply_to_children=True,
         )
 
     def _apply_common_tags(self) -> None:

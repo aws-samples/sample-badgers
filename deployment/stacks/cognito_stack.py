@@ -427,7 +427,21 @@ class CognitoStack(Stack):
                             "self_sign_up_enabled=False is intentional — this pool is "
                             "admin-provisioned only. MFA is REQUIRED via OTP."
                         ),
-                    }
+                    },
+                    {
+                        "id": "AwsSolutions-COG8",
+                        "reason": (
+                            "The Cognito Plus feature plan is a paid tier whose "
+                            "advanced security features (compromised-credential "
+                            "detection, adaptive authentication) target public "
+                            "self-service sign-up flows. This pool is "
+                            "admin-provisioned only with self_sign_up_enabled=False "
+                            "and MFA required via OTP, so the threat model Plus "
+                            "addresses does not apply. This is a reference "
+                            "implementation; deployments handling production "
+                            "end-user sign-up should enable the Plus tier."
+                        ),
+                    },
                 ],
             )
             NagSuppressions.add_resource_suppressions(
