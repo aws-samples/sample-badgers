@@ -25,13 +25,30 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 ## 📸 Screenshots
 
-| Local Testing — Home                                                | Local Testing — Chat                                                |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| ![Home Page](.github/assets/badgers-local-testing-ui-home-page.png) | ![Chat Interface](.github/assets/badgers-local-testing-ui-chat.png) |
+A single React + Express app is both the testing workbench and the deployment/ops console — the same code runs locally via `npm run dev` or on ECS behind Cognito OIDC. Tabs are role-gated: the **Testing** row below is visible to all users, while an admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not pictured here. See the [UI README](ui/UI_README.md) for the full tab and role breakdown.
 
-| Deployment UI — Stacks                                                       | Deployment UI — Config Editor                                        |
-| ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| ![Stack Information](.github/assets/badgers-deploy-ui-stack-information.png) | ![Config Editor](.github/assets/badgers-deploy-ui-config-editor.png) |
+### Testing tabs
+
+| Home                                                                                                                 | Chat                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home](.github/assets/01_sample-badgers-home.png)                                                                   | ![Chat](.github/assets/02_sample-badgers-chat.png)                                                                                                      |
+| Landing view with per-page navigation and the resolved environment (region, runtime ARN, gateway ID, config bucket). | Streams messages to the AgentCore Runtime over WebSocket, with extended-thinking blocks, the live gateway tool list, and audit / dynamic-token toggles. |
+
+| Create Specialist                                                                                                     | Evaluations                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| ![Create Specialist](.github/assets/03_sample-badgers-create-specialist.png)                                          | ![Evaluations](.github/assets/04_sample-badgers-evaluations.png)                                                           |
+| Four-step wizard — basic info, generated prompt review, examples, deploy — including primary model and two fallbacks. | Pages through a session's specialist output and scores accuracy, element identification, and contextual understanding 1–5. |
+
+| Pricing                                                                                                                | Observability                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ![Pricing](.github/assets/05_sample-badgers-cost-modeling.png)                                                         | ![Observability](.github/assets/06_sample-badgers-local-observability.png)                                              |
+| Basic and advanced Bedrock cost calculators with industry presets, per-model token pricing, and ingestion assumptions. | Pulls traces and spans for a session from the CloudWatch `aws/spans` log group, with token usage and an event timeline. |
+
+### Deployment CLI
+
+![Deployment CLI](.github/assets/07_sample-badgers-deployment-cli.png)
+
+The deployment menu tracks the eight ordered steps — Lambda layers, foundational infrastructure, prompts/manifests/schemas, specialist Lambdas, gateway, runtime, UI image, UI ECS service — per deployment ID and stack suffix. Steps can be run individually, all at once, or resumed from wherever the last run stopped.
 
 ## ⚙️ How It Works
 
