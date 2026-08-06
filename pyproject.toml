@@ -61,6 +61,8 @@ dependencies = [
     "aws-cdk-mixins-preview==2.234.1a0",
     "realesrgan>=0.3.0",
     "basicsr>=1.4.2",
+    "setuptools>=80.10.2",
+    "torch>=2.13.0",
     "setuptools>=83.0.0",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
