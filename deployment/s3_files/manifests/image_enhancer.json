@@ -1,7 +1,7 @@
 {
     "tool": {
         "name": "enhance_image_tool",
-        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling analyzers when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent analyzers.",
+        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent specialists.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -46,7 +46,7 @@
             ]
         }
     },
-    "analyzer": {
+    "specialist": {
         "name": "image_enhancer",
         "description": "Enhances historical document images using OpenCV for better vision LLM processing",
         "enhancement_eligible": false,
@@ -65,7 +65,7 @@
             "boto3"
         ],
         "wizard_managed": false,
-        "analyzer_type": "container",
+        "specialist_type": "container",
         "container_path": "deployment/lambdas/containers/image_enhancer"
     }
 }

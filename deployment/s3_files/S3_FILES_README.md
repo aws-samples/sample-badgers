@@ -1,11 +1,11 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [Local Testing](../../local_testing/LOCAL_TESTING_README.md) | [Deployment UI](../ui/DEPLOYMENT_UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Analyzers](../lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
 # 📦 S3 Files Directory Structure
 
-This directory contains all configuration, prompts, schemas, and manifests that are deployed to S3 for the analyzer system. These files are loaded at runtime by Lambda functions to configure and execute document analysis.
+This directory contains all configuration, prompts, schemas, and manifests that are deployed to S3 for the specialist system. These files are loaded at runtime by Lambda functions to configure and execute document analysis.
 
 ## 🗂️ Directory Overview
 
@@ -14,8 +14,8 @@ s3_files/
 ├── agent_config/          # 🤖 Agent orchestrator configuration
 ├── agent_system_prompt/   # 💬 System prompt for the orchestrating agent
 ├── core_system_prompts/   # 🔧 Shared prompt components (rules, error handling, wrapper)
-├── manifests/             # 📋 Tool and analyzer configuration manifests
-├── prompts/               # 📝 Analyzer-specific prompt files
+├── manifests/             # 📋 Tool and specialist configuration manifests
+├── prompts/               # 📝 Specialist-specific prompt files
 ├── schemas/               # 📐 JSON schemas for tool input/output validation
 └── wrappers/              # 🎁 System prompt wrapper templates
 ```
@@ -26,10 +26,10 @@ s3_files/
 
 Contains configuration for the orchestrating agent that coordinates PDF analysis workflows.
 
-| File                                      | Purpose                                                                                                  |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration          |
-| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + analyzers). See below. |
+| File                                      | Purpose                                                                                                    |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration            |
+| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below. |
 
 ### ⚠️ Operating Environment Configuration
 
@@ -57,7 +57,7 @@ Other examples depending on your use case:
 
 This value is injected into:
 - The **orchestrating agent's system prompt** (agentcore runtime) — prepended before the main prompt
-- Every **analyzer's system prompt** (Lambda functions) — via the `{operating_environment}` placeholder in the wrapper template
+- Every **specialist's system prompt** (Lambda functions) — via the `{operating_environment}` placeholder in the wrapper template
 
 If the file is missing or the value is empty, the system operates without any environment context (default behavior). Update this file in S3 to change the behavior without redeploying.
 
@@ -76,7 +76,7 @@ If the file is missing or the value is empty, the system operates without any en
 
 ## 🔧 core_system_prompts/
 
-Shared prompt components injected into every analyzer's system prompt via the wrapper template.
+Shared prompt components injected into every specialist's system prompt via the wrapper template.
 
 ```
 core_system_prompts/
@@ -93,7 +93,7 @@ core_system_prompts/
 The wrapper uses placeholder injection:
 - `{operating_environment}` → operating environment context from `agent_operating_environment_config.json`
 - `{core_rules}` → rules.xml content
-- `{composed_prompt}` → analyzer-specific prompts
+- `{composed_prompt}` → specialist-specific prompts
 - `{error_handler_general}` → error_handler.xml
 - `{error_handler_not_found}` → not_found_handler.xml
 
@@ -101,40 +101,40 @@ The wrapper uses placeholder injection:
 
 ## 📋 manifests/
 
-JSON configuration files defining each analyzer tool's metadata, model selection, prompt files, and runtime settings.
+JSON configuration files defining each specialist tool's metadata, model selection, prompt files, and runtime settings.
 
-| Manifest                        | Analyzer Purpose                            |
-| ------------------------------- | ------------------------------------------- |
-| 📄 `full_text_analyzer.json`     | General text extraction with reading order  |
-| 📊 `table_analyzer.json`         | Structured table data extraction            |
-| 📈 `charts_analyzer.json`        | Chart and graph data extraction             |
-| 🔀 `diagram_analyzer.json`       | Flowchart and diagram interpretation        |
-| ✍️ `handwriting_analyzer.json`   | Handwritten text OCR                        |
-| 🏥 `decision_tree_analyzer.json` | Clinical decision trees and medical content |
-| 💻 `code_block_analyzer.json`    | Source code extraction                      |
-| 📐 `layout_analyzer.json`        | Page layout structure analysis              |
-| 🧩 `elements_analyzer.json`      | Document element identification             |
-| 🏷️ `metadata_*_analyzer.json`    | MODS/MADS/Generic metadata extraction       |
-| 🗺️ `war_map_analyzer.json`       | Historical military map analysis            |
-| 🔬 `scientific_analyzer.json`    | Scientific notation and formulas            |
-| 🏷️ `classify_pdf_content.json`   | Page content classification                 |
-| 🖼️ `pdf_processor.json`          | PDF-to-image conversion orchestration       |
-| 🔗 `correlation_analyzer.json`   | Multi-analyzer result correlation per page  |
+| Manifest                          | Specialist Purpose                           |
+| --------------------------------- | -------------------------------------------- |
+| 📄 `full_text_specialist.json`     | General text extraction with reading order   |
+| 📊 `table_specialist.json`         | Structured table data extraction             |
+| 📈 `charts_specialist.json`        | Chart and graph data extraction              |
+| 🔀 `diagram_specialist.json`       | Flowchart and diagram interpretation         |
+| ✍️ `handwriting_specialist.json`   | Handwritten text OCR                         |
+| 🏥 `decision_tree_specialist.json` | Clinical decision trees and medical content  |
+| 💻 `code_block_specialist.json`    | Source code extraction                       |
+| 📐 `layout_specialist.json`        | Page layout structure analysis               |
+| 🧩 `elements_specialist.json`      | Document element identification              |
+| 🏷️ `metadata_*_specialist.json`    | MODS/MADS/Generic metadata extraction        |
+| 🗺️ `war_map_specialist.json`       | Historical military map analysis             |
+| 🔬 `scientific_specialist.json`    | Scientific notation and formulas             |
+| 🏷️ `classify_pdf_content.json`     | Page content classification                  |
+| 🖼️ `pdf_processor.json`            | PDF-to-image conversion orchestration        |
+| 🔗 `correlation_specialist.json`   | Multi-specialist result correlation per page |
 
 Each manifest contains:
 - `tool`: MCP tool definition (name, description, inputSchema including `audit_mode` boolean)
-- `analyzer`: Model selection, prompt files, examples configuration, `expected_output_tokens` (estimated tokens for cost calculation)
-- `metadata`: Version, dependencies, and `analyzer_type`
+- `specialist`: Model selection, prompt files, examples configuration, `expected_output_tokens` (estimated tokens for cost calculation)
+- `metadata`: Version, dependencies, and `specialist_type`
 
 ---
 
 ## 📝 prompts/
 
-Analyzer-specific prompt files organized by analyzer type. Each analyzer has a dedicated subdirectory containing XML prompt components.
+Specialist-specific prompt files organized by specialist type. Each specialist has a dedicated subdirectory containing XML prompt components.
 
 ### 📚 Standard Prompt File Pattern
 
-Most analyzers follow this file naming convention:
+Most specialists follow this file naming convention:
 
 | File Suffix              | Purpose                                         |
 | ------------------------ | ----------------------------------------------- |
@@ -146,25 +146,54 @@ Most analyzers follow this file naming convention:
 | `*_help.xml`             | 💡 Guidance for edge cases and complex scenarios |
 | `*_dictionary.xml`       | 📖 Element type definitions and terminology      |
 
-### 🎓 Analyzers with Few-Shot Examples
+### 🎓 Specialists with Few-Shot Examples
 
-Some analyzers include `few-shot-images/` or `few-shot-examples/` directories containing example images for in-context learning:
-- 📈 `charts_analyzer/`
-- 🏥 `decision_tree_analyzer/`
-- 🔀 `diagram_analyzer/`
-- ✍️ `handwriting_analyzer/`
-- 📊 `table_analyzer/`
+Some specialists include `few-shot-images/` or `few-shot-examples/` directories containing example images for in-context learning:
+- 📈 `charts_specialist/`
+- 🏥 `decision_tree_specialist/`
+- 🔀 `diagram_specialist/`
+- ✍️ `handwriting_specialist/`
+- 📊 `table_specialist/`
 
 ---
 
 ## 📐 schemas/
 
-JSON Schema definitions for tool input/output validation. Each schema file corresponds to an analyzer tool and defines:
+JSON Schema definitions for tool input/output validation. Each schema file corresponds to a
+specialist tool and defines:
 - ✅ Required and optional input parameters
 - 🏷️ Parameter types and descriptions
 - 📤 Output structure expectations
 
 Used by the MCP server for request validation and by clients for understanding tool interfaces.
+
+### Job tracking parameters
+
+All 26 schemas declare `job_id` and `doc_id` alongside `session_id`:
+
+```json
+"job_id": {
+  "type": "string",
+  "description": "Job identifier for tracking this analysis run"
+},
+"doc_id": {
+  "type": "string",
+  "description": "Document identifier this job belongs to"
+}
+```
+
+These must be declared here even though the agent injects the values itself: the Gateway
+builds each tool's advertised interface from this schema, and a parameter absent from the
+schema is not accepted on the call.
+
+Both are optional, never in `required`. A conversational turn can invoke a specialist
+outside any tracked job, in which case there is no `job_id` to pass and tracking no-ops.
+Only `session_id` is required.
+
+> `deployment/custom_specialists/schemas/` holds generated custom specialist schemas and is
+> gitignored. The wizard generator does not yet emit these two fields, so custom
+> specialists silently skip job tracking. See
+> [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md#-job-tracking).
 
 ---
 

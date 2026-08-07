@@ -21,19 +21,19 @@ class S3ResultSaverError(Exception):
     pass
 
 
-def _get_output_extension(analyzer_name: str) -> str:
-    """Get output extension from analyzer manifest.
+def _get_output_extension(specialist_name: str) -> str:
+    """Get output extension from specialist manifest.
 
     Args:
-        analyzer_name: Name of the analyzer (e.g., 'full_text_analyzer')
+        specialist_name: Name of the specialist (e.g., 'full_text_specialist')
 
     Returns:
         File extension ('xml' or 'json'), defaults to 'xml'
     """
     global _manifest_cache
 
-    if analyzer_name in _manifest_cache:
-        return _manifest_cache[analyzer_name]
+    if specialist_name in _manifest_cache:
+        return _manifest_cache[specialist_name]
 
     # Try to load from S3 manifest bucket or local file
     manifest_bucket = os.environ.get("MANIFEST_BUCKET")
@@ -41,23 +41,23 @@ def _get_output_extension(analyzer_name: str) -> str:
     if manifest_bucket:
         try:
             s3 = boto3.client("s3")
-            manifest_key = f"manifests/{analyzer_name}.json"
+            manifest_key = f"manifests/{specialist_name}.json"
             response = s3.get_object(Bucket=manifest_bucket, Key=manifest_key)
             manifest = json.loads(response["Body"].read().decode("utf-8"))
-            ext = manifest.get("analyzer", {}).get("output_extension", "xml")
-            _manifest_cache[analyzer_name] = ext
+            ext = manifest.get("specialist", {}).get("output_extension", "xml")
+            _manifest_cache[specialist_name] = ext
             return ext
         except Exception as e:
-            logger.warning("Could not load manifest for %s: %s", analyzer_name, e)
+            logger.warning("Could not load manifest for %s: %s", specialist_name, e)
 
     # Default to xml
-    _manifest_cache[analyzer_name] = "xml"
+    _manifest_cache[specialist_name] = "xml"
     return "xml"
 
 
 def save_result_to_s3(
     result: str,
-    analyzer_name: str,
+    specialist_name: str,
     output_bucket: str,
     session_id: str,
     image_path: Optional[str] = None,
@@ -66,7 +66,7 @@ def save_result_to_s3(
 
     Args:
         result: The analysis result content to save
-        analyzer_name: Name of the analyzer (used in S3 key path and to determine output format)
+        specialist_name: Name of the specialist (used in S3 key path and to determine output format)
         output_bucket: S3 bucket name for output
         session_id: Session ID for organizing results
         image_path: Optional source image path for naming
@@ -92,10 +92,10 @@ def save_result_to_s3(
     image_identifier = _extract_image_identifier(image_path)
 
     # Determine file extension from manifest config
-    ext = _get_output_extension(analyzer_name)
+    ext = _get_output_extension(specialist_name)
     content_type = "application/json" if ext == "json" else "application/xml"
-    filename = f"{analyzer_name}_{image_identifier}_{timestamp}.{ext}"
-    s3_key = f"{session_id}/{analyzer_name}/{filename}"
+    filename = f"{specialist_name}_{image_identifier}_{timestamp}.{ext}"
+    s3_key = f"{session_id}/{specialist_name}/{filename}"
 
     # Save to S3
     s3.put_object(

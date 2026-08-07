@@ -12,14 +12,17 @@ from stacks import (
     S3Stack,
     IAMStack,
     CognitoStack,
-    LambdaAnalyzerStack,
+    LambdaSpecialistStack,
     AgentCoreECRStack,
     AgentCoreGatewayStack,
     AgentCoreRuntimeWebSocketStack,
     AgentCoreMemoryStack,
     InferenceProfilesStack,
-    CustomAnalyzersStack,
+    CustomSpecialistsStack,
     XRayTransactionSearchStack,
+    VpcStack,
+    DynamoDBStack,
+    ECSStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -39,13 +42,60 @@ env = cdk.Environment(
     region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
 )
 
-# Generate unique deployment ID (or use existing from context)
-# Use: cdk deploy -c deployment_id=abc12345 to reuse an existing deployment
-deployment_id = app.node.try_get_context("deployment_id") or uuid.uuid4().hex[:8]
-print(f"Deployment ID: {deployment_id}")
+# ── Deployment identity ────────────────────────────────────────────────────
+# DEPLOYMENT_ID is a human-chosen label ("dev", "demo"). STACK_SUFFIX is a short
+# random token that makes stack and resource names unique, so several deployments
+# can coexist in one account and region.
+#
+# deploy.sh generates the suffix once and persists both in
+# .deploy-state/{DEPLOYMENT_ID}.json, then exports them. Context values are
+# accepted as a fallback for running cdk directly.
+DEPLOYMENT_ID = os.environ.get("DEPLOYMENT_ID") or app.node.try_get_context(
+    "deployment_id"
+)
+STACK_SUFFIX = os.environ.get("STACK_SUFFIX") or app.node.try_get_context(
+    "stack_suffix"
+)
 
-# Stack name prefix
-STACK_PREFIX = "badgers"
+if not DEPLOYMENT_ID:
+    raise SystemExit(
+        "DEPLOYMENT_ID is required. Use ./deploy.sh, or pass it explicitly:\n"
+        "  DEPLOYMENT_ID=dev STACK_SUFFIX=a1b cdk deploy ...\n"
+        "  cdk deploy -c deployment_id=dev -c stack_suffix=a1b ..."
+    )
+if not STACK_SUFFIX:
+    raise SystemExit(
+        "STACK_SUFFIX is required. ./deploy.sh generates and persists one; pass it "
+        "explicitly when running cdk directly (see .deploy-state/)."
+    )
+
+# Resource names carry both parts: badgers-config-dev-a1b, /badgers-dev-a1b/...
+# Every stack already derives its resource names from this single value.
+deployment_id = f"{DEPLOYMENT_ID}-{STACK_SUFFIX}"
+
+# ECS Express Mode derives the load balancer scheme from the subnets it is given:
+# public subnets produce an internet-facing ALB (and enable public IPs on the tasks),
+# while subnets without an internet gateway produce an internal one. Default is public,
+# because otherwise the UI's *.ecs.<region>.on.aws URL resolves but never answers.
+# Set UI_PUBLIC_ACCESS=false for an internal-only UI reachable from inside the VPC.
+UI_PUBLIC_ACCESS = os.environ.get("UI_PUBLIC_ACCESS", "true").lower() == "true"
+print(f"Deployment ID: {DEPLOYMENT_ID}   Stack suffix: {STACK_SUFFIX}")
+
+# Stack name prefix. Stack names are BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}, carrying
+# the same composite identity as resource names.
+#
+# The suffix alone would be enough for uniqueness, but it is not enough for identity: a
+# suffix-only name means a wrong DEPLOYMENT_ID still resolves real stacks while every
+# resource name derived from it points somewhere that does not exist. Including the ID
+# makes each stack self-describing, so tooling can read a deployment's identity off the
+# stack name instead of parsing it back out of a bucket name.
+STACK_PREFIX = "BADGERS"
+
+
+def _sn(name: str) -> str:
+    """Build a stack name: BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}."""
+    return f"{STACK_PREFIX}-{name}-{DEPLOYMENT_ID}-{STACK_SUFFIX}"
+
 
 # Deployment tags - customize these for your deployment
 # These tags are applied to all resources across all stacks
@@ -65,7 +115,7 @@ deployment_tags = {
 # S3 buckets for configs and outputs
 s3_stack = S3Stack(
     app,
-    f"{STACK_PREFIX}-s3",
+    _sn("S3"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
@@ -75,30 +125,42 @@ s3_stack = S3Stack(
 # Cognito for AgentCore Gateway authentication
 cognito_stack = CognitoStack(
     app,
-    f"{STACK_PREFIX}-cognito",
+    _sn("Cognito"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
     description="Cognito authentication for AgentCore Gateway",
 )
 
+# DynamoDB jobs table for specialist job tracking
+dynamodb_stack = DynamoDBStack(
+    app,
+    _sn("DynamoDB"),
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    env=env,
+    description="DynamoDB jobs table for BADGERS specialist job tracking",
+)
+
 # IAM roles and policies
 iam_stack = IAMStack(
     app,
-    f"{STACK_PREFIX}-iam",
+    _sn("IAM"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     config_bucket=s3_stack.config_bucket,
     source_bucket=s3_stack.source_bucket,
     output_bucket=s3_stack.output_bucket,
+    jobs_table=dynamodb_stack.jobs_table,
     env=env,
     description="IAM roles for BADGERS",
 )
+iam_stack.add_dependency(dynamodb_stack)
 
 # ECR repository for AgentCore Runtime container (and container Lambdas)
 ecr_stack = AgentCoreECRStack(
     app,
-    f"{STACK_PREFIX}-ecr",
+    _sn("ECR"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
@@ -108,68 +170,86 @@ ecr_stack = AgentCoreECRStack(
 # Inference Profiles for cost tracking
 inference_profiles_stack = InferenceProfilesStack(
     app,
-    f"{STACK_PREFIX}-inference-profiles",
+    _sn("InferenceProfiles"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
     description="Application Inference Profiles for cost tracking and usage monitoring",
 )
 
-# Load deployment config for selective analyzer deployment
-enabled_analyzers = None
+# Load deployment config for selective specialist deployment
+enabled_specialists = None
 deployment_config_path = Path("./deployment_config.json")
 if deployment_config_path.exists():
     with open(deployment_config_path, encoding="utf-8") as f:
         deployment_config = json.load(f)
-    analyzers_config = deployment_config.get("analyzers", {})
-    enabled_analyzers = {
-        name for name, cfg in analyzers_config.items() if cfg.get("enabled", True)
+    specialists_config = deployment_config.get("specialists", {})
+    enabled_specialists = {
+        name for name, cfg in specialists_config.items() if cfg.get("enabled", True)
     }
     disabled = {
-        name for name, cfg in analyzers_config.items() if not cfg.get("enabled", True)
+        name for name, cfg in specialists_config.items() if not cfg.get("enabled", True)
     }
     if disabled:
-        print(f"Disabled analyzers: {', '.join(sorted(disabled))}")
-    print(f"Enabled analyzers: {len(enabled_analyzers)} of {len(analyzers_config)}")
+        print(f"Disabled specialists: {', '.join(sorted(disabled))}")
+    print(
+        f"Enabled specialists: {len(enabled_specialists)} of {len(specialists_config)}"
+    )
 
 # Lambda functions and layer
-lambda_stack = LambdaAnalyzerStack(
+lambda_stack = LambdaSpecialistStack(
     app,
-    f"{STACK_PREFIX}-lambda",
+    _sn("Lambda"),
     deployment_tags=deployment_tags,
     execution_role=iam_stack.lambda_role,
     config_bucket=s3_stack.config_bucket,
     output_bucket=s3_stack.output_bucket,
+    jobs_table=dynamodb_stack.jobs_table,
     ecr_repository=ecr_stack.repository,
     inference_profiles_stack=inference_profiles_stack,
-    enabled_analyzers=enabled_analyzers,
+    enabled_specialists=enabled_specialists,
     env=env,
-    description="Lambda analyzers for BADGERS",
+    description="Lambda specialists for BADGERS",
 )
 lambda_stack.add_dependency(ecr_stack)
 lambda_stack.add_dependency(inference_profiles_stack)
+lambda_stack.add_dependency(dynamodb_stack)
 
-# X-Ray Transaction Search (account-level prerequisite for AgentCore tracing)
-# This is a singleton per account/region — if already enabled, destroy this stack
-# or remove it from the deploy sequence.
-xray_stack = XRayTransactionSearchStack(
-    app,
-    f"{STACK_PREFIX}-xray",
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    indexing_percentage=1,  # 1% is free tier
-    env=env,
-    description="X-Ray Transaction Search for AgentCore tracing",
-)
+# X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
+#
+# Transaction Search is a singleton per account and region, and enabling it requires a
+# CloudWatch Logs resource policy drawn from a hard, non-adjustable quota of 10 per
+# region that is shared with every other project in the account.
+#
+# deploy.sh checks the live state before deploying and sets BADGERS_SKIP_XRAY=1 when
+# Transaction Search is already active. The stack is then left out of the app entirely
+# rather than merely dropped from the deploy list — the Runtime stack depends on it, so
+# cdk would otherwise pull it back in and fail on the quota anyway.
+SKIP_XRAY = os.environ.get("BADGERS_SKIP_XRAY", "").strip() == "1"
+
+xray_stack = None
+if SKIP_XRAY:
+    print("BADGERS_SKIP_XRAY=1 — X-Ray Transaction Search stack omitted")
+else:
+    xray_stack = XRayTransactionSearchStack(
+        app,
+        _sn("XRay"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        indexing_percentage=1,  # 1% is free tier
+        env=env,
+        description="X-Ray Transaction Search for AgentCore tracing",
+    )
 
 # AgentCore Gateway with Lambda targets
 gateway_stack = AgentCoreGatewayStack(
     app,
-    f"{STACK_PREFIX}-gateway",
+    _sn("Gateway"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     lambda_functions=lambda_stack.functions,
     config_bucket=s3_stack.config_bucket,
+    cognito_stack_name=_sn("Cognito"),
     env=env,
     description="AgentCore Gateway with Lambda tool targets",
 )
@@ -179,7 +259,7 @@ gateway_stack.add_dependency(cognito_stack)
 # AgentCore Memory for session persistence
 memory_stack = AgentCoreMemoryStack(
     app,
-    f"{STACK_PREFIX}-memory",
+    _sn("Memory"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     env=env,
@@ -190,7 +270,7 @@ memory_stack = AgentCoreMemoryStack(
 # AgentCore Runtime WebSocket
 runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     app,
-    f"{STACK_PREFIX}-runtime-websocket",
+    _sn("RuntimeWebSocket"),
     deployment_id=deployment_id,
     deployment_tags=deployment_tags,
     ecr_repository_uri=ecr_stack.repository.repository_uri,
@@ -202,6 +282,7 @@ runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     memory_id=memory_stack.memory.attr_memory_id,
     s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
     inference_profiles_stack=inference_profiles_stack,
+    jobs_table=dynamodb_stack.jobs_table,
     image_tag="websocket",
     env=env,
     description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
@@ -211,7 +292,9 @@ runtime_websocket_stack.add_dependency(gateway_stack)
 runtime_websocket_stack.add_dependency(cognito_stack)
 runtime_websocket_stack.add_dependency(memory_stack)
 runtime_websocket_stack.add_dependency(inference_profiles_stack)
-runtime_websocket_stack.add_dependency(xray_stack)
+if xray_stack is not None:
+    runtime_websocket_stack.add_dependency(xray_stack)
+runtime_websocket_stack.add_dependency(dynamodb_stack)
 
 # Add dependencies
 iam_stack.add_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
@@ -222,41 +305,99 @@ lambda_stack.add_dependency(s3_stack)  # Lambda needs S3 bucket names
 # The Gateway stack creates the MCP endpoint
 # Runtime automatically authenticates via AgentCore Identity
 
-# Custom Analyzers Stack (optional - only deployed if custom analyzers exist)
-# Custom analyzers are created via the wizard UI and saved locally
-custom_analyzers_registry = Path("./custom_analyzers/analyzer_registry.json")
-if custom_analyzers_registry.exists():
+# Custom Specialists Stack (optional - only deployed if custom specialists exist)
+# Custom specialists are created via the wizard UI and saved locally
+custom_specialists_registry = Path("./custom_specialists/specialist_registry.json")
+if custom_specialists_registry.exists():
     # Use Fn.import_value to reference exports - no explicit dependencies needed
-    custom_analyzers_stack = CustomAnalyzersStack(
+    custom_specialists_stack = CustomSpecialistsStack(
         app,
-        f"{STACK_PREFIX}-custom-analyzers",
+        _sn("CustomSpecialists"),
         deployment_id=deployment_id,
         deployment_tags=deployment_tags,
-        config_bucket_name=cdk.Fn.import_value(f"{STACK_PREFIX}-s3-ConfigBucketName"),
-        output_bucket_name=cdk.Fn.import_value(f"{STACK_PREFIX}-s3-OutputBucketName"),
-        foundation_layer_arn=cdk.Fn.import_value(f"{STACK_PREFIX}-lambda-LayerArn"),
-        lambda_role_arn=cdk.Fn.import_value(f"{STACK_PREFIX}-iam-LambdaRoleArn"),
-        gateway_id=cdk.Fn.import_value(f"{STACK_PREFIX}-gateway-GatewayId"),
-        gateway_role_arn=cdk.Fn.import_value(f"{STACK_PREFIX}-gateway-GatewayRoleArn"),
-        kms_key_arn=cdk.Fn.import_value(f"{STACK_PREFIX}-s3-S3KmsKeyArn"),
+        config_bucket_name=cdk.Fn.import_value(f"{_sn('S3')}-ConfigBucketName"),
+        output_bucket_name=cdk.Fn.import_value(f"{_sn('S3')}-OutputBucketName"),
+        foundation_layer_arn=cdk.Fn.import_value(f"{_sn('Lambda')}-LayerArn"),
+        lambda_role_arn=cdk.Fn.import_value(f"{_sn('IAM')}-LambdaRoleArn"),
+        gateway_id=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayId"),
+        gateway_role_arn=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayRoleArn"),
+        kms_key_arn=cdk.Fn.import_value(f"{_sn('S3')}-S3KmsKeyArn"),
         claude_sonnet_profile_arn=cdk.Fn.import_value(
-            f"{STACK_PREFIX}-inference-profiles-ClaudeSonnetProfileArn"
+            f"{_sn('InferenceProfiles')}-ClaudeSonnetProfileArn"
         ),
         claude_haiku_profile_arn=cdk.Fn.import_value(
-            f"{STACK_PREFIX}-inference-profiles-ClaudeHaikuProfileArn"
+            f"{_sn('InferenceProfiles')}-ClaudeHaikuProfileArn"
         ),
         nova_premier_profile_arn=cdk.Fn.import_value(
-            f"{STACK_PREFIX}-inference-profiles-NovaPremierProfileArn"
+            f"{_sn('InferenceProfiles')}-NovaPremierProfileArn"
         ),
         claude_opus_46_profile_arn=cdk.Fn.import_value(
-            f"{STACK_PREFIX}-inference-profiles-ClaudeOpus46ProfileArn"
+            f"{_sn('InferenceProfiles')}-ClaudeOpus46ProfileArn"
         ),
         claude_opus_45_profile_arn=cdk.Fn.import_value(
-            f"{STACK_PREFIX}-inference-profiles-ClaudeOpus45ProfileArn"
+            f"{_sn('InferenceProfiles')}-ClaudeOpus45ProfileArn"
         ),
         env=env,
-        description="Custom analyzers created via the wizard UI",
+        description="Custom specialists created via the wizard UI",
     )
 
+# --- UI infrastructure (ECS Express Gateway) ---
+# No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
+# service provisions and manages its own load balancer and HTTPS endpoint.
+
+# VPC with private subnets and AWS service VPC endpoints
+vpc_stack = VpcStack(
+    app,
+    _sn("Vpc"),
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    env=env,
+    description="VPC for the BADGERS UI ECS service",
+)
+
+# Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
+ecs_stack = ECSStack(
+    app,
+    _sn("ECS"),
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    config_bucket_arn=s3_stack.config_bucket.bucket_arn,
+    output_bucket_arn=s3_stack.output_bucket.bucket_arn,
+    source_bucket_arn=s3_stack.source_bucket.bucket_arn,
+    config_bucket_name=s3_stack.config_bucket.bucket_name,
+    output_bucket_name=s3_stack.output_bucket.bucket_name,
+    source_bucket_name=s3_stack.source_bucket.bucket_name,
+    jobs_table_arn=dynamodb_stack.jobs_table.table_arn,
+    kms_key_arn=s3_stack.s3_kms_key.key_arn,
+    private_subnet_ids=(
+        vpc_stack.public_subnet_ids
+        if UI_PUBLIC_ACCESS
+        else vpc_stack.private_subnet_ids
+    ),
+    ui_task_sg_id=vpc_stack.ui_task_sg.security_group_id,
+    cognito_user_pool_id=cognito_stack.user_pool.user_pool_id,
+    cognito_ui_client_id=cognito_stack.ui_client.user_pool_client_id,
+    ecr_repository_uri=ecr_stack.repository.repository_uri,
+    agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
+    agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
+    stack_suffix=STACK_SUFFIX,
+    image_tag="frontend",
+    env=env,
+    description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
+)
+ecs_stack.add_dependency(vpc_stack)
+ecs_stack.add_dependency(cognito_stack)
+ecs_stack.add_dependency(ecr_stack)
+ecs_stack.add_dependency(s3_stack)
+ecs_stack.add_dependency(dynamodb_stack)
+ecs_stack.add_dependency(gateway_stack)
+ecs_stack.add_dependency(runtime_websocket_stack)
+
+# ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
+if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):
+    from cdk_nag import AwsSolutionsChecks
+
+    cdk.Aspects.of(app).add(AwsSolutionsChecks(verbose=True))
+    print("cdk-nag: AwsSolutionsChecks enabled")
 
 app.synth()

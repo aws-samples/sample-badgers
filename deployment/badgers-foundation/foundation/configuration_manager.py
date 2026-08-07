@@ -1,7 +1,7 @@
 """
-Configuration management for analyzer system.
+Configuration management for specialist system.
 
-Handles loading, validation, and access to analyzer configurations.
+Handles loading, validation, and access to specialist configurations.
 """
 
 import json
@@ -17,7 +17,7 @@ class ConfigurationError(Exception):
 
 
 class ConfigurationManager:
-    """Manages analyzer configuration loading and validation."""
+    """Manages specialist configuration loading and validation."""
 
     def __init__(self):
         self._config_cache: Optional[Dict[str, Any]] = None
@@ -57,37 +57,37 @@ class ConfigurationManager:
         except Exception as e:
             raise ConfigurationError(f"Failed to load configuration: {e}")
 
-    def get_analyzer_config(
+    def get_specialist_config(
         self,
-        analyzer_type: str,
+        specialist_type: str,
         config_path: str = "",
     ) -> Dict[str, Any]:
         """
-        Get configuration for a specific analyzer type.
+        Get configuration for a specific specialist type.
 
         Args:
-            analyzer_type: The type of analyzer (e.g., 'diagram', 'table')
+            specialist_type: The type of specialist (e.g., 'diagram', 'table')
             config_path: Path to the configuration JSON file
 
         Returns:
-            Dictionary containing the analyzer-specific configuration
+            Dictionary containing the specialist-specific configuration
 
         Raises:
-            ConfigurationError: If analyzer type is not found in configuration
+            ConfigurationError: If specialist type is not found in configuration
         """
         config = self.load_config(config_path)
 
-        if "analyzers" not in config:
-            raise ConfigurationError("Configuration missing 'analyzers' section")
+        if "specialists" not in config:
+            raise ConfigurationError("Configuration missing 'specialists' section")
 
-        if analyzer_type not in config["analyzers"]:
-            available_types = list(config["analyzers"].keys())
+        if specialist_type not in config["specialists"]:
+            available_types = list(config["specialists"].keys())
             raise ConfigurationError(
-                f"Analyzer type '{analyzer_type}' not found. "
+                f"Specialist type '{specialist_type}' not found. "
                 f"Available types: {available_types}"
             )
 
-        return config["analyzers"][analyzer_type]
+        return config["specialists"][specialist_type]
 
     def get_global_settings(self, config_path: str = "") -> Dict[str, Any]:
         """
@@ -119,17 +119,17 @@ class ConfigurationManager:
         if not isinstance(config, dict):
             raise ConfigurationError("Configuration must be a dictionary")
 
-        if "analyzers" not in config:
+        if "specialists" not in config:
             raise ConfigurationError(
-                "Configuration missing required 'analyzers' section"
+                "Configuration missing required 'specialists' section"
             )
 
-        if not isinstance(config["analyzers"], dict):
-            raise ConfigurationError("'analyzers' section must be a dictionary")
+        if not isinstance(config["specialists"], dict):
+            raise ConfigurationError("'specialists' section must be a dictionary")
 
-        # Validate each analyzer configuration
-        for analyzer_type, analyzer_config in config["analyzers"].items():
-            self._validate_analyzer_config(analyzer_type, analyzer_config)
+        # Validate each specialist configuration
+        for specialist_type, specialist_config in config["specialists"].items():
+            self._validate_specialist_config(specialist_type, specialist_config)
 
         # Validate global settings if present
         if "global_settings" in config:
@@ -137,10 +137,10 @@ class ConfigurationManager:
 
         return True
 
-    def _validate_analyzer_config(
-        self, analyzer_type: str, analyzer_config: Dict[str, Any]
+    def _validate_specialist_config(
+        self, specialist_type: str, specialist_config: Dict[str, Any]
     ) -> None:
-        """Validate individual analyzer configuration."""
+        """Validate individual specialist configuration."""
         required_fields = [
             "name",
             "description",
@@ -154,28 +154,28 @@ class ConfigurationManager:
         ]
 
         for field in required_fields:
-            if field not in analyzer_config:
+            if field not in specialist_config:
                 raise ConfigurationError(
-                    f"Analyzer '{analyzer_type}' missing required field: {field}"
+                    f"Specialist '{specialist_type}' missing required field: {field}"
                 )
 
         # Validate field types
-        if not isinstance(analyzer_config["prompt_files"], list):
+        if not isinstance(specialist_config["prompt_files"], list):
             raise ConfigurationError(
-                f"Analyzer '{analyzer_type}': 'prompt_files' must be a list"
+                f"Specialist '{specialist_type}': 'prompt_files' must be a list"
             )
 
         if (
-            not isinstance(analyzer_config["max_examples"], int)
-            or analyzer_config["max_examples"] < 0
+            not isinstance(specialist_config["max_examples"], int)
+            or specialist_config["max_examples"] < 0
         ):
             raise ConfigurationError(
-                f"Analyzer '{analyzer_type}': 'max_examples' must be a non-negative integer"
+                f"Specialist '{specialist_type}': 'max_examples' must be a non-negative integer"
             )
 
         # Validate pdf_processor specific settings
-        if analyzer_type == "pdf_processor":
-            self._validate_pdf_processor_config(analyzer_config)
+        if specialist_type == "pdf_processor":
+            self._validate_pdf_processor_config(specialist_config)
 
     def _validate_global_settings(self, global_settings: Dict[str, Any]) -> None:
         """Validate global settings configuration."""

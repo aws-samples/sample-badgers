@@ -59,7 +59,7 @@ cdk deploy
 
 Or deploy specific stack:
 ```bash
-cdk deploy LambdaAnalyzerStack
+cdk deploy LambdaSpecialistStack
 ```
 
 CDK will:

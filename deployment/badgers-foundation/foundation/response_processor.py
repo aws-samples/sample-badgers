@@ -1,5 +1,5 @@
 """
-Response processing functionality for analyzer system.
+Response processing functionality for specialist system.
 
 Handles extraction and validation of analysis results from Bedrock responses.
 """
@@ -249,14 +249,14 @@ class ResponseProcessor:
             return None
 
     def format_analysis_result(
-        self, result: str, analyzer_type: str, include_metadata: bool = False
+        self, result: str, specialist_type: str, include_metadata: bool = False
     ) -> str:
         """
         Format analysis result with optional metadata.
 
         Args:
             result: Raw analysis result
-            analyzer_type: Type of analyzer that produced the result
+            specialist_type: Type of specialist that produced the result
             include_metadata: Whether to include metadata in output
 
         Returns:
@@ -264,7 +264,7 @@ class ResponseProcessor:
         """
         try:
             if include_metadata:
-                formatted_result = f"Analysis Type: {analyzer_type}\n"
+                formatted_result = f"Analysis Type: {specialist_type}\n"
                 formatted_result += f"Result Length: {len(result)} characters\n"
                 formatted_result += "-" * 50 + "\n"
                 formatted_result += result

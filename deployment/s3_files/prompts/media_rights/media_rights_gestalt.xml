@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Gestalt Perception for Media Rights Contract Analyzer -->
-<gestalt_perception analyzer="media_rights">
+<!-- Gestalt Perception for Media Rights Contract Specialist -->
+<gestalt_perception specialist="media_rights">
 
     <prescan>
         <instruction>Before extracting contract provisions, perceive the document's legal structure:</instruction>

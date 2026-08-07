@@ -48,7 +48,7 @@ OUTPUT_QUALITY = int(os.environ.get("OUTPUT_QUALITY", "95"))
 # ============================================================================
 
 CONFIG_BUCKET = os.environ.get("CONFIG_BUCKET")
-ANALYZER_NAME = os.environ.get("ANALYZER_NAME", "image_enhancer")
+SPECIALIST_NAME = os.environ.get("SPECIALIST_NAME", "image_enhancer")
 
 # Hardcoded fallback if S3 load fails
 _FALLBACK_SYSTEM_PROMPT = f"""
@@ -125,7 +125,7 @@ def _load_system_prompt() -> str:
 
     try:
         s3 = boto3.client("s3")
-        key = f"prompts/{ANALYZER_NAME}/system_prompt.xml"
+        key = f"prompts/{SPECIALIST_NAME}/system_prompt.xml"
         logger.info("Loading system prompt from s3://%s/%s", CONFIG_BUCKET, key)
         response = s3.get_object(Bucket=CONFIG_BUCKET, Key=key)
         raw = response["Body"].read().decode("utf-8")

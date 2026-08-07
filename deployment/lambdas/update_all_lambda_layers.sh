@@ -5,12 +5,12 @@
 
 set -e
 
-LAYER_NAME="analyzer-foundation"
+LAYER_NAME="specialist-foundation"
 REGION="${AWS_REGION:-us-west-2}"
 FUNCTION_PREFIX="badgers_"
 
 # Container-based lambdas — these don't use layers
-SKIP_FUNCTIONS=("badgers_image_enhancer" "badgers_remediation_analyzer")
+SKIP_FUNCTIONS=("badgers_image_enhancer" "badgers_remediation_specialist")
 
 # ---------------------------------------------------------------------------
 # Resolve layer ARN

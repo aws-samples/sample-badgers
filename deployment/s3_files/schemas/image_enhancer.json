@@ -1,84 +1,92 @@
 [
-    {
-        "name": "enhance_image_tool",
-        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling analyzers when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent analyzers.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "image_path": {
-                    "type": "string",
-                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
-                },
-                "image_data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data. Use this OR image_path, not both."
-                },
-                "document_type": {
-                    "type": "string",
-                    "enum": [
-                        "auto",
-                        "manuscript",
-                        "annotated",
-                        "sheet_music",
-                        "diagram",
-                        "printed",
-                        "mixed",
-                        "watermarked"
-                    ],
-                    "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. Default: auto (auto-detect)."
-                },
-                "enhancement_level": {
-                    "type": "string",
-                    "enum": [
-                        "minimal",
-                        "moderate",
-                        "aggressive"
-                    ],
-                    "description": "Enhancement intensity. Default: moderate."
-                },
-                "session_id": {
-                    "type": "string",
-                    "description": "Runtime session ID for organizing outputs in S3."
-                }
-            },
-            "required": [
-                "session_id"
-            ]
+  {
+    "name": "enhance_image_tool",
+    "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement \u2014 without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent specialists.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
         },
-        "outputSchema": {
-            "type": "object",
-            "properties": {
-                "result": {
-                    "type": "object",
-                    "description": "Enhancement result with S3 URI of enhanced image and processing metadata",
-                    "properties": {
-                        "s3_output_uri": {
-                            "type": "string",
-                            "description": "S3 URI of the enhanced image - pass this to subsequent analyzers"
-                        },
-                        "operations_applied": {
-                            "type": "array",
-                            "description": "List of enhancement operations applied"
-                        },
-                        "original_shape": {
-                            "type": "array",
-                            "description": "Original image dimensions [height, width]"
-                        },
-                        "final_shape": {
-                            "type": "array",
-                            "description": "Enhanced image dimensions [height, width]"
-                        },
-                        "skew_angle": {
-                            "type": "number",
-                            "description": "Detected and corrected skew angle in degrees"
-                        }
-                    }
-                },
-                "success": {
-                    "type": "boolean",
-                    "description": "Whether the enhancement completed successfully"
-                }
-            }
+        "image_data": {
+          "type": "string",
+          "description": "Base64-encoded image data. Use this OR image_path, not both."
+        },
+        "document_type": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "manuscript",
+            "annotated",
+            "sheet_music",
+            "diagram",
+            "printed",
+            "mixed",
+            "watermarked"
+          ],
+          "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. Default: auto (auto-detect)."
+        },
+        "enhancement_level": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "moderate",
+            "aggressive"
+          ],
+          "description": "Enhancement intensity. Default: moderate."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID for organizing outputs in S3."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the analysis run this invocation belongs to. Pass through the job_id supplied in the orchestrator context. Omit only when no analysis run is active."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document being analysed. Pass through the doc_id supplied in the orchestrator context."
         }
+      },
+      "required": [
+        "session_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object",
+          "description": "Enhancement result with S3 URI of enhanced image and processing metadata",
+          "properties": {
+            "s3_output_uri": {
+              "type": "string",
+              "description": "S3 URI of the enhanced image - pass this to subsequent specialists"
+            },
+            "operations_applied": {
+              "type": "array",
+              "description": "List of enhancement operations applied"
+            },
+            "original_shape": {
+              "type": "array",
+              "description": "Original image dimensions [height, width]"
+            },
+            "final_shape": {
+              "type": "array",
+              "description": "Enhanced image dimensions [height, width]"
+            },
+            "skew_angle": {
+              "type": "number",
+              "description": "Detected and corrected skew angle in degrees"
+            }
+          }
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the enhancement completed successfully"
+        }
+      }
     }
+  }
 ]

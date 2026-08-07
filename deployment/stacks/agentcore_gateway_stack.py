@@ -16,6 +16,13 @@ try:
 except ImportError:
     import aws_cdk_aws_bedrock_agentcore_alpha as agentcore
 
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 
 class AgentCoreGatewayStack(Stack):
     """Stack for AgentCore Gateway with Lambda tool targets and logging."""
@@ -28,6 +35,7 @@ class AgentCoreGatewayStack(Stack):
         deployment_tags: dict[str, str],
         lambda_functions: dict[str, lambda_.Function],
         config_bucket: s3.Bucket,
+        cognito_stack_name: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -36,6 +44,9 @@ class AgentCoreGatewayStack(Stack):
         self.deployment_tags = deployment_tags
         self.lambda_functions = lambda_functions
         self.config_bucket = config_bucket
+        # Stack names carry a per-deployment suffix, so the Cognito export names
+        # cannot be hardcoded here.
+        self.cognito_stack_name = cognito_stack_name
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -60,6 +71,8 @@ class AgentCoreGatewayStack(Stack):
             "agentcore-gateway",
             "MCP Gateway for BADGERS tools",
         )
+
+        self._add_nag_suppressions()
 
         # Outputs
         CfnOutput(
@@ -112,6 +125,59 @@ class AgentCoreGatewayStack(Stack):
         Tags.of(resource).add("resource_name", name)
         Tags.of(resource).add("resource_description", description)
 
+    def _add_nag_suppressions(self) -> None:
+        """Document the wildcard permissions AwsSolutions-IAM5 flags on the
+        gateway execution role.
+
+        AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
+        names the exact resource it applies to and why the wildcard is needed.
+        """
+        if not _HAVE_CDK_NAG:
+            return
+
+        NagSuppressions.add_resource_suppressions(
+            self.gateway_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "The AgentCore Gateway construct grants lambda:InvokeFunction "
+                        "with a :* version suffix on each target function so the "
+                        "Gateway can invoke any published version or alias. The "
+                        "function ARNs themselves are resolved references to the "
+                        "specific specialist Lambdas -- the wildcard covers only the "
+                        "version qualifier."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ContainerFunctionimageenhancer2AFB4983.Arn>:*",
+                        "Resource::<ContainerFunctionremediationspecialistB67CD8CB.Arn>:*",
+                        "Resource::<FunctionchartsspecialistA6AA9F82.Arn>:*",
+                        "Resource::<FunctionclassifypdfcontentEC92FE26.Arn>:*",
+                        "Resource::<FunctioncorrelationspecialistE250ACCF.Arn>:*",
+                        "Resource::<FunctiondiagramspecialistB1D3C809.Arn>:*",
+                        "Resource::<Functionelementsspecialist2A88D0C1.Arn>:*",
+                        "Resource::<FunctionfulltextspecialistB95E9182.Arn>:*",
+                        "Resource::<Functionpdftoimagesconverter2E10A5D5.Arn>:*",
+                        "Resource::<FunctionscientificspecialistCB1826B1.Arn>:*",
+                        "Resource::<Functiontablespecialist6D08F0B2.Arn>:*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "The Gateway reads tool schemas from the config bucket. The /* "
+                        "suffix is required because schema object keys are per-"
+                        "specialist and are resolved at runtime; the bucket ARN is a "
+                        "resolved reference, not a wildcard."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                    ],
+                },
+            ],
+            apply_to_children=True,
+        )
+
     def create_gateway_role(self) -> iam.Role:
         """Create IAM role for gateway execution."""
         role = iam.Role(
@@ -163,8 +229,10 @@ class AgentCoreGatewayStack(Stack):
     def create_gateway(self) -> agentcore.Gateway:
         """Create AgentCore Gateway with Cognito authentication."""
         # Import Cognito outputs
-        user_pool_id = Fn.import_value("badgers-cognito-UserPoolId")
-        user_pool_client_id = Fn.import_value("badgers-cognito-UserPoolClientId")
+        user_pool_id = Fn.import_value(f"{self.cognito_stack_name}-UserPoolId")
+        user_pool_client_id = Fn.import_value(
+            f"{self.cognito_stack_name}-UserPoolClientId"
+        )
 
         # Construct OIDC discovery URL
         discovery_url = f"https://cognito-idp.{self.region}.amazonaws.com/{user_pool_id}/.well-known/openid-configuration"
@@ -173,7 +241,7 @@ class AgentCoreGatewayStack(Stack):
             self,
             "BadgersGateway",
             gateway_name=f"badgers-gtwy-{self.deployment_id}",
-            description="MCP Gateway for BADGERS analyzers with full observability",
+            description="MCP Gateway for BADGERS specialists with full observability",
             role=self.gateway_role,
             protocol_configuration=agentcore.McpProtocolConfiguration(
                 instructions="Use these tools to analyze PDF documents, extract content, and process images.",
@@ -203,10 +271,10 @@ class AgentCoreGatewayStack(Stack):
             if child_id == "DefaultPolicy" or child_id.startswith("OverflowPolicy"):
                 policy_dependencies.append(child)
 
-        for analyzer_name, lambda_function in self.lambda_functions.items():
+        for specialist_name, lambda_function in self.lambda_functions.items():
             # Create short target name by stripping analyze_ prefix and _tool suffix
             # This keeps MCP tool names shorter: ${target_name}__${tool_name}
-            short_name = analyzer_name
+            short_name = specialist_name
             if short_name.startswith("analyze_"):
                 short_name = short_name[8:]  # Remove "analyze_"
             if short_name.endswith("_tool"):
@@ -216,13 +284,13 @@ class AgentCoreGatewayStack(Stack):
             target_name = short_name.replace("_", "-")[:50]
 
             target = self.gateway.add_lambda_target(
-                f"Target-{analyzer_name}",
+                f"Target-{specialist_name}",
                 gateway_target_name=target_name,
-                description=f"Lambda target for {analyzer_name}",
+                description=f"Lambda target for {specialist_name}",
                 lambda_function=lambda_function,
                 tool_schema=agentcore.ToolSchema.from_s3_file(
                     bucket=self.config_bucket,
-                    object_key=f"schemas/{analyzer_name}.json",
+                    object_key=f"schemas/{specialist_name}.json",
                 ),
             )
 
