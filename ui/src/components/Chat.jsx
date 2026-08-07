@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   AssistantRuntimeProvider,
   useLocalRuntime,
-  useMessage,
+  useAuiState,
   ThreadPrimitive,
   MessagePrimitive,
   ComposerPrimitive,
@@ -101,7 +101,7 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
-  const message = useMessage()
+  const message = useAuiState()
   const isRunning = message.status?.type === 'running'
   const hasText = message.content?.some(c => c.type === 'text' && c.text?.trim())
   const reasoningParts = message.content?.filter(c => c.type === 'reasoning') || []
