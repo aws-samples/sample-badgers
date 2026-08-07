@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'child_process';
 import { readFile, writeFile, readdir, stat } from 'fs/promises';
+import { realpathSync } from 'fs';
 import { resolve } from 'path';
 import { requireAdmin } from '../auth.js';
 
@@ -206,7 +207,9 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         const relPath = decodeURIComponent(req.path.replace(/^\//, ''));
         if (!relPath || relPath.includes('..')) return res.status(400).json({ error: 'Invalid path' });
         const fullPath = resolve(S3_FILES_DIR, relPath);
-        if (!fullPath.startsWith(S3_FILES_DIR)) return res.status(403).json({ error: 'Forbidden' });
+        // Normalize the path and verify it's within the allowed directory
+        const normalizedPath = realpathSync(fullPath);
+        if (!normalizedPath.startsWith(S3_FILES_DIR + '/')) return res.status(403).json({ error: 'Forbidden' });
         if (req.method === 'GET') {
             try { res.json({ path: relPath, content: JSON.parse(await readFile(fullPath, 'utf-8')) }); }
             catch { res.status(404).json({ error: `Not found: ${relPath}` }); }

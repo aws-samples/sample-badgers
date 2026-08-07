@@ -341,7 +341,9 @@ class ECSStack(Stack):
             cluster="default",
             cpu="1024",
             memory="2048",
-            health_check_path="/api/env",
+            # Must match HEALTHCHECK_PATH in ui/server/index.js. This is the only route
+            # exempt from Cognito auth there, since the balancer carries no token.
+            health_check_path="/api/healthcheck",
             network_configuration=ecs.CfnExpressGatewayService.ExpressGatewayServiceNetworkConfigurationProperty(
                 subnets=private_subnet_ids,
                 security_groups=[ui_task_sg_id],

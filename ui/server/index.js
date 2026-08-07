@@ -68,7 +68,7 @@ async function loadSSMConfig() {
     }
 }
 
-import { getUser, requireAuth } from './auth.js';
+import { requireAuth } from './auth.js';
 import { mountCoreRoutes } from './routes/core.js';
 import { mountAdminRoutes } from './routes/admin.js';
 
@@ -76,6 +76,19 @@ const PROJECT_ROOT = resolve(__dirname, '../..');
 const DIST_DIR = resolve(__dirname, '../dist');
 
 const app = express();
+
+// ── Proxy trust ───────────────────────────────────────────────────────────
+// In production this server sits behind the load balancer that
+// CfnExpressGatewayService provisions (deployment/stacks/ecs_stack.py), and an ALB
+// sets X-Forwarded-For by default in append mode. Without this setting req.ip
+// resolves to the balancer for every request, so the rate limiters below collapse
+// into a single global bucket shared by all callers rather than one per user.
+//
+// 1 trusts exactly one hop, the balancer. `true` trusts the whole chain, which lets
+// a client forge X-Forwarded-For to get its own bucket and which express-rate-limit
+// rejects as ERR_ERL_PERMISSIVE_TRUST_PROXY. Raise this only if another proxy such
+// as CloudFront is placed in front of the balancer.
+app.set('trust proxy', 1);
 
 // ── CORS — same-origin only unless an explicit origin is configured ────────
 // The React bundle is served from this same server in production, so no
@@ -95,44 +108,64 @@ app.use((req, res, next) => {
     next();
 });
 
-const limiter = rateLimit({
+// The one anonymous route: the load balancer's health check. Declared once here because
+// three things below key off it — the rate-limit budget, the auth exemption, and the
+// route itself in routes/core.js. Must stay in step with health_check_path in
+// deployment/stacks/ecs_stack.py.
+const HEALTHCHECK_PATH = '/api/healthcheck';
+
+// ── Rate limiting ─────────────────────────────────────────────────────────
+// Three separate budgets. A single shared one cannot serve all three callers: the
+// balancer's health check must never be starved by user traffic, and a page load
+// pulls far more static requests than API calls.
+const RATE_LIMIT_DEFAULTS = {
     windowMs: 60 * 1000,
-    max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-});
-app.use('/api/', limiter);
+};
 
-// Every /api/* route requires a verified Cognito bearer token except /api/env, which
-// must answer unauthenticated: it is the ALB health check path (health_check_path in
-// deployment/stacks/ecs_stack.py), and the SPA reads it for branding before login.
-// This matches the media-contracts reference implementation, which passes requireAuth
-// into mountRoutes and applies it per route, leaving /api/env open. Mounted before the
-// route groups so no other handler can be reached unauthenticated.
+const limiter = rateLimit({ ...RATE_LIMIT_DEFAULTS, max: 100 });
+
+// /api/healthcheck is the balancer's health_check_path (ecs_stack.py) and the one
+// unauthenticated /api route. It gets its own budget rather than sharing the 100/min
+// above, because exhausting that budget would return 429 to the health check and get
+// the task killed. The 3.1.0 changelog records this same failure from a blanket
+// requireAuth mount returning 401 to health checks.
+//
+// A dedicated budget rather than a full exemption. The route is the only
+// unauthenticated one under /api/, so it should not be the one path with no ceiling
+// at all. The ceiling is far above any real health check interval.
+const healthLimiter = rateLimit({ ...RATE_LIMIT_DEFAULTS, max: 600 });
+
+app.use('/api/', (req, res, next) => {
+    if (req.originalUrl.split('?')[0] === HEALTHCHECK_PATH) return healthLimiter(req, res, next);
+    return limiter(req, res, next);
+});
+
+// Every /api/* route requires a verified Cognito bearer token except the health check,
+// which must answer unauthenticated because the load balancer carries no token
+// (health_check_path in deployment/stacks/ecs_stack.py). Mounted before the route groups
+// so no other handler can be reached unauthenticated.
+//
+// This is the only anonymous route in the app, so it is deliberately the only entry in
+// the set and the handler returns a constant. Branding used to be fetched here too; it
+// is now bundled at build time by the badgers-branding plugin in ui/vite.config.js.
 //
 // originalUrl is used rather than req.path because Express strips the '/api' mount
 // prefix from req.url inside path-mounted middleware.
-const PUBLIC_API_PATHS = new Set(['/api/env']);
+const PUBLIC_API_PATHS = new Set([HEALTHCHECK_PATH]);
 app.use('/api/', (req, res, next) => {
     if (PUBLIC_API_PATHS.has(req.originalUrl.split('?')[0])) return next();
     return requireAuth(req, res, next);
 });
 
-// ── User identity ──
-app.get('/api/me', async (req, res) => {
-    try {
-        const user = req.user || (await getUser(req));
-        if (!user) return res.status(401).json({ error: 'Authentication required' });
-        res.json({
-            email: user.email,
-            name: user.name,
-            role: user.groups.includes('admin') ? 'admin' : 'tester',
-            verified: user.verified,
-        });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+// No /api/me. The browser already holds a validated ID token from the OIDC flow, so it
+// reads its own email, name and cognito:groups from those claims (ui/src/hooks/useUser.js)
+// rather than asking the server to echo them back.
+//
+// The role that comes from those claims only drives which tabs are rendered. It is not an
+// access-control decision: every admin route enforces requireAdmin server-side
+// (ui/server/routes/admin.js), so a client claiming admin gains nothing.
 
 // ── Mount route groups ──
 mountCoreRoutes(app, PROJECT_ROOT);
@@ -149,7 +182,13 @@ async function startServer() {
         // Express 5 (path-to-regexp v8) rejects a bare '*' path; named wildcard
         // syntax is required. SPA fallback for client-side routes such as
         // /callback, which the OIDC redirect lands on.
-        app.get('/*splat', (req, res, next) => {
+        //
+        // Rate limited because the handler reaches the file system (CodeQL
+        // js/missing-rate-limiting, alert 42). The budget is generous relative to
+        // /api/: this serves one small cached file and a user hits it on every
+        // navigation and refresh, so a tight limit would throttle real browsing.
+        const staticLimiter = rateLimit({ ...RATE_LIMIT_DEFAULTS, max: 600 });
+        app.get('/*splat', staticLimiter, (req, res, next) => {
             if (req.path.startsWith('/api')) return next();
             res.sendFile(resolve(DIST_DIR, 'index.html'));
         });

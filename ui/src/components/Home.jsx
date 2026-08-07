@@ -1,24 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 
+// The "Environment" panel that listed the region, gateway id and bucket names is gone.
+// It was display-only — nothing here used those values, since the browser never calls
+// S3, DynamoDB or AgentCore directly — so it served deployment identifiers to a browser
+// for no functional reason. Deployment state is visible in the CloudFormation console
+// and in deploy.sh output.
 export default function Home({ onNavigate, branding = {} }) {
-  const [env, setEnv] = useState(null)
-
-  useEffect(() => {
-    async function fetchEnv(retries = 10, delay = 500) {
-      for (let i = 0; i < retries; i++) {
-        try {
-          const res = await fetch('/api/env')
-          if (!res.ok) throw new Error(res.status)
-          setEnv(await res.json())
-          return
-        } catch {
-          await new Promise(r => setTimeout(r, delay))
-        }
-      }
-    }
-    fetchEnv()
-  }, [])
-
   const name = branding.appName || 'BADGERS'
   const emoji = branding.appEmoji || '🦡'
   const description = branding.appDescription || ''
@@ -47,21 +34,6 @@ export default function Home({ onNavigate, branding = {} }) {
         ))}
       </div>
 
-      {env && (
-        <div className="card" style={{ fontSize: 12 }}>
-          <div style={{ fontWeight: 500, marginBottom: 8 }}>Environment</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 16px' }}>
-            <span style={{ color: 'var(--text-dim)' }}>Region</span>
-            <span style={{ fontFamily: 'SF Mono, Menlo, monospace' }}>{env.region || 'not set'}</span>
-            <span style={{ color: 'var(--text-dim)' }}>Runtime ARN</span>
-            <span style={{ fontFamily: 'SF Mono, Menlo, monospace', wordBreak: 'break-all' }}>{env.runtimeArn ? '✅ configured' : '❌ not set'}</span>
-            <span style={{ color: 'var(--text-dim)' }}>Gateway ID</span>
-            <span style={{ fontFamily: 'SF Mono, Menlo, monospace' }}>{env.gatewayId || '❌ not set'}</span>
-            <span style={{ color: 'var(--text-dim)' }}>Config Bucket</span>
-            <span style={{ fontFamily: 'SF Mono, Menlo, monospace' }}>{env.configBucket || '❌ not set'}</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

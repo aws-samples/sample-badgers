@@ -15,6 +15,10 @@ import SpecialistSelector from './components/SpecialistSelector.jsx'
 import S3ConfigEditor from './components/S3ConfigEditor.jsx'
 import ConfigEditor from './components/ConfigEditor.jsx'
 import LogPanel from './components/LogPanel.jsx'
+// Build-time branding from ui/config/branding.json, supplied by the badgers-branding
+// plugin in vite.config.js. Static so the login screen renders branded on first paint
+// with no request; it was previously fetched from /api/env behind a retry loop.
+import BRANDING from 'virtual:badgers-branding'
 
 const TABS = [
     // Testing tabs — all roles
@@ -46,7 +50,7 @@ export default function App() {
     const [tab, setTab] = useState('home')
     const [logs, setLogs] = useState([])
     const [running, setRunning] = useState(false)
-    const [branding, setBranding] = useState({})
+    const branding = BRANDING
     const [theme, setTheme] = useState(() => localStorage.getItem('badgers-theme') || '')
     const dirtyRef = useRef(false)
     const abortRef = useRef(null)
@@ -57,30 +61,12 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', t)
     }
 
-    // Fetch branding from /api/env (retry if backend isn't ready yet)
+    // Apply title and theme from the build-time branding. A theme the user picked
+    // previously still wins, matching the prior behaviour.
     useEffect(() => {
-        let cancelled = false
-        async function fetchEnv(retries = 10, delay = 500) {
-            for (let i = 0; i < retries; i++) {
-                if (cancelled) return
-                try {
-                    const res = await fetch('/api/env')
-                    if (!res.ok) throw new Error(res.status)
-                    const data = await res.json()
-                    if (data.branding) {
-                        setBranding(data.branding)
-                        document.title = data.branding.appName || 'BADGERS'
-                        const saved = localStorage.getItem('badgers-theme')
-                        applyTheme(saved || data.branding.theme || 'dark')
-                    }
-                    return
-                } catch {
-                    await new Promise(r => setTimeout(r, delay))
-                }
-            }
-        }
-        fetchEnv()
-        return () => { cancelled = true }
+        document.title = branding.appName || 'BADGERS'
+        const saved = localStorage.getItem('badgers-theme')
+        applyTheme(saved || branding.theme || 'dark')
     }, [])
 
     const testingTabs = TABS.filter(t => !t.adminOnly)
