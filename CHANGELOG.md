@@ -1,5 +1,38 @@
 # Changelog
 
+## [4.0.0] - 2026-08-07
+### Changed
+- **Version numbering is realigned across the repository.** `pyproject.toml` had drifted
+  to `1.2.0` while this file had reached `2.5.0`, and the two moved independently after
+  that — the branch carried `pyproject` `2.0.0` against a changelog claiming `3.1.0`.
+  Both now read `4.0.0`. The 2.x range was consumed between February and April 2026 and
+  `[2.0.0]` already denotes the February remediation container release, so this release
+  moves forward to a free major rather than reusing a number.
+  - `3.0.0` and `3.1.0` were never merged to `mainline`; they ship for the first time
+    alongside this entry and are left intact, since they document the specialist rename,
+    job tracking, Cognito OIDC/PKCE, and the ECS Express Gateway migration in detail.
+- `cdk-nag` is capped below 3.x. 3.x changed the Aspect API and fails at synth against
+  aws-cdk-lib 2.x with `aspectApplication.aspect.visit is not a function`.
+- Raised `mcp>=1.28.1`, `opencv-python>=4.13.0.92`, and `pydantic>=2.13.4`.
+
+### Security
+- **Merged the outstanding dependabot backlog from `mainline`.** pypdf 6.14.2,
+  bedrock-agentcore 1.18.1, setuptools 83.0.0, pillow 12.3.0, cryptography 50.0.0,
+  mcp 1.29.0, and the npm advisories covering vite, postcss, ip-address, body-parser,
+  shell-quote, and concurrently. `pip-audit` and `npm audit` both report no known
+  vulnerabilities.
+- **The `torch` advisory is resolved by removing the dependency rather than pinning it.**
+  `torch`, `torchvision`, `realesrgan`, `basicsr`, `spandrel`, and `super-image` are
+  dropped along with the upscaling stack they supported.
+- **npm fixes that landed on `mainline` under `local_testing/` are carried into `ui/`.**
+  That directory was consolidated into `ui/` in 3.0.0, so the upstream edits applied to
+  files this branch no longer has. Resolving the conflict as a deletion alone would have
+  discarded the fixes; the equivalent floors were raised in `ui/package.json` instead, so
+  a satisfied version cannot regress.
+
+### Removed
+- Duplicate `constructs` and `jpype1` entries in the `pyproject.toml` dependency list.
+
 ## [3.1.0] - 2026-08-04
 ### Changed
 - **BREAKING: stack names now include the `DEPLOYMENT_ID`.** `BADGERS-{Name}-{suffix}`
