@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, realpathSync } from 'fs';
 import { readFile, readdir, appendFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import WebSocket from 'ws';
@@ -46,15 +46,8 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         }
     );
 
-    // ── Load branding config (re-read on every request for hot reload) ──
-    const brandingPath = resolve(CONFIG_DIR, 'branding.json');
-    const BRANDING_DEFAULTS = { appName: 'BADGERS', appEmoji: '🦡', appSubtitle: 'Document analysis & deployment console', appDescription: '' };
-    function loadBranding() {
-        try {
-            if (existsSync(brandingPath)) return { ...BRANDING_DEFAULTS, ...JSON.parse(readFileSync(brandingPath, 'utf-8')) };
-        } catch { }
-        return BRANDING_DEFAULTS;
-    }
+    // Branding is no longer served here. It is build-time config bundled by the
+    // badgers-branding plugin in ui/vite.config.js and imported directly by App.jsx.
 
     const REGION = ENV.AWS_REGION || process.env.AWS_REGION || 'us-west-2';
     const RUNTIME_ARN = ENV.AGENTCORE_RUNTIME_WEBSOCKET_ARN || '';
@@ -125,16 +118,29 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
     // ── Routes ──
 
-    app.get('/api/env', (_req, res) => {
-        res.json({
-            region: REGION,
-            runtimeArn: RUNTIME_ARN ? 'configured' : '',
-            gatewayId: GATEWAY_ID,
-            configBucket: ENV.S3_CONFIG_BUCKET || '',
-            outputBucket: ENV.S3_OUTPUT_BUCKET || '',
-            branding: loadBranding(),
-        });
+    // The load balancer's health_check_path (deployment/stacks/ecs_stack.py) and the only
+    // unauthenticated route under /api/, because the balancer carries no Cognito token.
+    // Named for what it is; it was /api/env, which invited config to accumulate on it.
+    //
+    // Discloses nothing. It previously returned the region, gateway id and both bucket
+    // names to any caller: the service defaults to public subnets and therefore an
+    // internet-facing load balancer (UI_PUBLIC_ACCESS in deployment/app.py), so that
+    // response was public. Bucket names occupy a global namespace and the deployment id
+    // embedded in them derives every other resource name in the deployment.
+    //
+    // Keep this a constant. Anything added here is served to anonymous callers.
+    app.get('/api/healthcheck', (_req, res) => {
+        res.json({ status: 'ok' });
     });
+
+    // No deployment-config route here by design. The Home "Environment" panel that used
+    // to display the region, gateway id and bucket names is gone: every field was
+    // rendered as text and none was used by the browser, which never talks to S3,
+    // DynamoDB or AgentCore directly — the server does, with the task role. Even the
+    // region identifies the deployment, so nothing is sent.
+    //
+    // Note /api/config is already taken by an admin route (routes/admin.js) for the
+    // deployment tag editor, behind requireAdmin.
 
     // ── Tools ──
 
@@ -197,7 +203,9 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
         const logFile = resolve(LOGS_DIR, `${safeSessionId}.log`);
-        if (!logFile.startsWith(LOGS_DIR)) return res.status(403).json({ error: 'Forbidden' });
+        // Normalize the path and verify it's within the allowed logs directory
+        const normalizedLogFile = realpathSync(logFile);
+        if (!normalizedLogFile.startsWith(LOGS_DIR + '/')) return res.status(403).json({ error: 'Forbidden' });
         const log = (line) => { appendFile(logFile, line + '\n').catch(() => { }); };
         log(`\n${'='.repeat(60)}`);
         log(`[${new Date().toISOString()}] USER: ${message}`);
@@ -420,7 +428,10 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             const result = {};
             for (const relPath of promptFiles) {
                 const fullPath = resolve(specialistPromptDir, relPath);
-                const fileName = relPath.replace(/^\.\.\//, '');
+                const normalizedPath = realpathSync(fullPath);
+                // Verify the normalized path is within the allowed prompts directory
+                if (!normalizedPath.startsWith(promptsBase + '/')) continue;
+                const fileName = relPath.replace(/^(\.\.[\/\\]+)+/, '');
                 try { result[fileName] = await readFile(fullPath, 'utf-8'); } catch { }
             }
             res.json(result);
@@ -435,9 +446,12 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         try {
             const edits = req.body || {};
             for (const [fileName, content] of Object.entries(edits)) {
+                // Reject paths with ".." or absolute paths to prevent path traversal
                 if (fileName.includes('..') || fileName.startsWith('/')) continue;
                 const fullPath = resolve(specialistPromptDir, fileName);
-                if (!fullPath.startsWith(promptsBase)) continue;
+                // Normalize and verify the path is within the allowed directory
+                const normalizedPath = realpathSync(fullPath);
+                if (!normalizedPath.startsWith(promptsBase + '/')) continue;
                 await writeFile(fullPath, content, 'utf-8');
             }
             res.json({ ok: true });

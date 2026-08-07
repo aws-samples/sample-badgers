@@ -82,7 +82,9 @@ headers, which is why identity is established at the application layer instead. 
 Browser (React/Vite)
     │  Cognito hosted UI ──→ authorization code + PKCE ──→ access token
     │
-    ├── /api/me ──→ User identity (verified JWT claims, or local-dev identity)
+    │  Identity read from the ID token's claims in the browser — no /api/me round trip
+    │
+    ├── /api/healthcheck ──→ {"status":"ok"}, the only unauthenticated route
     ├── /api/* ──→ Express server (port 7860), all behind requireAuth
     │                ├── Core routes (all roles)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
@@ -142,7 +144,7 @@ ui/
 │   ├── authFetch.js               # Attaches the bearer token to API calls
 │   ├── index.css                  # Global styles
 │   ├── hooks/
-│   │   └── useUser.js             # User context (role, email) from /api/me
+│   │   └── useUser.js             # User context (role, email) from ID token claims
 │   └── components/
 │       ├── Home.jsx               # Dashboard
 │       ├── Chat.jsx               # Agent chat interface, PDF upload, doc_id
