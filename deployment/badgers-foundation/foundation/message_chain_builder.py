@@ -1,5 +1,5 @@
 """
-Message chain building functionality for analyzer system.
+Message chain building functionality for specialist system.
 
 Handles construction of message chains for Bedrock invocation with examples and target images.
 """

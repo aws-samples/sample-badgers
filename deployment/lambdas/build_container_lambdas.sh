@@ -2,7 +2,7 @@
 # Build and push container Lambda images to the badgers ECR repository
 # Usage: ./build_container_lambdas.sh <deployment_id>
 #
-# This script builds the image_enhancer and remediation_analyzer containers
+# This script builds the image_enhancer and remediation_specialist containers
 # and pushes them to the shared badgers-<deployment_id> ECR repository.
 
 set -e
@@ -27,7 +27,7 @@ echo "Logging into ECR..."
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
 # Container functions to build
-CONTAINERS=("image_enhancer" "remediation_analyzer")
+CONTAINERS=("image_enhancer" "remediation_specialist")
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     CONTAINER_DIR="./containers/${CONTAINER}"
@@ -47,18 +47,22 @@ for CONTAINER in "${CONTAINERS[@]}"; do
     echo "URI: ${FULL_URI}"
     echo "=========================================="
 
-    # Copy foundation and config modules for containers that need them
-    # (remediation_analyzer is self-contained — no foundation/config dependency)
-    if [ "$CONTAINER" != "remediation_analyzer" ]; then
-        echo "Copying foundation and config modules to build context..."
-        if [ -d "./layer/python/foundation" ]; then
-            rm -rf "${CONTAINER_DIR}/foundation"
-            cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
-        else
-            echo "Error: foundation module not found at ./layer/python/foundation"
-            exit 1
-        fi
+    # Copy the foundation module into every container build context. Both
+    # containers now import foundation.job_state to record their subtask state in
+    # DynamoDB, so remediation_specialist is no longer self-contained.
+    echo "Copying foundation module to build context..."
+    if [ -d "./layer/python/foundation" ]; then
+        rm -rf "${CONTAINER_DIR}/foundation"
+        cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
+    else
+        echo "Error: foundation module not found at ./layer/python/foundation"
+        exit 1
+    fi
 
+    # config is only needed by the containers that load specialist manifests;
+    # remediation_specialist reads none.
+    if [ "$CONTAINER" != "remediation_specialist" ]; then
+        echo "Copying config module to build context..."
         if [ -d "./layer/python/config" ]; then
             rm -rf "${CONTAINER_DIR}/config"
             cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
@@ -66,8 +70,6 @@ for CONTAINER in "${CONTAINERS[@]}"; do
             echo "Error: config module not found at ./layer/python/config"
             exit 1
         fi
-    else
-        echo "Skipping foundation/config copy (self-contained container)"
     fi
 
     # Build for x86_64 (Lambda runtime)
@@ -79,7 +81,7 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         "${CONTAINER_DIR}"
 
     # Clean up foundation and config copies (if they were added)
-    if [ "$CONTAINER" != "remediation_analyzer" ]; then
+    if [ "$CONTAINER" != "remediation_specialist" ]; then
         rm -rf "${CONTAINER_DIR}/foundation"
         rm -rf "${CONTAINER_DIR}/config"
     fi

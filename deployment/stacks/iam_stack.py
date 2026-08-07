@@ -4,10 +4,18 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     Tags,
+    aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_s3 as s3,
 )
 from constructs import Construct
+
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
 
 
 class IAMStack(Stack):
@@ -22,6 +30,7 @@ class IAMStack(Stack):
         config_bucket: s3.Bucket,
         source_bucket: s3.Bucket,
         output_bucket: s3.Bucket,
+        jobs_table: dynamodb.ITable,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -35,20 +44,20 @@ class IAMStack(Stack):
         # Lambda execution role
         self.lambda_role = iam.Role(
             self,
-            "LambdaAnalyzerExecutionRole",
-            role_name=f"lambda-analyzer-role-{deployment_id}",
+            "LambdaSpecialistExecutionRole",
+            role_name=f"lambda-specialist-role-{deployment_id}",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-            description="Execution role for Lambda analyzer functions with Bedrock and S3 access",
+            description="Execution role for Lambda specialist functions with Bedrock and S3 access",
         )
 
         # Apply resource-specific tags
         self._apply_resource_tags(
             self.lambda_role,
             "lambda-execution-role",
-            "IAM execution role for Lambda analyzer functions",
+            "IAM execution role for Lambda specialist functions",
         )
 
-        # Bedrock permissions - scoped to specific models used by analyzers
+        # Bedrock permissions - scoped to specific models used by specialists
         # For inference profiles, we need permissions on BOTH the inference profile
         # AND the underlying foundation models that requests can be routed to
         self.lambda_role.add_to_policy(
@@ -74,7 +83,7 @@ class IAMStack(Stack):
         )
 
         # Application inference profiles - created by InferenceProfilesStack for cost tracking
-        # These wrap the system-defined profiles above and are passed to analyzers via env vars
+        # These wrap the system-defined profiles above and are passed to specialists via env vars
         # when running in AgentCore Runtime
         self.lambda_role.add_to_policy(
             iam.PolicyStatement(
@@ -142,6 +151,30 @@ class IAMStack(Stack):
         # S3 output bucket read/write access
         output_bucket.grant_read_write(self.lambda_role)
 
+        # DynamoDB jobs table access for job state tracking.
+        # Specialists upsert their own subtask row (RUNNING -> COMPLETE/FAILED)
+        # via foundation.job_state. Without this grant those calls fail at the
+        # API and job tracking is silently lost.
+        #
+        # Scoped to exactly the four operations job_state performs rather than
+        # using grant_read_write_data, which would also allow DeleteItem, Scan
+        # and the Batch* operations. Specialists never delete or scan; the base
+        # table alone is enough because job_state.query filters on the job_id
+        # partition key and never reads a GSI.
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="DynamoDBJobState",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                ],
+                resources=[jobs_table.table_arn],
+            )
+        )
+
         # S3 access for specific buckets (config and output only)
         # Additional bucket access should be granted explicitly
 
@@ -179,6 +212,92 @@ class IAMStack(Stack):
             value=self.lambda_role.role_name,
             description="Lambda execution role name",
             export_name=f"{Stack.of(self).stack_name}-LambdaRoleName",
+        )
+
+        self._add_nag_suppressions()
+
+    def _add_nag_suppressions(self) -> None:
+        """Document the wildcard permissions AwsSolutions-IAM5 flags on the
+        specialist execution role.
+
+        AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
+        names the exact resource it applies to and why the wildcard is needed.
+        """
+        if not _HAVE_CDK_NAG:
+            return
+
+        NagSuppressions.add_resource_suppressions(
+            self.lambda_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference requires bedrock:InvokeModel on the "
+                        "foundation model in every destination Region the inference "
+                        "profile can route to, so the Region field is wildcarded. The "
+                        "model ID itself is pinned exactly -- no model wildcard. See "
+                        "https://docs.aws.amazon.com/bedrock/latest/userguide/"
+                        "geographic-cross-region-inference.html"
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Cross-Region inference profiles are resolved per Region, so "
+                        "the Region field is wildcarded while the profile ID stays "
+                        "pinned. The application-inference-profile/* entry is scoped to "
+                        "this account -- profile IDs are generated at runtime and "
+                        "cannot be enumerated at deploy time."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-opus-4-6-v1",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
+                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:application-inference-profile/*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "CloudWatch Logs targets are prefix-scoped to this "
+                        "deployment's specialist log groups (badgers-* / badgers_*). "
+                        "Log group names embed the specialist name and log stream names "
+                        "are generated at runtime, so neither can be enumerated at "
+                        "deploy time. Scoped to this account and Region."
+                    ),
+                    "appliesTo": [
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*:*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*",
+                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*:*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "S3 object access is scoped to these three specific buckets. "
+                        "The /* suffix is required because object keys are per-document "
+                        "and per-job values created at runtime and cannot be enumerated "
+                        "at deploy time. The bucket ARNs are resolved references, not "
+                        "wildcards."
+                    ),
+                    "appliesTo": [
+                        "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                        "Resource::<OutputBucket7114EB27.Arn>/*",
+                        "Resource::<SourceBucketDDD2130A.Arn>/*",
+                    ],
+                },
+            ],
+            apply_to_children=True,
         )
 
     def _apply_common_tags(self) -> None:

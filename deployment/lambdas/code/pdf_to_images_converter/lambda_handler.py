@@ -6,6 +6,7 @@ import base64
 import os
 import uuid
 from pathlib import Path
+from foundation import job_state
 from foundation.lambda_error_handler import (
     create_error_response,
     ValidationError,
@@ -34,6 +35,12 @@ def lambda_handler(event, context):
 
     logger.info("pdf2image will use pdftoppm at: %s", shutil.which("pdftoppm"))
 
+    # Job-tracking identifiers are read from the request body inside the try,
+    # but must exist out here so the except handler can mark the subtask failed
+    # even if the failure happened before they were parsed.
+    job_id = ""
+    subtask = ""
+
     try:
         # Log Gateway context information
         if hasattr(context, "client_context") and context.client_context:
@@ -50,8 +57,10 @@ def lambda_handler(event, context):
         # Parse input - AgentCore Gateway passes parameters directly in event
         body = json.loads(event["body"]) if "body" in event else event
 
-        # Extract session_id from AgentCore Runtime (use provided or generate new)
-        session_id = body.get("session_id")
+        # Extract session_id from AgentCore Runtime (use provided or generate new).
+        # The fallback is resolved here rather than after conversion so the
+        # session id is available to job tracking and to every log line below.
+        session_id = body.get("session_id") or uuid.uuid4().hex[:12]
 
         pdf_path = body.get("pdf_path")
         if not pdf_path:
@@ -59,6 +68,23 @@ def lambda_handler(event, context):
                 message="Missing required parameter: pdf_path",
                 details={"provided_keys": list(body.keys())},
             )
+
+        # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
+        # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
+        # This converter fans one PDF out into many page images, so its subtask
+        # is keyed off the source PDF rather than a page.
+        specialist_name = os.environ.get("SPECIALIST_NAME", "pdf_to_images_converter")
+        job_id = body.get("job_id") or ""
+        doc_id = body.get("doc_id") or ""
+        subtask = job_state.subtask_id(specialist_name, pdf_path)
+        job_state.mark_running(
+            job_id,
+            subtask,
+            doc_id=doc_id,
+            specialist=specialist_name,
+            image_id=job_state.image_identifier(pdf_path),
+            session_id=session_id,
+        )
 
         max_image_size_mb = body.get("max_image_size_mb", 4.0)
         dpi = body.get("dpi", 128)
@@ -69,12 +95,16 @@ def lambda_handler(event, context):
         # Convert PDF to base64 images
         base64_images = _convert_pdf_to_images(pdf_data, dpi, max_image_size_mb)
 
-        # Store base64 in S3 temp location (use provided session_id or generate new)
-        if not session_id:
-            session_id = uuid.uuid4().hex[:12]
+        # Store base64 in S3 temp location. _store_images_to_s3 raises when
+        # OUTPUT_BUCKET is unset, so a missing artifact destination already
+        # fails the invocation rather than returning an empty success.
         logger.info("Processing request for runtime session_id: %s", session_id)
 
         s3_paths = _store_images_to_s3(base64_images, session_id)
+
+        # The converter's artifact is the set of page images; record the first as
+        # the representative key so the row points into the right prefix.
+        job_state.mark_complete(job_id, subtask, s3_paths[0] if s3_paths else "")
 
         logger.info(
             "Converted PDF to %d images, stored in S3 temp/ (session: %s)",
@@ -100,6 +130,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
+        job_state.mark_failed(job_id, subtask, str(e))
         return create_error_response(e)
 
 
@@ -176,45 +207,6 @@ def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> lis
 
     pdf_data = _decrypt_pdf_if_needed(pdf_data)
     # Convert PDF to PIL images
-    # Test if decrypted PDF has text at all
-    text_result = subprocess.run(
-        ["/opt/bin/pdftotext", "-", "-"], input=pdf_data, capture_output=True
-    )
-    logger.info("pdftotext output length: %d bytes", len(text_result.stdout))
-    logger.info("pdftotext stderr: %s", text_result.stderr.decode())
-
-    # Run pdftoppm directly and check stderr
-    import tempfile, os
-
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(pdf_data)
-        tmp_pdf = f.name
-    ppm_result = subprocess.run(
-        [
-            "/opt/bin/pdftoppm",
-            "-jpeg",
-            "-r",
-            "128",
-            "-f",
-            "1",
-            "-l",
-            "1",
-            tmp_pdf,
-            "/tmp/debug_page",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    logger.info(
-        "pdftoppm returncode: %d, stderr: %s", ppm_result.returncode, ppm_result.stderr
-    )
-    debug_size = (
-        os.path.getsize("/tmp/debug_page-1.jpg")
-        if os.path.exists("/tmp/debug_page-1.jpg")
-        else 0
-    )
-    logger.info("Direct pdftoppm output size: %d bytes", debug_size)
-    os.unlink(tmp_pdf)
     pil_images = convert_from_bytes(pdf_data, dpi=dpi)
 
     base64_images = []

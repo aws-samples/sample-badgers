@@ -1,14 +1,14 @@
 #!/bin/bash
-# Deploy the analyzer foundation Lambda layer to AWS
+# Deploy the specialist foundation Lambda layer to AWS
 
 set -e
 
-LAYER_NAME="analyzer-foundation"
-DESCRIPTION="Reusable foundation framework for analyzer Lambda functions"
+LAYER_NAME="specialist-foundation"
+DESCRIPTION="Reusable foundation framework for specialist Lambda functions"
 COMPATIBLE_RUNTIMES="python3.12"
 REGION="${AWS_REGION:-us-west-2}"
 
-echo "☁️  Deploying Analyzer Foundation Lambda Layer..."
+echo "☁️  Deploying Specialist Foundation Lambda Layer..."
 
 # Check if layer.zip exists
 if [ ! -f "layer.zip" ]; then
@@ -62,7 +62,7 @@ if [ $? -eq 0 ]; then
     echo ""
 
     echo "Or in your function code:"
-    echo "from foundation.analyzer_foundation import AnalyzerFoundation"
+    echo "from foundation.specialist_foundation import SpecialistFoundation"
     echo ""
 
     # List all versions

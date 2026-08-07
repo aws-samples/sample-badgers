@@ -32,7 +32,9 @@ class AgentCoreMemoryStack(Stack):
         self.memory = agentcore.CfnMemory(
             self,
             "badgers-memory",
-            name=f"badgers_memory_{deployment_id}",
+            # AgentCore memory names must match [a-zA-Z][a-zA-Z0-9_]{0,47} — no
+            # hyphens, so the deployment_id separator is normalised here.
+            name=f"badgers_memory_{deployment_id.replace('-', '_')}",
             description="Short-term memory for BADGERS sessions",
             event_expiry_duration=90,  # days
         )

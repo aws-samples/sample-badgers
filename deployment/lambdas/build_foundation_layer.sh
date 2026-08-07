@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build the analyzer foundation Lambda layer using Docker
+# Build the specialist foundation Lambda layer using Docker
 
 set -e
 
-echo "🏗️  Building Analyzer Foundation Lambda Layer..."
+echo "🏗️  Building Specialist Foundation Lambda Layer..."
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
@@ -65,10 +65,10 @@ touch layer/python/foundation/__init__.py
 echo "📋 Copying config utilities..."
 mkdir -p layer/python/config
 cp ../badgers-foundation/config/config.py layer/python/config/
-# Don't copy analyzer_config.json - each function has its own manifest
+# Don't copy specialist_config.json - each function has its own manifest
 touch layer/python/config/__init__.py
 
-# Copy core system prompts (used by all analyzers)
+# Copy core system prompts (used by all specialists)
 echo "📋 Copying core system prompts..."
 mkdir -p layer/python/prompts/core_system_prompts
 cp -r ../badgers-foundation/foundation/core_system_prompts/* layer/python/prompts/core_system_prompts/
@@ -76,7 +76,7 @@ cp -r ../badgers-foundation/foundation/core_system_prompts/* layer/python/prompt
 # Create layer info file
 echo "📝 Creating layer info..."
 cat > layer/python/LAYER_INFO.txt << EOF
-Analyzer Foundation Lambda Layer
+Specialist Foundation Lambda Layer
 Built: $(date)
 Python: 3.12
 Architecture: x86_64, arm64
@@ -88,8 +88,8 @@ Contents:
 - boto3, pillow, botocore
 
 Usage:
-Import foundation in your analyzer:
-  from foundation.analyzer_foundation import AnalyzerFoundation
+Import foundation in your specialist:
+  from foundation.specialist_foundation import SpecialistFoundation
 
 Version: $(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 EOF

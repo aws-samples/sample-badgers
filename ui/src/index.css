@@ -1,0 +1,477 @@
+/* ═══════════════════════════════════════════════════════════════
+   Theme: Dark (default)
+   ═══════════════════════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+    --bg: #0f1117;
+    --bg-gradient: #0f1117;
+    --surface: #161b22;
+    --surface-hover: #1c2129;
+    --border: #30363d;
+    --text: #e1e4e8;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79b8ff;
+    --accent-bg: #1f6feb;
+    --accent-bg-hover: #388bfd;
+    --accent-subtle: rgba(31, 111, 235, 0.12);
+    --accent-border: rgba(31, 111, 235, 0.25);
+    --green: #3fb950;
+    --green-subtle: rgba(63, 185, 80, 0.15);
+    --green-border: rgba(63, 185, 80, 0.3);
+    --red: #f85149;
+    --yellow: #d29922;
+    --orange: #db6d28;
+    --radius: 8px;
+    --thinking-bg: rgba(210, 153, 34, 0.06);
+    --thinking-border: rgba(210, 153, 34, 0.2);
+    --thinking-hover: rgba(210, 153, 34, 0.08);
+    --code-bg: rgba(255, 255, 255, 0.06);
+    --code-block-bg: rgba(0, 0, 0, 0.3);
+    --code-header-bg: rgba(255, 255, 255, 0.04);
+    --table-header-bg: rgba(255, 255, 255, 0.04);
+    color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Theme: AWS Purple — deep purple-to-teal gradient
+   ═══════════════════════════════════════════════════════════════ */
+[data-theme="purple"] {
+    --bg: #1a0e2e;
+    --bg-gradient: linear-gradient(160deg, #1a0e2e 0%, #2d1b4e 30%, #1e2a5a 60%, #1a3a5c 80%, #1a4a5a 100%);
+    --surface: rgba(255, 255, 255, 0.06);
+    --surface-hover: rgba(255, 255, 255, 0.10);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #f0f0f5;
+    --text-dim: #a8a8c0;
+    --accent: #7eb8ff;
+    --accent-hover: #a0d0ff;
+    --accent-bg: #5b4fc4;
+    --accent-bg-hover: #7060d8;
+    --accent-subtle: rgba(91, 79, 196, 0.18);
+    --accent-border: rgba(91, 79, 196, 0.35);
+    --green: #56d4a0;
+    --green-subtle: rgba(86, 212, 160, 0.15);
+    --green-border: rgba(86, 212, 160, 0.3);
+    --red: #ff6b6b;
+    --yellow: #f0c060;
+    --orange: #e8884c;
+    --radius: 8px;
+    --thinking-bg: rgba(240, 192, 96, 0.08);
+    --thinking-border: rgba(240, 192, 96, 0.2);
+    --thinking-hover: rgba(240, 192, 96, 0.12);
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --code-block-bg: rgba(0, 0, 0, 0.25);
+    --code-header-bg: rgba(255, 255, 255, 0.06);
+    --table-header-bg: rgba(255, 255, 255, 0.06);
+    color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base styles (theme-agnostic)
+   ═══════════════════════════════════════════════════════════════ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg-gradient, var(--bg));
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+button {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    transition: background 0.15s;
+}
+
+button:hover {
+    background: var(--surface-hover);
+}
+
+button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+button.primary {
+    background: var(--accent-bg);
+    border-color: var(--accent-bg);
+}
+
+button.primary:hover {
+    background: var(--accent-bg-hover);
+}
+
+button.danger {
+    border-color: var(--red);
+    color: var(--red);
+}
+
+button.danger:hover {
+    background: rgba(248, 81, 73, 0.1);
+}
+
+input,
+select,
+textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    width: 100%;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+input[type="checkbox"] {
+    width: unset;
+}
+
+textarea {
+    font-family: 'SF Mono', Menlo, monospace;
+    resize: vertical;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+
+.home-card {
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.home-card:hover {
+    border-color: var(--accent-bg);
+    background: var(--accent-subtle);
+}
+
+/* ── Active tab button ── */
+button.tab-active {
+    background: var(--accent-bg);
+    border-color: var(--accent-bg);
+}
+
+button.tab-active:hover {
+    background: var(--accent-bg-hover);
+}
+
+/* ── Chat ── */
+
+.chat-message {
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+    font-size: 13px;
+    line-height: 1rem;
+    white-space: collapse;
+    word-break: break-word;
+}
+
+.chat-message.user {
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+}
+
+.chat-message.assistant {
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.chat-message .thinking {
+    background: var(--thinking-bg);
+    border: 1px solid var(--thinking-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.chat-message ul {
+    margin: .7rem .4rem;
+}
+
+.chat-message p {
+    margin-bottom: 1rem;
+}
+
+/* ── Thinking block ── */
+
+.thinking-block {
+    background: var(--thinking-bg);
+    border: 1px solid var(--thinking-border);
+    border-radius: 6px;
+    margin: 6px 0;
+    overflow: hidden;
+}
+
+.thinking-trigger {
+    display: flex;
+    width: 100%;
+    cursor: pointer;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    color: var(--yellow);
+    font-weight: 500;
+    font-size: 12px;
+    background: none;
+    border: none;
+}
+
+.thinking-trigger:hover {
+    background: var(--thinking-hover);
+}
+
+.reasoning-text {
+    white-space: pre-wrap;
+    padding: 6px 12px;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-style: italic;
+    line-height: 1.5;
+}
+
+/* ── assistant-ui overrides ── */
+
+[data-aui-thread] {
+    --aui-thread-background: var(--surface);
+    --aui-composer-background: var(--bg);
+    height: 100%;
+}
+
+.aui-root {
+    height: 100%;
+    color-scheme: dark;
+}
+
+.aui-thread-root {
+    background: var(--surface) !important;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    height: 100%;
+}
+
+.aui-composer-root {
+    border-color: var(--border) !important;
+}
+
+.aui-assistant-message-content {
+    color: var(--text);
+}
+
+.aui-user-message-content {
+    background: var(--accent-subtle) !important;
+    color: var(--text) !important;
+}
+
+/* ── Loading dots ── */
+
+.loading-dots {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.loading-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.3;
+    animation: dot-pulse 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes dot-pulse {
+
+    0%,
+    80%,
+    100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+
+    40% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ── Markdown ── */
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+    margin: 12px 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.markdown-body h1 {
+    font-size: 16px;
+}
+
+.markdown-body p {
+    margin: 4px 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+.markdown-body li {
+    margin: 2px 0;
+}
+
+.markdown-body code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'SF Mono', Menlo, monospace;
+}
+
+.markdown-body pre {
+    background: var(--code-block-bg);
+    padding: 10px 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.markdown-body pre code {
+    background: none;
+    padding: 0;
+}
+
+.markdown-body strong {
+    color: var(--accent);
+}
+
+.markdown-body a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+.markdown-body blockquote {
+    border-left: 3px solid var(--border);
+    padding-left: 12px;
+    color: var(--text-dim);
+    margin: 8px 0;
+}
+
+.markdown-body table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+}
+
+.markdown-body th,
+.markdown-body td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.markdown-body th {
+    background: var(--table-header-bg);
+}
+
+/* ── Attachment chips ── */
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--accent);
+}
+
+/* ── Code blocks ── */
+
+.code-block-wrapper {
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 8px 0;
+    border: 1px solid var(--border);
+}
+
+.code-block-header {
+    background: var(--code-header-bg);
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+}
+
+.inline-code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'SF Mono', Menlo, monospace;
+}
+
+/* ── Theme toggle ── */
+
+.theme-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
+}
+
+.theme-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}

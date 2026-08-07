@@ -1,7 +1,7 @@
 """
-Image processing functionality for analyzer system.
+Image processing functionality for specialist system.
 
-Handles image conversion, optimization, and base64 encoding for different analyzer types.
+Handles image conversion, optimization, and base64 encoding for different specialist types.
 """
 
 import base64

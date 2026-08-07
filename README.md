@@ -1,11 +1,12 @@
+> [!WARNING]
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🧭 **Navigation:**</sub><br>
-<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [Local Testing](local_testing/LOCAL_TESTING_README.md) | [Deployment UI](deployment/ui/DEPLOYMENT_UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Analyzers](deployment/lambdas/LAMBDA_ANALYZERS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
-# 🦡 BADGERS
+# 🦡 BADGERS v4.0 as of August 2026
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
@@ -18,19 +19,36 @@ Traditional document processing tools extract text but lose context. They can't 
 - 🏗️ **Preserving semantic structure** - Maintains document hierarchy and element relationships
 - 👁️ **Understanding visual context** - Recognizes how layout conveys meaning
 - 📚 **Processing diverse content** - Handles 21+ element types from handwriting to equations
-- 🤖 **Automating complex workflows** - Orchestrates multiple specialized analyzers via an AI agent
+- 🤖 **Automating complex workflows** - Orchestrates multiple specialized specialists via an AI agent
 
 Use cases: research acceleration, compliance automation, content management, accessibility remediation.
 
 ## 📸 Screenshots
 
-| Local Testing — Home                                               | Local Testing — Chat                                               |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| ![Home Page](github-assets/badgers-local-testing-ui-home-page.png) | ![Chat Interface](github-assets/badgers-local-testing-ui-chat.png) |
+A single React + Express app is both the testing workbench and the deployment/ops console — the same code runs locally via `npm run dev` or on ECS behind Cognito OIDC. Tabs are role-gated: the **Testing** row below is visible to all users, while an admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not pictured here. See the [UI README](ui/UI_README.md) for the full tab and role breakdown.
 
-| Deployment UI — Stacks                                                      | Deployment UI — Config Editor                                       |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| ![Stack Information](github-assets/badgers-deploy-ui-stack-information.png) | ![Config Editor](github-assets/badgers-deploy-ui-config-editor.png) |
+### Testing tabs
+
+| Home                                                                                                                 | Chat                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home](.github/assets/01_sample-badgers-home.png)                                                                   | ![Chat](.github/assets/02_sample-badgers-chat.png)                                                                                                      |
+| Landing view with per-page navigation and the resolved environment (region, runtime ARN, gateway ID, config bucket). | Streams messages to the AgentCore Runtime over WebSocket, with extended-thinking blocks, the live gateway tool list, and audit / dynamic-token toggles. |
+
+| Create Specialist                                                                                                     | Evaluations                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| ![Create Specialist](.github/assets/03_sample-badgers-create-specialist.png)                                          | ![Evaluations](.github/assets/04_sample-badgers-evaluations.png)                                                           |
+| Four-step wizard — basic info, generated prompt review, examples, deploy — including primary model and two fallbacks. | Pages through a session's specialist output and scores accuracy, element identification, and contextual understanding 1–5. |
+
+| Pricing                                                                                                                | Observability                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ![Pricing](.github/assets/05_sample-badgers-cost-modeling.png)                                                         | ![Observability](.github/assets/06_sample-badgers-local-observability.png)                                              |
+| Basic and advanced Bedrock cost calculators with industry presets, per-model token pricing, and ingestion assumptions. | Pulls traces and spans for a session from the CloudWatch `aws/spans` log group, with token usage and an event timeline. |
+
+### Deployment CLI
+
+![Deployment CLI](.github/assets/07_sample-badgers-deployment-cli.png)
+
+The deployment menu tracks the eight ordered steps — Lambda layers, foundational infrastructure, prompts/manifests/schemas, specialist Lambdas, gateway, runtime, UI image, UI ECS service — per deployment ID and stack suffix. Steps can be run individually, all at once, or resumed from wherever the last run stopped.
 
 ## ⚙️ How It Works
 
@@ -58,8 +76,8 @@ Use cases: research acceleration, compliance automation, content management, acc
                    ▼                  ▼                  ▼
             ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
             │   Lambda    │    │   Lambda    │    │   Lambda    │
-            │  Analyzer   │    │  Analyzer   │    │  Analyzer   │
-            │ (25 tools)  │    │             │    │             │
+            │ Specialist  │    │ Specialist  │    │ Specialist  │
+            │ (26 tools)  │    │             │    │             │
             └─────────────┘    └─────────────┘    └─────────────┘
                    │                  │                  │
                    └──────────────────┼──────────────────┘
@@ -72,55 +90,58 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 1. 📄 **User submits a document** with analysis instructions
 2. 🧠 **Strands Agent** (running in AgentCore Runtime) interprets the request
-3. 🔧 **Agent selects tools** from a library of specialized analyzers via MCP Gateway
-4. ⚡ **Lambda analyzers** (standardized and domain-specific functions, including container-based) process document elements using Claude vision models
-5. 📊 **Results aggregate** with preserved structure and semantic relationships
+3. 🔧 **Agent selects tools** from a library of specialists via MCP Gateway
+4. 📋 **Agent opens a job** on the first specialist call, tagging every invocation in the run with the job and document it belongs to
+5. ⚡ **Lambda specialists** (standardized and domain-specific functions, including container-based) process document elements using Claude vision models, each recording its own outcome
+6. 📊 **Results aggregate** with preserved structure and semantic relationships
 
 ## 🛠️ Tech Stack
 
-| Component          | Technology                                                         |
-| ------------------ | ------------------------------------------------------------------ |
-| 🤖 Agent Framework  | [Strands Agents](https://github.com/strands-agents/strands-agents) |
-| 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                   |
-| 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                    |
-| 🧠 Foundation Model | Claude Sonnet 4.5 (via Amazon Bedrock)                             |
-| ⚡ Compute          | AWS Lambda (modular analyzer functions, including container-based) |
-| 📦 Storage          | Amazon S3 (configs, prompts, outputs)                              |
-| 🔐 Auth             | Amazon Cognito (OAuth 2.0 client credentials)                      |
-| 🏗️ IaC              | AWS CDK (Python)                                                   |
-| 📈 Observability    | CloudWatch Logs, X-Ray                                             |
-| 📊 Cost Tracking    | Bedrock Application Inference Profiles                             |
+| Component          | Technology                                                             |
+| ------------------ | ---------------------------------------------------------------------- |
+| 🤖 Agent Framework  | [Strands Agents](https://github.com/strands-agents/strands-agents)     |
+| 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                       |
+| 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                        |
+| 🧠 Foundation Model | Claude Sonnet 4.5 (via Amazon Bedrock)                                 |
+| ⚡ Compute          | AWS Lambda (modular specialist functions, including container-based)   |
+| 📦 Storage          | Amazon S3 (configs, prompts, outputs)                                  |
+| 📋 Job Tracking     | Amazon DynamoDB (document → job → subtask state)                       |
+| 🖥️ UI Hosting       | Amazon ECS Express Gateway service (in a VPC)                          |
+| 🔐 Auth             | Amazon Cognito (OIDC + PKCE for the UI, OAuth 2.0 M2M for the Gateway) |
+| 🏗️ IaC              | AWS CDK (Python)                                                       |
+| 📈 Observability    | CloudWatch Logs, X-Ray Transaction Search                              |
+| 📊 Cost Tracking    | Bedrock Application Inference Profiles                                 |
 
-## 🔬 Analyzers
+## 🔬 Specialists
 
-| Analyzer                             | Purpose                                                                                    |
-| ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| 📸 `pdf_to_images_converter`          | Convert PDF pages to images                                                                |
-| 🏷️ `classify_pdf_content`             | Classify document content type                                                             |
-| 📝 `full_text_analyzer`               | Extract all text content                                                                   |
-| 📊 `table_analyzer`                   | Extract and structure tables                                                               |
-| 📈 `charts_analyzer`                  | Analyze charts and graphs                                                                  |
-| 🔀 `diagram_analyzer`                 | Process diagrams and flowcharts                                                            |
-| 📐 `layout_analyzer`                  | Document structure analysis                                                                |
-| ♿ `accessibility_analyzer`           | Generate accessibility metadata (part of remediation)                                      |
-| 🏥 `decision_tree_analyzer`           | Medical/clinical document analysis                                                         |
-| 🔬 `scientific_analyzer`              | Scientific paper analysis                                                                  |
-| ✍️ `handwriting_analyzer`             | Handwritten text recognition                                                               |
-| 💻 `code_block_analyzer`              | Extract code snippets                                                                      |
-| 🗂️ `metadata_generic_analyzer`        | Generic metadata extraction                                                                |
-| 🗂️ `metadata_mads_analyzer`           | MADS metadata format extraction                                                            |
-| 🗂️ `metadata_mods_analyzer`           | MODS metadata format extraction                                                            |
-| 🔑 `keyword_topic_analyzer`           | Extract keywords and topics                                                                |
-| 🔧 `remediation_analyzer`             | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
-| 📄 `page_analyzer`                    | Single page content analysis                                                               |
-| 🧱 `elements_analyzer`                | Document element detection                                                                 |
-| 🧱 `robust_elements_analyzer`         | Enhanced element detection with fallbacks                                                  |
-| 👁️ `general_visual_analysis_analyzer` | General-purpose visual content analysis                                                    |
-| ✏️ `editorial_analyzer`               | Editorial content and markup analysis                                                      |
-| 🗺️ `war_map_analyzer`                 | Historical war map analysis                                                                |
-| 🎓 `edu_transcript_analyzer`          | Educational transcript analysis                                                            |
-| 🔗 `correlation_analyzer`             | Correlate multi-analyzer results per page                                                  |
-| 🖼️ `image_enhancer`                   | Image enhancement and preprocessing                                                        |
+| Specialist                             | Purpose                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 📸 `pdf_to_images_converter`            | Convert PDF pages to images                                                                |
+| 🏷️ `classify_pdf_content`               | Classify document content type                                                             |
+| 📝 `full_text_specialist`               | Extract all text content                                                                   |
+| 📊 `table_specialist`                   | Extract and structure tables                                                               |
+| 📈 `charts_specialist`                  | Analyze charts and graphs                                                                  |
+| 🔀 `diagram_specialist`                 | Process diagrams and flowcharts                                                            |
+| 📐 `layout_specialist`                  | Document structure analysis                                                                |
+| 🏥 `decision_tree_specialist`           | Medical/clinical document analysis                                                         |
+| 🔬 `scientific_specialist`              | Scientific paper analysis                                                                  |
+| ✍️ `handwriting_specialist`             | Handwritten text recognition                                                               |
+| 🔢 `handwriting_math_specialist`        | Handwritten mathematical notation recognition                                              |
+| 💻 `code_block_specialist`              | Extract code snippets                                                                      |
+| 🗂️ `metadata_generic_specialist`        | Generic metadata extraction                                                                |
+| 🗂️ `metadata_mads_specialist`           | MADS metadata format extraction                                                            |
+| 🗂️ `metadata_mods_specialist`           | MODS metadata format extraction                                                            |
+| 🔑 `keyword_topic_specialist`           | Extract keywords and topics                                                                |
+| 🔧 `remediation_specialist`             | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
+| 📄 `page_specialist`                    | Single page content analysis                                                               |
+| 🧱 `elements_specialist`                | Document element detection                                                                 |
+| 🧱 `robust_elements_specialist`         | Enhanced element detection with fallbacks                                                  |
+| 👁️ `general_visual_analysis_specialist` | General-purpose visual content analysis                                                    |
+| ✏️ `editorial_specialist`               | Editorial content and markup analysis                                                      |
+| 🗺️ `war_map_specialist`                 | Historical war map analysis                                                                |
+| 🎓 `edu_transcript_specialist`          | Educational transcript analysis                                                            |
+| 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                |
+| 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                        |
 
 ## 🚀 Deployment
 
@@ -135,32 +156,87 @@ Use cases: research acceleration, compliance automation, content management, acc
 ### Quick Start
 
 ```bash
-cd deployment
-./deploy_from_scratch.sh
+./deploy.sh
 ```
 
-This deploys 10 CloudFormation stacks:
-1. 📦 S3 (config + output buckets)
-2. 🔐 Cognito (OAuth authentication)
-3. 👤 IAM (execution roles)
-4. 🐳 ECR (container registry)
-5. ⚡ Lambda (25 analyzer functions)
-6. 🚪 Gateway (MCP endpoint)
-7. 🧠 Memory (session persistence)
-8. 📊 Inference Profiles (cost tracking)
-9. 🏃 Runtime (Strands agent container)
-10. 🧩 Custom Analyzers (optional, wizard-created)
+That is the whole command. `deploy.sh` asks which deployment to work on — listing anything
+it finds in `.deploy-state/`, or offering to start a new one — and then presents a menu.
+It is resumable and every step is idempotent, so re-run it after a failure and it picks up
+where it stopped.
 
-### Manual Steps
+> `DEPLOYMENT_ID` is **not** read from the environment. It is always chosen interactively,
+> because a value left exported in your shell silently targets another deployment's stacks.
 
-See [deployment/DEPLOYMENT_README.md](deployment/DEPLOYMENT_README.md) for step-by-step instructions.
+Pick option **9** for a full deployment, or **12** to run only what is still outstanding.
+You can jump straight to one option — `./deploy.sh 6` — and the deployment is still chosen
+interactively first.
+
+The eight steps:
+
+| #   | Step               | What it does                                                            |
+| --- | ------------------ | ----------------------------------------------------------------------- |
+| 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                |
+| 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC |
+| 3   | Upload Config      | prompts, manifests and schemas to the config bucket                     |
+| 4   | Specialist Lambdas | container images, then the Lambda stack (26 specialists)                |
+| 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                          |
+| 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime             |
+| 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image           |
+| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it           |
+
+Plus **9** full deployment, **12** resume, **10** status, **11** reset state (deletes
+nothing in AWS), **0** exit.
+
+Step 8 asks once whether the UI should be publicly reachable. That answer is fixed for the
+life of the VPC — see
+[Network exposure](deployment/DEPLOYMENT_README.md#network-exposure--asked-once-fixed-for-the-vpcs-lifetime).
+
+For the full procedure, prerequisites in depth, and every environment variable, see the
+[Deployment Guide](deployment/DEPLOYMENT_README.md).
+
+### Deployment Identity
+
+`DEPLOYMENT_ID` is a short label you choose — lowercase, starting with a letter, 16
+characters or fewer. `deploy.sh` generates a three-character random `STACK_SUFFIX` once and
+persists both in `.deploy-state/{DEPLOYMENT_ID}.json`:
+
+- **Stack names** are `BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}` — for example
+  `BADGERS-S3-dev-a1b`
+- **Resource names** carry both parts — for example `badgers-config-dev-a1b`, and SSM
+  parameters under `/badgers-dev-a1b/`
+
+Because both are unique per deployment, several deployments can coexist in one account
+and region. Stack names include the deployment id as well as the suffix so each stack is
+self-describing — tooling reads a deployment's identity off the stack name, and a mistyped
+id matches no stacks instead of resolving someone else's. The state file also tracks which
+steps completed, which is what makes the script resumable.
 
 ### Cleanup
 
 ```bash
-cd deployment
 ./destroy.sh
 ```
+
+Like `deploy.sh` it asks what to tear down, but it discovers deployments from
+**CloudFormation** rather than from `.deploy-state/` — a state file can be deleted while the
+stacks are still live. You are then required to type the `DEPLOYMENT_ID` to confirm.
+
+It empties the S3 buckets, deletes the ECS Express service and the AgentCore runtime
+**before** the VPC (CloudFormation cannot delete a VPC while any ENI is still attached),
+sweeps leftover ENIs, destroys every stack in reverse dependency order, verifies they are
+gone, and only then schedules the KMS key for deletion so its alias is freed for
+redeployment. A teardown that leaves stacks standing exits non-zero and says so rather than
+reporting success.
+
+If a VPC stack still gets stuck on a lingering ENI:
+
+```bash
+DEPLOYMENT_ID=dev STACK_SUFFIX=a1b ./destroy.sh --vpc-cleanup-only
+```
+
+To tear down by hand when the script cannot run, follow
+[Manual Teardown in the Console](deployment/DEPLOYMENT_README.md#️-manual-teardown-in-the-console)
+— the stack deletion order matters, and two resources have to be removed before any stack.
 
 ## 📁 Project Structure
 
@@ -168,13 +244,14 @@ cd deployment
 ├── deployment/
 │   ├── app.py                 # CDK app entry point
 │   ├── stacks/                # CDK stack definitions
-│   ├── lambdas/code/          # Analyzer Lambda functions
+│   ├── lambdas/code/          # Specialist Lambda functions
 │   ├── runtime/               # AgentCore Runtime container
 │   ├── s3_files/              # Prompts, schemas, manifests
-│   └── badgers-foundation/    # Shared analyzer framework
-├── local_testing/             # Local dev/testing UI (React + Express)
-│   ├── src/                   # React components (chat, wizard, editor, pricing, etc.)
-│   └── server/                # Express API server
+│   └── badgers-foundation/    # Shared specialist framework
+├── ui/                        # BADGERS UI (React + Express, runs locally or deployed via Docker)
+│   ├── src/                   # React components (testing + admin tabs, role-gated)
+│   ├── server/                # Express API server (testing + admin routes, OIDC auth)
+│   └── Dockerfile             # Container image for AWS deployment
 └── pyproject.toml
 ```
 
@@ -184,18 +261,18 @@ cd deployment
 
 ### 📦 Lambda Layers
 
-BADGERS uses Lambda layers shared across analyzer functions:
+BADGERS uses Lambda layers shared across specialist functions:
 
 **🏗️ Foundation Layer** (`layer.zip`)
 - Built via `deployment/lambdas/build_foundation_layer.sh`
-- Contains the analyzer framework (7 Python modules)
+- Contains the specialist framework (7 Python modules)
 - Includes dependencies: boto3, botocore
-- Includes core system prompts used by all analyzers
+- Includes core system prompts used by all specialists
 
 ```
 layer/python/
 ├── foundation/
-│   ├── analyzer_foundation.py    # 🎯 Main orchestration class
+│   ├── specialist_foundation.py    # 🎯 Main orchestration class
 │   ├── bedrock_client.py         # 🔄 Bedrock API with retry/fallback
 │   ├── configuration_manager.py  # ⚙️ Config loading/validation
 │   ├── image_processor.py        # 🖼️ Image optimization
@@ -212,21 +289,21 @@ layer/python/
 - PDF rendering library for `pdf_to_images_converter`
 - Built via `deployment/lambdas/build_poppler_qdf_layer.sh`
 
-### 🔬 How an Analyzer Works
+### 🔬 How an Specialist Works
 
-Each analyzer follows the same pattern using `AnalyzerFoundation`:
+Each specialist follows the same pattern using `SpecialistFoundation`:
 
 ```python
 # Lambda handler (simplified)
 def lambda_handler(event, context):
     # 1️⃣ Load config from S3 manifest
-    config = load_manifest_from_s3(bucket, "full_text_analyzer")
+    config = load_manifest_from_s3(bucket, "full_text_specialist")
 
     # 2️⃣ Initialize foundation with S3-aware prompt loader
-    analyzer = AnalyzerFoundation(...)
+    specialist = SpecialistFoundation(...)
 
     # 3️⃣ Run analysis pipeline
-    result = analyzer.analyze(image_data)
+    result = specialist.analyze(image_data)
 
     # 4️⃣ Save result to S3 and return
     save_result_to_s3(result, session_id)
@@ -235,7 +312,7 @@ def lambda_handler(event, context):
 
 The `analyze()` method orchestrates:
 1. 🖼️ **Image processing** - Resize/optimize for Claude's vision API
-2. 📜 **Prompt loading** - Combine wrapper + analyzer prompts from S3
+2. 📜 **Prompt loading** - Combine wrapper + specialist prompts from S3
 3. 💬 **Message building** - Format for Bedrock Converse API
 4. ⚡ **Dynamic token estimation** - Score image complexity and set token budget (when enabled)
 5. 🤖 **Model invocation** - Call Claude with retry/fallback logic
@@ -249,14 +326,14 @@ Prompts are modular XML files composed at runtime:
 s3://config-bucket/
 ├── core_system_prompts/
 │   ├── prompt_system_wrapper.xml   # 🎁 Main template with placeholders
-│   ├── core_rules/rules.xml        # 📏 Shared rules for all analyzers
+│   ├── core_rules/rules.xml        # 📏 Shared rules for all specialists
 │   └── error_handling/*.xml        # ⚠️ Error response templates
-├── prompts/{analyzer_name}/
-│   ├── {analyzer}_job_role.xml     # 👤 Role definition
-│   ├── {analyzer}_context.xml      # 🌍 Domain context
-│   ├── {analyzer}_rules.xml        # 📏 Analyzer-specific rules
-│   ├── {analyzer}_tasks.xml        # ✅ Task instructions
-│   └── {analyzer}_format.xml       # 📋 Output format spec
+├── prompts/{specialist_name}/
+│   ├── {specialist}_job_role.xml     # 👤 Role definition
+│   ├── {specialist}_context.xml      # 🌍 Domain context
+│   ├── {specialist}_rules.xml        # 📏 Specialist-specific rules
+│   ├── {specialist}_tasks.xml        # ✅ Task instructions
+│   └── {specialist}_format.xml       # 📋 Output format spec
 └── wrappers/
     └── prompt_system_wrapper.xml
 ```
@@ -267,7 +344,7 @@ The `PromptLoader` composes the final system prompt:
 <!-- prompt_system_wrapper.xml -->
 <system_prompt>
     {core_rules}           <!-- 📏 Injected from core_rules/rules.xml -->
-    {composed_prompt}      <!-- 🧩 Injected from analyzer prompt files -->
+    {composed_prompt}      <!-- 🧩 Injected from specialist prompt files -->
     {error_handler_general}
     {error_handler_not_found}
 </system_prompt>
@@ -277,10 +354,10 @@ Placeholders like `[[PIXEL_WIDTH]]` and `[[PIXEL_HEIGHT]]` are replaced with act
 
 ### ⚙️ Configuration System
 
-Each analyzer has a manifest file in S3:
+Each specialist has a manifest file in S3:
 
 ```json
-// s3://config-bucket/manifests/full_text_analyzer.json
+// s3://config-bucket/manifests/full_text_specialist.json
 {
     "tool": {
         "name": "analyze_full_text_tool",
@@ -295,8 +372,8 @@ Each analyzer has a manifest file in S3:
             "required": ["image_path", "session_id"]
         }
     },
-    "analyzer": {
-        "name": "full_text_analyzer",
+    "specialist": {
+        "name": "full_text_specialist",
         "enhancement_eligible": true,
         "model_selections": {
             "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -323,10 +400,10 @@ Each analyzer has a manifest file in S3:
 
 Key configuration features:
 - 🔄 **Model fallback chain** - Primary model with ordered fallbacks
-- 🔁 **Retry logic** - Configurable retry count per analyzer
+- 🔁 **Retry logic** - Configurable retry count per specialist
 - 🧩 **Prompt composition** - List of XML files to combine
 - 📋 **Tool schema** - MCP-compatible input schema for Gateway
-- 🖼️ **Enhancement eligible** - Flag indicating analyzer benefits from image preprocessing (used by `image_enhancer` tool)
+- 🖼️ **Enhancement eligible** - Flag indicating specialist benefits from image preprocessing (used by `image_enhancer` tool)
 
 Global settings (from environment or defaults):
 ```python
@@ -349,7 +426,7 @@ Four metrics are combined into a complexity score: text pixel ratio, grayscale e
 
 **Enabling:** Toggle "Dynamic Token Estimation" in the chat UI, or set the Lambda environment variable `DYNAMIC_TOKENS_ENABLED=true`.
 
-**Tuning:** Add a `dynamic_tokens` block to an analyzer manifest to customize weights and thresholds:
+**Tuning:** Add a `dynamic_tokens` block to an specialist manifest to customize weights and thresholds:
 ```json
 "dynamic_tokens": {
     "weights": {
@@ -405,7 +482,7 @@ Model ID to environment variable mapping:
 | `*claude-opus-4-6*`   | `CLAUDE_OPUS_PROFILE_ARN`   |
 | `*nova-premier*`      | `NOVA_PREMIER_PROFILE_ARN`  |
 
-### ➕ Adding a New Analyzer
+### ➕ Adding a New Specialist
 
 **Option 1: Use the Wizard (Recommended)**
 
@@ -414,16 +491,16 @@ cd local_testing
 npm run dev
 ```
 
-The Analyzer Creation Wizard is available as the 🧙 Create Analyzer tab in the [Local Testing UI](local_testing/LOCAL_TESTING_README.md).
+The Specialist Creation Wizard is available as the 🧙 Create Specialist tab in the [UI](ui/UI_README.md).
 
 **Option 2: Manual Creation**
 
-1. 📜 Create prompt files in `deployment/s3_files/prompts/{analyzer_name}/`
-2. 📋 Create manifest in `deployment/s3_files/manifests/{analyzer_name}.json`
-3. 📐 Create schema in `deployment/s3_files/schemas/{analyzer_name}.json`
-4. ⚡ Create Lambda code in `deployment/lambdas/code/{analyzer_name}/lambda_handler.py`
+1. 📜 Create prompt files in `deployment/s3_files/prompts/{specialist_name}/`
+2. 📋 Create manifest in `deployment/s3_files/manifests/{specialist_name}.json`
+3. 📐 Create schema in `deployment/s3_files/schemas/{specialist_name}.json`
+4. ⚡ Create Lambda code in `deployment/lambdas/code/{specialist_name}/lambda_handler.py`
 5. 📝 Register in `deployment/stacks/lambda_stack.py`
-6. 🚀 Redeploy: `cdk deploy badgers-lambda badgers-gateway`
+6. 🚀 Redeploy: `cdk deploy BADGERS-Lambda-{id}-{suffix} BADGERS-Gateway-{id}-{suffix}`
 
 ---
 

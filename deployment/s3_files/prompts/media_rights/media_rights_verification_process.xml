@@ -94,7 +94,7 @@
                 <confirm_no_example_analysis>I confirm I did NOT analyze any example images.</confirm_no_example_analysis>
                 <contract_identified>NO</contract_identified>
                 <explanation>No media rights contract content was detected in the target image. The image appears to contain: {BRIEF_DESCRIPTION_OF_WHAT_IS_ACTUALLY_IN_THE_IMAGE}</explanation>
-                <recommendation>Consider using a different analyzer tool appropriate for the content type.</recommendation>
+                <recommendation>Consider using a different specialist tool appropriate for the content type.</recommendation>
             </media_rights_extraction>
         </format>
     </not_found_response>

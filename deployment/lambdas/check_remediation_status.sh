@@ -1,12 +1,12 @@
 #!/bin/bash
-# Check status of the remediation_analyzer Lambda
+# Check status of the remediation_specialist Lambda
 # Usage: ./check_remediation_status.sh [deployment_id]
 set -e
 export AWS_PAGER=""
 
 DEPLOYMENT_ID="${1:-89a27522}"
 REGION="${AWS_REGION:-us-west-2}"
-FUNCTION_NAME="badgers_remediation_analyzer"
+FUNCTION_NAME="badgers_remediation_specialist"
 
 echo "=== Lambda Function Status ==="
 aws lambda get-function-configuration \
@@ -17,7 +17,7 @@ aws lambda get-function-configuration \
 
 echo ""
 echo "=== IAM Role Inline Policies ==="
-ROLE_NAME="lambda-analyzer-role-${DEPLOYMENT_ID}"
+ROLE_NAME="lambda-specialist-role-${DEPLOYMENT_ID}"
 aws iam list-role-policies --role-name "${ROLE_NAME}" --output table
 
 echo ""

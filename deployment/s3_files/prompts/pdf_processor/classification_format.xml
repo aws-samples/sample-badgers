@@ -2,14 +2,14 @@
 <!-- BADGERS Schema v1.0 — Part 1 (envelope) + Part 2 (common_spine) + tool_recommendations -->
 
 <response_format>
-    <response analyzer="pdf_processor"
+    <response specialist="pdf_processor"
              schema_version="1.0"
              page="{PAGE_NUMBER}"
              session_id="{SESSION_ID}">
 
         <metadata>
             <source_image>{S3_URI_OR_PATH_TO_PAGE_IMAGE}</source_image>
-            <analyzer_name>pdf_processor</analyzer_name>
+            <specialist_name>pdf_processor</specialist_name>
             <timestamp>{ISO_8601_TIMESTAMP}</timestamp>
             <page_number>{PAGE_NUMBER_VISIBLE_ON_PAGE_OR_INFERRED}</page_number>
             <examples_count>{NUMBER_OF_EXAMPLE_IMAGES_YOU_WERE_GIVEN}</examples_count>
@@ -20,7 +20,7 @@
         <!--
         ============================================================
         COMMON SPINE — extract prominent text visible on the page
-        that helps identify which specialized analyzers to invoke.
+        that helps identify which specialized specialists to invoke.
         ============================================================
         -->
         <common_spine element_count="{NUMBER_OF_TEXT_ELEMENTS}">
@@ -41,7 +41,7 @@
         <!--
         ============================================================
         SPECIALIZED — tool recommendations for downstream processing.
-        Determines which specialized analyzers should process this page.
+        Determines which specialized specialists should process this page.
         ============================================================
         -->
         <specialized type="tool_recommendations">

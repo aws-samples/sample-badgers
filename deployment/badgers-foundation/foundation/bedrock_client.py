@@ -1,7 +1,7 @@
 """
-AWS Bedrock client management for analyzer system.
+AWS Bedrock client management for specialist system.
 
-Handles Bedrock client creation, invocation, and error handling for different analyzer types.
+Handles Bedrock client creation, invocation, and error handling for different specialist types.
 """
 
 import json
