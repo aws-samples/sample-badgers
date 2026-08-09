@@ -101,10 +101,13 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
-  const message = useAuiState()
-  const isRunning = message.status?.type === 'running'
-  const hasText = message.content?.some(c => c.type === 'text' && c.text?.trim())
-  const reasoningParts = message.content?.filter(c => c.type === 'reasoning') || []
+  // Current assistant-ui versions require an explicit state selector.
+  // Subscribe only to the fields this message renderer uses so streaming
+  // updates remain stable and do not try to read the entire store.
+  const isRunning = useAuiState(s => s.message.status?.type === 'running')
+  const content = useAuiState(s => s.message.content)
+  const hasText = content?.some(c => c.type === 'text' && c.text?.trim())
+  const reasoningParts = content?.filter(c => c.type === 'reasoning') || []
 
   if (!hasText && isRunning) {
     return (
