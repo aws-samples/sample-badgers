@@ -202,10 +202,12 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
         mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
-        const logFile = resolve(LOGS_DIR, `${safeSessionId}.log`);
-        // Normalize the path and verify it's within the allowed logs directory
-        const normalizedLogFile = realpathSync(logFile);
+        // The log file does not exist on the first message in a session, so
+        // realpathSync would fail before the first append. Resolve the future
+        // path and keep the same containment check instead.
+        const normalizedLogFile = resolve(LOGS_DIR, `${safeSessionId}.log`);
         if (!normalizedLogFile.startsWith(LOGS_DIR + '/')) return res.status(403).json({ error: 'Forbidden' });
+        const logFile = normalizedLogFile;
         const log = (line) => { appendFile(logFile, line + '\n').catch(() => { }); };
         log(`\n${'='.repeat(60)}`);
         log(`[${new Date().toISOString()}] USER: ${message}`);

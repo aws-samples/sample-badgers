@@ -173,6 +173,7 @@ mountAdminRoutes(app, PROJECT_ROOT);
 
 // ── Static serving ──
 const PORT = process.env.PORT || 7860;
+const HOST = process.env.HOST || '127.0.0.1';
 
 async function startServer() {
     await loadSSMConfig();
@@ -202,8 +203,8 @@ async function startServer() {
         app.use(vite.middlewares);
     }
 
-    app.listen(PORT, () => {
-        console.log(`\n🦡 BADGERS Unified UI on http://localhost:${PORT}\n`);
+    app.listen(PORT, HOST, () => {
+        console.log(`\n🦡 BADGERS Unified UI on http://${HOST}:${PORT}\n`);
     });
 }
 
