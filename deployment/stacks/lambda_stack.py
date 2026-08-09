@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 from aws_cdk import (
@@ -375,8 +376,12 @@ class LambdaSpecialistStack(Stack):
                 }
             )
 
-            # Image enhancer uses VISION_MODEL to select its model - point it at the application inference profile
-            if func_name == "image_enhancer":
+        # Image enhancer can use a direct model even when profile creation is skipped.
+        if func_name == "image_enhancer":
+            vision_model = os.environ.get("BADGERS_VISION_MODEL_ID")
+            if vision_model:
+                environment["VISION_MODEL"] = vision_model
+            elif self.inference_profiles_stack:
                 environment["VISION_MODEL"] = (
                     self.inference_profiles_stack.claude_sonnet_46_profile_arn
                 )

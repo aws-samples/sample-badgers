@@ -504,13 +504,18 @@ async def stream_agent_events(
 RUNTIME SESSION ID: {runtime_session_id}
 Include session_id: "{runtime_session_id}" in ALL tool calls."""
 
-    model = BedrockModel(
-        model_id=model_config.get("model_id", DEFAULT_MODEL_CONFIG["model_id"]),
-        region_name=os.environ.get("AWS_REGION", "us-west-2"),
-        temperature=model_config.get("temperature", 1.0),
-        max_tokens=model_config.get("max_tokens", 8000),
-        additional_request_fields={"thinking": model_config.get("thinking", {})},
-    )
+    model_kwargs: dict[str, Any] = {
+        "model_id": os.environ.get("BADGERS_MODEL_ID")
+        or model_config.get("model_id", DEFAULT_MODEL_CONFIG["model_id"]),
+        "region_name": os.environ.get("AWS_REGION", "us-west-2"),
+        "temperature": model_config.get("temperature", 1.0),
+        "max_tokens": model_config.get("max_tokens", 8000),
+    }
+    thinking = model_config.get("thinking")
+    if thinking:
+        model_kwargs["additional_request_fields"] = {"thinking": thinking}
+
+    model = BedrockModel(**model_kwargs)
 
     mcp_client = MCPClient(lambda: create_mcp_transport(gateway_url, access_token))
 

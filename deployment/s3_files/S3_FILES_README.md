@@ -28,7 +28,7 @@ Contains configuration for the orchestrating agent that coordinates PDF analysis
 
 | File                                      | Purpose                                                                                                    |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration            |
+| `agent_model_config.json`                 | Agent model selection, temperature, max tokens, and optional thinking configuration                         |
 | `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below. |
 
 ### ⚠️ Operating Environment Configuration
