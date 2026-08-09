@@ -406,6 +406,78 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         catch { res.json({ content: 'Session not found' }); }
     });
 
+    // ── Recognition JSON ──
+
+    app.get('/api/recognition/sessions', async (_req, res) => {
+        if (!OUTPUT_BUCKET) return res.json([]);
+        try {
+            const sessions = new Map();
+            let token;
+            do {
+                const response = await s3Client.send(new ListObjectsV2Command({
+                    Bucket: OUTPUT_BUCKET,
+                    ContinuationToken: token,
+                }));
+                for (const object of response.Contents || []) {
+                    const match = object.Key.match(/^([^/]+)\/correlated\/recognition_page_.+\.json$/);
+                    if (!match) continue;
+                    const sessionId = match[1];
+                    const current = sessions.get(sessionId) || {
+                        sessionId,
+                        recognitionFileCount: 0,
+                        lastModified: null,
+                    };
+                    current.recognitionFileCount += 1;
+                    if (!current.lastModified || object.LastModified > current.lastModified) {
+                        current.lastModified = object.LastModified;
+                    }
+                    sessions.set(sessionId, current);
+                }
+                token = response.NextContinuationToken;
+            } while (token);
+            res.json([...sessions.values()].sort((a, b) =>
+                new Date(b.lastModified || 0) - new Date(a.lastModified || 0)
+            ));
+        } catch (error) {
+            res.status(500).json({ error: 'Unable to list recognition sessions' });
+        }
+    });
+
+    app.get('/api/recognition/sessions/:sid', async (req, res) => {
+        if (!OUTPUT_BUCKET) return res.status(503).json({ error: 'S3_OUTPUT_BUCKET not configured' });
+        const sessionId = req.params.sid;
+        if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+            return res.status(400).json({ error: 'Invalid session ID' });
+        }
+        try {
+            const objects = [];
+            let token;
+            do {
+                const response = await s3Client.send(new ListObjectsV2Command({
+                    Bucket: OUTPUT_BUCKET,
+                    Prefix: `${sessionId}/correlated/recognition_page_`,
+                    ContinuationToken: token,
+                }));
+                objects.push(...(response.Contents || []).filter(object => object.Key.endsWith('.json')));
+                token = response.NextContinuationToken;
+            } while (token);
+
+            objects.sort((a, b) => a.Key.localeCompare(b.Key, undefined, { numeric: true }));
+            if (!objects.length) return res.status(404).json({ error: 'No recognition JSON found for this session' });
+
+            const files = await Promise.all(objects.map(async object => ({
+                filename: object.Key.split('/').at(-1),
+                s3Uri: `s3://${OUTPUT_BUCKET}/${object.Key}`,
+                sizeBytes: object.Size,
+                lastModified: object.LastModified,
+                content: await s3GetJson(OUTPUT_BUCKET, object.Key),
+            })));
+            res.json({ sessionId, files });
+        } catch (error) {
+            res.status(500).json({ error: 'Unable to load recognition JSON' });
+        }
+    });
+
     // ── Specialists ──
 
     app.get('/api/specialists', async (_req, res) => {

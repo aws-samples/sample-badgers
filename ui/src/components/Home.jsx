@@ -18,6 +18,7 @@ export default function Home({ onNavigate, branding = {} }) {
     ['pricing', '💰 Pricing', 'Estimate Bedrock costs for document workloads'],
     ['observability', '📊 Observability', 'View agent execution traces from CloudWatch'],
     ['chatlog', '📝 Chat Log', 'Browse historical chat sessions'],
+    ['recognition', '🧾 Recognition JSON', 'View, copy, and download recognition output files'],
   ]
 
   return (

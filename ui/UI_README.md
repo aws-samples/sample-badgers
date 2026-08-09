@@ -90,6 +90,7 @@ Browser (React/Vite)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
     │                │   ├── PDF upload to S3 (mints doc_id)
     │                │   ├── Job records (/api/jobs)
+    │                │   ├── Recognition JSON output browser
     │                │   ├── S3 file operations (manifests, prompts, schemas)
     │                │   ├── CloudWatch Logs Insights queries
     │                │   └── Evaluation and pricing endpoints
@@ -119,6 +120,17 @@ log as `[job] job_id=… doc_id=…`, so a chat transcript can be traced to its 
 
 Job status is computed at read time rather than stored — see the endpoint comments in
 `server/routes/core.js` for why.
+
+## Recognition JSON
+
+The correlation specialist stores an order-preserving JSON recognition file beside
+each correlated XML result under `<session_id>/correlated/`. The 🧾 Recognition JSON
+tab lists sessions, loads every page-level JSON file, and supports copy and download.
+
+| Endpoint                              | Returns                                      |
+| ------------------------------------- | -------------------------------------------- |
+| `GET /api/recognition/sessions`       | Sessions containing recognition JSON files  |
+| `GET /api/recognition/sessions/:sid`  | All page-level recognition files and content |
 
 ## Tech Stack
 
@@ -154,6 +166,7 @@ ui/
 │       ├── PricingCalculator.jsx  # Cost estimator
 │       ├── Observability.jsx      # CloudWatch queries
 │       ├── ChatLog.jsx            # Session log viewer
+│       ├── RecognitionOutput.jsx   # Recognition JSON viewer and download
 │       ├── StackList.jsx          # CDK stack deploy/destroy
 │       ├── SpecialistSelector.jsx # Specialist browser
 │       ├── S3ConfigEditor.jsx     # S3 config file editor
