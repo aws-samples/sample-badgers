@@ -5,13 +5,13 @@
 
 # 🦡 BADGERS UI
 
-Single React + Express application that serves as both the developer testing workbench and the deployment/ops console. Runs locally via `npm run dev`, or on AWS as a container on an ECS Express Gateway service authenticated with Cognito OIDC.
+Single React + Express application that serves as both the developer testing workbench and the deployment/ops console. Runs locally via `pnpm run dev`, or on AWS as a container on an ECS Express Gateway service authenticated with Cognito OIDC.
 
 ## Two Modes, One Codebase
 
 |                   | Local Development                                      | Deployed on AWS                                    |
 | ----------------- | ------------------------------------------------------ | -------------------------------------------------- |
-| **Start**         | `npm run dev`                                          | Container on an ECS Express Gateway service        |
+| **Start**         | `pnpm run dev`                                         | Container on an ECS Express Gateway service        |
 | **Auth**          | Bypassed — defaults to `admin` role (all tabs visible) | Cognito OIDC authorization code + PKCE             |
 | **Role override** | `BADGERS_UI_ROLE=tester` env var                       | Cognito group membership (`admin` / `tester`)      |
 | **Ports**         | Vite 5175 / Express 7860                               | Container exposes 7860                             |
@@ -32,8 +32,9 @@ shortcut, so requests fail rather than silently running unauthenticated.
 
 ```bash
 cd ui
-npm install    # first time only
-npm run dev    # starts Express API (7860) + Vite (5175)
+corepack enable
+pnpm install   # first time only
+pnpm run dev   # starts Express API (7860) + Vite (5175)
 ```
 
 | Service                   | URL                   |
@@ -66,7 +67,7 @@ A bundle built without them falls through to the server's local-dev bypass.
 ## Docker Deployment
 
 ```bash
-npm run build                    # build static assets into dist/
+pnpm run build                   # build static assets into dist/
 docker build -t badgers-ui .     # build container
 docker run -p 7860:7860 badgers-ui
 ```

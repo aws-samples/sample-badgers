@@ -25,7 +25,7 @@ Use cases: research acceleration, compliance automation, content management, acc
 
 ## 📸 Screenshots
 
-A single React + Express app is both the testing workbench and the deployment/ops console — the same code runs locally via `npm run dev` or on ECS behind Cognito OIDC. Tabs are role-gated: the **Testing** row below is visible to all users, while an admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not pictured here. See the [UI README](ui/UI_README.md) for the full tab and role breakdown.
+A single React + Express app is both the testing workbench and the deployment/ops console — the same code runs locally via `pnpm run dev` or on ECS behind Cognito OIDC. Tabs are role-gated: the **Testing** row below is visible to all users, while an admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not pictured here. See the [UI README](ui/UI_README.md) for the full tab and role breakdown.
 
 ### Testing tabs
 
@@ -487,8 +487,8 @@ Model ID to environment variable mapping:
 **Option 1: Use the Wizard (Recommended)**
 
 ```bash
-cd local_testing
-npm run dev
+cd ui
+pnpm run dev
 ```
 
 The Specialist Creation Wizard is available as the 🧙 Create Specialist tab in the [UI](ui/UI_README.md).
