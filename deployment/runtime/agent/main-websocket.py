@@ -599,7 +599,9 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
                 yield {"start": True}
                 continue
             if event_data.get("complete"):
-                yield {"complete": True, "response": final_response}
+                # Strands emits this lifecycle marker before its AgentResult.
+                # The client treats completion as terminal, so wait for the
+                # result event below instead of closing the stream early.
                 continue
             if event_data.get("force_stop"):
                 yield {
