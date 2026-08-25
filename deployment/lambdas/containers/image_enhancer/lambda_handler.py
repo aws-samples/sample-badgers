@@ -278,7 +278,12 @@ def _upload_to_s3(local_path: str, bucket: str, session_id: str, original: str) 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     output_key = f"{session_id}/enhanced/{original_name}_enhanced_{timestamp}.jpg"
 
-    s3.upload_file(local_path, bucket, output_key)
+    s3.upload_file(
+        local_path,
+        bucket,
+        output_key,
+        ExtraArgs={"ContentType": "image/jpeg"},
+    )
     return f"s3://{bucket}/{output_key}"
 
 

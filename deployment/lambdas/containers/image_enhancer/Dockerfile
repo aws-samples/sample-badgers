@@ -28,6 +28,10 @@ COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 # into the build context from ./layer/python/foundation before docker build.
 COPY foundation/ ${LAMBDA_TASK_ROOT}/foundation/
 
+# Foundation imports the shared config package during initialization. The build
+# scripts stage it alongside foundation, so include it in the runtime image too.
+COPY config/ ${LAMBDA_TASK_ROOT}/config/
+
 # Fix file permissions
 RUN chmod 644 ${LAMBDA_TASK_ROOT}/*.py
 
