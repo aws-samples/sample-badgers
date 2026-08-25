@@ -88,7 +88,7 @@ Browser (React/Vite)
     ├── /api/* ──→ Express server (port 7860), all behind requireAuth
     │                ├── Core routes (all roles)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
-    │                │   ├── PDF upload to S3 (mints doc_id)
+    │                │   ├── PDF and image upload to S3 (mints doc_id)
     │                │   ├── Job records (/api/jobs)
     │                │   ├── S3 file operations (manifests, prompts, schemas)
     │                │   ├── CloudWatch Logs Insights queries
@@ -112,7 +112,8 @@ The UI is the read side of the doc/job/subtask hierarchy described in
 | `GET /api/jobs/:jobId`  | One job: computed status, counts, and every subtask with its outcome |
 | `GET /api/jobs?doc_id=` | Every job recorded against one document, newest first                |
 
-`POST /api/upload` mints a `doc_id` per upload and returns it. `POST /api/chat` accepts
+`POST /api/upload` accepts PDF, PNG, JPEG/JPG, and TIFF/TIF files, validates their
+file signatures, mints a `doc_id` per upload, and returns it. `POST /api/chat` accepts
 that `doc_id` and forwards it to the agent, which stamps it onto each specialist call.
 When the agent mints a `job_id` it emits a `job` SSE event, also written to the session
 log as `[job] job_id=… doc_id=…`, so a chat transcript can be traced to its job record.
@@ -147,7 +148,7 @@ ui/
 │   │   └── useUser.js             # User context (role, email) from ID token claims
 │   └── components/
 │       ├── Home.jsx               # Dashboard
-│       ├── Chat.jsx               # Agent chat interface, PDF upload, doc_id
+│       ├── Chat.jsx               # Agent chat interface, PDF/image upload, doc_id
 │       ├── SpecialistEditor.jsx   # Manifest/prompt editor
 │       ├── SpecialistWizard.jsx   # New specialist wizard
 │       ├── Evaluator.jsx          # Test runner

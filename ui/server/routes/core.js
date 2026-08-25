@@ -70,6 +70,30 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION, credentials }));
     const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
+    function detectUploadType(buffer) {
+        if (buffer.length >= 5 && buffer.subarray(0, 5).toString() === '%PDF-') {
+            return { contentType: 'application/pdf', fileKind: 'pdf', extensions: ['.pdf'] };
+        }
+        if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+            return { contentType: 'image/png', fileKind: 'image', extensions: ['.png'] };
+        }
+        if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+            return { contentType: 'image/jpeg', fileKind: 'image', extensions: ['.jpg', '.jpeg'] };
+        }
+        const isClassicTiff = buffer.length >= 4 && (
+            (buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2a && buffer[3] === 0x00) ||
+            (buffer[0] === 0x4d && buffer[1] === 0x4d && buffer[2] === 0x00 && buffer[3] === 0x2a)
+        );
+        const isBigTiff = buffer.length >= 4 && (
+            (buffer[0] === 0x49 && buffer[1] === 0x49 && buffer[2] === 0x2b && buffer[3] === 0x00) ||
+            (buffer[0] === 0x4d && buffer[1] === 0x4d && buffer[2] === 0x00 && buffer[3] === 0x2b)
+        );
+        if (isClassicTiff || isBigTiff) {
+            return { contentType: 'image/tiff', fileKind: 'image', extensions: ['.tif', '.tiff'] };
+        }
+        return null;
+    }
+
     console.log(`Region: ${REGION}`);
     console.log(`Profile: ${AWS_PROFILE || 'default'}`);
     console.log(`Runtime ARN: ${RUNTIME_ARN ? '✅' : '❌ not set'}`);
@@ -167,9 +191,13 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     app.post('/api/upload', upload.single('file'), async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
         if (!UPLOAD_BUCKET) return res.status(500).json({ error: 'S3_UPLOAD_BUCKET not configured' });
-        const isPdfMime = req.file.mimetype === 'application/pdf';
-        const isPdfMagic = req.file.buffer.length >= 5 && req.file.buffer.slice(0, 5).toString() === '%PDF-';
-        if (!isPdfMime || !isPdfMagic) return res.status(400).json({ error: 'Only PDF files are accepted' });
+        const detectedType = detectUploadType(req.file.buffer);
+        const extension = req.file.originalname.toLowerCase().match(/\.[^.]+$/)?.[0];
+        if (!detectedType || !detectedType.extensions.includes(extension)) {
+            return res.status(400).json({
+                error: 'Supported formats: PDF, TIFF, TIF, JPEG, JPG, and PNG. File contents must match the extension.',
+            });
+        }
 
         const filename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
         // doc_id is the top level of the job-tracking hierarchy
@@ -182,10 +210,17 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
                 Bucket: UPLOAD_BUCKET,
                 Key: s3Key,
                 Body: req.file.buffer,
-                ContentType: req.file.mimetype,
+                ContentType: detectedType.contentType,
                 Metadata: { doc_id: docId },
             }));
-            res.json({ s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`, docId, filename, size: req.file.size });
+            res.json({
+                s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`,
+                docId,
+                filename,
+                size: req.file.size,
+                contentType: detectedType.contentType,
+                fileKind: detectedType.fileKind,
+            });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
