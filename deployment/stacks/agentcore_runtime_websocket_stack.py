@@ -3,7 +3,8 @@
 Separate runtime stack for WebSocket streaming support.
 """
 
-from typing import TYPE_CHECKING
+import os
+from typing import TYPE_CHECKING, Optional
 
 from aws_cdk import (
     Stack,
@@ -45,7 +46,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         source_bucket_name: str,
         memory_id: str,
         s3_kms_key_arn: str,
-        inference_profiles_stack: "InferenceProfilesStack",
+        inference_profiles_stack: Optional["InferenceProfilesStack"],
         jobs_table: dynamodb.ITable,
         image_tag: str = "websocket",
         **kwargs,
@@ -74,8 +75,9 @@ class AgentCoreRuntimeWebSocketStack(Stack):
 
         self.agent_role = self.create_agent_role()
 
-        # Grant inference profile permissions via CDK grants
-        self.inference_profiles_stack.grant_invoke_to_role(self.agent_role)
+        # Grant profile-backed model permissions when profiles are deployed.
+        if self.inference_profiles_stack is not None:
+            self.inference_profiles_stack.grant_invoke_to_role(self.agent_role)
 
         self.runtime = self.create_runtime(ecr_image_uri)
 
@@ -221,7 +223,19 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             )
         )
 
-        # Note: Bedrock permissions are granted via inference_profiles_stack.grant_invoke_to_role()
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="InvokeQwenFoundationModel",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream",
+                ],
+                resources=[
+                    f"arn:aws:bedrock:{self.region}::foundation-model/qwen.qwen3-vl-235b-a22b"
+                ],
+            )
+        )
 
         role.add_to_policy(
             iam.PolicyStatement(
@@ -423,12 +437,22 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                 # foundation.job_state reads this at call time; when it is absent
                 # every write becomes a no-op and tracking is simply off.
                 "JOBS_TABLE_NAME": self.jobs_table.table_name,
-                # Inference profile ARNs for cost tracking
-                "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
-                "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
-                "NOVA_PREMIER_PROFILE_ARN": self.inference_profiles_stack.nova_premier_profile_arn,
-                "CLAUDE_OPUS_46_PROFILE_ARN": self.inference_profiles_stack.claude_opus_46_profile_arn,
-                "CLAUDE_OPUS_45_PROFILE_ARN": self.inference_profiles_stack.claude_opus_45_profile_arn,
+                **(
+                    {
+                        "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
+                        "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
+                        "NOVA_PREMIER_PROFILE_ARN": self.inference_profiles_stack.nova_premier_profile_arn,
+                        "CLAUDE_OPUS_46_PROFILE_ARN": self.inference_profiles_stack.claude_opus_46_profile_arn,
+                        "CLAUDE_OPUS_45_PROFILE_ARN": self.inference_profiles_stack.claude_opus_45_profile_arn,
+                    }
+                    if self.inference_profiles_stack is not None
+                    else {}
+                ),
+                **(
+                    {"BADGERS_MODEL_ID": os.environ["BADGERS_MODEL_ID"]}
+                    if os.environ.get("BADGERS_MODEL_ID")
+                    else {}
+                ),
             },
         )
 

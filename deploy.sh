@@ -109,10 +109,13 @@ step_infra() {
     "$(_sn DynamoDB)"
     "$(_sn IAM)"
     "$(_sn ECR)"
-    "$(_sn InferenceProfiles)"
     "$(_sn Memory)"
     "$(_sn Vpc)"
   )
+  if [ "${BADGERS_SKIP_INFERENCE_PROFILES:-}" != "1" ] \
+      && [[ "${BADGERS_MODEL_ID:-}" != qwen.* ]]; then
+    stacks+=("$(_sn InferenceProfiles)")
+  fi
   if [ "${BADGERS_SKIP_XRAY}" != "1" ]; then
     stacks+=("$(_sn XRay)")
   fi
