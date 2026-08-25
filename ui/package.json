@@ -2,6 +2,7 @@
   "name": "badgers-local-testing",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.20.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,vite -c blue,green \"node server/index.js\" \"vite\"",

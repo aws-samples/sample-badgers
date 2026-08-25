@@ -1,8 +1,8 @@
 FROM node:20-slim
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --production
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile --prod
 
 COPY server/ ./server/
 COPY dist/ ./dist/
