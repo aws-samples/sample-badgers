@@ -26,7 +26,7 @@ trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; 
 
 # ── Defaults ──
 IMAGE_TAG="${IMAGE_TAG:-latest}"
-RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
+RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-}"
 UI_IMAGE_TAG="${UI_IMAGE_TAG:-frontend}"
 # Must match CONTAINER_PORT in deployment/stacks/ecs_stack.py — it is sent with the
 # forced container rollout in step 8, and a mismatch would repoint the service's target
@@ -43,8 +43,20 @@ UI_CONTAINER_PORT="${UI_CONTAINER_PORT:-7860}"
 unset DEPLOYMENT_ID
 choose_deployment || exit 1
 require_deployment_id
-ensure_account
-ensure_suffix
+ensure_region || { log_error "ensure_region failed"; exit 1; }
+log_info "Region OK: ${AWS_REGION}"
+
+ensure_account || { log_error "ensure_account failed — check AWS credentials"; exit 1; }
+log_info "Account OK: ${ACCOUNT_ID}"
+
+ensure_suffix || { log_error "ensure_suffix failed"; exit 1; }
+log_info "Suffix OK: ${STACK_SUFFIX}"
+
+RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-$(runtime_image_tag 2>/dev/null || echo "websocket")}"
+export RUNTIME_IMAGE_TAG
+log_info "Runtime image tag: ${RUNTIME_IMAGE_TAG}"
+
+ensure_cdk_deps || { log_error "ensure_cdk_deps failed — check node/cdk/uv installation"; exit 1; }
 
 ECR_BASE="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 # One repository per deployment, named badgers-{DEPLOYMENT_ID}-{suffix} by the ECR
@@ -59,6 +71,7 @@ step_layers() {
   log_step "Step 1: Build Lambda Layers"
 
   if check_completed "layers_built"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
     log_warn "Already built. Re-running rebuilds the layer archives."
     _confirm || return 0
   fi
@@ -89,11 +102,16 @@ step_infra() {
   log_step "Step 2: Foundational Infrastructure"
 
   if check_completed "infra_complete"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
     log_warn "Already complete. Re-running will update stacks if changes are detected."
     _confirm || return 0
   fi
 
-  ensure_cdk_deps
+  # CDK must be bootstrapped before first deploy
+  preflight_bootstrap || return 1
+
+  # Service quotas for VPC, S3, ECR, Lambda, etc.
+  preflight_service_quotas || return 1
 
   # Decide about X-Ray before deploying anything. Enabling Transaction Search needs a
   # CloudWatch Logs resource policy from a hard quota of 10 per region, and finding that
@@ -133,6 +151,7 @@ step_upload() {
   log_step "Step 3: Upload Prompts, Manifests & Schemas"
 
   if check_completed "s3_files_uploaded"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
     log_info "Already uploaded. Re-uploading to sync any changes..."
   fi
 
@@ -143,14 +162,56 @@ step_upload() {
     exit 1
   fi
 
-  log_info "Syncing s3_files/ to s3://${config_bucket}/..."
-  aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
-    --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
-    --region "${AWS_REGION}" --quiet \
-    || { log_error "Config upload failed."; return 1; }
+  # Submenu: which config to sync
+  local choice
+  if [ "${DEPLOY_RESUME_MODE:-}" = "1" ]; then
+    choice="6"
+  else
+    echo ""
+    echo "  Which config to upload?"
+    echo "    1) Prompts (specialist prompts)"
+    echo "    2) Core System Prompts (shared rules, wrappers, error handling)"
+    echo "    3) Manifests (tool schemas, model selections, prompt file lists)"
+    echo "    4) Schemas (MCP-compatible input schemas)"
+    echo "    5) Agent Config (agent operating environment, model config)"
+    echo "    6) All"
+    echo ""
+    read -rp "  Choice [6]: " choice
+    choice="${choice:-6}"
+  fi
+
+  case "$choice" in
+    1) _sync_config_category "prompts" "$config_bucket" ;;
+    2) _sync_config_category "core_system_prompts" "$config_bucket" ;;
+    3) _sync_config_category "manifests" "$config_bucket" ;;
+    4) _sync_config_category "schemas" "$config_bucket" ;;
+    5) _sync_config_category "agent_config" "$config_bucket" ;;
+    6)
+      log_info "Syncing all s3_files/ → s3://${config_bucket}/..."
+      aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
+        --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
+        --region "${AWS_REGION}" --quiet \
+        || { log_error "Config upload failed."; return 1; }
+      ;;
+    *) log_error "Invalid choice: ${choice}"; return 1 ;;
+  esac
 
   log_success "Config files uploaded to ${config_bucket}"
   mark_complete "s3_files_uploaded"
+}
+
+# Sync a single s3_files/ subdirectory to the config bucket (skips if absent).
+_sync_config_category() {
+  local dir="$1" bucket="$2"
+  local full_path="${DEPLOYMENT_DIR}/s3_files/${dir}"
+  if [ -d "${full_path}" ]; then
+    log_info "  Syncing ${dir}/ → s3://${bucket}/${dir}/"
+    aws s3 sync "${full_path}/" "s3://${bucket}/${dir}/" \
+      --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
+      --region "${AWS_REGION}" --quiet
+  else
+    log_warn "  Directory ${dir}/ not found in s3_files/ — skipping"
+  fi
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -160,6 +221,7 @@ step_specialists() {
   log_step "Step 4: Specialist Lambdas"
 
   if check_completed "specialists_complete"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
     log_warn "Already complete. Re-running will update if changes are detected."
     _confirm || return 0
   fi
@@ -173,7 +235,6 @@ step_specialists() {
   (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_container_lambdas.sh "$(resource_id)") \
     || { log_error "Container Lambda build failed."; return 1; }
 
-  ensure_cdk_deps
   ensure_xray_decision || return 1
   export_cdk_env
 
@@ -190,11 +251,11 @@ step_gateway() {
   log_step "Step 5: Gateway"
 
   if check_completed "gateway_complete"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
     log_warn "Already complete. Re-running will update if changes are detected."
     _confirm || return 0
   fi
 
-  ensure_cdk_deps
   ensure_xray_decision || return 1
   export_cdk_env
 
@@ -227,6 +288,9 @@ step_runtime() {
 
   ecr_login
 
+  # Ensure ARM64 cross-compilation works (QEMU on x86 hosts / WSL)
+  preflight_docker_cross_platform arm64 || return 1
+
   # build_and_push_websocket.sh stages deployment/badgers-foundation/foundation into
   # the image so the agent can import foundation.job_state to open a job record.
   log_info "Building and pushing the AgentCore Runtime image (linux/arm64)..."
@@ -244,7 +308,6 @@ step_runtime() {
   log_success "Image verified in ECR: ${RUNTIME_IMAGE_TAG}"
   mark_complete "runtime_image_pushed"
 
-  ensure_cdk_deps
   ensure_xray_decision || return 1
   export_cdk_env
 
@@ -273,6 +336,9 @@ step_ui_build() {
   log_info "Building React app..."
   (cd "${REPO_ROOT}/ui" && npm install --silent && npm run build) \
     || { log_error "UI bundle build failed."; return 1; }
+
+  # Ensure AMD64 cross-compilation works (QEMU on ARM hosts / Apple Silicon)
+  preflight_docker_cross_platform amd64 || return 1
 
   log_info "Building UI container image (linux/amd64)..."
   docker build \
@@ -355,19 +421,41 @@ _ui_deploy_failed() {
 step_ui_deploy() {
   log_step "Step 8: UI — Deploy ECS"
 
+  if check_completed "ecs_deployed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already deployed. Re-running will update ECS."
+    _confirm || return 0
+  fi
+
   _prompt_ui_public_access || return 1
 
-  ensure_cdk_deps
   ensure_xray_decision || return 1
-  export_cdk_env
 
+  local service_name="badgers-ui-$(resource_id)"
+  local service_arn="arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/default/${service_name}"
+
+  # Submenu: full CDK deploy or force-new-deployment only
+  local ecs_choice
+  if [ "${DEPLOY_RESUME_MODE:-}" = "1" ]; then
+    ecs_choice="1"
+  else
+    echo ""
+    echo "  ECS deployment mode:"
+    echo "    1) Full deploy      (CDK — updates task def, ALB config, scaling, env vars)"
+    echo "    2) Force new deploy (restarts tasks with latest image — no infra changes)"
+    echo ""
+    read -rp "  Choice [1]: " ecs_choice
+    ecs_choice="${ecs_choice:-1}"
+  fi
+
+  case "$ecs_choice" in
+  1)
+  export_cdk_env
   log_info "Deploying $(_sn ECS)..."
   if ! cdk_deploy "$(_sn ECS)"; then
     _ui_deploy_failed "ECS deploy failed."
     return 1
   fi
-
-  local service_name="badgers-ui-$(resource_id)"
 
   # The stack references the image by a static tag, so pushing a new image to that same
   # tag leaves the template unchanged — cdk reports "no changes" and the service keeps
@@ -375,54 +463,138 @@ step_ui_deploy() {
   # regardless, which is what makes a step 7 rebuild actually take effect.
   log_info "Forcing image rollout for ${service_name} (${ECR_REPO}:${UI_IMAGE_TAG})..."
   if ! aws ecs update-express-gateway-service \
-      --service-arn "arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/default/${service_name}" \
+      --service-arn "${service_arn}" \
       --primary-container "{\"image\":\"${ECR_REPO}:${UI_IMAGE_TAG}\",\"containerPort\":${UI_CONTAINER_PORT}}" \
       --region "${AWS_REGION}" --no-cli-pager > /dev/null; then
-    _ui_deploy_failed "Forcing the image rollout failed for ${service_name}."
+    log_warn "Could not force rollout — service may be newly created (continuing)."
+  fi
+  ;;
+  2)
+  # Force new deployment only (no CDK)
+  log_info "Forcing new deployment on ${service_name}..."
+  if ! aws ecs update-express-gateway-service \
+      --service-arn "${service_arn}" \
+      --primary-container "{\"image\":\"${ECR_REPO}:${UI_IMAGE_TAG}\",\"containerPort\":${UI_CONTAINER_PORT}}" \
+      --region "${AWS_REGION}" --no-cli-pager > /dev/null 2>&1; then
+    _ui_deploy_failed "Could not force rollout. Is the ECS service deployed?"
     return 1
   fi
-  log_info "Polling rollout state for ${service_name}..."
-  local state completed=0
-  for _ in $(seq 1 60); do
+  ;;
+  *)
+  log_error "Invalid choice: ${ecs_choice}"
+  return 1
+  ;;
+  esac
+
+  # ── Poll until live ─────────────────────────────────────────────────
+  echo ""
+  echo "  ┌────────────────────────────────────────────────────────────┐"
+  echo "  │  🚀 ECS service is starting up — waiting for healthy...   │"
+  echo "  └────────────────────────────────────────────────────────────┘"
+  echo ""
+
+  local state="" completed=0 elapsed=0
+  local spinner=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  local spin_idx=0
+
+  for attempt in $(seq 1 120); do
     state="$(aws ecs describe-services \
       --cluster default --services "${service_name}" \
       --region "${AWS_REGION}" \
       --query "services[0].deployments[0].rolloutState" \
-      --output text 2>/dev/null || echo "UNKNOWN")"
-    echo "  $(_ts) — ${state}"
+      --output text 2>/dev/null || echo "CREATING")"
+
+    local running desired
+    running="$(aws ecs describe-services \
+      --cluster default --services "${service_name}" \
+      --region "${AWS_REGION}" \
+      --query "services[0].deployments[0].runningCount" \
+      --output text 2>/dev/null || echo "0")"
+    desired="$(aws ecs describe-services \
+      --cluster default --services "${service_name}" \
+      --region "${AWS_REGION}" \
+      --query "services[0].deployments[0].desiredCount" \
+      --output text 2>/dev/null || echo "1")"
+
+    local status_msg=""
+    case "${state}" in
+      COMPLETED)    status_msg="✅ Service is live!" ;;
+      IN_PROGRESS)  status_msg="🔄 Deploying containers... (${running}/${desired} running)" ;;
+      FAILED)       status_msg="❌ Rollout failed" ;;
+      *)            status_msg="⏳ Provisioning service..." ;;
+    esac
+
+    local s="${spinner[$spin_idx]}"
+    spin_idx=$(( (spin_idx + 1) % ${#spinner[@]} ))
+    elapsed=$((attempt * 5))
+    printf "\r  %s  %s  [%ds elapsed]    " "${s}" "${status_msg}" "${elapsed}"
+
     if [ "${state}" = "COMPLETED" ]; then
       completed=1
+      echo ""
       break
     fi
+
     if [ "${state}" = "FAILED" ]; then
+      echo ""
       _ui_deploy_failed "ECS rollout failed for ${service_name}."
       log_error "Task-level cause: aws logs tail /ecs/badgers-ui-$(resource_id) --region ${AWS_REGION} --since 30m"
       return 1
     fi
+
+    if [ "${attempt}" -eq 60 ]; then
+      echo ""
+      echo "  ⚠️  Taking longer than usual — trying for 5 more minutes..."
+      echo ""
+    fi
+
     sleep 5
   done
 
-  # Falling out of the loop without COMPLETED is a timeout, not a success.
   if [ "${completed}" -ne 1 ]; then
-    _ui_deploy_failed "ECS rollout did not reach COMPLETED within 5 minutes (last state: ${state:-unknown})."
+    echo ""
+    _ui_deploy_failed "Service did not reach healthy state within 10 minutes (last: ${state:-unknown})."
     log_error "Task-level cause: aws logs tail /ecs/badgers-ui-$(resource_id) --region ${AWS_REGION} --since 30m"
     return 1
   fi
 
-  mark_complete "ecs_deployed"
-
   local endpoint
-  endpoint="$(stack_output "$(_sn ECS)" ServiceEndpoint)"
+  endpoint="$(stack_output "$(_sn ECS)" ServiceEndpoint)" 2>/dev/null || true
   if [ -n "${endpoint}" ] && [ "${endpoint}" != "None" ]; then
-    log_success "UI available at https://${endpoint}"
+    echo ""
+    echo "  ┌────────────────────────────────────────────────────────────┐"
+    echo "  │  🌐 UI is live at:                                         │"
+    echo "  │  https://${endpoint}"
+    echo "  └────────────────────────────────────────────────────────────┘"
+    echo ""
   else
     log_warn "Could not read ServiceEndpoint from $(_sn ECS)"
   fi
+
+  mark_complete "ecs_deployed"
 }
 
 # ══════════════════════════════════════════════════════════════════════════
 # Resume — run only the steps this deployment still needs
 # ══════════════════════════════════════════════════════════════════════════
+ALL_STEPS=(step_layers step_infra step_upload step_specialists step_gateway step_runtime step_ui_build step_ui_deploy)
+
+# Run every step in order, skipping completed ones silently (resume mode).
+run_remaining() {
+  export DEPLOY_RESUME_MODE=1
+  local s
+  for s in "${ALL_STEPS[@]}"; do
+    if ! "${s}"; then
+      echo ""
+      log_error "Resume stopped at ${s}."
+      log_error "Fix the cause and resume again — completed steps stay recorded."
+      unset DEPLOY_RESUME_MODE
+      return 1
+    fi
+  done
+  unset DEPLOY_RESUME_MODE
+}
+
 step_resume() {
   log_step "Resume — Run Remaining Steps"
 
@@ -432,48 +604,10 @@ step_resume() {
     _prompt_ui_public_access || return 1
   fi
 
-  # A step counts as done only when every state key it writes is set, so a partially
-  # finished step (runtime image pushed but never deployed) is re-entered rather than
-  # skipped. Completed steps are skipped before being called, so their "already
-  # complete, re-run?" prompts never fire — that is the difference from option 9.
-  local -a order=(
-    "step_layers:layers_built"
-    "step_infra:infra_complete"
-    "step_upload:s3_files_uploaded"
-    "step_specialists:specialists_complete"
-    "step_gateway:gateway_complete"
-    "step_runtime:runtime_image_pushed,runtime_deployed"
-    "step_ui_build:ui_image_pushed"
-    "step_ui_deploy:ecs_deployed"
-  )
-
-  local entry fn keys k pending ran=0
-  for entry in "${order[@]}"; do
-    fn="${entry%%:*}"
-    keys="${entry#*:}"
-    pending=0
-    for k in ${keys//,/ }; do
-      check_completed "${k}" || { pending=1; break; }
-    done
-    if [ "${pending}" -eq 0 ]; then
-      log_info "skip  ${fn} — already complete"
-      continue
-    fi
-    if ! "${fn}"; then
-      echo ""
-      log_error "Resume stopped at ${fn}."
-      log_error "Fix the cause and resume again — completed steps stay recorded."
-      return 1
-    fi
-    ran=$((ran + 1))
-  done
+  run_remaining || return 1
 
   echo ""
-  if [ "${ran}" -eq 0 ]; then
-    log_success "Nothing to run — every step is already complete for ${DEPLOYMENT_ID}."
-  else
-    log_success "Resume complete (${ran} step(s) run)."
-  fi
+  log_success "Resume complete for ${DEPLOYMENT_ID}."
   show_status
 }
 
@@ -489,18 +623,7 @@ step_full() {
   # Asked up front rather than at step 8, so the run is unattended after this point.
   _prompt_ui_public_access || return 1
 
-  # Stop at the first failure. Continuing would deploy on top of a broken
-  # foundation and report success at the end.
-  local s
-  for s in step_layers step_infra step_upload step_specialists \
-           step_gateway step_runtime step_ui_build step_ui_deploy; do
-    if ! "${s}"; then
-      echo ""
-      log_error "Full deployment stopped at ${s}."
-      log_error "Fix the cause and re-run — completed steps are recorded and will be skipped."
-      return 1
-    fi
-  done
+  run_remaining || return 1
 
   echo ""
   log_success "Full deployment complete!"
@@ -594,19 +717,20 @@ EOF
   echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
   echo ""
   echo -e "  ${BOLD} 1${NC}) Build Lambda Layers"
-  echo -e "  ${BOLD} 2${NC}) Foundational Infra (S3, Cognito, DynamoDB, IAM, ECR, Profiles, XRay, Memory, VPC)"
-  echo -e "  ${BOLD} 3${NC}) Upload Prompts, Manifests & Schemas"
-  echo -e "  ${BOLD} 4${NC}) Specialist Lambdas (incl. container images)"
+  echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB, IAM, ECR, Profiles, XRay, Memory, VPC)"
+  echo -e "  ${BOLD} 3${NC}) Upload Config Files     → submenu"
+  echo -e "  ${BOLD} 4${NC}) Specialist Lambdas      (incl. container images)"
   echo -e "  ${BOLD} 5${NC}) Gateway"
   echo -e "  ${BOLD} 6${NC}) Runtime — Build & Deploy"
   echo -e "  ${BOLD} 7${NC}) UI — Build & Push Image"
-  echo -e "  ${BOLD} 8${NC}) UI — Deploy ECS"
+  echo -e "  ${BOLD} 8${NC}) UI — Deploy ECS          → submenu"
   echo ""
   echo -e "  ${BOLD} 9${NC}) ${GREEN}Full Deployment (Run All Steps)${NC}"
-  echo -e "  ${BOLD}12${NC}) ${GREEN}Resume (Run Remaining Steps Only)${NC}"
+  echo -e "  ${BOLD} r${NC}) ${GREEN}Resume (Run Remaining Steps Only)${NC}"
   echo ""
   echo -e "  ${BOLD}10${NC}) Show Deployment Status"
   echo -e "  ${BOLD}11${NC}) Reset Deployment State (start fresh)"
+  echo -e "  ${BOLD} m${NC}) Model Configuration (placeholder)"
   echo -e "  ${BOLD} 0${NC}) Exit"
   echo ""
   echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
@@ -626,7 +750,9 @@ dispatch() {
     9)  step_full ;;
     10) show_status ;;
     11) reset_state ;;
-    12|resume) step_resume ;;
+    r|R|resume) step_resume ;;
+    m|M) echo ""; log_info "Model configuration not yet implemented for BADGERS."; echo ""
+      log_info "BADGERS currently uses models configured in the CDK stacks and manifests." ;;
     0)  log_info "Exiting..."; exit 0 ;;
     *)  return 1 ;;
   esac
@@ -637,7 +763,7 @@ dispatch() {
 # ══════════════════════════════════════════════════════════════════════════
 _valid_option() {
   case "$1" in
-    0|1|2|3|4|5|6|7|8|9|10|11|12|resume) return 0 ;;
+    0|1|2|3|4|5|6|7|8|9|10|11|r|R|resume|m|M) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -653,7 +779,7 @@ fi
 
 while true; do
   show_menu
-  read -rp "Select option (0-12): " choice
+  read -rp "Select option: " choice
   echo ""
   if _valid_option "${choice}"; then
     # Capture dispatch's status directly. Reading $? inside an else branch reports the
