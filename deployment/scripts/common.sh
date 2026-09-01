@@ -1043,6 +1043,11 @@ _check_quota() {
   # Convert quota to int (it may be a float like 100.0)
   quota="$(printf '%.0f' "${quota}")"
 
+  # Normalize count: AWS CLI auto-pagination applies `length(...)` per page,
+  # so a paginated response yields one number per line (e.g. "50\n31"). Sum
+  # all numeric lines into a single integer; default to 0 if empty.
+  count="$(printf '%s\n' "${count}" | awk '{ s += $1 } END { print s + 0 }')"
+
   local remaining=$(( quota - count ))
   if [ "${remaining}" -lt "${needed}" ]; then
     log_error "${label}: ${count}/${quota} used, need ${needed} more — NOT ENOUGH HEADROOM"
