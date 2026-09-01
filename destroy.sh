@@ -40,6 +40,7 @@ KMS_WAIT_DAYS="${KMS_WAIT_DAYS:-7}"
 VPC_CLEANUP_ONLY=false
 [ "${1:-}" = "--vpc-cleanup-only" ] && VPC_CLEANUP_ONLY=true
 
+ensure_region
 ensure_account
 
 # With no DEPLOYMENT_ID given, the target is chosen from what is actually deployed in
@@ -205,7 +206,9 @@ resolve_vpc_id() {
   if [ -z "${vpc_id}" ] || [ "${vpc_id}" = "None" ]; then
     # Stack may already be gone — fall back to tags.
     vpc_id="$(aws ec2 describe-vpcs \
-      --filters Name=tag:application_name,Values=badgers \
+      --filters \
+        Name=tag:application_name,Values=badgers \
+        Name=tag:deployment_id,Values="${DEPLOYMENT_ID}" \
       --region "${AWS_REGION}" --query "Vpcs[0].VpcId" --output text 2>/dev/null || true)"
   fi
   echo "${vpc_id}"
@@ -222,6 +225,16 @@ if [ "${VPC_CLEANUP_ONLY}" = true ]; then
   fi
   log_info "Found VPC: ${VPC_ID}"
   cleanup_vpc_enis "${VPC_ID}"
+
+  # Also retry the VPC stack deletion now that ENIs are clean.
+  VPC_STACK="$(_sn Vpc)"
+  if [ "$(stack_status "${VPC_STACK}")" = "DELETE_FAILED" ]; then
+    log_info "Retrying VPC stack deletion after ENI cleanup..."
+    aws cloudformation delete-stack --stack-name "${VPC_STACK}" --region "${AWS_REGION}" || true
+    aws cloudformation wait stack-delete-complete --stack-name "${VPC_STACK}" \
+      --region "${AWS_REGION}" 2>/dev/null && log_success "VPC stack deleted" || log_warn "VPC stack still stuck"
+  fi
+
   log_success "VPC ENI cleanup complete"
   exit 0
 fi
@@ -276,14 +289,32 @@ empty_bucket() {
 }
 
 echo "── Emptying S3 buckets ───────────────────────────────────"
-empty_bucket "badgers-config-${RESOURCE_ID}"
-empty_bucket "badgers-source-${RESOURCE_ID}"
-empty_bucket "badgers-output-${RESOURCE_ID}"
+# Dynamically discover bucket names from stack outputs — avoids hardcoded names
+# drifting from what the CDK stack actually creates.
+for bucket_output in ConfigBucketName SourceBucketName OutputBucketName; do
+  BNAME="$(stack_output "$(_sn S3)" "${bucket_output}" 2>/dev/null || true)"
+  if [ -n "${BNAME}" ] && [ "${BNAME}" != "None" ]; then
+    empty_bucket "${BNAME}"
+  fi
+done
+# Fallback: also try the conventional names in case the stack is already gone.
+for suffix in config source output; do
+  empty_bucket "badgers-${suffix}-${RESOURCE_ID}" 2>/dev/null || true
+done
 echo ""
 
 # ── Capture KMS key and VPC id before the stacks go ────────────────────────
 echo "── Capturing KMS key and VPC id ──────────────────────────"
-KMS_KEY_ARN="$(stack_output "$(_sn S3)" S3KmsKeyArn)"
+KMS_KEY_ARN="$(stack_output "$(_sn S3)" S3KmsKeyArn 2>/dev/null || true)"
+# Also resolve via alias — the stack output may already be gone, but the alias
+# survives stack deletion and is needed for the alias-delete step below.
+KMS_ALIAS="alias/badgers-${RESOURCE_ID}"
+if [ -z "${KMS_KEY_ARN}" ]; then
+  KMS_KEY_ARN="$(aws kms describe-key --key-id "${KMS_ALIAS}" --region "${AWS_REGION}" \
+    --query 'KeyMetadata.Arn' --output text 2>/dev/null || true)"
+  [ "${KMS_KEY_ARN}" = "None" ] && KMS_KEY_ARN=""
+fi
+  echo "  ✓ KMS alias: ${KMS_ALIAS}"
 [ "${KMS_KEY_ARN}" = "None" ] && KMS_KEY_ARN=""
 if [ -n "${KMS_KEY_ARN}" ]; then
   echo "  ✓ KMS key: ${KMS_KEY_ARN}"
@@ -303,9 +334,15 @@ if [ -n "${SERVICE_ARN}" ] && [ "${SERVICE_ARN}" != "None" ]; then
   echo "  → Deleting ${ECS_SERVICE_NAME}..."
   # DeleteService rejects an Express Gateway Service outright. DeleteExpressGatewayService
   # also removes what the service created — notably the load balancer, when no other
-  # service is sharing it.
+  # service is sharing it. Fall back to delete-service --force if the Express API fails.
   aws ecs delete-express-gateway-service --service-arn "${SERVICE_ARN}" \
-    --region "${AWS_REGION}" --no-cli-pager > /dev/null || true
+    --region "${AWS_REGION}" --no-cli-pager > /dev/null 2>&1 || {
+    log_warn "delete-express-gateway-service failed — falling back to delete-service --force"
+    aws ecs delete-service --cluster default --service "${SERVICE_ARN}" --force \
+      --region "${AWS_REGION}" --no-cli-pager > /dev/null 2>&1 || {
+      log_warn "delete-service also failed — service may already be gone"
+    }
+  }
   DELETED=false
   for i in $(seq 1 30); do
     STATUS="$(express_service_status "${SERVICE_ARN}")"
@@ -331,7 +368,7 @@ echo ""
 
 # ── Delete the AgentCore runtime (releases its ENIs) ───────────────────────
 echo "── Deleting AgentCore runtime ────────────────────────────"
-RUNTIME_ID="$(stack_output "$(_sn RuntimeWebSocket)" RuntimeId)"
+RUNTIME_ID="$(stack_output "$(_sn RuntimeWebSocket)" RuntimeId 2>/dev/null || true)"
 if [ -n "${RUNTIME_ID}" ] && [ "${RUNTIME_ID}" != "None" ]; then
   echo "  → Deleting runtime ${RUNTIME_ID}..."
   ENDPOINTS="$(aws bedrock-agentcore-control list-agent-runtime-endpoints \
@@ -460,6 +497,12 @@ if [ -n "${KMS_KEY_ARN}" ]; then
         --output text --no-cli-pager > /dev/null
       echo "  ✓ Scheduled for deletion in ${KMS_WAIT_DAYS} days"
       echo "    (cancel: aws kms cancel-key-deletion --key-id ${KMS_KEY_ARN})"
+      # Delete the alias so the name is freed immediately for redeployment.
+      # The alias stays reserved while the key is pending deletion, blocking
+      # a redeploy with the same DEPLOYMENT_ID.
+      aws kms delete-alias --alias-name "${KMS_ALIAS}" --region "${AWS_REGION}" 2>/dev/null && \
+        echo "  ✓ KMS alias ${KMS_ALIAS} deleted (name freed for redeployment)" || \
+        log_warn "Could not delete alias ${KMS_ALIAS} — redeployment may need to wait ${KMS_WAIT_DAYS} days"
       ;;
     MISSING)
       echo "  (key not found — skipping)"
@@ -470,6 +513,19 @@ if [ -n "${KMS_KEY_ARN}" ]; then
   esac
   echo ""
 fi
+
+# ── Clean up local state ─────────────────────────────────────────────────────────
+echo "── Cleaning up local state ─────────────────────────────────────"
+STATE_FILE="$(state_file 2>/dev/null || true)"
+if [ -n "${STATE_FILE}" ] && [ -f "${STATE_FILE}" ]; then
+  rm -f "${STATE_FILE}"
+  echo "  ✓ Removed ${STATE_FILE}"
+else
+  echo "  (no state file to remove)"
+fi
+# Also remove the stack outputs cache if it exists.
+rm -f "${REPO_ROOT}/.deploy-state/${DEPLOYMENT_ID}-outputs.json" 2>/dev/null || true
+echo ""
 
 echo "════════════════════════════════════════════════════════"
 echo "  ✅ Teardown complete  (DEPLOYMENT_ID=${DEPLOYMENT_ID}, STACK_SUFFIX=${STACK_SUFFIX})"
