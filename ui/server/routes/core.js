@@ -17,7 +17,14 @@ import multer from 'multer';
 export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
     const CONFIG_DIR = resolve(PROJECT_ROOT, 'ui', 'config');
-    const LOGS_DIR = resolve(PROJECT_ROOT, 'ui', 'logs', 'chat_sessions');
+    // In the container the server is copied to /app/server (no `ui/` prefix),
+    // so PROJECT_ROOT resolves to `/` and the default ui/logs path lands on the
+    // read-only filesystem root, crashing /api/chat with EACCES on mkdir. Allow
+    // an explicit override (set in the Dockerfile/ECS task to a writable path)
+    // and fall back to the local repo layout for development.
+    const LOGS_DIR = process.env.CHAT_LOGS_DIR
+        ? resolve(process.env.CHAT_LOGS_DIR)
+        : resolve(PROJECT_ROOT, 'ui', 'logs', 'chat_sessions');
 
     // ── Load env config ──
 
@@ -202,10 +209,14 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
         mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
-        const logFile = resolve(LOGS_DIR, `${safeSessionId}.log`);
-        // Normalize the path and verify it's within the allowed logs directory
-        const normalizedLogFile = realpathSync(logFile);
-        if (!normalizedLogFile.startsWith(LOGS_DIR + '/')) return res.status(403).json({ error: 'Forbidden' });
+        // Resolve the logs directory (which exists after mkdir) rather than the
+        // log file, which does not exist yet for a new session — realpathSync on
+        // a missing path throws ENOENT. safeSessionId is already stripped to
+        // [a-zA-Z0-9_-], so the constructed filename cannot escape the directory;
+        // the containment check below is defense-in-depth.
+        const logsDirReal = realpathSync(LOGS_DIR);
+        const logFile = resolve(logsDirReal, `${safeSessionId}.log`);
+        if (!logFile.startsWith(logsDirReal + '/')) return res.status(403).json({ error: 'Forbidden' });
         const log = (line) => { appendFile(logFile, line + '\n').catch(() => { }); };
         log(`\n${'='.repeat(60)}`);
         log(`[${new Date().toISOString()}] USER: ${message}`);

@@ -10,6 +10,10 @@ COPY config/ ./config/
 
 ENV NODE_ENV=production
 ENV PORT=7860
+# Chat-session logs must live on a writable path. The server resolves its
+# default logs dir relative to the repo layout, which does not exist in this
+# flattened image; point it at a writable location under /app (owned by node).
+ENV CHAT_LOGS_DIR=/app/logs/chat_sessions
 EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
