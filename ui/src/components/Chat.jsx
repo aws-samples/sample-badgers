@@ -101,7 +101,7 @@ function UserMessage() {
 }
 
 function AssistantMessage() {
-  const message = useAuiState()
+  const message = useAuiState((s) => s.message)
   const isRunning = message.status?.type === 'running'
   const hasText = message.content?.some(c => c.type === 'text' && c.text?.trim())
   const reasoningParts = message.content?.filter(c => c.type === 'reasoning') || []
