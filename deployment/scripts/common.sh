@@ -15,6 +15,75 @@
 # Stack names carry the suffix only (BADGERS-S3-a1b). Resource names carry both
 # parts (badgers-config-dev-a1b) via RESOURCE_ID, matching what app.py composes.
 
+# ── Docker cross-platform build check ─────────────────────────────────────────
+# Ensures QEMU binfmt is registered when building for a different architecture
+# than the host. On WSL/Linux, also ensures qemu-user-static is installed
+# (provides the actual interpreter binaries on the host filesystem).
+# Accepts a target platform argument:
+#   preflight_docker_cross_platform arm64   (for runtime image)
+#   preflight_docker_cross_platform amd64   (for UI image)
+# If no argument, defaults to arm64 (runtime).
+preflight_docker_cross_platform() {
+  local target_arch="${1:-arm64}"
+  local host_arch
+  host_arch="$(uname -m)"
+
+  # Normalize host arch names
+  local host_normalized
+  case "${host_arch}" in
+    x86_64|amd64)   host_normalized="amd64" ;;
+    aarch64|arm64)   host_normalized="arm64" ;;
+    *)               host_normalized="${host_arch}" ;;
+  esac
+
+  # If host matches target, no emulation needed
+  if [[ "${host_normalized}" == "${target_arch}" ]]; then
+    log_info "Docker platform check: native ${target_arch} host — no emulation needed"
+    return 0
+  fi
+
+  log_info "Docker platform check: host is ${host_normalized} (${host_arch}), target is linux/${target_arch}"
+
+  # Check if Docker is available at all
+  if ! command -v docker &>/dev/null; then
+    log_error "Docker not found in PATH. Install Docker Desktop or Docker Engine first."
+    return 1
+  fi
+
+  # On WSL/Linux: ensure qemu-user-static is installed (provides the interpreter
+  # binaries that binfmt_misc points to). Without this, binfmt registers but
+  # execution fails with "No such file or directory" for /bin/sh.
+  if [[ "$(uname -s)" == "Linux" ]] && ! command -v qemu-aarch64-static &>/dev/null && [[ "${target_arch}" == "arm64" ]]; then
+    log_warn "qemu-user-static not found — installing (provides /usr/bin/qemu-aarch64-static)..."
+    sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static \
+      || { log_error "Failed to install qemu-user-static."; \
+           log_error "Run manually: sudo apt-get install qemu-user-static"; return 1; }
+  elif [[ "$(uname -s)" == "Linux" ]] && ! command -v qemu-x86_64-static &>/dev/null && [[ "${target_arch}" == "amd64" ]]; then
+    log_warn "qemu-user-static not found — installing (provides /usr/bin/qemu-x86_64-static)..."
+    sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static \
+      || { log_error "Failed to install qemu-user-static."; \
+           log_error "Run manually: sudo apt-get install qemu-user-static"; return 1; }
+  fi
+
+  # Test if target platform emulation works
+  if docker run --rm --platform "linux/${target_arch}" public.ecr.aws/docker/library/alpine:3 true 2>/dev/null; then
+    log_success "${target_arch} emulation: OK (QEMU already registered)"
+    return 0
+  fi
+
+  # Not registered — attempt auto-install
+  log_warn "${target_arch} emulation not available — registering QEMU binfmt handlers..."
+  if docker run --privileged --rm tonistiigi/binfmt --install "${target_arch}"; then
+    log_success "QEMU ${target_arch} emulation registered successfully."
+    return 0
+  else
+    log_error "Failed to register QEMU binfmt for ${target_arch}."
+    log_error "Try manually: docker run --privileged --rm tonistiigi/binfmt --install ${target_arch}"
+    log_error "On Docker Desktop: ensure 'Use Rosetta / QEMU' is enabled in Settings → General."
+    return 1
+  fi
+}
+
 # ── Colors ──
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -45,6 +114,37 @@ log_warn() { echo -e "${YELLOW}[$(_ts) !]${NC} $1"; }
 log_error() { echo -e "${RED}[$(_ts) ✗]${NC} $1"; }
 log_step() { echo -e "${CYAN}${BOLD}── [$(_ts)]${NC} ${BOLD}$1${NC}"; }
 
+# ── Windows VDI: strip carriage returns from tool output ─────────────────────
+# These scripts may be run from a Windows VDI under Git Bash. The native Windows
+# builds of python and the aws CLI open stdout in text mode, so every "\n" they
+# print goes out as "\r\n". Bash command substitution "$(…)" strips a trailing
+# "\n" but NOT the "\r", so captured values silently gain a trailing carriage
+# return. That stray "\r" breaks string comparisons ("True\r" != "True"),
+# JMESPath equality filters (modelId=='...\r' matches nothing), JSON, and
+# resource names built from the value.
+#
+# Route both tools through a wrapper that removes CRs so every caller gets clean
+# output, instead of sprinkling `tr -d '\r'` on each capture site (and missing new
+# ones). `command` avoids recursing back into these wrappers. All scripts here run
+# with `set -o pipefail`, so the pipeline still reports the tool's own exit status
+# and `|| echo default` style fallbacks keep working.
+#
+# Safe here because no `aws`/`python3` call streams binary to stdout; the only
+# raw-token case (`aws ecr get-login-password`) benefits from CR removal too.
+aws()     { command aws     "$@" | tr -d '\r'; }
+
+# python3 wrapper: use python3 if available, else python (Windows Git Bash).
+# Also strips \r from output (Git Bash / Windows line endings).
+if command -v python3 &>/dev/null; then
+  _PYTHON_CMD=python3
+elif command -v python &>/dev/null; then
+  _PYTHON_CMD=python
+else
+  echo "ERROR: Neither python3 nor python found in PATH." >&2
+  exit 1
+fi
+python3() { command ${_PYTHON_CMD} "$@" | tr -d '\r'; }
+
 # ── Paths ──────────────────────────────────────────────────────────────────
 # This file lives at <repo>/deployment/scripts/common.sh
 BADGERS_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -52,7 +152,13 @@ DEPLOYMENT_DIR="$(cd "${BADGERS_SCRIPTS_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${DEPLOYMENT_DIR}/.." && pwd)"
 
 # ── Defaults ───────────────────────────────────────────────────────────────
-AWS_REGION="${AWS_REGION:-us-west-2}"
+# Capture a caller-pinned region before applying any fallback, so ensure_region()
+# can tell an explicit choice from an unset variable. AWS_REGION stays populated
+# either way: scripts that source this file without calling ensure_region() still
+# need a usable value.
+_AWS_REGION_FROM_ENV="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
+BADGERS_DEFAULT_REGION="us-west-2"
+AWS_REGION="${_AWS_REGION_FROM_ENV:-${BADGERS_DEFAULT_REGION}}"
 STACK_PREFIX="${STACK_PREFIX:-BADGERS}"
 
 # ── Deployment identity ────────────────────────────────────────────────────
@@ -62,6 +168,15 @@ require_deployment_id() {
     log_error "explicitly, e.g. DEPLOYMENT_ID=dev ./destroy.sh"
     exit 1
   fi
+}
+
+# Convert MSYS/Git Bash paths (/c/...) to Windows-compatible paths (C:/...) for
+# Python subprocesses. On Linux/macOS this is a no-op.
+_py_path() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) cygpath -m "$1" ;;
+    *) echo "$1" ;;
+  esac
 }
 
 state_file() {
@@ -98,21 +213,20 @@ get_state() {
   f="$(state_file)"
   [ -f "${f}" ] || { echo ""; return; }
   python3 -c "import json,sys
-try:
-    d=json.load(open('${f}'))
-except Exception:
-    print(''); sys.exit(0)
-print(d.get('$1',''))"
+with open('$(_py_path "${f}")') as fh:
+    d=json.load(fh)
+print(d.get(sys.argv[1],''))" "$1"
 }
 
 set_state() {
-  local f
+  local f key val
   f="$(state_file)"
-  python3 -c "
-import json
-with open('${f}', 'r+') as fh:
+  key="$1"; val="$2"
+  python3 -c "import json
+f='$(_py_path "${f}")'
+with open(f, 'r+') as fh:
     data = json.load(fh)
-    data['$1'] = $2
+    data['${key}'] = ${val}
     fh.seek(0)
     json.dump(data, fh, indent=2)
     fh.truncate()
@@ -256,9 +370,10 @@ choose_deployment() {
     echo "    n) Start a new deployment instead"
     echo ""
     local pick
-    read -rp "Select which? (1-${#ids[@]}, or n) [1]: " pick
+    read -rp "Select which? (1-${#ids[@]}, n, or q to quit) [1]: " pick
     pick="${pick:-1}"
     case "${pick}" in
+      q|Q|0) log_info "Aborted."; return 1 ;;
       n|N) ;;
       ''|*[!0-9]*)
         log_error "Invalid selection: ${pick}"
@@ -454,6 +569,72 @@ print(m.group(1) + ' ' + m.group(2) if m else '')
 resource_id() { echo "${DEPLOYMENT_ID}-${STACK_SUFFIX}"; }
 
 # ── AWS helpers ────────────────────────────────────────────────────────────
+# Region resolution ladder:
+#   1. AWS_REGION / AWS_DEFAULT_REGION from the environment — no prompt
+#   2. the active credential profile's configured region
+#   3. ask
+#   4. warn that us-west-2 is the fallback, then confirm
+# Must run before ensure_account, which calls STS with --region "${AWS_REGION}".
+
+# Validate an AWS region name (e.g. us-west-2).
+_valid_region() {
+  [[ "$1" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]$ ]]
+}
+
+ensure_region() {
+  local source_desc=""
+
+  if [ -n "${_AWS_REGION_FROM_ENV}" ]; then
+    AWS_REGION="${_AWS_REGION_FROM_ENV}"
+    source_desc="environment"
+  else
+    # Bare `aws configure get region` already honours an exported AWS_PROFILE.
+    local cred_region
+    cred_region="$(aws configure get region 2>/dev/null || true)"
+    if [ -n "${cred_region}" ]; then
+      AWS_REGION="${cred_region}"
+      source_desc="AWS profile ${AWS_PROFILE:-default}"
+    fi
+  fi
+
+  if [ -z "${source_desc}" ]; then
+    local can_prompt=true
+    [ -t 0 ] || can_prompt=false
+
+    local reply=""
+    if [ "${can_prompt}" = true ]; then
+      read -rp "  AWS region to deploy into (Enter if you are not sure): " reply || reply=""
+      reply="${reply//$'\r'/}"
+    else
+      log_warn "No region in the environment or AWS profile."
+    fi
+
+    if [ -n "${reply}" ]; then
+      AWS_REGION="${reply}"
+      source_desc="entered"
+    else
+      AWS_REGION="${BADGERS_DEFAULT_REGION}"
+      log_warn "Defaulting to ${AWS_REGION}."
+      log_warn "Model availability varies by region; ${AWS_REGION} is where this stack is tested."
+      if [ "${can_prompt}" = true ]; then
+        _confirm "  Deploy into ${AWS_REGION}? (y/n): " || {
+          log_error "Cancelled. Pin a region explicitly: AWS_REGION=<region> $0"
+          exit 1
+        }
+      fi
+      source_desc="default"
+    fi
+  fi
+
+  if ! _valid_region "${AWS_REGION}"; then
+    log_error "'${AWS_REGION}' is not a valid AWS region name (expected e.g. us-west-2)."
+    exit 1
+  fi
+
+  export AWS_REGION
+  log_info "Region ${AWS_REGION} (${source_desc})."
+}
+
 ensure_account() {
   if [ -z "${ACCOUNT_ID:-}" ]; then
     ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -491,14 +672,73 @@ ensure_cdk_deps() {
   export PATH="${REPO_ROOT}/.venv/bin:${PATH}"
 }
 
+# ── CDK Bootstrap Preflight ──────────────────────────────────────────────────
+# CDK requires a bootstrap stack (CDKToolkit) in the target account/region before
+# any deployment. This check runs before the first cdk deploy and gives clear
+# remediation steps if the toolkit stack is missing or in a bad state.
+preflight_bootstrap() {
+  log_info "Checking CDK bootstrap status for ${ACCOUNT_ID}/${AWS_REGION}..."
+
+  local status
+  status="$(aws cloudformation describe-stacks --stack-name CDKToolkit \
+    --region "${AWS_REGION}" --query "Stacks[0].StackStatus" \
+    --output text 2>/dev/null || echo "NOT_FOUND")"
+
+  case "${status}" in
+    CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+      # Check bootstrap version — modern CDK needs version >= 6 (ideally latest)
+      local version
+      version="$(aws ssm get-parameter \
+        --name "/cdk-bootstrap/${CDK_QUALIFIER:-hnb659fds}/${ACCOUNT_ID}/${AWS_REGION}" \
+        --region "${AWS_REGION}" --query "Parameter.Value" \
+        --output text 2>/dev/null || echo "")"
+      if [ -n "${version}" ] && [ "${version}" != "None" ]; then
+        log_success "CDK bootstrap v${version} found in ${AWS_REGION} — ready to deploy."
+      else
+        log_success "CDK bootstrap stack found (${status}) — ready to deploy."
+      fi
+      return 0
+      ;;
+    NOT_FOUND|"")
+      echo ""
+      log_error "CDK has not been bootstrapped in this account/region."
+      echo ""
+      log_error "  Account: ${ACCOUNT_ID}"
+      log_error "  Region:  ${AWS_REGION}"
+      echo ""
+      log_error "Run the following command first (requires AdministratorAccess or equivalent):"
+      echo ""
+      log_error "      cdk bootstrap aws://${ACCOUNT_ID}/${AWS_REGION}"
+      echo ""
+      log_error "Or with an explicit profile:"
+      log_error "      cdk bootstrap aws://${ACCOUNT_ID}/${AWS_REGION} --profile <your-profile>"
+      echo ""
+      log_error "Then re-run ./deploy.sh"
+      echo ""
+      return 1
+      ;;
+    *)
+      log_warn "CDK bootstrap stack exists but is in state: ${status}"
+      log_warn "This may indicate a previous bootstrap failed. Consider re-running:"
+      log_warn "      cdk bootstrap aws://${ACCOUNT_ID}/${AWS_REGION}"
+      _confirm "Attempt deploy anyway? (y/n): " || return 1
+      ;;
+  esac
+}
+
 export_cdk_env() {
   ensure_account
   export DEPLOYMENT_ID
   export STACK_SUFFIX
+  export STACK_PREFIX
   export CDK_DEFAULT_ACCOUNT="${ACCOUNT_ID}"
   export CDK_DEFAULT_REGION="${AWS_REGION}"
   export TYPEGUARD_DISABLE=1
   export PYTHONWARNINGS="ignore::UserWarning:aws_cdk"
+  # app.py reads RUNTIME_IMAGE_TAG to point the runtime at the image the build
+  # step pushed. Default it here so CDK-only entry points stay in sync with the
+  # build without every caller having to set it.
+  export RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
 }
 
 cdk_deploy() {
@@ -770,6 +1010,261 @@ preflight_xray() {
     log_info "Headroom available (${projected}/${quota} after deploy) — $(_sn XRay) will be deployed."
   fi
   return 0
+}
+
+# ── Service Quota Checks ─────────────────────────────────────────────────────
+# Verifies headroom exists for all resources this deployment creates.
+# Each check: current count vs quota, fail if count+needed >= quota.
+
+_check_quota() {
+  # Usage: _check_quota <service_code> <quota_code> <count> <needed> <label>
+  local service="$1" quota_code="$2" count="$3" needed="$4" label="$5"
+  local quota
+
+  quota="$(aws service-quotas get-service-quota \
+    --service-code "${service}" --quota-code "${quota_code}" \
+    --region "${AWS_REGION}" --query 'Quota.Value' --output text 2>/dev/null || echo "")"
+
+  # If Service Quotas unavailable, try default
+  if [ -z "${quota}" ] || [ "${quota}" = "None" ]; then
+    quota="$(aws service-quotas get-aws-default-service-quota \
+      --service-code "${service}" --quota-code "${quota_code}" \
+      --region "${AWS_REGION}" --query 'Quota.Value' --output text 2>/dev/null || echo "")"
+  fi
+
+  if [ -z "${quota}" ] || [ "${quota}" = "None" ]; then
+    echo "    ? ${label}: could not determine quota (skipping)"
+    return 0
+  fi
+
+  # Convert quota to int (it may be a float like 100.0)
+  quota="$(printf '%.0f' "${quota}")"
+
+  local remaining=$(( quota - count ))
+  if [ "${remaining}" -lt "${needed}" ]; then
+    log_error "${label}: ${count}/${quota} used, need ${needed} more — NOT ENOUGH HEADROOM"
+    log_error "      Request a quota increase: https://console.aws.amazon.com/servicequotas/"
+    return 1
+  fi
+
+  echo "    ✓ ${label}: ${count}/${quota} (need ${needed}, ${remaining} available)"
+  return 0
+}
+
+preflight_service_quotas() {
+  log_info "Checking service quotas for deployment headroom..."
+  local failed=0
+
+  # VPCs (we create 1)
+  local vpc_count
+  vpc_count="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
+    --query 'length(Vpcs)' --output text 2>/dev/null || echo "0")"
+  _check_quota "vpc" "L-F678F1CE" "${vpc_count}" 1 "VPCs per Region" || ((failed++))
+
+  # Internet Gateways (we create 1)
+  local igw_count
+  igw_count="$(aws ec2 describe-internet-gateways --region "${AWS_REGION}" \
+    --query 'length(InternetGateways)' --output text 2>/dev/null || echo "0")"
+  _check_quota "vpc" "L-A4707A72" "${igw_count}" 1 "Internet gateways per Region" || ((failed++))
+
+  # S3 Buckets (we create 3: config, source, output)
+  local bucket_count
+  bucket_count="$(aws s3api list-buckets --query 'length(Buckets)' --output text 2>/dev/null || echo "0")"
+  _check_quota "s3" "L-DC2B2D3D" "${bucket_count}" 3 "S3 buckets" || ((failed++))
+
+  # Cognito User Pools (we create 1)
+  local pool_count
+  pool_count="$(aws cognito-idp list-user-pools --max-results 60 --region "${AWS_REGION}" \
+    --query 'length(UserPools)' --output text 2>/dev/null || echo "0")"
+  _check_quota "cognito-idp" "L-F9A5A2F3" "${pool_count}" 1 "Cognito user pools" || ((failed++))
+
+  # DynamoDB Tables (we create 1: jobs)
+  local table_count
+  table_count="$(aws dynamodb list-tables --region "${AWS_REGION}" \
+    --query 'length(TableNames)' --output text 2>/dev/null || echo "0")"
+  _check_quota "dynamodb" "L-F98FE922" "${table_count}" 1 "DynamoDB tables" || ((failed++))
+
+  # ECR Repositories (we create 1)
+  local ecr_count
+  ecr_count="$(aws ecr describe-repositories --region "${AWS_REGION}" \
+    --query 'length(repositories)' --output text 2>/dev/null || echo "0")"
+  _check_quota "ecr" "L-CFEB8E8D" "${ecr_count}" 1 "ECR repositories" || ((failed++))
+
+  # Lambda Functions (we create ~26 specialist functions)
+  local lambda_count
+  lambda_count="$(aws lambda list-functions --region "${AWS_REGION}" \
+    --query 'length(Functions)' --output text 2>/dev/null || echo "0")"
+  _check_quota "lambda" "L-B99A9384" "${lambda_count}" 26 "Lambda functions" || ((failed++))
+
+  # IAM Roles (we create ~5: lambda execution, ecs task, CDK roles)
+  local role_count
+  role_count="$(aws iam list-roles --query 'length(Roles)' --output text 2>/dev/null || echo "0")"
+  _check_quota "iam" "L-FE177D64" "${role_count}" 5 "IAM roles" || ((failed++))
+
+  # KMS Keys (we create 1)
+  local kms_count
+  kms_count="$(aws kms list-keys --region "${AWS_REGION}" \
+    --query 'length(Keys)' --output text 2>/dev/null || echo "0")"
+  _check_quota "kms" "L-C2F1777E" "${kms_count}" 1 "KMS keys" || ((failed++))
+
+  if [ "${failed}" -gt 0 ]; then
+    log_error "${failed} quota check(s) failed — cannot proceed."
+    return 1
+  fi
+
+  log_success "Service quotas OK — headroom confirmed for all resources"
+  return 0
+}
+
+# ── Preflight: Bedrock Model Access ──────────────────────────────────────────
+# Verifies that the default models used by BADGERS are available in the target
+# region. Models with a "us." prefix are cross-region inference profiles and
+# always pass.
+#
+# BADGERS uses these models by default (configurable via inference profiles):
+BADGERS_DEFAULT_MODELS=(
+  "us.anthropic.claude-sonnet-4-5-20250514-v1:0"
+)
+
+preflight_model_access() {
+  log_info "Checking Bedrock model access in ${AWS_REGION}..."
+
+  local missing=() model_id status
+
+  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
+    # Cross-region inference profiles (us.*, eu.*) are always available.
+    if [[ "${model_id}" == us.* ]] || [[ "${model_id}" == eu.* ]]; then
+      echo "    ✓ ${model_id} (cross-region)"
+      continue
+    fi
+
+    # In-region model — verify it exists in the target region.
+    status="$(aws bedrock list-foundation-models --region "${AWS_REGION}" \
+      --query "modelSummaries[?modelId=='${model_id}'].modelLifecycle.status | [0]" \
+      --output text 2>/dev/null | tr -d '\r' || echo "NOT_FOUND")"
+    status="${status%%[[:space:]]}"  # strip trailing whitespace/CR
+
+    if [ "${status}" = "ACTIVE" ] || [ "${status}" = "LEGACY" ]; then
+      echo "    ✓ ${model_id}"
+    else
+      echo "    ✗ ${model_id} (not found in ${AWS_REGION})"
+      missing+=("${model_id}")
+    fi
+  done
+
+  if [ ${#missing[@]} -gt 0 ]; then
+    echo ""
+    log_error "The following models are NOT available in ${AWS_REGION}:"
+    for m in "${missing[@]}"; do
+      log_error "    ${m}"
+    done
+    echo ""
+    log_error "Options:"
+    log_error "  1. Deploy to a region where these models are available"
+    log_error "  2. Use cross-region inference profiles (us.anthropic.* prefix)"
+    log_error ""
+    log_error "Model catalog: https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards.html"
+    return 1
+  fi
+
+  log_success "All configured models are accessible in ${AWS_REGION}"
+  return 0
+}
+
+# ── Model Invocation Test ────────────────────────────────────────────────────
+# Actually invokes each model with a minimal payload to confirm marketplace
+# subscriptions, inference profiles, and IAM permissions are all in place.
+preflight_model_invocation() {
+  log_info "Testing model invocations (this may take 10-20 seconds)..."
+  local failed=0
+
+  local claude_body='{"anthropic_version":"bedrock-2023-05-31","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+
+  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
+    local response
+    response="$(aws bedrock-runtime invoke-model \
+      --model-id "${model_id}" \
+      --region "${AWS_REGION}" \
+      --content-type "application/json" \
+      --body "${claude_body}" \
+      --output json \
+      /dev/null 2>&1)" || true
+
+    if echo "${response}" | grep -qi "AccessDeniedException\|ValidationException\|ResourceNotFoundException\|ServiceUnavailableException"; then
+      local err_msg
+      err_msg="$(echo "${response}" | grep -o '"[Mm]essage":"[^"]*"' | head -1 || echo "${response}")"
+      echo "    ✗ ${model_id}"
+      echo "      Error: ${err_msg}"
+      ((failed++))
+    else
+      echo "    ✓ ${model_id}"
+    fi
+  done
+
+  if [ "${failed}" -gt 0 ]; then
+    log_error "${failed} model(s) failed invocation test."
+    log_error "Common fixes:"
+    log_error "  - Marketplace models (Anthropic): Subscribe at https://console.aws.amazon.com/bedrock/home#/modelaccess"
+    log_error "  - IAM: Ensure your deploy role has bedrock:InvokeModel on the model ARN"
+    log_error "  - Region: Model may not be available in ${AWS_REGION}"
+    return 1
+  fi
+
+  log_success "All models respond to invocation"
+  return 0
+}
+
+# ── ECS Service-Linked Role ──────────────────────────────────────────────────
+# Ensure the ECS service-linked role exists, creating it only if genuinely absent.
+preflight_ecs_slr() {
+  log_info "Checking ECS service-linked role..."
+
+  local slr_arn get_err get_rc
+  get_err="$(aws iam get-role \
+    --role-name AWSServiceRoleForECS \
+    --query 'Role.Arn' --output text 2>&1 >/dev/null)"
+  get_rc=$?
+  slr_arn="$(aws iam get-role \
+    --role-name AWSServiceRoleForECS \
+    --query 'Role.Arn' --output text 2>/dev/null)"
+
+  if [ "${get_rc}" -eq 0 ] && [ -n "${slr_arn}" ] && [ "${slr_arn}" != "None" ]; then
+    log_info "  ✓ ECS service-linked role exists: ${slr_arn}"
+    return 0
+  fi
+
+  # get-role failed. Only "NoSuchEntity" means it truly isn't there — anything
+  # else (AccessDenied, wrong account/profile, expired creds) means we can't
+  # see it, and creating would be wrong.
+  if ! printf '%s' "${get_err}" | grep -qi 'NoSuchEntity'; then
+    log_error "  Cannot verify ECS service-linked role — get-role did not return NoSuchEntity."
+    log_error "  AWS error: ${get_err:-<none>}"
+    log_error "  Confirm the CLI is using the same account/region as the console:"
+    aws sts get-caller-identity \
+      --query '{Account:Account,Arn:Arn}' --output text 2>&1 | sed 's/^/    /'
+    log_error "  Region: ${AWS_REGION:-$(aws configure get region 2>/dev/null)}"
+    return 1
+  fi
+
+  log_warn "  ECS service-linked role not found — creating..."
+  local create_err
+  create_err="$(aws iam create-service-linked-role \
+    --aws-service-name ecs.amazonaws.com 2>&1 >/dev/null)"
+  if [ $? -eq 0 ]; then
+    log_success "  Created ECS service-linked role."
+    return 0
+  fi
+
+  # Create failed. "already exists" is benign (race, or it was there all along).
+  if printf '%s' "${create_err}" | grep -qiE 'has been taken|InvalidInput|EntityAlreadyExists'; then
+    log_info "  ✓ ECS service-linked role already exists (confirmed)."
+    return 0
+  fi
+
+  log_error "  Failed to create ECS service-linked role."
+  log_error "  AWS error: ${create_err:-<none>}"
+  log_error "  Retry manually: aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com"
+  return 1
 }
 
 ecr_login() {
