@@ -471,9 +471,12 @@ choose_deployment_to_destroy() {
   done < <(list_deployed_deployments)
 
   if [ "${#ids[@]}" -eq 0 ]; then
-    log_error "No ${STACK_PREFIX}-*-{id}-{suffix} stacks found in ${AWS_REGION}."
-    log_error "Nothing to destroy. Stacks named under an older convention are not matched"
-    log_error "here and need deleting directly."
+    log_warn "No ${STACK_PREFIX}-*-{id}-{suffix} stacks found in ${AWS_REGION}."
+    log_warn "Nothing to destroy. Stacks named under an older convention are not matched"
+    log_warn "here and need deleting directly."
+    echo ""
+    read -rsn1 -p "Press any key to exit... "
+    echo ""
     return 1
   fi
 
