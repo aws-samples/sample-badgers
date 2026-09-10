@@ -11,7 +11,7 @@ import os
 import tempfile
 import base64
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import cv2
 import numpy as np
@@ -25,6 +25,11 @@ logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
 logger.setLevel(getattr(logging, log_level, logging.INFO))
 
+# S3 config bucket (shared with agentic_enhancer.py prompt loader)
+CONFIG_BUCKET = os.environ.get("CONFIG_BUCKET")
+
+# Module-level cache for document type contexts (loaded once per cold start)
+_cached_doc_type_contexts: Optional[Dict[str, str]] = None
 
 def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
     """Lambda handler for agentic image enhancement."""
@@ -171,18 +176,179 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         return _error_response(str(e))
 
 
-def _map_document_type_to_context(doc_type: str) -> str:
-    """Map document_type to LLM context string."""
-    mapping = {
-        "manuscript": "18th century handwritten manuscript",
-        "annotated": "historical document with handwritten annotations",
-        "sheet_music": "musical score with performance annotations",
-        "diagram": "technical diagram or chart",
-        "printed": "printed historical document",
-        "mixed": "mixed media document with multiple content types",
+_FALLBACK_DOC_TYPE_CONTEXTS: Dict[str, str] = {
+        "manuscript": (
+            "18th century handwritten manuscript on laid or wove paper. "
+            "Expect iron gall ink with possible corrosion halos, variable stroke "
+            "weight from quill or steel nib, and natural baseline drift. Paper may "
+            "show age-related yellowing, foxing spots, and bleed-through from the "
+            "verso. Prioritize ink legibility over background aesthetics — gentle "
+            "contrast and white balance corrections are usually sufficient."
+        ),
+        "annotated": (
+            "Historical document with handwritten annotations overlaid on printed "
+            "or manuscript base text. Multiple ink layers may be present — original "
+            "text in one color/weight and later annotations in another (pencil, "
+            "colored ink, or ballpoint). Marginal notes, interlinear glosses, "
+            "underlines, brackets, and correction marks are common. Enhancement "
+            "must preserve both layers without merging or suppressing either. "
+            "Avoid aggressive contrast that could erase light pencil annotations."
+        ),
+        "sheet_music": (
+            "Musical score with performance annotations. Contains precise geometric "
+            "elements (staff lines, note heads, stems, beams, slurs) alongside "
+            "handwritten markings (fingerings, dynamics, phrasing, rehearsal notes). "
+            "Staff lines must remain continuous and even — avoid denoise or sharpen "
+            "settings that could break thin horizontal lines. Handwritten annotations "
+            "are often in pencil and lighter than the printed score. Prefer contrast "
+            "enhancement over sharpening to maintain fine line integrity."
+        ),
+        "diagram": (
+            "Technical diagram or chart — may include engineering drawings, "
+            "architectural plans, flowcharts, circuit schematics, or scientific "
+            "figures. Contains precise geometric lines, arrowheads, labels, and "
+            "possibly hatching or cross-hatching patterns. Line weight variation "
+            "is intentional and must be preserved. Text labels may be small and "
+            "dense. Avoid denoise that could erode fine lines or merge closely "
+            "spaced parallel lines. Deskew is critical — even small rotation "
+            "misalignment is visually obvious in geometric content."
+        ),
+        "printed": (
+            "Printed historical document — letterpress, lithograph, or early "
+            "typewritten text. Uniform letterforms with possible impression "
+            "artifacts (ink spread, uneven inking, strike-through ghosting). "
+            "Paper may be brittle, yellowed, or show acid migration staining. "
+            "Printed text is inherently higher contrast than handwriting, so "
+            "moderate enhancement is usually sufficient. Watch for show-through "
+            "from double-sided printing — denoise or remove_stains can help "
+            "suppress verso bleed without harming the primary text."
+        ),
+        "mixed": (
+            "Mixed media document with multiple content types — may combine "
+            "printed text, handwriting, photographs, stamps, seals, colored "
+            "illustrations, or pasted-in elements on a single page. Each "
+            "content region may need different enhancement treatment. Consider "
+            "regional operations: sharpen for text areas, gentle contrast for "
+            "photographic regions, and stain removal for background. Global "
+            "operations should be conservative to avoid degrading any single "
+            "content type — prefer targeted regional enhancement."
+        ),
+        "historical_manuscript": (
+            "Historical manuscript with period handwriting (secretary hand, "
+            "court hand, or early modern cursive), likely 15th–18th century. "
+            "Written on parchment or rag paper with iron gall ink, carbon ink, "
+            "or sepia. Expect significant age degradation: foxing, tide lines, "
+            "bleed-through, ink fading, and possible mold staining. The writing "
+            "system may include period abbreviations (tildes, superscript letters, "
+            "sigla), ligatures, and non-standard letterforms. Parchment backgrounds "
+            "are typically warm-toned (cream to brown). Modern researcher annotations "
+            "may be present — colored highlights, pencil marks, or sticky-note "
+            "residue overlaid on the original. Enhancement priority: maximize "
+            "ink-to-background contrast without clipping faded strokes. A "
+            "desaturate → levels or desaturate → contrast pipeline is usually "
+            "most effective. Avoid threshold unless the ink is uniformly dark — "
+            "historical inks vary in density and thresholding destroys stroke "
+            "weight information critical for paleographic reading."
+        ),
+        "photograph": (
+            "Photographic content — may be a historical photograph, daguerreotype, "
+            "tintype, or modern print/scan. Contains continuous tonal gradations "
+            "rather than sharp text edges. Enhancement should preserve tonal "
+            "subtlety — avoid over-sharpening that introduces halo artifacts "
+            "or aggressive contrast that clips highlight/shadow detail. For "
+            "faded photographs, equalize_histogram or gentle levels adjustment "
+            "can recover lost tonal range. Scratches, dust, and emulsion damage "
+            "may be present — denoise at low intensity can help without destroying "
+            "grain structure."
+        ),
+        "map": (
+            "Cartographic document — historical or technical map with geographic "
+            "features, boundary lines, place-name labels, compass roses, scale "
+            "bars, and possibly hand-colored regions. Contains both fine line "
+            "work and text at multiple sizes and orientations. Color information "
+            "may be semantically meaningful (boundary colors, terrain shading) — "
+            "do NOT desaturate unless specifically instructed. Fold lines, tears, "
+            "and water damage are common in historical maps. Enhancement should "
+            "prioritize label legibility while preserving geographic line work. "
+            "Deskew carefully — maps may have intentional non-orthogonal framing."
+        ),
+        "legal": (
+            "Legal or administrative document — contracts, deeds, court records, "
+            "certificates, or government filings. May contain pre-printed form "
+            "fields with handwritten entries, stamps, seals (embossed or wax), "
+            "signatures, notary marks, and official letterhead. Multiple ink "
+            "colors and writing implements on a single page are common. "
+            "Enhancement must preserve all layers — faint stamps and light-ink "
+            "entries are as important as bold signatures. Avoid aggressive "
+            "contrast that could erase light form-field entries or background "
+            "security patterns."
+        ),
+        "newspaper": (
+            "Newspaper or periodical page — dense multi-column layout with "
+            "varying font sizes (headlines, body, captions), halftone photographs, "
+            "line illustrations, and advertisements. Paper is typically low-quality "
+            "newsprint with significant yellowing and brittleness. Halftone dots "
+            "may create moiré patterns when scanned — gentle denoise can help. "
+            "Column boundaries and text alignment should guide deskew. Show-through "
+            "from verso is common on thin newsprint — remove_stains or levels "
+            "adjustment can suppress it."
+        ),
         "auto": "",
-    }
-    return mapping.get(doc_type.lower(), "")
+}
+
+
+def _load_doc_type_contexts() -> Dict[str, str]:
+    """Load document type context map from S3, falling back to hardcoded default.
+
+    Mirrors the S3-first pattern from agentic_enhancer._load_system_prompt():
+    1. Try S3:  s3://{CONFIG_BUCKET}/config/document_type_contexts.json
+    2. Fall back to _FALLBACK_DOC_TYPE_CONTEXTS on any failure
+    3. Cache at module level so subsequent warm invocations skip the S3 call
+
+    The S3 JSON file should be a flat object mapping document type keys
+    (lowercase) to context description strings, e.g.:
+        {"manuscript": "18th century handwritten ...", "auto": "", ...}
+    """
+    global _cached_doc_type_contexts
+    if _cached_doc_type_contexts is not None:
+        return _cached_doc_type_contexts
+
+    if CONFIG_BUCKET:
+        try:
+            s3 = boto3.client("s3")
+            key = "config/document_type_contexts.json"
+            logger.info(
+                "Loading document type contexts from s3://%s/%s", CONFIG_BUCKET, key
+            )
+            response = s3.get_object(Bucket=CONFIG_BUCKET, Key=key)
+            raw = response["Body"].read().decode("utf-8")
+            loaded = json.loads(raw)
+
+            if isinstance(loaded, dict):
+                logger.info(
+                    "Loaded %d document type contexts from S3", len(loaded)
+                )
+                _cached_doc_type_contexts = loaded
+                return _cached_doc_type_contexts
+            else:
+                logger.warning("S3 document_type_contexts.json is not a dict, using fallback")
+        except Exception as e:
+            logger.warning("Failed to load document type contexts from S3: %s. Using fallback.", e)
+    else:
+        logger.info("No CONFIG_BUCKET set, using fallback document type contexts")
+
+    _cached_doc_type_contexts = _FALLBACK_DOC_TYPE_CONTEXTS
+    return _cached_doc_type_contexts
+
+
+def _map_document_type_to_context(doc_type: str) -> str:
+    """Map document_type to LLM context string.
+
+    Loads the mapping from S3 on first call (with hardcoded fallback),
+    then returns the context for the requested document type.
+    """
+    contexts = _load_doc_type_contexts()
+    return contexts.get(doc_type.lower(), "")
 
 
 def _map_enhancement_level_to_iterations(level: str) -> int:
