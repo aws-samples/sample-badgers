@@ -6,11 +6,13 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { SSMClient, GetParametersCommand } from '@aws-sdk/client-ssm';
 
-// Load .env before any modules that read process.env.
+// Load ui/.env before any modules that read process.env. It is the single env file
+// for the UI: Vite reads the VITE_* lines from it at build time, this server reads
+// the rest at runtime. deployment/scripts/generate_ui_env.sh writes it.
 // In production the ECS task injects every value from SSM Parameter Store, so
-// this file is a local-development convenience only.
+// this file is a local-development convenience only and is not copied into the image.
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = resolve(__dirname, '../config/.env');
+const envPath = resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
     for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
         const m = line.match(/^([A-Z0-9_]+)=(.*)$/);

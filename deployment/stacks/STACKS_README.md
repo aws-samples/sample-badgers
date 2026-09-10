@@ -103,6 +103,9 @@ Single table, `badgers-jobs-{deployment_id}`, holding the doc/job/subtask hierar
 - Point-in-time recovery enabled, AWS-managed encryption
 - `status-index` GSI for ops monitoring and UI status filters
 - `doc-index` GSI to list every job and subtask belonging to one document
+- `owner-index` GSI to list every job — and so every generated report — belonging to
+  one user. Sparse: `owner_sub` is written only on the job-level row, so a job whose
+  owner was never recorded is absent from the index and its reports do not list.
 - Table name published to SSM at `/badgers-{deployment_id}/jobs-table-name`
 
 See [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md#-job-tracking) for the record

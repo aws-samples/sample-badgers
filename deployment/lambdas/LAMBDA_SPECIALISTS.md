@@ -223,6 +223,13 @@ The agent stamps `job_id` and `doc_id` into the tool input via a Strands
 asked to supply them — it would have to invent and then remember a UUID across turns,
 which is not something to depend on for the integrity of a tracking record.
 
+The same hook stamps `user_id` and `user_name`, but only into tools whose schema declares
+them, so ordinary specialists never receive an identity they have no use for. `user_id` is
+the caller's Cognito sub (`local` in local development); the hook also passes it to
+`create_job` as `owner_sub`, which is the sole record of who a run belongs to and the
+partition key of the `owner-index` GSI. Identity reaches the runtime from the UI server as
+`actor_id`/`user_name` on the invoke and WebSocket payloads — never from the model.
+
 ### What a specialist writes
 
 ```python
@@ -245,6 +252,19 @@ job_state.mark_failed(job_id, subtask, str(e))       # failure, records the reas
 Status moves `PENDING → RUNNING → COMPLETE | FAILED`. On failure the exception message is
 stored in the `error` attribute (truncated to 1024 characters), so a failed page carries
 its own reason.
+
+One specialist writes to the job-level row as well. After `html_report_specialist` has
+made both the report HTML and its manifest durable in S3, it records the report on that
+row so the UI can enumerate a user's reports from `owner-index` alone:
+
+```python
+job_state.set_report(job_id, report_id=report_id, title=title,
+                     created_at=created_at, page_count=len(pages))
+```
+
+The write is conditional on the job-level row already existing. An unconditional
+`update_item` is an upsert and would create a row carrying no `owner_sub` — invisible in
+the sparse index, and a job record for a job that was never tracked.
 
 ### Two properties worth relying on
 

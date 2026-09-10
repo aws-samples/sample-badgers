@@ -302,9 +302,18 @@ class JobTrackingHook:
     # about, since nothing else in the request path changes when it happens.
     _warned_unavailable = False
 
-    def __init__(self, *, doc_id: str = "", session_id: str = "") -> None:
+    def __init__(
+        self,
+        *,
+        doc_id: str = "",
+        session_id: str = "",
+        actor_id: str = "local",
+        user_name: str = "local",
+    ) -> None:
         self.doc_id = doc_id
         self.session_id = session_id
+        self.actor_id = actor_id
+        self.user_name = user_name
         self.job_id = ""
 
         if job_state is None and not JobTrackingHook._warned_unavailable:
@@ -328,20 +337,20 @@ class JobTrackingHook:
         self.job_id = ""
 
     @staticmethod
-    def _declares_job_id(tool: Any) -> bool:
-        """True when the tool's input schema accepts a ``job_id`` parameter."""
+    def _declared_properties(tool: Any) -> dict[str, Any]:
+        """Return declared input properties for Gateway or native tool schemas."""
         try:
             schema = tool.tool_spec.get("inputSchema") or {}
         except Exception:  # tool_spec is a property and may raise
-            return False
-        # Gateway/MCP tool specs nest the JSON Schema under a "json" key; accept
-        # either shape so this keeps working for natively defined tools.
-        properties = (schema.get("json") or schema).get("properties") or {}
-        return "job_id" in properties
+            return {}
+        return (schema.get("json") or schema).get("properties") or {}
 
     def _on_before_tool_call(self, event: Any) -> None:
-        """Stamp job_id/doc_id into the tool input, minting the job if needed."""
-        if job_state is None or not self._declares_job_id(event.selected_tool):
+        """Stamp job, document, and verified user identity into tool input."""
+        if job_state is None:
+            return
+        properties = self._declared_properties(event.selected_tool)
+        if "job_id" not in properties:
             return
 
         tool_name = event.tool_use.get("name", "unknown")
@@ -359,6 +368,8 @@ class JobTrackingHook:
                 doc_id=self.doc_id,
                 session_id=self.session_id,
                 reason=f"first specialist tool call: {tool_name}",
+                owner_sub=self.actor_id,
+                user_name=self.user_name,
             )
 
         # The executor reads tool_use back off the event after callbacks run, so
@@ -367,6 +378,10 @@ class JobTrackingHook:
         tool_input["job_id"] = self.job_id
         if self.doc_id:
             tool_input["doc_id"] = self.doc_id
+        if "user_id" in properties:
+            tool_input["user_id"] = self.actor_id
+        if "user_name" in properties:
+            tool_input["user_name"] = self.user_name
 
 
 def load_config_from_s3() -> tuple[str, dict[str, Any]]:
@@ -477,6 +492,7 @@ async def stream_agent_events(
     query: str,
     session_id: str,
     actor_id: str,
+    user_name: str,
     runtime_session_id: str,
     doc_id: str = "",
 ) -> AsyncIterator[dict[str, Any]]:
@@ -546,7 +562,12 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
 
         # Mints job_id on the first specialist tool call and stamps job_id/doc_id
         # into the tool input for every specialist invocation in this turn.
-        job_hook = JobTrackingHook(doc_id=doc_id, session_id=session_id)
+        job_hook = JobTrackingHook(
+            doc_id=doc_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            user_name=user_name,
+        )
 
         # Create agent
         agent = Agent(
@@ -714,6 +735,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
     query = "Hello!"
     session_id = f"session_{uuid.uuid4().hex}"
     actor_id = "default_user"
+    user_name = "local"
 
     doc_id = ""
 
@@ -721,6 +743,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
         query = str(payload.get("prompt", "Hello!"))
         session_id = str(payload.get("session_id") or f"session_{uuid.uuid4().hex}")
         actor_id = str(payload.get("actor_id", "default_user"))
+        user_name = str(payload.get("user_name", "local"))
         # Top level of the job hierarchy, minted by the UI server at upload time.
         doc_id = str(payload.get("doc_id") or "")
 
@@ -745,6 +768,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 query=query,
                 session_id=session_id,
                 actor_id=actor_id,
+                user_name=user_name,
                 runtime_session_id=runtime_session_id,
                 doc_id=doc_id,
             ):
@@ -786,6 +810,7 @@ async def websocket_handler(websocket, context) -> None:
             query = data.get("prompt", "Hello!")
             session_id = data.get("session_id") or f"session_{uuid.uuid4().hex}"
             actor_id = data.get("actor_id", "default_user")
+            user_name = data.get("user_name", "local")
             runtime_session_id = context.session_id or f"ws-{uuid.uuid4().hex}"
             # Top level of the job hierarchy, minted by the UI server at upload time.
             doc_id = str(data.get("doc_id") or "")
@@ -820,6 +845,7 @@ async def websocket_handler(websocket, context) -> None:
                         query=query,
                         session_id=session_id,
                         actor_id=actor_id,
+                        user_name=user_name,
                         runtime_session_id=runtime_session_id,
                         doc_id=doc_id,
                     ):

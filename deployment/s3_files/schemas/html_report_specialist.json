@@ -1,0 +1,99 @@
+[
+  {
+    "name": "generate_html_report_tool",
+    "description": "Generates one document-level BADGERS HTML analysis and audit report after all page correlations are complete. Preserves every page-level spine, copies page images into durable report storage, and returns report artifact URIs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source_document_path": {
+          "type": "string",
+          "description": "S3 URI of the source PDF"
+        },
+        "document_title": {
+          "type": "string",
+          "description": "Optional human-readable report title"
+        },
+        "expected_page_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Page count returned by pdf_to_images_converter"
+        },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "description": "Ordered pages to include in the document report",
+          "items": {
+            "type": "object",
+            "properties": {
+              "page_number": {
+                "type": "string"
+              },
+              "correlation_specialist_uri": {
+                "type": "string"
+              },
+              "source_image_path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "page_number",
+              "correlation_specialist_uri",
+              "source_image_path"
+            ]
+          }
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID"
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Injected analysis job ID"
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Injected document ID"
+        },
+        "user_id": {
+          "type": "string",
+          "description": "Injected authenticated Cognito subject or local identity"
+        },
+        "user_name": {
+          "type": "string",
+          "description": "Injected authenticated username or local"
+        }
+      },
+      "required": [
+        "source_document_path",
+        "expected_page_count",
+        "pages",
+        "session_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "html_report_uri": {
+          "type": "string"
+        },
+        "report_manifest_uri": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "page_count": {
+          "type": "integer"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+]

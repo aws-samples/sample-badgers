@@ -260,9 +260,10 @@ local-dev bypass.
 `/badgers-{id}-{suffix}/`, so there is no `.env` to ship into the image beyond the
 build-time `VITE_*` values.
 
-> **Note:** `update_frontend_env.sh` writes `ui/config/.env` for local development only.
-> It does not write the Cognito values, which are build-time inputs to the Vite bundle —
-> that is `scripts/generate_ui_env.sh`. The deployed service reads everything from SSM.
+> **Note:** `scripts/generate_ui_env.sh` also writes the local-development runtime values
+> (buckets, Runtime ARN, Gateway ID, jobs table) into the same `ui/.env`. Vite ignores the
+> non-`VITE_` lines, `ui/server/index.js` reads them when run outside ECS, and the deployed
+> service reads everything from SSM.
 
 ## 🔧 Manual Deployment
 
@@ -404,7 +405,7 @@ deployment/
 ├── deploy_specialist.sh      # 🔬 Single specialist deployment
 ├── deploy_custom_specialists.sh # 🎨 Wizard-created specialist deployment
 ├── scripts/
-│   └── generate_ui_env.sh    # 🔐 Writes ui/.env from BADGERS-Cognito-{id}-{suffix} outputs
+│   └── generate_ui_env.sh    # 🔐 Writes ui/.env (VITE_* Cognito + local runtime values) from stack outputs
 ├── stacks/                   # 📦 CDK stack definitions
 ├── lambdas/
 │   ├── build_foundation_layer.sh    # Core framework layer

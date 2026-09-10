@@ -136,16 +136,15 @@ can see them.
 
 ## scripts/generate_ui_env.sh
 
-Writes `ui/.env` from the Cognito stack outputs. Vite only exposes `VITE_`-prefixed
-variables and bakes them in at build time, so this must run after Cognito is deployed and
-before the UI image is built. `deploy.sh` step 7 calls it.
-
-## update_frontend_env.sh
-
-Writes `ui/config/.env` for local development — bucket names, the Runtime ARN, the Gateway
-ID and the jobs table name. Local convenience only: the deployed UI reads all of these
-from SSM Parameter Store. It does not write the Cognito values, which are build-time
-inputs (see `scripts/generate_ui_env.sh`).
+Writes `ui/.env`, the single UI env file, from the deployed stacks. Two kinds of value
+land in it: the `VITE_*` Cognito values, which Vite bakes into the bundle at build time
+(it only exposes `VITE_`-prefixed variables), and the local-development runtime values
+read by `ui/server/index.js` — bucket names, the Runtime ARN, the Gateway ID, the jobs
+table. Must run after Cognito is deployed and before the UI image is built; `deploy.sh`
+step 7 calls it. Operator-owned lines (`AWS_PROFILE`, `CORS_ALLOWED_ORIGIN`,
+`BADGERS_UI_ROLE`, `WS_TIMEOUT_MINUTES`) are carried over on regeneration. The deployed
+container reads the runtime values from SSM Parameter Store instead; `ui/.env` is never
+copied into the image.
 
 ## cleanup-stack.sh
 
