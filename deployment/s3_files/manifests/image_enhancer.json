@@ -1,7 +1,7 @@
 {
     "tool": {
         "name": "enhance_image_tool",
-        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports desaturation (remove color tints) and thresholding (binary B&W conversion to strip watermarks/background patterns). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. Returns S3 URI of enhanced image to pass to subsequent specialists.",
+        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, researcher highlights/annotations overlaid on originals, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports 13 operations including desaturation (remove color tints), thresholding (binary B&W conversion to strip watermarks/background patterns), and levels (Photoshop-style tonal remapping with auto black/white point and gamma — ideal for maximizing ink-to-background contrast on aged manuscripts). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. For historical manuscripts with period handwriting, use document_type 'historical_manuscript'. Returns S3 URI of enhanced image to pass to subsequent specialists.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -23,9 +23,14 @@
                         "diagram",
                         "printed",
                         "mixed",
-                        "watermarked"
+                        "watermarked",
+                        "historical_manuscript",
+                        "photograph",
+                        "map",
+                        "legal",
+                        "newspaper"
                     ],
-                    "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. Default: auto (auto-detect)."
+                    "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. 'historical_manuscript' optimizes for aged parchment/paper with period handwriting and possible researcher annotations. 'photograph' preserves continuous tonal gradations. 'map' preserves semantically meaningful color. 'legal' preserves multiple ink layers and faint stamps. 'newspaper' handles dense multi-column layouts on degraded newsprint. Default: auto (auto-detect)."
                 },
                 "enhancement_level": {
                     "type": "string",
@@ -58,7 +63,7 @@
         "output_extension": "png"
     },
     "metadata": {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "dependencies": [
             "opencv-python-headless",
             "numpy",

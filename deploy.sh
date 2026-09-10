@@ -165,7 +165,7 @@ step_upload() {
   # Submenu: which config to sync
   local choice
   if [ "${DEPLOY_RESUME_MODE:-}" = "1" ]; then
-    choice="6"
+    choice="7"
   else
     echo ""
     echo "  Which config to upload?"
@@ -174,10 +174,11 @@ step_upload() {
     echo "    3) Manifests (tool schemas, model selections, prompt file lists)"
     echo "    4) Schemas (MCP-compatible input schemas)"
     echo "    5) Agent Config (agent operating environment, model config)"
-    echo "    6) All"
+    echo "    6) Runtime Config (document type contexts, enhancement settings)"
+    echo "    7) All"
     echo ""
-    read -rp "  Choice [6]: " choice
-    choice="${choice:-6}"
+    read -rp "  Choice [7]: " choice
+    choice="${choice:-7}"
   fi
 
   case "$choice" in
@@ -186,7 +187,8 @@ step_upload() {
     3) _sync_config_category "manifests" "$config_bucket" ;;
     4) _sync_config_category "schemas" "$config_bucket" ;;
     5) _sync_config_category "agent_config" "$config_bucket" ;;
-    6)
+    6) _sync_config_category "config" "$config_bucket" ;;
+    7)
       log_info "Syncing all s3_files/ → s3://${config_bucket}/..."
       aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
         --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \

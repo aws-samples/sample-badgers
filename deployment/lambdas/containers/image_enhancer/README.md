@@ -33,10 +33,11 @@ The agent can choose to skip enhancement if the original is already good, or ret
                │
                ▼
 ┌────────────────────────────────────┐
-│  10 Enhancement Operations         │  ← Image processing
+│  13 Enhancement Operations         │  ← Image processing
 │  contrast, brightness, sharpen,    │     OpenCV operations
 │  denoise, deskew, white_balance,   │
-│  equalize, crop, invert, stains    │
+│  equalize, crop, invert, stains,   │
+│  desaturate, threshold, levels     │
 └────────────────────────────────────┘
 ```
 
@@ -95,6 +96,11 @@ Maps to LLM context for better enhancement decisions:
 - `"printed"` → "printed historical document"
 - `"mixed"` → "mixed media document with multiple content types"
 - `"auto"` → No context provided, LLM assesses independently
+- `"historical_manuscript"` → "Historical manuscript with period handwriting, aged parchment/paper"
+- `"photograph"` → "Photographic content with continuous tonal gradations"
+- `"map"` → "Cartographic document with semantically meaningful color"
+- `"legal"` → "Legal or administrative document with multiple ink layers"
+- `"newspaper"` → "Newspaper or periodical on degraded newsprint"
 
 ### Enhancement Levels
 
@@ -165,7 +171,7 @@ Maps to MAX_ITERATIONS for the agent:
 
 | Feature | Old (Fixed Pipeline) | New (Agentic) |
 |---------|---------------------|---------------|
-| **Operations** | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 10 available, agent selects |
+| **Operations** | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 13 available, agent selects |
 | **Decision Making** | Hardcoded sequence | LLM vision analysis per image |
 | **Iterations** | 1 (single pass) | 1-3 (with feedback loop) |
 | **Regional Operations** | No | Yes (normalized 0-1 coords) |
