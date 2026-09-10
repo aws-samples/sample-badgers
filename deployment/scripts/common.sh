@@ -729,6 +729,22 @@ preflight_bootstrap() {
   esac
 }
 
+# A unique image tag per deploy.sh invocation.
+#
+# AgentCore runtime versions are immutable and CfnRuntime only creates a new one
+# when container_uri changes. With a fixed ":websocket" tag, re-pushing the image
+# left CloudFormation with an identical property, so it made no update and the
+# runtime went on serving the digest pinned at the version it already had — a
+# rebuilt agent silently never went live.
+#
+# Deliberately time-based rather than a hash of the build inputs. A hash is only
+# correct while it covers every input, and the failure it would reintroduce is
+# exactly the one this exists to prevent: a stale runtime that looks deployed.
+# The cost of being wrong the other way is one surplus ECR image.
+runtime_image_tag() {
+  echo "websocket-$(date -u +%Y%m%d%H%M%S)"
+}
+
 export_cdk_env() {
   ensure_account
   export DEPLOYMENT_ID
@@ -774,8 +790,20 @@ LOGS_RESOURCE_POLICY_QUOTA_FALLBACK=10
 # other people's policies to the operator, who can go and identify the owners.
 LOGS_RESOURCE_POLICY_AWS_MANAGED="XRayToLogsIngestion_DO-NOT-EDIT_*"
 
-# The single policy this project creates — see stacks/xray_transaction_search_stack.py.
+# The policies this project creates. Two, not one:
+#
+#   TransactionSearchAccess  — stacks/xray_transaction_search_stack.py, account-wide
+#                              and shared by every deployment in the region.
+#   BadgersLogDelivery-*     — stacks/log_delivery.py via the Gateway stack, one per
+#                              deployment, covering every AgentCore log group it
+#                              delivers to.
+#
+# This was previously declared as a single policy while the runtime stack silently
+# created a second one through the CDK logging mixin, so logs_resource_policy_report
+# attributed BADGERS' own delivery policy to an unknown third party — the opposite of
+# helpful when the report exists to answer "which of these can I remove?".
 LOGS_RESOURCE_POLICY_OWN="TransactionSearchAccess"
+LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX="BadgersLogDelivery-"
 
 # Echoes the count, or nothing at all when the call fails. An empty result means
 # "could not determine", which callers must not conflate with zero — treating a
@@ -784,6 +812,18 @@ LOGS_RESOURCE_POLICY_OWN="TransactionSearchAccess"
 logs_resource_policy_count() {
   aws logs describe-resource-policies --region "${AWS_REGION}" \
     --query 'length(resourcePolicies)' --output text 2>/dev/null || echo ""
+}
+
+# True when a policy of exactly this name already exists. Returns false when the call
+# fails, which over-projects rather than under-projects: callers use this to decide how
+# many slots BADGERS still needs, and claiming a policy already exists when the account
+# could not be read is how a preflight passes and CloudFormation then fails.
+logs_resource_policy_exists() {
+  local name="$1"
+  [ -z "${name}" ] && return 1
+  aws logs describe-resource-policies --region "${AWS_REGION}" \
+    --query "resourcePolicies[?policyName=='${name}'] | length(@)" \
+    --output text 2>/dev/null | grep -qx "1"
 }
 
 logs_resource_policy_quota() {
@@ -811,6 +851,7 @@ logs_resource_policy_quota() {
 logs_resource_policy_report() {
   aws logs describe-resource-policies --region "${AWS_REGION}" --output json 2>/dev/null \
     | BADGERS_OWN="${LOGS_RESOURCE_POLICY_OWN}" \
+      BADGERS_OWN_DELIVERY_PREFIX="${LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX}" \
       python3 -c '
 import json, os, sys
 from datetime import datetime, timezone
@@ -822,6 +863,7 @@ except Exception:
     raise SystemExit
 
 OWN = os.environ.get("BADGERS_OWN", "")
+OWN_DELIVERY_PREFIX = os.environ.get("BADGERS_OWN_DELIVERY_PREFIX", "")
 
 
 def summarise(doc):
@@ -860,7 +902,12 @@ for p in rows:
     name = p["policyName"]
     dt = datetime.fromtimestamp(p.get("lastUpdatedTime", 0) / 1000, tz=timezone.utc)
     who, where = summarise(p.get("policyDocument", ""))
-    mark = "  (*) created by this deployment" if name == OWN else ""
+    # Two shapes belong to BADGERS: the shared account-wide X-Ray policy, and one
+    # log-delivery policy per deployment (name carries the deployment id).
+    own = name == OWN or (
+        bool(OWN_DELIVERY_PREFIX) and name.startswith(OWN_DELIVERY_PREFIX)
+    )
+    mark = "  (*) created by BADGERS" if own else ""
     print(f"      {name}{mark}")
     print(f"          updated {dt:%Y-%m-%d} ({(now - dt).days}d ago)")
     print(f"          grants  {who}")
@@ -959,8 +1006,18 @@ preflight_xray() {
     return 1
   fi
 
-  # BADGERS' X-Ray stack creates exactly one resource policy.
-  local projected=$((count + 1))
+  # BADGERS creates two policies, not one: the account-wide X-Ray policy from this
+  # stack, and one log-delivery policy per deployment owned by the Gateway stack.
+  # Only count the ones that do not exist yet — re-running a deployment that already
+  # has its delivery policy adds nothing, and projecting it again would report a
+  # deployment as unable to proceed when it has room.
+  local delivery_policy="${LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX}${DEPLOYMENT_ID:-}-${STACK_SUFFIX:-}"
+  local to_create=1 # the X-Ray policy; this function already returned if it exists
+  if ! logs_resource_policy_exists "${delivery_policy}"; then
+    to_create=$((to_create + 1))
+  fi
+
+  local projected=$((count + to_create))
   log_info "Transaction Search status: ${status}"
   log_info "CloudWatch Logs resource policies: ${count}/${quota} (BADGERS would make it ${projected})"
 

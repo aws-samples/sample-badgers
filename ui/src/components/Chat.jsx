@@ -481,26 +481,49 @@ function useJobStatus(jobId, active) {
   return job
 }
 
+// RUNNING gets a spinner element instead of a glyph. Colour comes from
+// currentColor so one rule works on every pill background.
+const PILL_GLYPH = {
+  COMPLETE: '✓',
+  FAILED: '✕',
+  PENDING: '·',
+}
+
 function AnalyzerPills({ job }) {
   const specialists = useMemo(() => groupSpecialists(job?.subtasks), [job])
   if (!specialists.length) return null
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {specialists.map(s => (
-        <span
-          key={s.name}
-          title={s.error || `${s.name}: ${s.status}${s.total > 1 ? ` (${s.complete}/${s.total} pages)` : ''}`}
-          style={{
-            ...(PILL_STYLE[s.status] || PILL_STYLE.PENDING),
-            border: '1px solid', borderRadius: 999,
-            padding: '2px 8px', fontSize: 10, whiteSpace: 'nowrap',
-          }}
-        >
-          {s.name.replace(/_/g, ' ')}
-          {s.total > 1 && ` ${s.complete}/${s.total}`}
-        </span>
-      ))}
+      {specialists.map(s => {
+        const pages = s.total > 1 ? ` (${s.complete}/${s.total} pages)` : ''
+        // Carried on aria-label as well as title: a title alone is not reliably
+        // announced, and the glyph itself is decorative.
+        const label = `${s.name.replace(/_/g, ' ')}: ${s.status}${pages}${s.error ? ` — ${s.error}` : ''}`
+        return (
+          <span
+            key={s.name}
+            title={label}
+            aria-label={label}
+            style={{
+              ...(PILL_STYLE[s.status] || PILL_STYLE.PENDING),
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              border: '1px solid', borderRadius: 999,
+              padding: '2px 8px', fontSize: 10, whiteSpace: 'nowrap',
+            }}
+          >
+            {s.status === 'RUNNING'
+              ? <span className="pill-spinner" aria-hidden="true" />
+              : <span aria-hidden="true" style={{ fontSize: 11, lineHeight: 1 }}>
+                  {PILL_GLYPH[s.status] || PILL_GLYPH.PENDING}
+                </span>}
+            <span>
+              {s.name.replace(/_/g, ' ')}
+              {s.total > 1 && ` ${s.complete}/${s.total}`}
+            </span>
+          </span>
+        )
+      })}
     </div>
   )
 }

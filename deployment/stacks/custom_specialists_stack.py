@@ -19,6 +19,10 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+# Wizard-generated specialists run the same handler shape as the built-in ones, so
+# they get the same memory. Imported rather than repeated so the two cannot diverge.
+from .lambda_stack import SPECIALIST_MEMORY_MB
+
 logger = logging.getLogger(__name__)
 
 
@@ -235,7 +239,7 @@ class CustomSpecialistsStack(Stack):
             role=self.lambda_role,
             layers=[self.foundation_layer, self.pillow_layer],
             timeout=Duration.seconds(900),
-            memory_size=2048,
+            memory_size=SPECIALIST_MEMORY_MB,
             reserved_concurrent_executions=5,
             description=description,
             environment=environment,

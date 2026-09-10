@@ -14,8 +14,9 @@ from aws_cdk import (
     aws_iam as iam,
     aws_logs as logs,
 )
-from aws_cdk.mixins_preview.aws_bedrockagentcore import mixins as agentcore_mixins
 from constructs import Construct
+
+from .log_delivery import deliver_to_log_group, deliver_traces_to_xray
 
 try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
     from cdk_nag import NagSuppressions
@@ -434,14 +435,31 @@ class AgentCoreRuntimeWebSocketStack(Stack):
 
         runtime.node.add_dependency(self.agent_role)
 
-        # Apply logging and tracing mixins
-        agentcore_mixins.CfnRuntimeLogsMixin.APPLICATION_LOGS.to_log_group(
-            app_log_group
-        ).apply_to(runtime)
-        agentcore_mixins.CfnRuntimeLogsMixin.USAGE_LOGS.to_log_group(
-            usage_log_group
-        ).apply_to(runtime)
-        agentcore_mixins.CfnRuntimeLogsMixin.TRACES.to_x_ray().apply_to(runtime)
+        # Log delivery via the L1 chain rather than CfnRuntimeLogsMixin. The mixin
+        # creates its own resource policy per stack, so using it here would add a
+        # second policy alongside the deployment-wide one the Gateway stack owns and
+        # defeat the point of consolidating. The grant covering these log groups
+        # lives there; this stack already depends on the Gateway stack (app.py), so
+        # it exists by the time these deliveries are created.
+        for construct_id, log_type, log_group in (
+            ("RuntimeApplicationLogs", "APPLICATION_LOGS", app_log_group),
+            ("RuntimeUsageLogs", "USAGE_LOGS", usage_log_group),
+        ):
+            deliver_to_log_group(
+                self,
+                construct_id,
+                deployment_id=self.deployment_id,
+                source_resource_arn=runtime.attr_agent_runtime_arn,
+                log_type=log_type,
+                log_group=log_group,
+            )
+
+        deliver_traces_to_xray(
+            self,
+            "RuntimeTraces",
+            deployment_id=self.deployment_id,
+            source_resource_arn=runtime.attr_agent_runtime_arn,
+        )
 
         CfnOutput(
             self,

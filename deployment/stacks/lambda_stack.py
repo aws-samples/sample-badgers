@@ -29,6 +29,13 @@ except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
 if TYPE_CHECKING:
     from stacks.inference_profiles_stack import InferenceProfilesStack
 
+# Memory for every specialist function, zip and container alike. Lambda scales CPU
+# with memory, so this is as much about decode and image-processing throughput as it
+# is about headroom: specialists load page images through Pillow and hold both the
+# source and the processed copy. Kept in one place so the two function factories below
+# and CustomSpecialistsStack cannot drift apart.
+SPECIALIST_MEMORY_MB = 6144
+
 # Container-based functions (too large for layers)
 CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist"]
 
@@ -282,7 +289,7 @@ class LambdaSpecialistStack(Stack):
             role=self.execution_role,
             layers=layers,
             timeout=Duration.seconds(900),
-            memory_size=2048,
+            memory_size=SPECIALIST_MEMORY_MB,
             reserved_concurrent_executions=5,
             description=description,
             environment=environment,
@@ -395,7 +402,7 @@ class LambdaSpecialistStack(Stack):
             runtime=lambda_.Runtime.FROM_IMAGE,
             role=self.execution_role,
             timeout=Duration.seconds(900),
-            memory_size=2048,
+            memory_size=SPECIALIST_MEMORY_MB,
             reserved_concurrent_executions=5,
             description=description,
             environment=environment,

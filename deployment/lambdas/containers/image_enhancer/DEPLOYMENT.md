@@ -66,7 +66,7 @@ CDK will:
 - Create Lambda function from ECR image
 - Configure environment variables
 - Attach execution role with S3 + Bedrock permissions
-- Set timeout (300s), memory (2048MB), concurrency (5)
+- Set timeout (300s), memory (6144MB), concurrency (5)
 
 ## Configuration
 
@@ -74,16 +74,16 @@ CDK will:
 
 Set in `lambda_stack.py` or override in AWS console:
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `VISION_MODEL` | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID |
-| `MAX_ITERATIONS` | `2` | Max agent iterations |
-| `MAX_IMAGE_DIMENSION` | `4000` | Max dimension for LLM |
-| `JPEG_QUALITY` | `85` | LLM image encoding quality |
-| `OUTPUT_QUALITY` | `95` | Final output quality |
-| `OUTPUT_BUCKET` | (from CDK) | S3 bucket for enhanced images |
-| `AWS_REGION` | `us-west-2` | Bedrock region |
-| `LOGGING_LEVEL` | `INFO` | Log level |
+| Variable              | Default                          | Purpose                       |
+| --------------------- | -------------------------------- | ----------------------------- |
+| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID              |
+| `MAX_ITERATIONS`      | `2`                              | Max agent iterations          |
+| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM         |
+| `JPEG_QUALITY`        | `85`                             | LLM image encoding quality    |
+| `OUTPUT_QUALITY`      | `95`                             | Final output quality          |
+| `OUTPUT_BUCKET`       | (from CDK)                       | S3 bucket for enhanced images |
+| `AWS_REGION`          | `us-west-2`                      | Bedrock region                |
+| `LOGGING_LEVEL`       | `INFO`                           | Log level                     |
 
 ### IAM Permissions Required
 
@@ -385,7 +385,7 @@ If issues arise after deployment:
    aws ecr describe-images \
      --repository-name badgers-<deployment_id> \
      --query 'sort_by(imageDetails,& imagePushedAt)[-2:]'
-   
+
    # Update Lambda to previous image
    aws lambda update-function-code \
      --function-name badgers_image_enhancer \
