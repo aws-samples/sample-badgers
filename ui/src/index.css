@@ -350,8 +350,22 @@ button.tab-active:hover {
     }
 }
 
+/* Spinner inside an analyzer pill. currentColor so it reads on the solid
+   coloured RUNNING background and on the muted PENDING one alike. */
+.pill-spinner {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: activity-spin 0.7s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .activity-spinner {
+
+    .activity-spinner,
+    .pill-spinner {
         animation: none;
     }
 }

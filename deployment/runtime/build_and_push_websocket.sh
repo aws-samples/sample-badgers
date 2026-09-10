@@ -27,11 +27,17 @@ if [ -z "$REPOSITORY_NAME" ] || [ "$REPOSITORY_NAME" == "None" ]; then
     exit 1
 fi
 
+# deploy.sh mints a unique tag per invocation (common.sh runtime_image_tag) and
+# exports it, because CfnRuntime only cuts a new AgentCore runtime version when
+# container_uri changes — re-pushing a fixed tag never rolls the runtime. The
+# default keeps this script usable standalone.
+IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
+
 echo "📋 Configuration:"
 echo "   Account: $ACCOUNT"
 echo "   Region: $REGION"
 echo "   Repository: $REPOSITORY_NAME"
-echo "   Tag: websocket"
+echo "   Tag: $IMAGE_TAG"
 echo ""
 
 # Login to ECR
@@ -71,7 +77,7 @@ trap cleanup_foundation EXIT
 
 # Build WebSocket image
 echo "🏗️  Building Docker image (WebSocket)..."
-docker build --platform linux/arm64 -t "$REPOSITORY_NAME:websocket" -f Dockerfile.websocket .
+docker build --platform linux/arm64 -t "$REPOSITORY_NAME:$IMAGE_TAG" -f Dockerfile.websocket .
 
 if [ $? -ne 0 ]; then
     echo "❌ Docker build failed"
@@ -81,25 +87,33 @@ fi
 echo "✅ Image built"
 echo ""
 
-# Tag and push
+# Tag and push. The unique tag is what the runtime stack points at; "websocket"
+# is also pushed as a floating alias so anything still naming it resolves to the
+# most recent build.
 echo "🏷️  Tagging image..."
-docker tag "$REPOSITORY_NAME:websocket" \
+docker tag "$REPOSITORY_NAME:$IMAGE_TAG" \
+    "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG"
+docker tag "$REPOSITORY_NAME:$IMAGE_TAG" \
     "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:websocket"
 
 echo "📤 Pushing to ECR..."
-docker push "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:websocket"
+docker push "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG"
 
 if [ $? -ne 0 ]; then
     echo "❌ Docker push failed"
     exit 1
 fi
 
+docker push "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:websocket" || {
+    echo "⚠️  Could not update the floating 'websocket' alias (the unique tag pushed fine)"
+}
+
 echo ""
 echo "===================================================="
 echo "✅ WebSocket image pushed!"
 echo ""
 echo "📝 Image URI:"
-echo "   $ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:websocket"
+echo "   $ACCOUNT.dkr.ecr.$REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG"
 echo ""
 echo "📝 Next step:"
 echo "   cd .. && uv run cdk deploy $(_sn RuntimeWebSocket) --require-approval never"

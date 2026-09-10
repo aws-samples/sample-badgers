@@ -4,12 +4,20 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     Fn,
+    RemovalPolicy,
     Tags,
     aws_lambda as lambda_,
     aws_iam as iam,
+    aws_logs as logs,
     aws_s3 as s3,
 )
 from constructs import Construct
+
+from .log_delivery import (
+    deliver_to_log_group,
+    deliver_traces_to_xray,
+    shared_delivery_policy,
+)
 
 try:
     import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
@@ -25,7 +33,12 @@ except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
 
 
 class AgentCoreGatewayStack(Stack):
-    """Stack for AgentCore Gateway with Lambda tool targets and logging."""
+    """Stack for AgentCore Gateway with Lambda tool targets, logs and traces.
+
+    Also owns the deployment's single CloudWatch Logs delivery resource policy
+    (see log_delivery), which the Runtime stack's deliveries rely on. Every stack
+    that delivers logs already depends on this one.
+    """
 
     def __init__(
         self,
@@ -59,6 +72,10 @@ class AgentCoreGatewayStack(Stack):
 
         # Add Lambda targets
         self.add_lambda_targets()
+
+        # Observability. Owns the deployment's single log-delivery resource policy
+        # because every other stack that delivers logs already depends on this one.
+        self.create_log_delivery()
 
         # Apply resource-specific tags
         self._apply_resource_tags(
@@ -256,6 +273,61 @@ class AgentCoreGatewayStack(Stack):
         )
 
         return gateway
+
+    def create_log_delivery(self) -> None:
+        """Deliver Gateway application logs to CloudWatch and traces to X-Ray.
+
+        Without this the Gateway emits nothing: the stack previously granted the
+        IAM permissions to write logs and claimed "full observability" in the
+        Gateway description, but never configured a delivery, so the console
+        showed "Log delivery (0)" and "Tracing: Not enabled". A Gateway that
+        accepts an MCP request and never answers left no trace anywhere.
+
+        Uses the L1 delivery chain rather than CfnGatewayLogsMixin so the grant can
+        be the deployment-wide policy created here instead of a second stack
+        singleton — see log_delivery for why that quota matters.
+
+        Identity (workload identity directory) logs are deliberately absent. The
+        directory is named "default" and appears to be account-and-region scoped
+        rather than per-deployment, so creating that delivery here would have every
+        deployment in the account contend for the same one. It needs to be owned
+        outside the per-deployment stacks, or gated so exactly one deployment owns
+        it, and that scoping is unconfirmed.
+        """
+        self.log_delivery_policy = shared_delivery_policy(
+            self,
+            "BadgersLogDeliveryPolicy",
+            self.deployment_id,
+        )
+
+        self.gateway_log_group = logs.LogGroup(
+            self,
+            "GatewayAppLogs",
+            log_group_name=f"/aws/bedrock-agentcore/gateways/{self.deployment_id}/app",
+            retention=logs.RetentionDays.TWO_YEARS,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+
+        app_logs = deliver_to_log_group(
+            self,
+            "GatewayApplicationLogs",
+            deployment_id=self.deployment_id,
+            source_resource_arn=self.gateway.gateway_arn,
+            log_type="APPLICATION_LOGS",
+            log_group=self.gateway_log_group,
+        )
+        # The grant has to exist before the delivery that relies on it.
+        app_logs.node.add_dependency(self.log_delivery_policy)
+
+        # Free of the resource-policy quota: the destination is X-Ray, not a log
+        # group. This is the signal that shows whether the Gateway received an MCP
+        # request and dropped it.
+        deliver_traces_to_xray(
+            self,
+            "GatewayTraces",
+            deployment_id=self.deployment_id,
+            source_resource_arn=self.gateway.gateway_arn,
+        )
 
     def add_lambda_targets(self) -> None:
         """Add all Lambda functions as gateway targets."""

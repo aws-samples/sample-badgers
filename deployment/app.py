@@ -283,7 +283,11 @@ runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
     inference_profiles_stack=inference_profiles_stack,
     jobs_table=dynamodb_stack.jobs_table,
-    image_tag="websocket",
+    # Set by common.sh export_cdk_env from the same value the build step tagged.
+    # This has to vary per build: AgentCore runtime versions are immutable and
+    # CfnRuntime only cuts a new one when container_uri changes, so a hardcoded
+    # tag here meant a rebuilt image was pushed but never actually served.
+    image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
     env=env,
     description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
 )

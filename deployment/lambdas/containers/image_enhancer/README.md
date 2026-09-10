@@ -43,18 +43,18 @@ The agent can choose to skip enhancement if the original is already good, or ret
 
 ## Available Operations
 
-| Operation | Purpose | Use Case |
-|-----------|---------|----------|
-| **contrast** (CLAHE) | Adaptive contrast enhancement | Uneven lighting, fading |
-| **brightness** | Overall brightness adjustment | Dark/light documents |
-| **sharpen** | Unsharp mask edge enhancement | Blurry text/diagrams |
-| **denoise** | Non-local means noise removal | Scanner noise, grain |
-| **deskew** | Rotation correction via Hough lines | Skewed scans |
-| **white_balance** | Gray-world color correction | Yellowing/aging |
-| **equalize_histogram** | Global tonal range spread | Severely faded docs |
-| **auto_crop** | Document boundary detection | Remove borders |
-| **invert** | Negative inversion | Dark-background docs |
-| **remove_stains** | Morphological background removal | Foxing, age spots |
+| Operation              | Purpose                             | Use Case                |
+| ---------------------- | ----------------------------------- | ----------------------- |
+| **contrast** (CLAHE)   | Adaptive contrast enhancement       | Uneven lighting, fading |
+| **brightness**         | Overall brightness adjustment       | Dark/light documents    |
+| **sharpen**            | Unsharp mask edge enhancement       | Blurry text/diagrams    |
+| **denoise**            | Non-local means noise removal       | Scanner noise, grain    |
+| **deskew**             | Rotation correction via Hough lines | Skewed scans            |
+| **white_balance**      | Gray-world color correction         | Yellowing/aging         |
+| **equalize_histogram** | Global tonal range spread           | Severely faded docs     |
+| **auto_crop**          | Document boundary detection         | Remove borders          |
+| **invert**             | Negative inversion                  | Dark-background docs    |
+| **remove_stains**      | Morphological background removal    | Foxing, age spots       |
 
 Each operation supports:
 - **Intensity control** (0.0 to 1.0)
@@ -73,15 +73,15 @@ Each operation supports:
 
 ### Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `image_path` | string | Yes* | - | S3 URI (e.g., `s3://bucket/key`) |
-| `image_data` | string | Yes* | - | Base64-encoded image (alternative to image_path) |
-| `document_type` | string | No | "auto" | Document type hint for LLM context |
-| `enhancement_level` | string | No | "moderate" | Enhancement aggressiveness |
-| `session_id` | string | Yes | "no_session" | Session identifier for S3 organization |
-| `output_quality` | integer | No | 85 | JPEG quality (1-100) |
-| `skip_upscale` | boolean | No | true | Skip pre-processing upscale |
+| Parameter           | Type    | Required | Default      | Description                                      |
+| ------------------- | ------- | -------- | ------------ | ------------------------------------------------ |
+| `image_path`        | string  | Yes*     | -            | S3 URI (e.g., `s3://bucket/key`)                 |
+| `image_data`        | string  | Yes*     | -            | Base64-encoded image (alternative to image_path) |
+| `document_type`     | string  | No       | "auto"       | Document type hint for LLM context               |
+| `enhancement_level` | string  | No       | "moderate"   | Enhancement aggressiveness                       |
+| `session_id`        | string  | Yes      | "no_session" | Session identifier for S3 organization           |
+| `output_quality`    | integer | No       | 85           | JPEG quality (1-100)                             |
+| `skip_upscale`      | boolean | No       | true         | Skip pre-processing upscale                      |
 
 *Either `image_path` or `image_data` is required.
 
@@ -156,30 +156,30 @@ Maps to MAX_ITERATIONS for the agent:
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VISION_MODEL` | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID |
-| `MAX_ITERATIONS` | `2` | Max agent iterations (overridden by enhancement_level at runtime) |
-| `MAX_IMAGE_DIMENSION` | `4000` | Max dimension for LLM submission |
-| `JPEG_QUALITY` | `85` | Quality for LLM image encoding |
-| `OUTPUT_QUALITY` | `95` | Quality for final output |
-| `OUTPUT_BUCKET` | - | S3 bucket for enhanced images (if not set, returns base64) |
-| `AWS_REGION` | `us-west-2` | AWS region for Bedrock |
-| `LOGGING_LEVEL` | `INFO` | Python log level |
+| Variable              | Default                          | Description                                                       |
+| --------------------- | -------------------------------- | ----------------------------------------------------------------- |
+| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID                                                  |
+| `MAX_ITERATIONS`      | `2`                              | Max agent iterations (overridden by enhancement_level at runtime) |
+| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM submission                                  |
+| `JPEG_QUALITY`        | `85`                             | Quality for LLM image encoding                                    |
+| `OUTPUT_QUALITY`      | `95`                             | Quality for final output                                          |
+| `OUTPUT_BUCKET`       | -                                | S3 bucket for enhanced images (if not set, returns base64)        |
+| `AWS_REGION`          | `us-west-2`                      | AWS region for Bedrock                                            |
+| `LOGGING_LEVEL`       | `INFO`                           | Python log level                                                  |
 
 ## Comparison: Old vs. New
 
-| Feature | Old (Fixed Pipeline) | New (Agentic) |
-|---------|---------------------|---------------|
-| **Operations** | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 13 available, agent selects |
-| **Decision Making** | Hardcoded sequence | LLM vision analysis per image |
-| **Iterations** | 1 (single pass) | 1-3 (with feedback loop) |
-| **Regional Operations** | No | Yes (normalized 0-1 coords) |
-| **Quality Metrics** | Basic (shape, skew) | Comprehensive (contrast, sharpness, brightness, saturation, edges, yellowing) |
-| **Winner Selection** | Always enhanced | Agent chooses original or enhanced based on metrics |
-| **Adaptability** | Same for all images | Tailored to document type and condition |
-| **Skip Option** | Must always process | Can skip if original is already good |
-| **Failure Recovery** | N/A | Resets and retries with different approach |
+| Feature                 | Old (Fixed Pipeline)                                           | New (Agentic)                                                                 |
+| ----------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Operations**          | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 13 available, agent selects                                                   |
+| **Decision Making**     | Hardcoded sequence                                             | LLM vision analysis per image                                                 |
+| **Iterations**          | 1 (single pass)                                                | 1-3 (with feedback loop)                                                      |
+| **Regional Operations** | No                                                             | Yes (normalized 0-1 coords)                                                   |
+| **Quality Metrics**     | Basic (shape, skew)                                            | Comprehensive (contrast, sharpness, brightness, saturation, edges, yellowing) |
+| **Winner Selection**    | Always enhanced                                                | Agent chooses original or enhanced based on metrics                           |
+| **Adaptability**        | Same for all images                                            | Tailored to document type and condition                                       |
+| **Skip Option**         | Must always process                                            | Can skip if original is already good                                          |
+| **Failure Recovery**    | N/A                                                            | Resets and retries with different approach                                    |
 
 ### Key Advantages
 
@@ -242,7 +242,7 @@ Key log entries:
 
 ### Key Metrics
 - **Duration**: 30-180 seconds depending on iterations
-- **Memory**: 512-1536MB (2048MB allocated)
+- **Memory**: 512-1536MB (6144MB allocated)
 - **Bedrock Calls**: 2-6 per image (2-3 iterations × 2 calls per iteration)
 - **Cost**: ~$0.015-0.045 per image
 
@@ -257,7 +257,7 @@ Key log entries:
 
 2. **Memory Issues**
    - Large images may require more memory
-   - Increase Lambda memory allocation (currently 2048MB)
+   - Increase Lambda memory allocation (currently 6144MB)
 
 3. **Agent Doesn't Finish**
    - Automatic fallback after MAX_ITERATIONS
