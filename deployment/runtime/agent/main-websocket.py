@@ -34,10 +34,17 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 # build_and_push_websocket.sh (the same way build_container_lambdas.sh supplies it
 # to the container Lambdas). Guarded so the agent still imports outside that build
 # — job tracking then degrades to a no-op rather than breaking the runtime.
+#
+# The reason is retained and logged rather than assumed. A missing directory and a
+# missing transitive dependency both land here, and reporting only the first sent
+# an investigation to the build script when the actual cause was foundation's
+# package __init__ importing Pillow, which this image does not install.
+_JOB_STATE_IMPORT_ERROR: str = ""
 try:
     from foundation import job_state
-except ImportError:  # pragma: no cover - foundation is present in the container
+except ImportError as e:  # pragma: no cover - foundation is present in the container
     job_state = None  # type: ignore[assignment]
+    _JOB_STATE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -319,9 +326,10 @@ class JobTrackingHook:
         if job_state is None and not JobTrackingHook._warned_unavailable:
             JobTrackingHook._warned_unavailable = True
             log(
-                "foundation.job_state is not importable — job tracking is DISABLED. "
-                "The build did not copy deployment/badgers-foundation/foundation "
-                "into the container context.",
+                "foundation.job_state is not importable — job tracking is DISABLED, "
+                "so no job_id is minted and specialists that require it (such as "
+                "html_report_specialist) will fail. Cause: "
+                f"{_JOB_STATE_IMPORT_ERROR or 'unknown'}",
                 level="warning",
             )
 
