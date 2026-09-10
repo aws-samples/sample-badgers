@@ -80,6 +80,10 @@
             "enabled": true,
             "category": "Structured Data"
         },
+        "html_report_specialist": {
+            "enabled": true,
+            "category": "Post-Processing"
+        },
         "metadata_generic_specialist": {
             "enabled": false,
             "category": "Metadata"

@@ -4,6 +4,7 @@ import { useUser } from './hooks/useUser.js'
 import Header from './components/Header.jsx'
 import Home from './components/Home.jsx'
 import Chat from './components/Chat.jsx'
+import Reports from './components/Reports.jsx'
 import SpecialistEditor from './components/SpecialistEditor.jsx'
 import SpecialistWizard from './components/SpecialistWizard.jsx'
 import Evaluator from './components/Evaluator.jsx'
@@ -24,6 +25,7 @@ const TABS = [
     // Testing tabs — all roles
     { id: 'home', label: '🏠 Home' },
     { id: 'chat', label: '💬 Chat' },
+    { id: 'reports', label: '📚 Reports' },
     { id: 'editor', label: '✏️ Edit Specialist' },
     { id: 'wizard', label: '🧙 Create Specialist' },
     { id: 'evaluator', label: '🧪 Evaluations' },
@@ -51,7 +53,10 @@ export default function App() {
     const [logs, setLogs] = useState([])
     const [running, setRunning] = useState(false)
     const branding = BRANDING
-    const [theme, setTheme] = useState(() => localStorage.getItem('badgers-theme') || '')
+    const [theme, setTheme] = useState(() => {
+        const saved = localStorage.getItem('badgers-theme') || ''
+        return saved === 'purple' ? 'light' : saved
+    })
     const dirtyRef = useRef(false)
     const abortRef = useRef(null)
 
@@ -66,7 +71,8 @@ export default function App() {
     useEffect(() => {
         document.title = branding.appName || 'BADGERS'
         const saved = localStorage.getItem('badgers-theme')
-        applyTheme(saved || branding.theme || 'dark')
+        const migrated = saved === 'purple' ? 'light' : saved
+        applyTheme(migrated || branding.theme || 'light')
     }, [])
 
     const testingTabs = TABS.filter(t => !t.adminOnly)
@@ -245,6 +251,7 @@ export default function App() {
             {/* Testing tabs */}
             {tab === 'home' && <Home onNavigate={switchTab} branding={branding} />}
             <div style={{ display: tab === 'chat' ? 'block' : 'none' }}><Chat /></div>
+            {tab === 'reports' && <Reports />}
             {tab === 'editor' && <SpecialistEditor dirtyRef={dirtyRef} />}
             {tab === 'wizard' && <SpecialistWizard runSSE={runSSE} running={running} />}
             {tab === 'evaluator' && <Evaluator />}

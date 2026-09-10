@@ -26,7 +26,7 @@ const BRANDING_DEFAULTS = {
     appDescription: '',
     appLogo: '',
     appLogoHeight: 32,
-    theme: 'dark',
+    theme: 'light',
 }
 
 function brandingPlugin() {

@@ -12,6 +12,7 @@ export default function Home({ onNavigate, branding = {} }) {
 
   const tabs = [
     ['chat', '💬 Chat', 'Stream messages to the AgentCore Runtime via WebSocket'],
+    ['reports', '📚 Reports', 'Review document analysis, page spines, and audit trails'],
     ['editor', '✏️ Edit Specialist', 'Modify specialist prompts and configuration in S3'],
     ['wizard', '🧙 Create Specialist', 'Build new specialists with the guided wizard'],
     ['evaluator', '🧪 Evaluations', 'Review and score specialist output quality'],

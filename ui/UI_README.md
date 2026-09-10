@@ -15,7 +15,7 @@ Single React + Express application that serves as both the developer testing wor
 | **Auth**          | Bypassed — defaults to `admin` role (all tabs visible) | Cognito OIDC authorization code + PKCE             |
 | **Role override** | `BADGERS_UI_ROLE=tester` env var                       | Cognito group membership (`admin` / `tester`)      |
 | **Ports**         | Vite 5175 / Express 7860                               | Container exposes 7860                             |
-| **Config**        | `config/.env`                                          | SSM Parameter Store, injected as container secrets |
+| **Config**        | `ui/.env` (`deployment/scripts/generate_ui_env.sh`)    | SSM Parameter Store, injected as container secrets |
 
 Auth is bypassed only when `COGNITO_USER_POOL_ID` is unset **and** the process is not
 running on ECS. On ECS a missing user pool is treated as a misconfiguration, not a dev
@@ -60,8 +60,13 @@ Every `/api/*` route is behind `requireAuth`, mounted before the route groups so
 individual handler can be reached unauthenticated.
 
 The Vite build needs the Cognito values at build time — `deployment/scripts/generate_ui_env.sh`
-writes `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, and `VITE_COGNITO_DOMAIN`.
-A bundle built without them falls through to the server's local-dev bypass.
+writes `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, and `VITE_COGNITO_DOMAIN` to
+`ui/.env`. A bundle built without them falls through to the server's local-dev bypass.
+
+`ui/.env` is the only env file. Vite only exposes `VITE_`-prefixed lines to the bundle;
+the remaining lines (bucket names, Runtime ARN, Gateway ID, jobs table, `AWS_PROFILE`) are
+read by `server/index.js` when running locally. Nothing copies the file into the Docker
+image — the deployed container gets those values from SSM.
 
 ## Docker Deployment
 
@@ -119,6 +124,30 @@ log as `[job] job_id=… doc_id=…`, so a chat transcript can be traced to its 
 
 Job status is computed at read time rather than stored — see the endpoint comments in
 `server/routes/core.js` for why.
+
+## Report Endpoints
+
+The Reports tab reads the artifacts written by `html_report_specialist`. Every endpoint is
+authenticated and scoped to the caller.
+
+| Endpoint                              | Returns                                    |
+| ------------------------------------- | ------------------------------------------ |
+| `GET /api/reports`                    | Every report the caller owns, newest first |
+| `GET /api/reports/:id/manifest`       | One report's manifest                      |
+| `GET /api/reports/:id/pages/:n/image` | The durable analysis image for one page    |
+| `GET /api/reports/:id/pages/:n/xml`   | The correlated page spine for one page     |
+| `GET /api/reports/:id/download`       | The offline single-file HTML report        |
+
+The listing is a keyed DynamoDB query on the `owner-index` GSI, partitioned by the
+caller's `owner_sub` and filtered to job rows carrying a `report_id`. Ownership therefore
+comes from the job record rather than from the bucket layout, and no S3 listing is
+involved. A job whose owner was never recorded is absent from the index, so its reports do
+not list — the deliberate fail-closed case.
+
+The remaining endpoints load the manifest and re-check its `owner_sub` against the caller,
+then serve only keys the manifest itself declares under that report's prefix. Nothing
+accepts a caller-supplied S3 key, and no presigned URLs are issued: the listing decides
+what may be enumerated, the manifest decides what may be opened.
 
 ## Tech Stack
 

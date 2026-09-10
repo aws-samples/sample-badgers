@@ -2,11 +2,11 @@ import React from 'react'
 import { useUser } from '../hooks/useUser.js'
 
 const THEMES = [
+    { id: 'light', label: '☀️ Light' },
     { id: 'dark', label: '🌑 Dark' },
-    { id: 'purple', label: '🟣 AWS Purple' },
 ]
 
-export default function Header({ branding = {}, theme = 'dark', onThemeChange, onLogout }) {
+export default function Header({ branding = {}, theme = 'light', onThemeChange, onLogout }) {
     const { email, role, loading } = useUser()
     const name = branding.appName || ''
     const emoji = branding.appEmoji || '🦡'

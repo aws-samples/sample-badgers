@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/scripts/common.sh"
 load_suffix
 
 # Try the local UI env first (faster than a CloudFormation lookup).
-UI_ENV="${SCRIPT_DIR}/../ui/config/.env"
+UI_ENV="${SCRIPT_DIR}/../ui/.env"
 if [ -f "${UI_ENV}" ]; then
     CONFIG_BUCKET=$(grep "^S3_CONFIG_BUCKET=" "${UI_ENV}" | cut -d'=' -f2 | tr -d '"' | tr -d "'")
 fi

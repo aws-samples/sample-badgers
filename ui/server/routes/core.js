@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { readFileSync, existsSync, mkdirSync, realpathSync } from 'fs';
 import { readFile, readdir, appendFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -17,6 +17,10 @@ import multer from 'multer';
 export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
     const CONFIG_DIR = resolve(PROJECT_ROOT, 'ui', 'config');
+    // ui/.env is the single local-dev env file (written by
+    // deployment/scripts/generate_ui_env.sh). index.js has already merged it into
+    // process.env; this second read only fills keys the shell left unset.
+    const ENV_FILE = resolve(PROJECT_ROOT, 'ui', '.env');
     // In the container the server is copied to /app/server (no `ui/` prefix),
     // so PROJECT_ROOT resolves to `/` and the default ui/logs path lands on the
     // read-only filesystem root, crashing /api/chat with EACCES on mkdir. Allow
@@ -29,7 +33,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     // ── Load env config ──
 
     function loadEnvFile() {
-        const envPath = resolve(CONFIG_DIR, '.env');
+        const envPath = ENV_FILE;
         if (!existsSync(envPath)) return {};
         const env = {};
         for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
@@ -121,6 +125,48 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     async function s3GetJson(bucket, key) {
         const resp = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
         return JSON.parse(await resp.Body.transformToString());
+    }
+
+    function reportOwnerKey(user) {
+        if (!user?.sub || user.sub === 'local') return 'local';
+        return createHash('sha256').update(user.sub).digest('hex').slice(0, 24);
+    }
+
+    function validReportId(value) {
+        return typeof value === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(value);
+    }
+
+    async function loadReportManifest(req, reportId) {
+        if (!OUTPUT_BUCKET) throw Object.assign(new Error('S3_OUTPUT_BUCKET not configured'), { status: 503 });
+        if (!validReportId(reportId)) throw Object.assign(new Error('Invalid report id'), { status: 400 });
+        const ownerKey = reportOwnerKey(req.user);
+        const prefix = `reports/${ownerKey}/${reportId}/`;
+        const manifestKey = `${prefix}manifest.json`;
+        let manifest;
+        try {
+            manifest = await s3GetJson(OUTPUT_BUCKET, manifestKey);
+        } catch {
+            throw Object.assign(new Error('Report not found'), { status: 404 });
+        }
+        if (manifest.owner_sub !== req.user.sub || manifest.report_id !== reportId) {
+            throw Object.assign(new Error('Report not found'), { status: 404 });
+        }
+        const declaredKeys = [manifest.manifest_key, manifest.html_key];
+        for (const page of manifest.pages || []) declaredKeys.push(page.image_key, page.spine_key);
+        if (declaredKeys.some(key => typeof key !== 'string' || !key.startsWith(prefix))) {
+            throw Object.assign(new Error('Invalid report manifest'), { status: 500 });
+        }
+        return { manifest, prefix };
+    }
+
+    async function sendReportObject(res, key, contentType, filename = '') {
+        const object = await s3Client.send(new GetObjectCommand({ Bucket: OUTPUT_BUCKET, Key: key }));
+        const bytes = Buffer.from(await object.Body.transformToByteArray());
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        if (filename) res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(bytes);
     }
 
     // ── Routes ──
@@ -248,7 +294,15 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
             ws.on('open', () => {
                 send('status', 'Thinking...');
-                ws.send(JSON.stringify({ prompt: message, session_id, actor_id: 'local_testing_user', audit_mode: audit_mode || false, dynamic_tokens_enabled: dynamic_tokens || false, doc_id: doc_id || '' }));
+                ws.send(JSON.stringify({
+                    prompt: message,
+                    session_id,
+                    actor_id: req.user?.sub || 'local',
+                    user_name: req.user?.email || 'local',
+                    audit_mode: audit_mode || false,
+                    dynamic_tokens_enabled: dynamic_tokens || false,
+                    doc_id: doc_id || '',
+                }));
             });
 
             ws.on('message', (raw) => {
@@ -286,6 +340,105 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             req.on('close', () => { if (ws.readyState === WebSocket.OPEN) ws.close(); });
         } catch (e) {
             send('error', e.message); res.end();
+        }
+    });
+
+    // ── Reports ──
+
+    // Every report owned by the caller, newest first, via the owner-index GSI.
+    //
+    // Ownership is asserted from DynamoDB, not inferred from the bucket layout.
+    // The job-level row carries owner_sub (foundation/job_state.create_job) and
+    // the report pointer (job_state.set_report), so one keyed query returns
+    // exactly this caller's reports and nothing else. This replaced a paginated
+    // LIST of reports/{ownerKey}/ followed by a GetObject on every manifest found
+    // to re-check its owner_sub — a cost linear in the number of reports, on a
+    // path scoped by a hashed key segment rather than by the identity itself.
+    //
+    // The detail routes below still read the manifest, and still re-verify
+    // owner_sub against it: this query decides what the caller may enumerate, not
+    // what they may open.
+    app.get('/api/reports', async (req, res) => {
+        const table = jobsTable();
+        if (!table) return res.status(503).json({ error: 'JOBS_TABLE_NAME not configured' });
+        // No identity, no partition key, no listing. An unauthenticated caller
+        // cannot reach a query that would return another user's rows.
+        const ownerSub = req.user?.sub;
+        if (!ownerSub) return res.status(403).json({ error: 'Forbidden' });
+        try {
+            const reports = [];
+            let key;
+            do {
+                const page = await ddbClient.send(new QueryCommand({
+                    TableName: table,
+                    IndexName: 'owner-index',
+                    KeyConditionExpression: 'owner_sub = :owner',
+                    // Job rows exist from the moment analysis starts; only those
+                    // that produced a report belong in this list.
+                    FilterExpression: 'attribute_exists(report_id)',
+                    ExpressionAttributeValues: { ':owner': ownerSub },
+                    ScanIndexForward: false,
+                    ExclusiveStartKey: key,
+                }));
+                for (const item of page.Items || []) {
+                    if (!validReportId(item.report_id)) continue;
+                    reports.push({
+                        report_id: item.report_id,
+                        title: item.report_title || item.report_id,
+                        created_at: item.report_created_at || item.started_at,
+                        page_count: item.report_page_count ?? 0,
+                        doc_id: item.doc_id || '',
+                        session_id: item.session_id || '',
+                    });
+                }
+                key = page.LastEvaluatedKey;
+            } while (key);
+            // The index sorts on started_at, which is when the job began; the list
+            // shows when the report was generated. Order by what is displayed.
+            reports.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+            res.json({ reports });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/manifest', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            res.json(manifest);
+        } catch (e) {
+            res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/pages/:pageNumber/image', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            await sendReportObject(res, page.image_key, 'image/jpeg');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/pages/:pageNumber/xml', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            await sendReportObject(res, page.spine_key, 'application/xml; charset=utf-8');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/download', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            await sendReportObject(res, manifest.html_key, 'text/html; charset=utf-8', `${manifest.report_id}.html`);
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
         }
     });
 

@@ -185,6 +185,8 @@ def create_job(
     doc_id: str = "",
     session_id: str = "",
     reason: str = "",
+    owner_sub: str = "",
+    user_name: str = "",
 ) -> None:
     """Create the job-level ('orchestrator') row if it does not already exist."""
     if not (enabled() and job_id):
@@ -203,6 +205,8 @@ def create_job(
         ("doc_id", doc_id),
         ("session_id", session_id),
         ("reason", reason),
+        ("owner_sub", owner_sub),
+        ("user_name", user_name),
     ):
         if val:
             item[attr] = val
@@ -218,6 +222,57 @@ def create_job(
             "ConditionalCheckFailed" not in str(e)
         ):
             logger.warning("job_state.create_job failed (job=%s): %s", job_id, e)
+
+
+def set_report(
+    job_id: str,
+    *,
+    report_id: str,
+    title: str = "",
+    created_at: str = "",
+    page_count: int = 0,
+) -> None:
+    """Record a generated HTML report on the job-level ('orchestrator') row.
+
+    The UI lists a user's reports by querying the owner-index GSI, which is keyed
+    on the owner_sub that create_job writes to this row. That row is the only
+    place ownership is recorded, so the report pointer belongs on it too: one
+    keyed query then answers "which reports does this user own" without listing
+    the output bucket and reopening every manifest to re-check the owner.
+
+    The condition is deliberate. An unconditional update_item is an upsert and
+    would happily create an orchestrator row that has no owner_sub, which would
+    be invisible in the sparse index and would also fabricate a job record for a
+    job that was never tracked. If the row is absent, no pointer is written and
+    the report simply does not appear — the same fail-closed behaviour the report
+    Lambda already applies when it cannot match owner_sub.
+
+    ttl is refreshed so the pointer survives as long as any other write to the
+    job. The manifest in S3 outlives the row regardless; once the row expires the
+    report drops out of the listing even though its artifacts remain.
+    """
+    if not (enabled() and job_id and report_id):
+        return
+    try:
+        _table().update_item(
+            Key={"job_id": job_id, "subtask_id": ORCHESTRATOR_SUBTASK},
+            UpdateExpression=(
+                "SET report_id = :rid, report_title = :title, "
+                "report_created_at = :created, report_page_count = :pages, "
+                "#ttl = :ttl"
+            ),
+            ExpressionAttributeNames={"#ttl": "ttl"},
+            ExpressionAttributeValues={
+                ":rid": report_id,
+                ":title": str(title)[:512],
+                ":created": created_at or _now_iso(),
+                ":pages": int(page_count),
+                ":ttl": _ttl(),
+            },
+            ConditionExpression="attribute_exists(job_id)",
+        )
+    except Exception as e:
+        logger.warning("job_state.set_report failed (job=%s): %s", job_id, e)
 
 
 def increment_retry(job_id: str, subtask: str) -> int:
@@ -260,6 +315,7 @@ def get_job_records(job_id: str) -> list[dict[str, Any]]:
         resp = _table().query(
             KeyConditionExpression="job_id = :jid",
             ExpressionAttributeValues={":jid": job_id},
+            ConsistentRead=True,
         )
         return resp.get("Items", []) or []
     except Exception as e:
