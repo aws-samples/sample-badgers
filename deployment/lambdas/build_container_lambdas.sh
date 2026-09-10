@@ -59,17 +59,18 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         exit 1
     fi
 
-    # config is only needed by the containers that load specialist manifests;
-    # remediation_specialist reads none.
-    if [ "$CONTAINER" != "remediation_specialist" ]; then
-        echo "Copying config module to build context..."
-        if [ -d "./layer/python/config" ]; then
-            rm -rf "${CONTAINER_DIR}/config"
-            cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
-        else
-            echo "Error: config module not found at ./layer/python/config"
-            exit 1
-        fi
+    # config is required by every container that imports foundation, not just the
+    # ones that read specialist manifests: foundation/__init__.py eagerly imports
+    # specialist_foundation, which resolves SPECIALIST_CONFIG_PATH from
+    # config.config at module import time. Skipping it produces
+    # "Runtime.ImportModuleError: No module named 'config'" at cold start.
+    echo "Copying config module to build context..."
+    if [ -d "./layer/python/config" ]; then
+        rm -rf "${CONTAINER_DIR}/config"
+        cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
+    else
+        echo "Error: config module not found at ./layer/python/config"
+        exit 1
     fi
 
     # Build for x86_64 (Lambda runtime)
@@ -80,11 +81,9 @@ for CONTAINER in "${CONTAINERS[@]}"; do
         -t "${FULL_URI}" \
         "${CONTAINER_DIR}"
 
-    # Clean up foundation and config copies (if they were added)
-    if [ "$CONTAINER" != "remediation_specialist" ]; then
-        rm -rf "${CONTAINER_DIR}/foundation"
-        rm -rf "${CONTAINER_DIR}/config"
-    fi
+    # Clean up foundation and config copies
+    rm -rf "${CONTAINER_DIR}/foundation"
+    rm -rf "${CONTAINER_DIR}/config"
 
     # Push to ECR
     echo "Pushing ${FULL_URI}..."

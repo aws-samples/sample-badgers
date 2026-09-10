@@ -6,8 +6,10 @@ import {
   ThreadPrimitive,
   MessagePrimitive,
   ComposerPrimitive,
+  AttachmentPrimitive,
 } from '@assistant-ui/react'
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import ShikiHighlighter from 'react-shiki'
 
 function genSessionId() {
@@ -43,11 +45,18 @@ function CodeBlock({ className, children }) {
   }
 }
 
+// react-markdown only implements CommonMark, where tables, strikethrough and
+// autolinks do not exist. Without remark-gfm the agent's pipe tables parsed as a
+// single paragraph and CommonMark collapsed their newlines into spaces, which is
+// why they rendered as one run-together line of pipes. Module scope, not inline,
+// so the array identity is stable across renders while a response streams.
+const REMARK_PLUGINS = [remarkGfm]
+
 function MarkdownContent({ text }) {
   if (!text) return null
   try {
     return (
-      <Markdown components={{ code: CodeBlock }}>
+      <Markdown remarkPlugins={REMARK_PLUGINS} components={{ code: CodeBlock }}>
         {text}
       </Markdown>
     )
@@ -83,24 +92,86 @@ function LoadingDots() {
   return <div className="loading-dots"><span /><span /><span /></div>
 }
 
+// ── Copy ──
+
+function CopyButton({ getText, label = 'Copy' }) {
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  const copy = async () => {
+    const text = getText()
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+    } catch {
+      // navigator.clipboard is undefined on insecure origins and can be denied
+      // by permission policy. Staying silent is better than a thrown error in
+      // the render tree; the user sees no tick and can select the text.
+    }
+  }
+
+  return (
+    <button
+      onClick={copy}
+      title={copied ? 'Copied' : label}
+      aria-label={label}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
+        fontSize: 12, lineHeight: 1,
+        color: copied ? 'var(--green)' : 'var(--text-dim)',
+      }}
+    >
+      {copied ? '✓' : '⧉'}
+    </button>
+  )
+}
+
+// ── Message text ──
+
+// The composer keeps typed text in `content` and each attachment's parts in a
+// separate `attachments` array; it never merges them. Both halves are collected
+// here so the rendered bubble shows exactly what run() sends to the agent --
+// otherwise an attachment-only message renders as an empty bubble.
+function collectUserText(message) {
+  const typed = (message?.content || [])
+    .filter(c => c.type === 'text')
+    .map(c => c.text)
+  const attached = (message?.attachments || [])
+    .flatMap(a => (a.content || []).filter(c => c.type === 'text').map(c => c.text))
+  return [...typed, ...attached].join('\n\n')
+}
+
+function assistantCopyText(message) {
+  const parts = message?.content || []
+  const text = parts.filter(c => c.type === 'text').map(c => c.text).join('\n')
+  const reasoning = parts.filter(c => c.type === 'reasoning').map(c => c.text).join('\n')
+  if (!reasoning) return text
+  return `${text}\n\n--- Thinking ---\n\n${reasoning}`
+}
+
 // ── Messages ──
 
 function UserMessage() {
+  const message = useAuiState((s) => s.message)
+  const text = collectUserText(message)
+
   return (
     <MessagePrimitive.Root style={{ marginBottom: 8 }}>
-      <div className="chat-message user">
-        <MessagePrimitive.Parts>
-          {({ part }) => {
-            if (part.type === 'text') return <span>{part.text}</span>
-            return null
-          }}
-        </MessagePrimitive.Parts>
+      <div className="chat-message user" style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <span style={{ flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{text}</span>
+        <CopyButton getText={() => text} label="Copy message" />
       </div>
     </MessagePrimitive.Root>
   )
 }
 
-function AssistantMessage() {
+function AssistantMessage({ activity }) {
   const message = useAuiState((s) => s.message)
   const isRunning = message.status?.type === 'running'
   const hasText = message.content?.some(c => c.type === 'text' && c.text?.trim())
@@ -111,6 +182,9 @@ function AssistantMessage() {
       <MessagePrimitive.Root style={{ marginBottom: 8 }}>
         <div className="chat-message assistant">
           <LoadingDots />
+          {activity && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{activity}</div>
+          )}
         </div>
       </MessagePrimitive.Root>
     )
@@ -126,6 +200,11 @@ function AssistantMessage() {
           }}
         </MessagePrimitive.Parts>
         <ChainOfThought parts={reasoningParts} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+          {/* Read at click time, not render time, so a copy during streaming
+              takes whatever has arrived so far. */}
+          <CopyButton getText={() => assistantCopyText(message)} label="Copy response and thinking" />
+        </div>
       </div>
     </MessagePrimitive.Root>
   )
@@ -133,7 +212,7 @@ function AssistantMessage() {
 
 // ── Thread + Composer ──
 
-function MyThread() {
+function MyThread({ attachmentAdapter, activity }) {
   return (
     <ThreadPrimitive.Root style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <ThreadPrimitive.Viewport style={{ flex: 1, overflow: 'auto', padding: 12 }}>
@@ -143,42 +222,113 @@ function MyThread() {
           </div>
         </ThreadPrimitive.Empty>
         <ThreadPrimitive.Messages>
-          {({ message }) => message.role === 'user' ? <UserMessage /> : <AssistantMessage />}
+          {({ message }) => message.role === 'user' ? <UserMessage /> : <AssistantMessage activity={activity} />}
         </ThreadPrimitive.Messages>
+        {/* Streamed reasoning is collapsed inside the message, so without this a
+            long tool call looks like a hung UI. `activity` is the server's own
+            status event: Connecting, Thinking, or Using <tool>. */}
+        {activity && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 12, color: 'var(--accent)', padding: '4px 2px',
+          }}>
+            <span className="activity-spinner" aria-hidden="true" />
+            <span>{activity}</span>
+          </div>
+        )}
       </ThreadPrimitive.Viewport>
-      <MyComposer />
+      <MyComposer attachmentAdapter={attachmentAdapter} />
     </ThreadPrimitive.Root>
   )
 }
 
-function MyComposer() {
+// 'removed' has no entry on purpose: dropping an attachment clears the line.
+const UPLOAD_STATUS_TEXT = {
+  attached: e => `📎 ${e.filename} attached. It uploads when you press Send.`,
+  uploading: e => `⏳ Uploading ${e.filename}...`,
+  uploaded: e => `✓ Uploaded ${e.filename}`,
+  error: e => `❌ ${e.filename}: ${e.message}`,
+}
+
+// Hoisted so ComposerPrimitive.Attachments can memoize on it. Rendered inside
+// the attachment provider, which is what makes AttachmentPrimitive work here.
+const renderAttachmentChip = ({ attachment }) => (
+  <div style={{
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', padding: '3px 6px 3px 8px',
+    fontSize: 12, color: 'var(--text-dim)', maxWidth: 260,
+  }}>
+    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      📄 <AttachmentPrimitive.Name />
+    </span>
+    <AttachmentPrimitive.Remove
+      aria-label={`Remove ${attachment.name}`}
+      title="Remove attachment"
+      style={{
+        background: 'none', border: 'none', color: 'var(--text-dim)',
+        cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 2px',
+      }}
+    >
+      ✕
+    </AttachmentPrimitive.Remove>
+  </div>
+)
+
+function MyComposer({ attachmentAdapter }) {
+  const [upload, setUpload] = useState(null)
+
+  useEffect(() => {
+    if (!attachmentAdapter) return
+    return attachmentAdapter.subscribe(setUpload)
+  }, [attachmentAdapter])
+
+  const statusText = upload && UPLOAD_STATUS_TEXT[upload.state]?.(upload)
+
   return (
-    <ComposerPrimitive.Root style={{
-      display: 'flex', gap: 8,
-      padding: '8px 12px', borderTop: '1px solid var(--border)',
-    }}>
-      <ComposerPrimitive.AddAttachment style={{
-        background: 'none', border: '1px solid var(--border)',
-        color: 'var(--text-dim)', padding: '6px 10px',
-        borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer',
+    <div style={{ borderTop: '1px solid var(--border)' }}>
+      {statusText && (
+        <div style={{
+          fontSize: 12, padding: '6px 12px 0',
+          color: upload.state === 'error' ? 'var(--red)'
+            : upload.state === 'uploaded' ? 'var(--green)'
+              : 'var(--text-dim)',
+        }}>
+          {statusText}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 12px 0' }}>
+        <ComposerPrimitive.Attachments>
+          {renderAttachmentChip}
+        </ComposerPrimitive.Attachments>
+      </div>
+      <ComposerPrimitive.Root style={{
+        display: 'flex', gap: 8,
+        padding: '8px 12px',
       }}>
-        📎
-      </ComposerPrimitive.AddAttachment>
-      <ComposerPrimitive.Input
-        placeholder="Ask your agent something..."
-        style={{
-          flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
-          color: 'var(--text)', padding: '8px 10px', borderRadius: 'var(--radius)',
-          fontSize: 13, outline: 'none',
-        }}
-      />
-      <ComposerPrimitive.Send style={{
-        background: 'var(--accent-bg)', border: '1px solid var(--accent-bg)', color: '#fff',
-        padding: '6px 16px', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer',
-      }}>
-        Send
-      </ComposerPrimitive.Send>
-    </ComposerPrimitive.Root>
+        <ComposerPrimitive.AddAttachment style={{
+          background: 'none', border: '1px solid var(--border)',
+          color: 'var(--text-dim)', padding: '6px 10px',
+          borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer',
+        }}>
+          📎
+        </ComposerPrimitive.AddAttachment>
+        <ComposerPrimitive.Input
+          placeholder="Provide an S3 URI or attach a PDF by clicking the paperclip icon."
+          style={{
+            flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
+            color: 'var(--text)', padding: '8px 10px', borderRadius: 'var(--radius)',
+            fontSize: 13, outline: 'none',
+          }}
+        />
+        <ComposerPrimitive.Send style={{
+          background: 'var(--accent-bg)', border: '1px solid var(--accent-bg)', color: '#fff',
+          padding: '6px 16px', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer',
+        }}>
+          Send
+        </ComposerPrimitive.Send>
+      </ComposerPrimitive.Root>
+    </div>
   )
 }
 
@@ -192,10 +342,31 @@ class S3AttachmentAdapter {
   // turns can attribute their jobs to the document being discussed.
   lastDocId = ''
 
+  // The adapter is a plain class outside the React tree, so it cannot render
+  // status itself. Components inside AssistantRuntimeProvider subscribe and do
+  // it on its behalf.
+  listeners = new Set()
+
+  subscribe(listener) {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  notify(event) {
+    for (const listener of this.listeners) listener(event)
+  }
+
+  // Holds the file in memory only. Nothing is uploaded here, so an attachment
+  // the user removes -- or never sends -- leaves no object in S3.
   async add({ file }) {
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      throw new Error('Only PDF files are supported')
+      const message = 'Only PDF files are supported'
+      this.notify({ state: 'error', filename: file.name, message })
+      throw new Error(message)
     }
+
+    this.notify({ state: 'attached', filename: file.name })
+
     return {
       id: crypto.randomUUID(),
       type: 'document',
@@ -206,29 +377,132 @@ class S3AttachmentAdapter {
     }
   }
 
+  // Called by the composer only when the message is actually sent, which is
+  // where the upload happens. The returned text part is what the agent reads
+  // as its instruction; see the run() adapter, which pulls it out of
+  // message.attachments.
   async send(attachment) {
-    const formData = new FormData()
-    formData.append('file', attachment.file)
+    this.notify({ state: 'uploading', filename: attachment.name })
 
-    const res = await fetch('/api/upload', { method: 'POST', body: formData })
-    const data = await res.json()
+    try {
+      const formData = new FormData()
+      formData.append('file', attachment.file)
 
-    if (data.error) throw new Error(data.error)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      // The route reports failures as JSON, but a proxy or crash upstream can
+      // return something else -- fall back to the status code instead of
+      // throwing an unhelpful parse error.
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.error) throw new Error(data.error || `Upload failed (HTTP ${res.status})`)
+      if (!data.s3Uri) throw new Error('Upload succeeded but the server returned no S3 URI')
 
-    if (data.docId) this.lastDocId = data.docId
+      if (data.docId) this.lastDocId = data.docId
 
-    // Return the s3 URI as text content so the agent sees it
-    return {
-      ...attachment,
-      status: { type: 'complete' },
-      content: [{
-        type: 'text',
-        text: `Uploaded file: ${data.s3Uri}`,
-      }],
+      this.notify({ state: 'uploaded', filename: attachment.name, s3Uri: data.s3Uri })
+
+      return {
+        ...attachment,
+        status: { type: 'complete' },
+        content: [{
+          type: 'text',
+          text: `Process: ${data.s3Uri}`,
+        }],
+      }
+    } catch (e) {
+      this.notify({ state: 'error', filename: attachment.name, message: e.message })
+      throw e
     }
   }
 
-  async remove() {}
+  // Nothing was uploaded, so discarding an attachment is purely local.
+  async remove(attachment) {
+    this.notify({ state: 'removed', filename: attachment?.name })
+  }
+}
+
+// ── Analyzer status ──
+
+// The stream reports which tool is starting but never reports one finishing or
+// failing, so terminal state has to come from the job records the specialist
+// Lambdas write. /api/jobs/:jobId is the only source of real COMPLETE/FAILED.
+const PILL_STYLE = {
+  COMPLETE: { background: 'var(--green)', color: '#fff', borderColor: 'var(--green)' },
+  FAILED: { background: 'var(--red)', color: '#fff', borderColor: 'var(--red)' },
+  RUNNING: { background: 'var(--accent-bg)', color: '#fff', borderColor: 'var(--accent-bg)' },
+  PENDING: { background: 'var(--surface)', color: 'var(--text-dim)', borderColor: 'var(--border)' },
+}
+
+// A specialist runs once per page, so one name can hold several subtasks. The
+// pill reports the state that needs attention rather than the most common one.
+const STATUS_RANK = { FAILED: 0, RUNNING: 1, PENDING: 2, COMPLETE: 3 }
+
+function groupSpecialists(subtasks) {
+  const byName = new Map()
+  for (const task of subtasks || []) {
+    const name = task.specialist || String(task.subtask_id || '').split('#')[0] || 'unknown'
+    const entry = byName.get(name) || { name, status: task.status, error: '', total: 0, complete: 0 }
+    entry.total += 1
+    if (task.status === 'COMPLETE') entry.complete += 1
+    if ((STATUS_RANK[task.status] ?? 9) < (STATUS_RANK[entry.status] ?? 9)) entry.status = task.status
+    if (task.status === 'FAILED' && task.error && !entry.error) entry.error = task.error
+    byName.set(name, entry)
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function useJobStatus(jobId, active) {
+  const [job, setJob] = useState(null)
+
+  useEffect(() => {
+    if (!jobId) { setJob(null); return }
+    let cancelled = false
+    let timer
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`)
+        // 404 until the first specialist writes its row, 503 when the deployment
+        // has no jobs table. Both mean "nothing to show", not an error to raise.
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled) setJob(data)
+        }
+      } catch { /* transient; the next tick retries */ }
+      // Re-polls only while the turn runs. When `active` goes false the effect
+      // re-runs and this fires once more, letting the pills settle on their
+      // terminal state. 2.5s keeps well inside the server's 100 req/min budget.
+      if (!cancelled && active) timer = setTimeout(poll, 2500)
+    }
+
+    poll()
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [jobId, active])
+
+  return job
+}
+
+function AnalyzerPills({ job }) {
+  const specialists = useMemo(() => groupSpecialists(job?.subtasks), [job])
+  if (!specialists.length) return null
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {specialists.map(s => (
+        <span
+          key={s.name}
+          title={s.error || `${s.name}: ${s.status}${s.total > 1 ? ` (${s.complete}/${s.total} pages)` : ''}`}
+          style={{
+            ...(PILL_STYLE[s.status] || PILL_STYLE.PENDING),
+            border: '1px solid', borderRadius: 999,
+            padding: '2px 8px', fontSize: 10, whiteSpace: 'nowrap',
+          }}
+        >
+          {s.name.replace(/_/g, ' ')}
+          {s.total > 1 && ` ${s.complete}/${s.total}`}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 // ── Chat with adapter ──
@@ -240,6 +514,10 @@ function ChatInner() {
   const [sessionId, setSessionId] = useState(genSessionId)
   const [auditMode, setAuditMode] = useState(false)
   const [dynamicTokens, setDynamicTokens] = useState(false)
+  // Non-null only while a turn is in flight; doubles as the "is running" flag.
+  const [activity, setActivity] = useState(null)
+  const [jobId, setJobId] = useState('')
+  const job = useJobStatus(jobId, activity !== null)
 
   const refreshTools = useCallback(async () => {
     setToolsLoading(true)
@@ -258,53 +536,64 @@ function ChatInner() {
   const adapter = useMemo(() => ({
     async *run({ messages, abortSignal }) {
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-      const messageText = lastUserMsg?.content
-        ?.filter(c => c.type === 'text')
-        .map(c => c.text)
-        .join('\n') || ''
+      // Includes the attachment's `Process: <s3 uri>` part, which lives outside
+      // `content`. Appending it means an empty composer sends just the
+      // instruction, while typed text keeps it.
+      const messageText = collectUserText(lastUserMsg)
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          session_id: sessionId,
-          audit_mode: auditMode,
-          dynamic_tokens: dynamicTokens,
-          // Empty until a PDF has been uploaded in this session; the agent
-          // treats an absent doc_id as "not attributable to a document".
-          doc_id: attachmentAdapter.lastDocId,
-        }),
-        signal: abortSignal,
-      })
+      setActivity('Connecting...')
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageText,
+            session_id: sessionId,
+            audit_mode: auditMode,
+            dynamic_tokens: dynamicTokens,
+            // Empty until a PDF has been uploaded in this session; the agent
+            // treats an absent doc_id as "not attributable to a document".
+            doc_id: attachmentAdapter.lastDocId,
+          }),
+          signal: abortSignal,
+        })
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let text = ''
-      let reasoning = ''
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let text = ''
+        let reasoning = ''
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop()
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const evt = JSON.parse(line.slice(6))
-            if (evt.type === 'text') text += evt.text
-            else if (evt.type === 'thinking') reasoning += evt.text
-            else if (evt.type === 'error') text = `❌ ${evt.text}`
-          } catch {}
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const evt = JSON.parse(line.slice(6))
+              if (evt.type === 'text') text += evt.text
+              else if (evt.type === 'thinking') reasoning += evt.text
+              else if (evt.type === 'error') text = `❌ ${evt.text}`
+              // Previously discarded. 'status' is the only progress signal the
+              // server sends, and 'job' is what drives the analyzer pills.
+              else if (evt.type === 'status') setActivity(evt.text)
+              else if (evt.type === 'job' && evt.job_id) setJobId(evt.job_id)
+              else if (evt.type === 'done') setActivity(null)
+            } catch {}
+          }
+
+          const content = []
+          if (reasoning) content.push({ type: 'reasoning', text: reasoning })
+          if (text.trim()) content.push({ type: 'text', text })
+          if (content.length) yield { content }
         }
-
-        const content = []
-        if (reasoning) content.push({ type: 'reasoning', text: reasoning })
-        if (text.trim()) content.push({ type: 'text', text })
-        if (content.length) yield { content }
+      } finally {
+        // Covers abort and thrown errors too, so the indicator can't stick on.
+        setActivity(null)
       }
     },
   }), [sessionId, auditMode, dynamicTokens, attachmentAdapter])
@@ -319,10 +608,19 @@ function ChatInner() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 12, height: 600 }}>
       <div className="card" style={{ minHeight: 0, overflow: 'hidden' }}>
         <AssistantRuntimeProvider runtime={runtime}>
-          <MyThread />
+          <MyThread attachmentAdapter={attachmentAdapter} activity={activity} />
         </AssistantRuntimeProvider>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'auto' }}>
+        {job?.subtasks?.length > 0 && (
+          <div className="card" style={{ padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>🧩 Analyzers</span>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{job.status}</span>
+            </div>
+            <AnalyzerPills job={job} />
+          </div>
+        )}
         <div className="card" style={{ padding: 12 }}>
           <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={auditMode} onChange={e => setAuditMode(e.target.checked)} />

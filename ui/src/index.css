@@ -333,6 +333,29 @@ button.tab-active:hover {
     padding: 4px 0;
 }
 
+/* Activity indicator next to the streamed status text ("Using table_specialist"). */
+.activity-spinner {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border: 2px solid var(--accent-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: activity-spin 0.7s linear infinite;
+}
+
+@keyframes activity-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .activity-spinner {
+        animation: none;
+    }
+}
+
 .loading-dots span {
     width: 8px;
     height: 8px;
