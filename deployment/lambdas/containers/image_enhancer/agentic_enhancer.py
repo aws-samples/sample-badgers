@@ -39,7 +39,7 @@ VISION_MODEL = os.environ.get(
     "CLAUDE_OPUS_46_PROFILE_ARN", "us.anthropic.claude-opus-4-6-v1"
 )
 MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "2"))
-MAX_IMAGE_DIMENSION = int(os.environ.get("MAX_IMAGE_DIMENSION", "4000"))
+MAX_IMAGE_DIMENSION = int(os.environ.get("MAX_IMAGE_DIMENSION", "2048"))
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", "85"))
 OUTPUT_QUALITY = int(os.environ.get("OUTPUT_QUALITY", "95"))
 

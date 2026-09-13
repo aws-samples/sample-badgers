@@ -154,7 +154,7 @@ Maps to MAX_ITERATIONS for the agent:
 |----------|---------|-------------|
 | `VISION_MODEL` | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID |
 | `MAX_ITERATIONS` | `2` | Max agent iterations (overridden by enhancement_level at runtime) |
-| `MAX_IMAGE_DIMENSION` | `4000` | Max dimension for LLM submission |
+| `MAX_IMAGE_DIMENSION` | `2048` | Max dimension for LLM submission |
 | `JPEG_QUALITY` | `85` | Quality for LLM image encoding |
 | `OUTPUT_QUALITY` | `95` | Quality for final output |
 | `OUTPUT_BUCKET` | - | S3 bucket for enhanced images (if not set, returns base64) |

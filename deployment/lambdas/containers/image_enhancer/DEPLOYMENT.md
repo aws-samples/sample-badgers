@@ -78,7 +78,7 @@ Set in `lambda_stack.py` or override in AWS console:
 |----------|---------|---------|
 | `VISION_MODEL` | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID |
 | `MAX_ITERATIONS` | `2` | Max agent iterations |
-| `MAX_IMAGE_DIMENSION` | `4000` | Max dimension for LLM |
+| `MAX_IMAGE_DIMENSION` | `2048` | Max dimension for LLM |
 | `JPEG_QUALITY` | `85` | LLM image encoding quality |
 | `OUTPUT_QUALITY` | `95` | Final output quality |
 | `OUTPUT_BUCKET` | (from CDK) | S3 bucket for enhanced images |
@@ -343,7 +343,7 @@ aws lambda update-function-configuration \
   --environment Variables="{
     VISION_MODEL=us.anthropic.claude-sonnet-4-6,
     MAX_ITERATIONS=3,
-    MAX_IMAGE_DIMENSION=4000
+    MAX_IMAGE_DIMENSION=2048
   }"
 ```
 
