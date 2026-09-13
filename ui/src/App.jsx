@@ -10,6 +10,7 @@ import Evaluator from './components/Evaluator.jsx'
 import PricingCalculator from './components/PricingCalculator.jsx'
 import Observability from './components/Observability.jsx'
 import ChatLog from './components/ChatLog.jsx'
+import RecognitionOutput from './components/RecognitionOutput.jsx'
 import StackList from './components/StackList.jsx'
 import SpecialistSelector from './components/SpecialistSelector.jsx'
 import S3ConfigEditor from './components/S3ConfigEditor.jsx'
@@ -30,6 +31,7 @@ const TABS = [
     { id: 'pricing', label: '💰 Pricing' },
     { id: 'observability', label: '📊 Observability' },
     { id: 'chatlog', label: '📝 Chat Log' },
+    { id: 'recognition', label: '🧾 Recognition JSON' },
     // Admin tabs
     { id: 'stacks', label: '📦 Stacks', adminOnly: true },
     { id: 'specialists', label: '🔬 Specialists', adminOnly: true },
@@ -251,6 +253,7 @@ export default function App() {
             {tab === 'pricing' && <PricingCalculator />}
             {tab === 'observability' && <Observability />}
             {tab === 'chatlog' && <ChatLog />}
+            {tab === 'recognition' && <RecognitionOutput />}
 
             {/* Admin tabs */}
             {role === 'admin' && tab === 'stacks' && <StackList runSSE={runSSE} runSSEGet={runSSEGet} running={running} />}

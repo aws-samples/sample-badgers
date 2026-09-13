@@ -9,6 +9,7 @@ import logging
 import os
 from datetime import datetime
 from typing import Any
+from xml.etree import ElementTree
 
 import boto3
 
@@ -19,6 +20,42 @@ from foundation import job_state
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
 logger.setLevel(getattr(logging, log_level, logging.INFO))
+
+
+def _xml_element_to_json(element: ElementTree.Element) -> dict[str, Any]:
+    """Convert XML to an order-preserving JSON representation."""
+    node: dict[str, Any] = {"tag": element.tag}
+    if element.attrib:
+        node["attributes"] = dict(element.attrib)
+    text = (element.text or "").strip()
+    if text:
+        node["text"] = text
+    children = [_xml_element_to_json(child) for child in element]
+    if children:
+        node["children"] = children
+    return node
+
+
+def _build_recognition_json(
+    xml_content: str,
+    *,
+    session_id: str,
+    page_number: str,
+    source_image_path: str,
+    generated_at: str,
+    xml_uri: str,
+) -> dict[str, Any]:
+    """Build the portable JSON recognition artifact saved beside correlated XML."""
+    root = ElementTree.fromstring(xml_content)
+    return {
+        "schema_version": "1.0",
+        "session_id": session_id,
+        "page_number": page_number,
+        "source_image_path": source_image_path,
+        "generated_at": generated_at,
+        "source": {"format": "xml", "s3_uri": xml_uri},
+        "recognition": _xml_element_to_json(root),
+    }
 
 
 def lambda_handler(
@@ -201,8 +238,12 @@ def lambda_handler(
             job_state.mark_failed(job_id, subtask, "OUTPUT_BUCKET not configured")
             return _error_response("OUTPUT_BUCKET not configured")
 
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        generated_at = datetime.utcnow()
+        timestamp = generated_at.strftime("%Y%m%d_%H%M%S")
         s3_key = f"{session_id}/correlated/correlation_specialist_page_{page_number}_{timestamp}.xml"
+        correlation_specialist_uri = f"s3://{output_bucket}/{s3_key}"
+        json_key = f"{session_id}/correlated/recognition_page_{page_number}_{timestamp}.json"
+        recognition_json_uri = f"s3://{output_bucket}/{json_key}"
 
         # Verify we have content before writing
         if not unified_document or len(unified_document.strip()) == 0:
@@ -217,6 +258,19 @@ def lambda_handler(
             )
 
         body_bytes = unified_document.encode("utf-8")
+        try:
+            recognition_json = _build_recognition_json(
+                unified_document,
+                session_id=session_id,
+                page_number=str(page_number),
+                source_image_path=source_image_path,
+                generated_at=generated_at.isoformat(timespec="seconds") + "Z",
+                xml_uri=correlation_specialist_uri,
+            )
+        except ElementTree.ParseError as error:
+            job_state.mark_failed(job_id, subtask, f"Invalid correlated XML: {error}")
+            return _error_response(f"Unable to create recognition JSON: {error}")
+
         logger.info(
             "Writing %d bytes to S3: %s/%s", len(body_bytes), output_bucket, s3_key
         )
@@ -228,11 +282,18 @@ def lambda_handler(
             ContentType="application/xml",
             Tagging=f"session_id={session_id}&type=correlation_specialist&page={page_number}",
         )
+        s3.put_object(
+            Bucket=output_bucket,
+            Key=json_key,
+            Body=json.dumps(recognition_json, ensure_ascii=False, indent=2).encode("utf-8"),
+            ContentType="application/json",
+            Tagging=f"session_id={session_id}&type=recognition_json&page={page_number}",
+        )
 
-        correlation_specialist_uri = f"s3://{output_bucket}/{s3_key}"
         logger.info(
             "Saved correlation_specialist output to %s", correlation_specialist_uri
         )
+        logger.info("Saved recognition JSON to %s", recognition_json_uri)
         job_state.mark_complete(job_id, subtask, correlation_specialist_uri)
 
         return {
@@ -240,6 +301,7 @@ def lambda_handler(
             "body": json.dumps(
                 {
                     "correlation_specialist_uri": correlation_specialist_uri,
+                    "recognition_json_uri": recognition_json_uri,
                     "summary": summary,
                     "success": True,
                     "session_id": session_id,
