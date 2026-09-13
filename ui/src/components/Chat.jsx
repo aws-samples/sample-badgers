@@ -185,7 +185,7 @@ function MyComposer() {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf'
+  accept = 'application/pdf,image/png,image/jpeg,image/tiff,.pdf,.png,.jpg,.jpeg,.tif,.tiff'
 
   // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
   // The server mints it per upload; we hold the most recent one so subsequent
@@ -193,14 +193,24 @@ class S3AttachmentAdapter {
   lastDocId = ''
 
   async add({ file }) {
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      throw new Error('Only PDF files are supported')
+    const extension = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]
+    const supportedTypes = {
+      '.pdf': 'application/pdf',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.tif': 'image/tiff',
+      '.tiff': 'image/tiff',
+    }
+    const contentType = supportedTypes[extension]
+    if (!contentType) {
+      throw new Error('Supported formats: PDF, TIFF, TIF, JPEG, JPG, and PNG')
     }
     return {
       id: crypto.randomUUID(),
-      type: 'document',
+      type: contentType.startsWith('image/') ? 'image' : 'document',
       name: file.name,
-      contentType: 'application/pdf',
+      contentType,
       file,
       status: { type: 'requires-action', reason: 'composer-send' },
     }
@@ -217,13 +227,13 @@ class S3AttachmentAdapter {
 
     if (data.docId) this.lastDocId = data.docId
 
-    // Return the s3 URI as text content so the agent sees it
+    const uploadedKind = data.fileKind === 'image' ? 'image' : 'PDF'
     return {
       ...attachment,
       status: { type: 'complete' },
       content: [{
         type: 'text',
-        text: `Uploaded file: ${data.s3Uri}`,
+        text: `Uploaded ${uploadedKind} ready for analysis: ${data.s3Uri}`,
       }],
     }
   }
@@ -258,10 +268,16 @@ function ChatInner() {
   const adapter = useMemo(() => ({
     async *run({ messages, abortSignal }) {
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-      const messageText = lastUserMsg?.content
+      const typedText = lastUserMsg?.content
         ?.filter(c => c.type === 'text')
         .map(c => c.text)
         .join('\n') || ''
+      const attachmentText = lastUserMsg?.attachments
+        ?.flatMap(attachment => attachment.content || [])
+        .filter(c => c.type === 'text')
+        .map(c => c.text)
+        .join('\n') || ''
+      const messageText = [typedText, attachmentText].filter(Boolean).join('\n')
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -271,7 +287,7 @@ function ChatInner() {
           session_id: sessionId,
           audit_mode: auditMode,
           dynamic_tokens: dynamicTokens,
-          // Empty until a PDF has been uploaded in this session; the agent
+          // Empty until a document or image has been uploaded in this session; the agent
           // treats an absent doc_id as "not attributable to a document".
           doc_id: attachmentAdapter.lastDocId,
         }),
