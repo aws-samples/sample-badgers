@@ -469,6 +469,59 @@ Each specialist has a manifest file in `s3_files/manifests/` that configures its
 > [!NOTE]
 > Extended thinking is only supported on Claude models. When enabled, thinking content is saved to S3 alongside results: `{session_id}/{specialist_name}/{image}_thinking_{timestamp}.txt`
 
+### Qwen3 VL support
+
+`qwen.qwen3-vl-235b-a22b` is supported for both the orchestrating agent and
+image-aware specialists through the Amazon Bedrock Converse API. Confirm that the
+model is available in the deployment Region before selecting it.
+
+To use Qwen3 VL for the orchestrating agent, update
+`s3_files/agent_config/agent_model_config.json` before deployment (or update the
+same object in the configuration bucket):
+
+```json
+{
+    "model_id": "qwen.qwen3-vl-235b-a22b",
+    "temperature": 0.1,
+    "max_tokens": 8000,
+    "fallback_models": []
+}
+```
+
+To use it for a specialist, select the same model ID in that specialist's
+manifest:
+
+```json
+"model_selections": {
+    "primary": {
+        "model_id": "qwen.qwen3-vl-235b-a22b"
+    },
+    "fallback_list": []
+}
+```
+
+Qwen does not use the Claude `thinking`, `extended_thinking`,
+`adaptive_thinking`, or `budget_tokens` fields. Omit those fields from Qwen
+configurations. The deployment grants direct regional invocation permission for
+this model. When `BADGERS_MODEL_ID` starts with `qwen.`, the application inference
+profile stack is omitted automatically because it is not required and its
+profile-backed models are not available in every Region. Set
+`BADGERS_SKIP_INFERENCE_PROFILES=1` to request the same direct-invocation-only
+deployment explicitly.
+
+For a deployment-time override of the agent and image-enhancer models, export
+the model IDs before running the deployment command:
+
+```bash
+export BADGERS_MODEL_ID=qwen.qwen3-vl-235b-a22b
+export BADGERS_VISION_MODEL_ID=qwen.qwen3-vl-235b-a22b
+./deploy.sh
+```
+
+These variables configure the orchestrating agent and the image enhancer. Each
+specialist still follows its own manifest, allowing Qwen adoption per specialist
+without changing unrelated model selections.
+
 Simple format (no extended thinking) is still supported for backward compatibility:
 ```json
 "model_selections": {

@@ -4,6 +4,7 @@ AWS Bedrock client management for specialist system.
 Handles Bedrock client creation, invocation, and error handling for different specialist types.
 """
 
+import base64
 import json
 import logging
 import time
@@ -81,7 +82,7 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude' or 'nova'
+        'claude', 'nova', or 'qwen'
 
     Raises:
         BedrockError: If model family cannot be determined
@@ -92,6 +93,8 @@ def get_model_family(model_id: str) -> str:
         return "claude"
     elif "nova" in model_lower or "amazon.nova" in model_lower:
         return "nova"
+    elif "qwen" in model_lower:
+        return "qwen"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
 
@@ -365,6 +368,20 @@ class BedrockClient:
                 adaptive_thinking,
             )
 
+            if model_family == "qwen":
+                if extended_thinking or adaptive_thinking:
+                    self.logger.warning(
+                        "Extended/adaptive thinking is not supported for Qwen models; ignoring"
+                    )
+                normalized = self._invoke_qwen_with_converse(
+                    client,
+                    invoke_model_id,
+                    payload,
+                    max_retries=max_retries,
+                )
+                normalized["model_id"] = model_id
+                return normalized
+
             # Convert payload to model-specific format
             model_payload = self._convert_payload_for_model(
                 payload,
@@ -396,6 +413,7 @@ class BedrockClient:
 
             # Normalize response to common format
             normalized = self._normalize_response(response_body, model_family)
+            normalized["model_id"] = model_id
 
             self.logger.info("Model invocation successful")
             return normalized
@@ -404,6 +422,76 @@ class BedrockClient:
             raise
         except Exception as e:
             raise BedrockError(f"Model invocation failed: {e}") from e
+
+    def _invoke_qwen_with_converse(
+        self,
+        client,
+        model_id: str,
+        payload: Dict[str, Any],
+        max_retries: int = 3,
+    ) -> Dict[str, Any]:
+        """Invoke a Qwen model with the Bedrock Converse API."""
+        messages: list[Dict[str, Any]] = []
+        for message in payload.get("messages", []):
+            content = message.get("content", [])
+            if isinstance(content, str):
+                content = [{"type": "text", "text": content}]
+
+            converted_content: list[Dict[str, Any]] = []
+            for item in content:
+                if item.get("type") == "text" or "text" in item:
+                    converted_content.append({"text": item.get("text", "")})
+                elif item.get("type") == "image":
+                    source = item.get("source", {})
+                    image_format = (
+                        source.get("media_type", "image/png")
+                        .split("/", 1)[-1]
+                        .lower()
+                    )
+                    if image_format == "jpg":
+                        image_format = "jpeg"
+                    image_data = source.get("data", "")
+                    if isinstance(image_data, str):
+                        image_data = base64.b64decode(image_data)
+                    converted_content.append(
+                        {
+                            "image": {
+                                "format": image_format,
+                                "source": {"bytes": image_data},
+                            }
+                        }
+                    )
+
+            messages.append(
+                {
+                    "role": message.get("role", "user"),
+                    "content": converted_content,
+                }
+            )
+
+        converse_args: Dict[str, Any] = {
+            "modelId": model_id,
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": min(int(payload.get("max_tokens", 8000)), 8000),
+                "temperature": float(payload.get("temperature", 0.1)),
+            },
+        }
+        system_prompt = payload.get("system")
+        if system_prompt:
+            converse_args["system"] = (
+                [{"text": system_prompt}]
+                if isinstance(system_prompt, str)
+                else system_prompt
+            )
+
+        time.sleep(self.throttle_delay)
+        response = self.handle_throttling(
+            client.converse,
+            max_retries=max_retries,
+            **converse_args,
+        )
+        return self._normalize_response(response, "qwen")
 
     def _convert_payload_for_model(
         self,
@@ -419,7 +507,7 @@ class BedrockClient:
 
         Args:
             payload: Base payload with system, messages, max_tokens, temperature
-            model_family: 'claude' or 'nova'
+            model_family: 'claude', 'nova', or 'qwen'
             extended_thinking: Whether to enable extended thinking (Claude only)
             budget_tokens: Optional budget tokens for extended thinking
             adaptive_thinking: Whether to enable adaptive thinking (Claude only)
@@ -442,6 +530,8 @@ class BedrockClient:
                     "Extended/adaptive thinking not supported for Nova models, ignoring"
                 )
             return self._convert_to_nova_payload(payload)
+        elif model_family == "qwen":
+            return payload
         else:
             raise BedrockError(f"Unknown model family: {model_family}")
 
@@ -576,7 +666,7 @@ class BedrockClient:
 
         Args:
             response_body: Raw response from model
-            model_family: 'claude' or 'nova'
+            model_family: 'claude', 'nova', or 'qwen'
 
         Returns:
             Normalized response with 'content' key and optional 'thinking' key
@@ -600,22 +690,28 @@ class BedrockClient:
 
             return result
 
-        elif model_family == "nova":
-            # Convert Nova response to Claude format
+        elif model_family in {"nova", "qwen"}:
+            # Convert Bedrock Converse/Nova response to Claude-compatible content.
             try:
                 nova_content = response_body["output"]["message"]["content"]
-                # Convert Nova content format to Claude format
                 claude_content = []
                 for item in nova_content:
                     if "text" in item:
                         claude_content.append({"type": "text", "text": item["text"]})
 
                 if not claude_content:
-                    raise BedrockError("Empty response from Nova model")
+                    raise BedrockError(f"Empty response from {model_family} model")
 
-                return {"content": claude_content}
+                result = {"content": claude_content}
+                if "usage" in response_body:
+                    result["usage"] = response_body["usage"]
+                if "stopReason" in response_body:
+                    result["stop_reason"] = response_body["stopReason"]
+                return result
             except KeyError as e:
-                raise BedrockError(f"Invalid Nova response structure: {e}") from e
+                raise BedrockError(
+                    f"Invalid {model_family} response structure: {e}"
+                ) from e
 
         else:
             raise BedrockError(f"Unknown model family: {model_family}")
@@ -749,6 +845,8 @@ class BedrockClient:
             "amazon.nova-",
             "us.amazon.nova-",
             "global.amazon.nova-",
+            # Qwen
+            "qwen.",
             # Other supported models
             "amazon.titan-",
             "ai21.j2-",

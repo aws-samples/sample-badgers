@@ -122,6 +122,8 @@ class IAMStack(Stack):
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
                     # Claude Sonnet 4 foundation model (cell grid resolver)
                     "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+                    # Qwen multimodal model (direct regional invocation)
+                    f"arn:aws:bedrock:{self.region}::foundation-model/qwen.qwen3-vl-235b-a22b",
                 ],
             )
         )

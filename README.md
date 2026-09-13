@@ -482,6 +482,16 @@ Model ID to environment variable mapping:
 | `*claude-opus-4-6*`   | `CLAUDE_OPUS_PROFILE_ARN`   |
 | `*nova-premier*`      | `NOVA_PREMIER_PROFILE_ARN`  |
 
+### Qwen3 VL
+
+BADGERS supports the multimodal Bedrock model
+`qwen.qwen3-vl-235b-a22b` for the agent and specialists. Qwen uses direct
+regional invocation and the Bedrock Converse API. Do not configure Claude
+thinking fields for Qwen. See the
+[deployment model configuration](deployment/DEPLOYMENT_README.md#qwen3-vl-support)
+for agent and specialist examples and verify that the model is available in your
+deployment Region.
+
 ### ➕ Adding a New Specialist
 
 **Option 1: Use the Wizard (Recommended)**

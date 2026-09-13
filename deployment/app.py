@@ -167,15 +167,26 @@ ecr_stack = AgentCoreECRStack(
     description="ECR repository for AgentCore Runtime agent container",
 )
 
-# Inference Profiles for cost tracking
-inference_profiles_stack = InferenceProfilesStack(
-    app,
-    _sn("InferenceProfiles"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="Application Inference Profiles for cost tracking and usage monitoring",
+# Application inference profiles are only required by profile-backed models. Qwen is
+# invoked directly in the deployment Region, and some Regions do not offer the
+# cross-Region profiles configured by this stack.
+model_id = os.environ.get("BADGERS_MODEL_ID", "").strip().lower()
+SKIP_INFERENCE_PROFILES = (
+    os.environ.get("BADGERS_SKIP_INFERENCE_PROFILES", "").strip() == "1"
+    or model_id.startswith("qwen.")
 )
+inference_profiles_stack = None
+if SKIP_INFERENCE_PROFILES:
+    print("Application inference profiles omitted for direct model invocation")
+else:
+    inference_profiles_stack = InferenceProfilesStack(
+        app,
+        _sn("InferenceProfiles"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="Application Inference Profiles for cost tracking and usage monitoring",
+    )
 
 # Load deployment config for selective specialist deployment
 enabled_specialists = None
@@ -212,7 +223,8 @@ lambda_stack = LambdaSpecialistStack(
     description="Lambda specialists for BADGERS",
 )
 lambda_stack.add_dependency(ecr_stack)
-lambda_stack.add_dependency(inference_profiles_stack)
+if inference_profiles_stack is not None:
+    lambda_stack.add_dependency(inference_profiles_stack)
 lambda_stack.add_dependency(dynamodb_stack)
 
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
@@ -291,7 +303,8 @@ runtime_websocket_stack.add_dependency(ecr_stack)
 runtime_websocket_stack.add_dependency(gateway_stack)
 runtime_websocket_stack.add_dependency(cognito_stack)
 runtime_websocket_stack.add_dependency(memory_stack)
-runtime_websocket_stack.add_dependency(inference_profiles_stack)
+if inference_profiles_stack is not None:
+    runtime_websocket_stack.add_dependency(inference_profiles_stack)
 if xray_stack is not None:
     runtime_websocket_stack.add_dependency(xray_stack)
 runtime_websocket_stack.add_dependency(dynamodb_stack)
