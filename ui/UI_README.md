@@ -130,13 +130,24 @@ Job status is computed at read time rather than stored — see the endpoint comm
 The Reports tab reads the artifacts written by `html_report_specialist`. Every endpoint is
 authenticated and scoped to the caller.
 
-| Endpoint                              | Returns                                    |
-| ------------------------------------- | ------------------------------------------ |
-| `GET /api/reports`                    | Every report the caller owns, newest first |
-| `GET /api/reports/:id/manifest`       | One report's manifest                      |
-| `GET /api/reports/:id/pages/:n/image` | The durable analysis image for one page    |
-| `GET /api/reports/:id/pages/:n/xml`   | The correlated page spine for one page     |
-| `GET /api/reports/:id/download`       | The offline single-file HTML report        |
+| Endpoint                                       | Returns                                    |
+| ---------------------------------------------- | ------------------------------------------ |
+| `GET /api/reports`                             | Every report the caller owns, newest first |
+| `GET /api/reports/:id/manifest`                | One report's manifest                      |
+| `GET /api/reports/:id/pages/:n/image`          | The durable analysis image for one page    |
+| `GET /api/reports/:id/pages/:n/enhanced-image` | The enhanced copy, when the run made one   |
+| `GET /api/reports/:id/pages/:n/xml`            | The correlated page spine for one page     |
+| `GET /api/reports/:id/download`                | The offline single-file HTML report        |
+
+`enhanced-image` returns **404 rather than an error** when the page has no
+`enhanced_image_key`: a clean page is never enhanced, and reports generated before that
+field existed have none. The Page Reader only requests it when the manifest declares one, so
+un-enhanced and legacy reports cost no extra round trip, and it offers Original/Enhanced
+tabs only when a second image exists.
+
+The image the correlation artifact names as its source is the *original*, so before this
+existed a report showed the page as scanned while most specialists had read the enhanced
+copy. Persisting both is what makes that provenance visible rather than implied.
 
 The listing is a keyed DynamoDB query on the `owner-index` GSI, partitioned by the
 caller's `owner_sub` and filtered to job rows carrying a `report_id`. Ownership therefore
@@ -148,6 +159,58 @@ The remaining endpoints load the manifest and re-check its `owner_sub` against t
 then serve only keys the manifest itself declares under that report's prefix. Nothing
 accepts a caller-supplied S3 key, and no presigned URLs are issued: the listing decides
 what may be enumerated, the manifest decides what may be opened.
+
+## Specialist Wizard Endpoints
+
+The 🧙 Create Specialist tab's four steps map to four endpoints in `server/routes/wizard.js`,
+mounted by `mountWizardRoutes(app, PROJECT_ROOT)`.
+
+| Endpoint                    | Transport | Does                                                         |
+| --------------------------- | --------- | ------------------------------------------------------------ |
+| `POST /api/wizard/generate` | **SSE**   | Six sequential Bedrock calls, one per prompt section         |
+| `POST /api/wizard/preview`  | JSON      | Assembles the manifest and schema for review; writes nothing |
+| `POST /api/wizard/save`     | JSON      | Writes every artifact under `deployment/custom_specialists/` |
+| `POST /api/wizard/deploy`   | **SSE**   | Streams `deployment/deploy_custom_specialists.sh`            |
+
+`generate` streams because six calls take minutes, which no plain POST survives behind the
+load balancer. Its frames are `start` (carrying the full section list, so the client keeps no
+second copy), then `progress` and `section` per prompt, then `done` or `error`. Sections are
+generated in load order: `gestalt`, `job_role`, `context`, `rules`, `tasks`, `format`.
+
+A single failed section becomes an `<!-- ERROR ... -->` stub and is reported in `warnings`, so
+one bad generation does not lose the other five. All six failing is a hard error instead —
+that means credentials, region, or model access is broken, and six comment stubs would read
+as content.
+
+Bedrock is called by **hand-signing an HTTPS Converse request with SigV4**, not through
+`@aws-sdk/client-bedrock-runtime`, which is deliberately not a dependency of this package.
+Region comes from `AWS_REGION` (default `us-west-2`), credentials from the node provider
+chain, profile from `AWS_PROFILE`. The generator model is fixed in `wizard.js`
+(`GENERATOR_MODEL_ID`); the separate `MODEL_IDS` map backs the primary/fallback dropdowns and
+must stay aligned with `deployment/stacks/inference_profiles_stack.py`.
+
+`save` and `deploy` are separate steps, and Deploy stays disabled until a save succeeds.
+Everything is written to the **local working tree**, never to S3 — see
+[Custom Specialists](../deployment/DEPLOYMENT_README.md#-custom-specialists). Every write
+target is resolved and confirmed to be inside `custom_specialists/` first, and the shared
+`specialist_registry.json` is read-modify-written so other entries are never clobbered.
+
+## Streaming and Timeouts
+
+The chat SSE stream writes a `: ping` comment every 15 seconds. Two reasons, both load-bearing:
+
+- The deployed load balancer closes any connection idle in **either** direction for 60
+  seconds (`idle_timeout.timeout_seconds`, the AWS default, which `CfnExpressGatewayService`
+  does not expose). This stream writes nothing for the whole of a tool call, and `full_text`
+  has taken 115 seconds on a dense page — so a slow specialist dropped the connection every
+  time.
+- Writing is the only way to notice the client has gone. TCP does not report a closed peer
+  until you write to it, so without a heartbeat an abandoned request surfaced only when the
+  next real event arrived. A `[client-gone]` line is now logged when the browser leaves
+  mid-run.
+
+`POST /api/wizard/deploy` sends the same kind of heartbeat and kills the child process when
+the client disconnects.
 
 ## Tech Stack
 
@@ -177,8 +240,10 @@ ui/
 │   └── components/
 │       ├── Home.jsx               # Dashboard
 │       ├── Chat.jsx               # Agent chat interface, PDF upload, doc_id
+│       ├── CopyButton.jsx         # Shared copy-to-clipboard control
+│       ├── Reports.jsx            # Report index and Page Reader
 │       ├── SpecialistEditor.jsx   # Manifest/prompt editor
-│       ├── SpecialistWizard.jsx   # New specialist wizard
+│       ├── SpecialistWizard.jsx   # New specialist wizard (consumes the SSE stream)
 │       ├── Evaluator.jsx          # Test runner
 │       ├── PricingCalculator.jsx  # Cost estimator
 │       ├── Observability.jsx      # CloudWatch queries
@@ -195,6 +260,7 @@ ui/
 │   ├── auth.js                    # Cognito JWT verification / local-dev bypass
 │   └── routes/
 │       ├── core.js                # Core API routes (all roles)
+│       ├── wizard.js              # Specialist wizard routes (SSE generate/deploy)
 │       └── admin.js               # Admin API routes (admin only)
 ├── config/
 │   ├── .env                       # Local environment variables

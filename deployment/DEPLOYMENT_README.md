@@ -513,33 +513,49 @@ BADGERS ships with 5 base specialists. Organizations can create additional speci
 
 ### Architecture
 
+The wizard writes to the **local working tree**, not to S3. `CustomSpecialistsStack` reads
+these paths at synth time, so the artifacts must exist on disk before a deploy:
+
 ```
-s3://{config-bucket}/
-├── manifests/              # Base specialists (deployed with BADGERS-Lambda-{id}-{suffix})
-├── schemas/
-├── prompts/
-└── custom-specialists/       # Wizard-created specialists
-    ├── specialist_registry.json
-    ├── manifests/
-    ├── schemas/
-    └── prompts/
+deployment/custom_specialists/
+├── specialist_registry.json      # top-level key: "specialists"
+├── manifests/{name}.json         # 2nd top-level key: "specialist"
+├── schemas/{name}.json           # a single-element list
+└── prompts/{name}/
+    ├── {short}_gestalt.xml       # the six generated prompt sections
+    ├── {short}_job_role.xml
+    ├── {short}_context.xml
+    ├── {short}_rules.xml
+    ├── {short}_tasks.xml
+    ├── {short}_format.xml
+    └── few-shot-images/          # up to 6 example images, optional
 ```
+
+Nothing writes `code/` — the stack generates `lambda_handler.py` at synth.
 
 ### Workflow
 
-1. **Create specialist** via the 🧙 Create Specialist tab in the [UI](../ui/UI_README.md)
-   - Wizard uploads files to S3 under `custom-specialists/` prefix
+1. **Create the specialist** via the 🧙 Create Specialist tab in the
+   [UI](../ui/UI_README.md). The wizard generates the six prompts with Bedrock, then
+   **💾 Save Specialist** writes the tree above. Save is a distinct step from deploy, and
+   **☁️ Deploy Stack** stays disabled until a save succeeds.
 
-2. **Sync to local** for CDK deployment:
+2. **Deploy**, either from the wizard's Deploy Stack button or directly:
    ```bash
    cd deployment
-   ./sync_custom_specialists.sh
+   ./deploy_custom_specialists.sh
    ```
+   The script reads the local `custom_specialists/specialist_registry.json`, exits cleanly
+   if it is missing or lists no specialists, and runs `cdk deploy --exclusively` on the
+   CustomSpecialists stack.
 
-3. **Deploy custom stack**:
-   ```bash
-   uv run cdk deploy BADGERS-CustomSpecialists-{id}-{suffix}
-   ```
+> [!NOTE]
+> Creating `specialist_registry.json` is what makes the CustomSpecialists stack join
+> `cdk deploy --all`. Delete test artifacts when you are finished with them.
+
+`sync_custom_specialists.sh` pulls specialists *down* from a deployed config bucket into
+`custom_specialists/`. That is for adopting specialists created elsewhere — it is not a step
+in the wizard flow, which never uploads to S3 in the first place.
 
 The custom stack:
 - Creates Lambda functions for each custom specialist

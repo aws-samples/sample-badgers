@@ -1,5 +1,298 @@
 # Changelog
 
+## [Unreleased]
+
+Everything on top of `[4.0.0]`: 15 commits, `f6ad01e` through `f352f2e`. None of it has
+shipped as a version — `pyproject.toml` still reads `4.0.0`.
+
+Two items are breaking for anyone scripting the deploy entry points or referencing the UI
+env file; both are marked **BREAKING** below.
+
+### Added
+
+- **HTML document reports.** A new deterministic specialist, `html_report_specialist`,
+  runs once per document after every page correlation and produces a durable report. It
+  makes no model call and has no prompt files.
+  - Tool `generate_html_report_tool`; new workflow **step 6 (REPORT)** in
+    `agent_system_prompt.xml`, exempt from the per-page tool budget.
+  - New S3 layout under the output bucket: `reports/{ownerKey}/{reportId}/` holding
+    `report.html`, `manifest.json`, and `pages/page-{n}.jpg` / `.xml` per page.
+    `ownerKey` is `local` in local development, otherwise the first 24 hex characters of
+    `sha256(user_id)`.
+  - Five endpoints: `GET /api/reports`, `/api/reports/:id/manifest`,
+    `/api/reports/:id/pages/:n/image`, `/api/reports/:id/pages/:n/xml`, and
+    `/api/reports/:id/download`.
+  - New **`owner-index` GSI** on the jobs table (PK `owner_sub`, SK `started_at`,
+    INCLUDE projection). Deliberately sparse: `owner_sub` is written only on the
+    job-level `orchestrator` row, so subtask rows never appear.
+  - New job-row attributes: `owner_sub`, `user_name`, and — once a report exists —
+    `report_id`, `report_title`, `report_created_at`, `report_page_count`.
+  - Identity now propagates end to end. The UI sends the caller's Cognito sub as
+    `actor_id` and email as a new `user_name` payload field, replacing the hardcoded
+    `local_testing_user`; `JobTrackingHook` stamps `user_id`/`user_name` into any tool
+    whose schema declares them.
+  - New **📚 Reports** tab with three views — Overview, Page Reader (image beside the
+    correlated spine, with Rendered Spine / Raw XML / Specialists / Audit tabs and
+    ← → keyboard navigation), and Audit Trail — plus a single-file HTML download that
+    inlines the CSS, JS, and every page image as base64 so it works offline.
+- **The specialist creation wizard works end to end.** Its three server endpoints were
+  stubs returning `{prompts:{}}`, `{}`, and `{output:'Not yet wired'}`; they are now
+  implemented in a new `ui/server/routes/wizard.js`, mounted by `mountWizardRoutes`.
+  - `POST /api/wizard/generate` streams **SSE**, not JSON. Six sequential Bedrock calls
+    (`gestalt`, `job_role`, `context`, `rules`, `tasks`, `format`) take minutes, which no
+    plain POST survives behind the load balancer. The `start` frame ships the whole
+    section list so the client keeps no second copy of it.
+  - `POST /api/wizard/save` is **new** — it did not previously exist in any form. It
+    writes every artifact under `deployment/custom_specialists/`, which
+    `CustomSpecialistsStack` already reads. The built-in specialists in
+    `deployment/s3_files/` are never touched.
+  - `POST /api/wizard/deploy` also changed from JSON to SSE, streaming
+    `deploy_custom_specialists.sh` into the shared log panel.
+  - A failed section becomes an `<!-- ERROR ... -->` stub and is reported in `warnings`,
+    so one bad generation does not lose the other five. All six failing is a hard error
+    instead: that means credentials, region, or model access is broken, and six comment
+    stubs would read as content.
+  - Bedrock is reached by hand-signing an HTTPS Converse request with SigV4 rather than
+    through `@aws-sdk/client-bedrock-runtime`, which is not a dependency of `ui/`. **No
+    new npm dependency and no container-build change.**
+  - Save and Deploy are separate buttons; Deploy stays disabled until a save succeeds.
+- **Gateway observability, which previously produced nothing.** The Gateway had the IAM
+  permissions and claimed full observability but had no delivery configured — the console
+  showed "Log delivery (0)" and "Tracing: Not enabled". A new
+  `deployment/stacks/log_delivery.py` provides `shared_delivery_policy`,
+  `deliver_to_log_group`, and `deliver_traces_to_xray`. The Gateway stack now creates log
+  group `/aws/bedrock-agentcore/gateways/{deployment_id}/app` (TWO_YEARS retention,
+  `RETAIN`), delivers `APPLICATION_LOGS` to it, and delivers `TRACES` to X-Ray.
+- **Deploy preflights.** `step_infra` now refuses to proceed unless the account/region is
+  CDK-bootstrapped and service quotas have headroom: `preflight_bootstrap` and
+  `preflight_service_quotas` (VPCs, internet gateways, S3 buckets, Cognito pools,
+  DynamoDB tables, ECR repositories, 26 Lambda functions, 5 IAM roles, KMS keys). Steps 6
+  and 7 additionally check QEMU binfmt for cross-architecture container builds via
+  `preflight_docker_cross_platform`, installing `qemu-user-static` on Linux if absent.
+- **A log-delivery preflight before the Gateway and Runtime steps.** A CloudWatch
+  `DeliverySource` is unique per `(resourceArn, logType)`, not per name, and
+  CloudFormation creates new resources before deleting removed ones — so both spellings
+  coexist during an update, collide, and fail the deploy with `AlreadyExists`. Renaming
+  cannot fix it. `preflight_log_delivery` reports what occupies the slot, explains that
+  removing it deletes delivery configuration only, and clears it on confirmation.
+- **Region is resolved rather than assumed.** `ensure_region` walks env
+  (`AWS_REGION`, `AWS_DEFAULT_REGION`) → `aws configure get region` → prompt →
+  `us-west-2` with a confirmation. An invalid region name is a hard failure.
+- **Enhanced-image provenance in HTML reports.** Reports previously showed the page as
+  scanned, because the correlation artifact names the *original* as its source — while
+  most specialists had read the enhanced copy. `html_report_specialist` now persists the
+  enhanced image to `{report_prefix}/pages/page-{token}-enhanced.jpg` and records
+  `enhanced_image_key` per page; the Page Reader offers Original/Enhanced tabs when a
+  second image exists. New endpoint
+  `GET /api/reports/:reportId/pages/:pageNumber/enhanced-image`, returning 404 rather
+  than an error when absent.
+- **A `levels` enhancement operation** — the 13th. A Photoshop-style levels adjustment
+  that auto-computes black and white points from the histogram by percentile, applies
+  gamma, and blends back by intensity. Unlike `threshold` it preserves continuous tonal
+  gradation, so ink stroke weight survives. It returns percentile analysis to the agent
+  so intensity can be retuned on retry, and comes with a new **Pipeline F, "Historical
+  Manuscript Restoration"** (`desaturate@1.0 → levels@0.5 → remove_stains@0.4`).
+- **Enhancement document-type context is now operator-editable.** The enhancer reads
+  `s3://{CONFIG_BUCKET}/config/document_type_contexts.json`, falling back to an in-code
+  map, so enhancement behaviour can be tuned per document type without a container
+  rebuild. Contexts went from a terse phrase to a paragraph of guidance each, and five
+  types were added: `historical_manuscript`, `photograph`, `map`, `legal`, `newspaper`.
+  New `deploy.sh` step-3 submenu option `6) Runtime Config` uploads it.
+- **Live analyzer status in Chat.** A new right-hand "🧩 Analyzers" panel polls
+  `/api/jobs/:jobId` every 2.5s while a turn runs and shows one pill per specialist with
+  `complete/total` pages. It exists because the stream reports a tool *starting* but
+  never finishing or failing, so real COMPLETE/FAILED can only come from the job rows.
+  Pills report the status needing attention (FAILED before RUNNING before PENDING before
+  COMPLETE) and carry the first failure's error in the tooltip.
+- Live activity indicator in Chat, driven by the server's `status` events, which the UI
+  previously discarded.
+- Copy buttons on chat messages, extracted to a shared `CopyButton` component, plus Shiki
+  syntax highlighting in the Reports Raw XML tab and the Evaluations Result Output pane.
+  The Evaluations pane picks its grammar from the artifact's file extension rather than
+  assuming XML.
+- Attachment chips in the composer with a status line, and deferred upload — nothing
+  reaches S3 until Send, so a removed or unsent attachment leaves no object behind.
+
+### Changed
+
+- **BREAKING — `deploy.sh` menu keys and option 9 semantics.** Resume moved from `12` to
+  `r`/`R`/`resume`, and `./deploy.sh 12` is now rejected. Option `9` (Full Deployment) no
+  longer re-runs completed steps or prompts on each one; it delegates to the same
+  `run_remaining` path as resume, so it behaves like resume. Anyone who used option 9 to
+  force a redeploy needs `11` (Reset Deployment State) first.
+- **BREAKING — the UI env file moved and `update_frontend_env.sh` was deleted.**
+  `ui/config/.env` → `ui/.env`, and `deployment/update_frontend_env.sh` is gone with its
+  job folded into `deployment/scripts/generate_ui_env.sh`. An existing `ui/config/.env`
+  is now silently ignored: the UI comes up with unset buckets and table name, and
+  `/api/reports` returns 503, until `generate_ui_env.sh` is re-run.
+- **Deploy behaviour: `step_gateway` and `step_runtime` now have an interactive gate.**
+  Both call `preflight_log_delivery`, which prompts before deleting anything and stops
+  the deploy on decline. It also stops when it cannot determine the answer, on the
+  reasoning that "could not determine" is not "clear to proceed". **An unattended or CI
+  invocation that previously ran clean can now block on the prompt.** New escape hatch
+  `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1`; note `BADGERS_ASSUME_YES=1` answers the prompt
+  too and therefore deletes the conflicting sources without asking.
+- **`destroy.sh` now deletes local deploy state** (`.deploy-state/{id}.json` and the
+  outputs cache) and resolves bucket names from stack outputs instead of hardcoding them.
+  It also deletes the KMS **alias** after scheduling key deletion, so a redeploy with the
+  same `DEPLOYMENT_ID` no longer waits out `KMS_WAIT_DAYS`. With nothing to destroy it
+  now waits for a keypress rather than exiting, **which will hang a non-interactive run.**
+- **Specialist Lambda memory raised 2048 MB → 6144 MB** via a new `SPECIALIST_MEMORY_MB`
+  constant, applied to zip, container, and wizard-generated specialists. Lambda scales CPU
+  with memory and specialists hold source plus processed page images. Faster pages, higher
+  per-invocation cost.
+- **`full_text` + `elements` are now mandatory on every page**, including visual-only and
+  handwriting-only pages, so every page can be correlated into a canonical spine. More
+  model invocations and more cost per document than before.
+- **Default theme is now light, and the AWS Purple theme was removed.** A stored
+  `badgers-theme` of `purple` is rewritten to `light` on load.
+- Runtime images now carry a unique tag per deploy (`websocket-{UTC timestamp}` from
+  `runtime_image_tag`, exposed as `RUNTIME_IMAGE_TAG`) alongside the floating `websocket`
+  alias. See Fixed for why.
+- The chat SSE stream sends a `: ping` comment every 15s. The load balancer closes any
+  connection idle in either direction for 60s (`idle_timeout.timeout_seconds`, the AWS
+  default, which `CfnExpressGatewayService` does not expose) and this stream writes
+  nothing for the whole of a tool call — `full_text` has taken 115s on a dense page.
+- `deploy_specialist.sh` no longer requires a `prompts/` directory; it reads the manifest
+  and only uploads prompts when `specialist.prompt_files` is non-empty. This is what lets
+  a promptless specialist such as `html_report_specialist` deploy.
+- The text an attachment sends to the agent changed from `Uploaded file: <s3 uri>` to
+  **`Process: <s3 uri>`**. The agent parses this, so it is a contract between UI and
+  prompt.
+- `foundation/__init__.py` resolves submodules lazily (PEP 562) instead of eagerly
+  re-exporting them. Source-compatible for every documented name, but anything relying on
+  `import foundation` pre-importing `foundation.image_processor` as a side effect breaks.
+- The `aws` and `python3` CLI calls in `common.sh` are now shell-function wrappers that
+  strip carriage returns, for Windows VDI / Git Bash hosts where captured values silently
+  gained a trailing `\r`.
+- `@assistant-ui/react` `^0.12.21` → `^0.15.8`, adding `@assistant-ui/core`, `store`, and
+  `tap`. The hook `useMessage()` was replaced by `useAuiState()`.
+- `markitdown` and its dependency tree (`magika`, `onnxruntime`, `mammoth`, `openpyxl`,
+  `pdfminer-six`, Azure Document Intelligence clients) added to the lock file.
+- `pypdf` `6.14.2` → `6.15.0`; `playwright>=1.62.0` and `pillow>=12.3.0` added to the
+  `dev` dependency group. `version` remains `4.0.0`.
+
+### Fixed
+
+- **Job tracking was silently disabled in every deployed environment.**
+  `foundation/__init__.py` eagerly re-exported every submodule, so
+  `from foundation import job_state` in the orchestrator dragged in `image_processor`,
+  which imports Pillow at module scope — and Pillow is deliberately absent from the agent
+  container. The caller catches `ImportError` to degrade gracefully, so **no `job_id` was
+  ever minted** and every specialist requiring one, including
+  `html_report_specialist`, failed. The import error is now captured and named in the
+  warning rather than blamed on the build script.
+- **Rebuilt agent images never went live.** AgentCore runtime versions are immutable and
+  `CfnRuntime` only cuts a new version when `container_uri` changes; with a fixed
+  `:websocket` tag, re-pushing left the CloudFormation property identical, so no update
+  happened and the runtime kept serving the previously pinned digest.
+- **`No module named 'config'` cold-start failure** in container Lambdas.
+  `build_container_lambdas.sh` skipped staging `layer/python/config` into the
+  `remediation_specialist` build context, and neither it nor `image_enhancer` copied it in
+  their Dockerfile.
+- **The quota preflight aborted the deploy in any account large enough to paginate.** The
+  AWS CLI applies a `--query length(...)` per page when auto-paginating, so
+  `lambda list-functions` in an account with 81 functions returned `"50\n31"`. Bash
+  arithmetic on a multi-line value is a syntax error, and under `set -euo pipefail` with
+  an `ERR` trap that aborted the whole run with a bare arithmetic error rather than any
+  quota message. Counts are now summed with `awk`. Operators in large accounts who never
+  saw quota checks will now see them — and may be legitimately blocked by real headroom
+  failures the crash was masking.
+- **`/api/chat` crashed with `EACCES` in the container.** The server is copied to
+  `/app/server` with no `ui/` prefix, so `PROJECT_ROOT` resolved to `/` and the default
+  log path landed on the read-only filesystem root. New `CHAT_LOGS_DIR` override.
+- **A new chat session threw `ENOENT`** — `realpathSync` ran on the log file, which does
+  not exist yet for a new session. It now resolves the directory, which exists after
+  `mkdir`.
+- **Assistant messages stopped rendering** after the assistant-ui upgrade:
+  `useAuiState()` was called without a selector, so it returned the whole state rather
+  than the message. Now `useAuiState((s) => s.message)`.
+- **Gateway emitted no logs and no traces at all** — see Added.
+- **Markdown tables rendered as one run-together line of pipes.** react-markdown is
+  CommonMark-only, where tables do not exist; `remark-gfm` is now wired in, bringing
+  strikethrough and autolinks with it.
+- **Attachment-only messages rendered as an empty bubble and sent an empty string.** The
+  composer keeps typed text and attachment parts in separate arrays and never merges
+  them; a new `collectUserText` merges both for rendering and for the request body.
+- Upload failures surfaced as an unhelpful JSON parse error when a proxy or crash
+  returned non-JSON. Non-2xx and missing-`s3Uri` cases are now reported distinctly.
+- The activity indicator could stick on after an abort or a thrown error; it is now
+  cleared in a `finally`.
+- **"New Session" in Chat did not reset the session.** It swapped the session id in
+  place, leaving the thread, the composer's attachments, the activity indicator, the
+  analyzer pills, and `S3AttachmentAdapter.lastDocId` intact. `lastDocId` is the one that
+  mattered: carrying it into a new session attributed the next job to the *previous*
+  document — the `doc_id` mismatch that breaks report generation. The button now remounts
+  the component, since `useLocalRuntime` owns the message store and no single call clears
+  all of it.
+- `job_state.get_job_records` now reads with `ConsistentRead=True`; the report Lambda
+  reads job rows immediately after the specialists wrote them, and an eventually
+  consistent read could miss records and produce an incomplete report.
+- `job_state.set_report` is guarded by `attribute_exists(job_id)` so an `update_item`
+  upsert cannot fabricate an ownerless job row, and is called only after both
+  `report.html` and `manifest.json` are durable — a pointer to a half-written report
+  would list and then 404 on open.
+- `loadReportManifest`'s prefix-confinement check pushed `undefined` for
+  `enhanced_image_key`, which would have failed manifest validation on every
+  pre-existing report. It is now confined only when present.
+- `image_enhancer` sets `ContentType: image/jpeg` on upload. The report side additionally
+  tolerates `binary/octet-stream` and `application/octet-stream` — the S3 default when an
+  uploader omits the header — and verifies JPEG identity by the SOI marker rather than
+  trusting metadata, which had been silently dropping enhanced images.
+- The resource-policy preflight both under-counted BADGERS' own policies and misattributed
+  one of them to an unknown third party, which is the opposite of useful in a report whose
+  purpose is answering "which of these can I remove?".
+- `step_ui_deploy` gained the completion guard it was missing, and `mark_complete` moved
+  from before the rollout poll to after it — the step previously recorded success before
+  the service was confirmed healthy.
+
+### Security
+
+- **`/api/env` disclosed deployment configuration to unauthenticated callers.** It was the
+  load balancer's health check path and therefore necessarily unauthenticated, and the
+  service defaults to public subnets and an internet-facing balancer — yet it returned the
+  region, gateway id, and both bucket names. Bucket names occupy a global namespace and the
+  deployment id embedded in them derives every other resource name in the deployment. It is
+  replaced by `GET /api/healthcheck`, which returns a constant `{"status":"ok"}`. The ECS
+  stack's `health_check_path` was updated to match.
+- **`/api/me` was removed.** Identity now comes from claims in the ID token the OIDC
+  authorization-code + PKCE flow already produced and `oidc-client-ts` already validated
+  (signature, issuer, audience, nonce). Asking the server to echo back claims the browser
+  holds added a request and an endpoint without adding information. The client-side role
+  still decides only which tabs render; every admin route enforces `requireAdmin`
+  server-side, so a client claiming `admin` still gets 403.
+- Branding moved to build-time config bundled by a Vite plugin, removing a synchronous
+  file read that ran on every request to the one route reachable without a token.
+- The Home "Environment" panel that displayed region, gateway id, and bucket names was
+  removed. Every field was rendered as text and none was used by the browser, which never
+  talks to S3, DynamoDB, or AgentCore directly.
+
+### Known Issues
+
+- **Wizard-created specialists still skip job tracking**, but no longer because the
+  generator is a stub. The generated schema declares only `session_id`, where built-in
+  schemas also declare `job_id` and `doc_id` — which is what the foundation layer stamps
+  records from. This supersedes the stub-related entry under `[2.5.0]`.
+- **Jobs recorded before `owner_sub` propagation have no owner and are absent from the
+  sparse `owner-index`, so their reports never list.** This is the intended fail-closed
+  outcome — a row whose owner cannot be established is not attributed to anybody — but it
+  means historical runs surface no reports.
+- The enhanced copy counts against the same 150 MiB `_MAX_AGGREGATE_BYTES` ceiling, so a
+  second image per page effectively halves the page budget on enhanced runs. Exceeding it
+  is caught and logged, and the page simply carries no enhanced key.
+- `preflight_model_access`, `preflight_model_invocation`, and `preflight_ecs_slr` are
+  defined in `common.sh` but never called from any entry point. `BADGERS_DEFAULT_MODELS`
+  also names `us.anthropic.claude-sonnet-4-5-20250514-v1:0`, a date that appears nowhere
+  else in the repository.
+- On resume, `step_runtime`'s guard tests only `runtime_image_pushed`, so a deployment
+  that pushed the runtime image but never deployed the runtime is skipped rather than
+  re-entered. The previous resume table checked both keys.
+- Editing `config/document_type_contexts.json` in S3 does not take effect on warm Lambda
+  containers, because the map is cached in a module global for the life of the execution
+  environment.
+- `watermarked` is a valid `document_type` in both the enhancer schema and manifest but
+  has no entry in `document_type_contexts.json` or the in-code fallback, so it silently
+  resolves to empty context.
 ## [4.0.0] - 2026-08-07
 ### Changed
 - **Version numbering is realigned across the repository.** `pyproject.toml` had drifted
