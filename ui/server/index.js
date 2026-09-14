@@ -73,6 +73,7 @@ async function loadSSMConfig() {
 import { requireAuth } from './auth.js';
 import { mountCoreRoutes } from './routes/core.js';
 import { mountAdminRoutes } from './routes/admin.js';
+import { mountWizardRoutes } from './routes/wizard.js';
 
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const DIST_DIR = resolve(__dirname, '../dist');
@@ -172,6 +173,7 @@ app.use('/api/', (req, res, next) => {
 // ── Mount route groups ──
 mountCoreRoutes(app, PROJECT_ROOT);
 mountAdminRoutes(app, PROJECT_ROOT);
+mountWizardRoutes(app, PROJECT_ROOT);
 
 // ── Static serving ──
 const PORT = process.env.PORT || 7860;

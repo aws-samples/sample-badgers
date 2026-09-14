@@ -152,7 +152,13 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             throw Object.assign(new Error('Report not found'), { status: 404 });
         }
         const declaredKeys = [manifest.manifest_key, manifest.html_key];
-        for (const page of manifest.pages || []) declaredKeys.push(page.image_key, page.spine_key);
+        for (const page of manifest.pages || []) {
+            declaredKeys.push(page.image_key, page.spine_key);
+            // Optional and absent from reports generated before it existed, so it is
+            // only confined when present — pushing undefined would fail the manifest
+            // outright on every older report.
+            if (page.enhanced_image_key) declaredKeys.push(page.enhanced_image_key);
+        }
         if (declaredKeys.some(key => typeof key !== 'string' || !key.startsWith(prefix))) {
             throw Object.assign(new Error('Invalid report manifest'), { status: 500 });
         }
@@ -281,6 +287,27 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
         if (!RUNTIME_ARN) { send('error', 'AGENTCORE_RUNTIME_WEBSOCKET_ARN not configured'); res.end(); return; }
 
+        // An SSE comment line. The client parser ignores anything not starting with
+        // "data: ", so the content is irrelevant — the bytes are the point.
+        //
+        // Two reasons this has to exist. The deployed load balancer closes any
+        // connection with no data in EITHER direction for 60s (idle_timeout
+        // .timeout_seconds, the AWS default, which CfnExpressGatewayService does not
+        // expose), and this stream writes nothing for the whole of a tool call:
+        // full_text has taken 115s on a dense page, so a slow specialist dropped the
+        // connection every time. AWS's documented remedy is to send at least one byte
+        // per idle period.
+        //
+        // Second, writing is the only way to notice the client has gone. TCP does not
+        // report a closed peer until you write to it, so without a heartbeat an
+        // abandoned request is discovered only when the next real event arrives — which
+        // is how a completed specialist's result was thrown away with no error shown.
+        const HEARTBEAT_MS = 15000;
+        const heartbeat = setInterval(() => {
+            if (res.writableEnded) return;
+            res.write(': ping\n\n');
+        }, HEARTBEAT_MS);
+
         try {
             send('status', 'Connecting...');
             const wsUrl = await getPresignedWsUrl(session_id);
@@ -290,7 +317,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             }, WS_TIMEOUT_MIN * 60 * 1000);
 
             let ended = false;
-            const finish = () => { if (ended) return; ended = true; clearTimeout(wsTimeout); send('done', ''); res.end(); };
+            const finish = () => { if (ended) return; ended = true; clearTimeout(wsTimeout); clearInterval(heartbeat); send('done', ''); res.end(); };
 
             ws.on('open', () => {
                 send('status', 'Thinking...');
@@ -337,8 +364,18 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
             ws.on('error', (e) => { send('error', e.message); finish(); });
             ws.on('close', () => { finish(); });
-            req.on('close', () => { if (ws.readyState === WebSocket.OPEN) ws.close(); });
+            req.on('close', () => {
+                clearInterval(heartbeat);
+                // Recorded because an abandoned request and a clean finish were
+                // previously indistinguishable in the log: both simply stopped. `ended`
+                // is set only once the agent reported completion, so reaching here
+                // without it means the browser went away mid-run — the agent then dies
+                // on its next send with a WebSocketDisconnect whose str() is empty.
+                if (!ended) log(`[client-gone] ${new Date().toISOString()} browser closed the stream before the run finished`);
+                if (ws.readyState === WebSocket.OPEN) ws.close();
+            });
         } catch (e) {
+            clearInterval(heartbeat);
             send('error', e.message); res.end();
         }
     });
@@ -417,6 +454,21 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
             if (!page) return res.status(404).json({ error: 'Page not found' });
             await sendReportObject(res, page.image_key, 'image/jpeg');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    // The enhanced copy of the page, when the run enhanced it. 404 rather than an
+    // error when absent: a clean page is never enhanced, and reports predating
+    // enhanced_image_key have none at all.
+    app.get('/api/reports/:reportId/pages/:pageNumber/enhanced-image', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            if (!page.enhanced_image_key) return res.status(404).json({ error: 'Page has no enhanced image' });
+            await sendReportObject(res, page.enhanced_image_key, 'image/jpeg');
         } catch (e) {
             if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
         }
@@ -750,11 +802,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         catch (e) { res.status(500).json({ error: 'Failed to load pricing config: ' + e.message }); }
     });
 
-    // ── Wizard stubs ──
-
-    app.post('/api/wizard/generate', (_req, res) => res.json({ prompts: {} }));
-    app.post('/api/wizard/preview', (_req, res) => res.json({}));
-    app.post('/api/wizard/deploy', (_req, res) => res.json({ output: 'Not yet wired' }));
+    // Wizard routes live in ./wizard.js, mounted separately from index.js.
 
     // ── Evaluator ──
 

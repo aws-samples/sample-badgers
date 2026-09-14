@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import ShikiHighlighter from 'react-shiki'
+import CopyButton from './CopyButton'
 
 const VIEW_TABS = [
   ['overview', '▦ Overview'],
@@ -27,6 +29,10 @@ export default function Reports() {
   const [pageIndex, setPageIndex] = useState(0)
   const [spineTab, setSpineTab] = useState('rendered')
   const [imageUrl, setImageUrl] = useState('')
+  // Empty unless the run enhanced this page. Drives whether the image pane offers
+  // tabs at all rather than showing an empty "Enhanced" view.
+  const [enhancedImageUrl, setEnhancedImageUrl] = useState('')
+  const [imageTab, setImageTab] = useState('original')
   const [xml, setXml] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -86,14 +92,20 @@ export default function Reports() {
   useEffect(() => {
     if (!reportId || !currentPage || loadedReportId !== reportId) {
       setImageUrl('')
+      setEnhancedImageUrl('')
       setXml('')
       return
     }
     setImageUrl('')
+    setEnhancedImageUrl('')
+    setImageTab('original')
     setXml('')
     let cancelled = false
-    let objectUrl = ''
+    const objectUrls = []
     const base = `/api/reports/${encodeURIComponent(reportId)}/pages/${encodeURIComponent(currentPage.page_number)}`
+    // Only requested when the manifest declares one, so an un-enhanced page (or a
+    // report generated before enhanced copies were kept) costs no extra request.
+    const hasEnhanced = Boolean(currentPage.enhanced_image_key)
     Promise.all([
       fetch(`${base}/image`).then(async response => {
         if (!response.ok) throw new Error('Could not load page image')
@@ -103,15 +115,28 @@ export default function Reports() {
         if (!response.ok) throw new Error('Could not load page spine')
         return response.text()
       }),
-    ]).then(([blob, pageXml]) => {
+      // Supplementary: resolves to null on failure so a missing enhanced copy
+      // cannot stop the page from rendering.
+      hasEnhanced
+        ? fetch(`${base}/enhanced-image`)
+            .then(response => (response.ok ? response.blob() : null))
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([blob, pageXml, enhancedBlob]) => {
       if (cancelled) return
-      objectUrl = URL.createObjectURL(blob)
-      setImageUrl(objectUrl)
+      const url = URL.createObjectURL(blob)
+      objectUrls.push(url)
+      setImageUrl(url)
       setXml(pageXml)
+      if (enhancedBlob) {
+        const enhancedUrl = URL.createObjectURL(enhancedBlob)
+        objectUrls.push(enhancedUrl)
+        setEnhancedImageUrl(enhancedUrl)
+      }
     }).catch(e => { if (!cancelled) setError(e.message) })
     return () => {
       cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      for (const url of objectUrls) URL.revokeObjectURL(url)
     }
   }, [reportId, currentPage, loadedReportId])
 
@@ -187,6 +212,9 @@ export default function Reports() {
           pageIndex={pageIndex}
           setPageIndex={setPageIndex}
           imageUrl={imageUrl}
+          enhancedImageUrl={enhancedImageUrl}
+          imageTab={imageTab}
+          setImageTab={setImageTab}
           xml={xml}
           spineTab={spineTab}
           setSpineTab={setSpineTab}
@@ -214,16 +242,55 @@ function Metric({ label, value }) {
   return <div><label>{label}</label><b>{value ?? 0}</b></div>
 }
 
-function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, xml, spineTab, setSpineTab, pageSpecialists, onIndex }) {
+// The copy control sits outside the scrolling element so it stays pinned to the
+// visible corner instead of scrolling away with the document.
+function XmlPane({ xml }) {
+  if (!xml) return <pre className="report-code">Loading XML...</pre>
+
+  let body
+  try {
+    body = <ShikiHighlighter language="xml" theme="github-dark">{xml}</ShikiHighlighter>
+  } catch {
+    // Highlighting is cosmetic; unreadable XML is not worth losing the pane over.
+    body = <pre>{xml}</pre>
+  }
+
+  return (
+    <div className="report-xml-pane">
+      <div className="report-xml-copy">
+        <CopyButton getText={() => xml} label="Copy raw XML" />
+      </div>
+      <div className="report-code report-xml-scroll">{body}</div>
+    </div>
+  )
+}
+
+function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, enhancedImageUrl, imageTab, setImageTab, xml, spineTab, setSpineTab, pageSpecialists, onIndex }) {
   const tabs = [['rendered', 'Rendered Spine'], ['xml', 'Raw XML'], ['results', 'Specialists'], ['audit', 'Audit']]
   return <>
     <div className="report-page-nav"><button onClick={onIndex}>⌂ Index</button><button disabled={pageIndex === 0} onClick={() => setPageIndex(pageIndex - 1)}>◀ Previous</button><b>Page {page.page_number} of {manifest.pages.length}</b><button disabled={pageIndex >= manifest.pages.length - 1} onClick={() => setPageIndex(pageIndex + 1)}>Next ▶</button></div>
     <div className="report-page-context">Spine: <code>{page.spine_key}</code> · {pageSpecialists.length} specialists · Keyboard ← → navigates pages</div>
     <div className="report-reader-grid">
-      <div className="card report-image-pane"><div className="report-pane-head">🖼 Analysis Image <span>durable report copy</span></div><div className="report-image-canvas">{imageUrl ? <img src={imageUrl} alt={`Analysis page ${page.page_number}`} /> : <span>Loading image...</span>}</div></div>
+      <div className="card report-image-pane">
+        <div className="report-pane-head">🖼 Page Image <span>durable report copy</span></div>
+        {/* Tabs only when there is a second image to switch to. The original is what
+            the correlation artifact names as its source; the enhanced copy is what
+            the image enhancer produced and what most specialists actually read. */}
+        {enhancedImageUrl && <div className="report-spine-tabs">
+          {[['original', 'Original'], ['enhanced', 'Enhanced']].map(([id, label]) =>
+            <button key={id} className={imageTab === id ? 'active' : ''} onClick={() => setImageTab(id)}>{label}</button>)}
+        </div>}
+        <div className="report-image-canvas">
+          {imageTab === 'enhanced' && enhancedImageUrl
+            ? <img src={enhancedImageUrl} alt={`Enhanced page ${page.page_number}`} />
+            : imageUrl
+              ? <img src={imageUrl} alt={`Page ${page.page_number} as analysed`} />
+              : <span>Loading image...</span>}
+        </div>
+      </div>
       <div className="card report-spine-pane"><div className="report-pane-head">🌳 Correlated Page Spine <span>schema v2.0</span></div><div className="report-spine-tabs">{tabs.map(([id, label]) => <button key={id} className={spineTab === id ? 'active' : ''} onClick={() => setSpineTab(id)}>{label}</button>)}</div>
         {spineTab === 'rendered' && <div className="report-spine-scroll"><div className="report-callout"><b>Page {page.page_number} synthesis</b><br />{page.summary}</div><div className="report-tree">{(page.elements || []).map((element, index) => <div className="report-tree-node" key={element.id || index} style={{ marginLeft: Math.min(element.depth || 0, 5) * 16 }}><span>{element.tag || 'P'}</span>{element.text}<small>{element.id}</small></div>)}</div></div>}
-        {spineTab === 'xml' && <pre className="report-code">{xml || 'Loading XML...'}</pre>}
+        {spineTab === 'xml' && <XmlPane xml={xml} />}
         {spineTab === 'results' && <div className="report-spine-scroll">{pageSpecialists.map((specialist, index) => <div className="report-result" key={`${specialist.name}-${index}`}><b>{specialist.name}</b><em>✓ COMPLETE</em><small>{specialist.s3_uri || 'Artifact retained'}</small></div>)}</div>}
         {spineTab === 'audit' && <div className="report-spine-scroll">{(page.audit || []).length ? page.audit.map((record, index) => <div className="report-result" key={`${record.specialist}-${index}`}><b>{record.specialist}</b><em className={record.status === 'FAILED' ? 'failed' : ''}>{record.status}</em><small>{formatDate(record.started_at)} → {formatDate(record.completed_at)} · {duration(record.started_at, record.completed_at)}</small></div>) : <p className="report-muted">No page timing records available.</p>}</div>}
       </div>

@@ -729,6 +729,188 @@ preflight_bootstrap() {
   esac
 }
 
+# ── Log delivery preflight ─────────────────────────────────────────────────
+#
+# A CloudWatch DeliverySource is unique per (resourceArn, logType), NOT per name.
+# So only one delivery source may exist for a given AgentCore resource and log type,
+# whoever created it — the console, an older CDK revision, or this deployment.
+#
+# That breaks a stack update in a way renaming cannot fix, because CloudFormation
+# creates new resources first and only deletes removed ones in a cleanup phase
+# afterwards. During the update both spellings exist at once, the pair collides, and
+# the deploy fails with "This ResourceId has already been used in another Delivery
+# Source in this account" (HandlerErrorCode: AlreadyExists).
+#
+# Two ways in. Enabling log delivery by hand in the console leaves WdDeliverySource-*
+# entries, and a stack that previously used the CDK logging mixin leaves
+# cdk-<type>-source-<hash> entries. Both must be removed before the stack can own the
+# delivery itself.
+#
+# Anything this deployment's own CDK created is named badgers-<deployment>-*, so that
+# prefix is what distinguishes "ours, leave it alone" from "foreign, in the way".
+LOGS_DELIVERY_OWN_PREFIX="badgers-"
+
+# Echoes "name<TAB>logType" for every delivery source occupying a slot this
+# deployment needs, or nothing when the slot is free.
+#
+# Scoped by the exact resource ARNs this deployment's own stacks publish
+# (GatewayArn, RuntimeArn), not by guessing at names. Anything bound to a different
+# ARN is a different deployment's, occupies a different (resourceArn, logType) slot,
+# and therefore is not in this deployment's way.
+#
+# The ARNs come from the deployed stacks rather than the state file: the state file
+# records which steps ran, not what they produced. A stack that does not exist yet
+# yields no ARN, which correctly means "nothing of ours can be occupying a slot".
+logs_foreign_delivery_sources() {
+  local rid; rid="$(resource_id)"
+  local ours="${LOGS_DELIVERY_OWN_PREFIX}${rid}-"
+
+  local gateway_arn runtime_arn
+  gateway_arn="$(stack_output "$(_sn Gateway)" GatewayArn)"
+  runtime_arn="$(stack_output "$(_sn RuntimeWebSocket)" RuntimeArn)"
+  [ "${gateway_arn}" = "None" ] && gateway_arn=""
+  [ "${runtime_arn}" = "None" ] && runtime_arn=""
+
+  # Neither stack deployed yet, so this deployment owns no AgentCore resource that a
+  # delivery source could be attached to.
+  [ -z "${gateway_arn}" ] && [ -z "${runtime_arn}" ] && return 0
+
+  # Emits "!ERROR<TAB>reason" when the answer could not be determined. Callers must
+  # not read that as "nothing in the way": an earlier revision of this function
+  # crashed in the filter, printed nothing, and was indistinguishable from a clean
+  # account — a preflight that silently passes when broken is worse than none.
+  local json out
+  json="$(aws logs describe-delivery-sources --region "${AWS_REGION}" --output json 2>/dev/null)" || {
+    printf '!ERROR\tcould not list delivery sources (credentials or logs:DescribeDeliverySources)\n'
+    return 0
+  }
+  if [ -z "${json}" ]; then
+    printf '!ERROR\tempty response from logs:DescribeDeliverySources\n'
+    return 0
+  fi
+
+  out="$(printf '%s' "${json}" \
+    | GATEWAY_ARN="${gateway_arn}" RUNTIME_ARN="${runtime_arn}" OURS="${ours}" python3 -c '
+import json, os, sys
+
+sources = json.load(sys.stdin).get("deliverySources", [])
+ours = os.environ["OURS"]
+# Exact match. A workload identity ARN embeds the gateway name but is a different
+# resource, so substring matching would wrongly claim its deliveries; nothing here
+# manages those.
+mine = {a for a in (os.environ.get("GATEWAY_ARN"), os.environ.get("RUNTIME_ARN")) if a}
+
+for source in sources:
+    arns = source.get("resourceArns") or []
+    if not any(arn in mine for arn in arns):
+        continue
+    name = source.get("name", "")
+    if name.startswith(ours):
+        continue
+    log_type = source.get("logType", "?")
+    print(f"{name}\t{log_type}")
+')" || {
+    printf '!ERROR\tdelivery source filter failed\n'
+    return 0
+  }
+
+  printf '%s' "${out}"
+}
+
+# Deletes one delivery source and whatever delivery references it. The delivery holds
+# the reference, so it goes first or the source delete is rejected.
+logs_delete_delivery_source() {
+  local name="$1"
+  [ -z "${name}" ] && return 1
+
+  local ids
+  ids="$(aws logs describe-deliveries --region "${AWS_REGION}" \
+    --query "deliveries[?deliverySourceName=='${name}'].id" --output text 2>/dev/null)"
+  for id in ${ids}; do
+    [ -z "${id}" ] || [ "${id}" = "None" ] && continue
+    aws logs delete-delivery --id "${id}" --region "${AWS_REGION}" >/dev/null 2>&1 \
+      || log_warn "    could not delete delivery ${id}"
+  done
+
+  aws logs delete-delivery-source --name "${name}" --region "${AWS_REGION}" >/dev/null 2>&1
+}
+
+# Called before deploying a stack that creates delivery sources. Reports what is in
+# the way, explains what removing it does and does not destroy, then clears it on
+# confirmation. Returns non-zero when the caller should stop.
+preflight_log_delivery() {
+  if [ "${BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT:-}" = "1" ]; then
+    log_warn "BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 — not checking for conflicting delivery sources"
+    return 0
+  fi
+
+  local found; found="$(logs_foreign_delivery_sources)"
+
+  # "Could not determine" is not "clear to proceed". Stopping here costs a re-run;
+  # proceeding costs a failed stack update partway through.
+  if printf '%s' "${found}" | grep -q '^!ERROR'; then
+    echo ""
+    log_error "Could not determine whether conflicting delivery sources exist:"
+    log_error "      ${found#*$'\t'}"
+    log_error "Verify with:  aws sts get-caller-identity"
+    log_error "To deploy anyway (it will fail with AlreadyExists if any exist):"
+    log_error "      BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 ./deploy.sh"
+    echo ""
+    return 1
+  fi
+
+  [ -z "${found}" ] && return 0
+
+  echo ""
+  log_warn "Existing CloudWatch delivery sources occupy slots this deployment needs:"
+  echo ""
+  while IFS=$'\t' read -r name logtype; do
+    [ -z "${name}" ] && continue
+    case "${name}" in
+      WdDeliverySource-*) origin="enabled by hand in the console" ;;
+      cdk-*)              origin="left by the previous CDK logging mixin" ;;
+      *)                  origin="unrecognised origin" ;;
+    esac
+    echo "      ${logtype}  ${name}"
+    echo "          ${origin}"
+  done <<< "${found}"
+  echo ""
+  log_warn "A delivery source is unique per resource and log type, so the stack cannot"
+  log_warn "create its own while these exist — CloudFormation creates before it deletes,"
+  log_warn "and the deploy fails with AlreadyExists."
+  echo ""
+  log_info "Removing them deletes the delivery configuration only. Existing log groups"
+  log_info "and everything already written to them are left untouched. New logs will go"
+  log_info "to the log groups this deployment manages, so anything previously delivered"
+  log_info "stays where it is and remains readable."
+  echo ""
+  log_warn "Log and trace delivery stops until the deploy finishes."
+  echo ""
+
+  _confirm "Delete these delivery sources and continue? (y/n): " || {
+    log_error "Stopped. To keep them and skip this check (the deploy will then fail"
+    log_error "on AlreadyExists):  BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 ./deploy.sh"
+    return 1
+  }
+
+  while IFS=$'\t' read -r name logtype; do
+    [ -z "${name}" ] && continue
+    log_info "Deleting ${logtype} delivery source ${name}..."
+    logs_delete_delivery_source "${name}"
+  done <<< "${found}"
+
+  local remaining; remaining="$(logs_foreign_delivery_sources)"
+  if [ -n "${remaining}" ]; then
+    log_error "Some delivery sources could not be removed:"
+    echo "${remaining}" | sed 's/^/      /'
+    log_error "Delete them manually, then re-run."
+    return 1
+  fi
+
+  log_success "Conflicting delivery sources removed."
+  return 0
+}
+
 # A unique image tag per deploy.sh invocation.
 #
 # AgentCore runtime versions are immutable and CfnRuntime only creates a new one

@@ -259,6 +259,9 @@ step_gateway() {
   fi
 
   ensure_xray_decision || return 1
+  # This stack creates the Gateway's delivery sources and owns the deployment's
+  # log-delivery resource policy, so it is the first place a conflicting source bites.
+  preflight_log_delivery || return 1
   export_cdk_env
 
   log_info "Deploying $(_sn Gateway)..."
@@ -289,6 +292,10 @@ step_runtime() {
   fi
 
   ecr_login
+
+  # Checked before the image build, which takes minutes — a conflicting delivery
+  # source would otherwise fail the deploy after all that work.
+  preflight_log_delivery || return 1
 
   # Ensure ARM64 cross-compilation works (QEMU on x86 hosts / WSL)
   preflight_docker_cross_platform arm64 || return 1

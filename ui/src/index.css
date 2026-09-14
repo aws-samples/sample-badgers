@@ -929,6 +929,76 @@ button.tab-active:hover {
     max-height: 280px;
 }
 
+/* Raw XML tab: syntax-highlighted body with a pinned copy control. */
+.report-xml-pane {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.report-xml-copy {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    background: #191724;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 2px 4px;
+    line-height: 1;
+}
+
+.report-xml-scroll {
+    padding: 0;
+}
+
+/* Shiki emits its own <pre>; neutralise its background and match the pane font
+   so the highlighted output looks identical to the plain view it replaced. */
+.report-xml-scroll pre {
+    margin: 0;
+    padding: 11px;
+    background: transparent !important;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 10px/1.5 'SF Mono', Menlo, monospace;
+}
+
+/* Evaluator "Result Output" pane. Matches the Raw XML tab: the container owns the
+   dark surface, the inner Shiki <pre> is transparent on top of it. */
+.eval-result-output {
+    margin: 0;
+    max-height: 600px;
+    overflow: auto;
+    color: #eee9f8;
+    background: #191724;
+    border-radius: 7px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 11px/1.5 'SF Mono', Menlo, monospace;
+}
+
+/* The wrapper defers padding to Shiki's <pre>; the bare-<pre> fallback needs its
+   own, since there is no inner element to supply it. */
+div.eval-result-output {
+    padding: 0;
+}
+
+pre.eval-result-output {
+    padding: 11px;
+}
+
+.eval-result-output pre {
+    margin: 0;
+    padding: 11px;
+    background: transparent !important;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 11px/1.5 'SF Mono', Menlo, monospace;
+}
+
 .report-result {
     border: 1px solid var(--border);
     border-radius: 7px;

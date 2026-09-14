@@ -1,6 +1,32 @@
 import { useState, useEffect, useCallback } from 'react'
+import ShikiHighlighter from 'react-shiki'
 
 const LIKERT = ['Failed', 'Major errors', 'Partial success', 'Minor issues', 'Perfect']
+
+// Specialists declare output_extension in their manifest: 22 emit xml, 4 json,
+// 1 html, 1 png. Derive the grammar from the filename rather than assuming XML.
+const EXTENSION_LANGUAGES = { xml: 'xml', json: 'json', html: 'html', htm: 'html' }
+
+function languageFor(filename) {
+  const extension = String(filename || '').split('.').pop().toLowerCase()
+  return EXTENSION_LANGUAGES[extension] || null
+}
+
+function ResultOutput({ content, filename }) {
+  if (!content) return <pre className="eval-result-output">No content</pre>
+
+  const language = languageFor(filename)
+
+  // No grammar for this extension (or a binary artifact such as png): show it
+  // verbatim rather than asking Shiki to guess.
+  if (!language) return <pre className="eval-result-output">{content}</pre>
+
+  return (
+    <div className="eval-result-output">
+      <ShikiHighlighter language={language} theme="github-dark">{content}</ShikiHighlighter>
+    </div>
+  )
+}
 
 function formatMetadata(meta) {
   if (!meta) return null
@@ -188,12 +214,7 @@ export default function Evaluator() {
             {loadingContent ? (
               <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)' }}>Loading...</div>
             ) : (
-              <pre style={{
-                fontSize: 11, fontFamily: 'SF Mono, Menlo, monospace', whiteSpace: 'pre-wrap',
-                maxHeight: 600, overflow: 'auto', color: 'var(--text-dim)', margin: 0,
-              }}>
-                {content || 'No content'}
-              </pre>
+              <ResultOutput content={content} filename={currentResult?.filename} />
             )}
           </div>
 
