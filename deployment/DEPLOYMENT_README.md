@@ -5,6 +5,8 @@
 
 # 🚀 BADGERS Deployment Guide
 
+![Deployment CLI](../.github/assets/07_sample-badgers-deployment-cli.png)
+
 Step-by-step AWS CDK deployment for BADGERS. For architecture overview and technical details, see the [main README](../README.md).
 
 ## ☁️ AWS Services
