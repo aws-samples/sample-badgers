@@ -150,6 +150,48 @@ def lambda_handler(
                 ContentType="image/jpeg",
                 CacheControl="private, max-age=3600",
             )
+
+            # The image above is whatever the correlation artifact names as its
+            # source, which for an enhanced run is the *original* — so the report
+            # showed the page as scanned while most specialists had read the
+            # enhanced copy. Persist that copy too so the reader can show both and
+            # the provenance is visible rather than implied.
+            #
+            # Supplementary, so a failure here must not lose an otherwise complete
+            # report: the page simply carries no enhanced key and the reader falls
+            # back to a single view.
+            enhanced_image_key = ""
+            enhanced_uri = _enhanced_source(job_records, image_uri)
+            if enhanced_uri:
+                try:
+                    enhanced_base64, enhanced_bytes = _get_image(
+                        s3, enhanced_uri, output_bucket
+                    )
+                    # Counted against the same aggregate ceiling as everything else;
+                    # a second image per page doubles the image budget.
+                    aggregate_bytes += len(enhanced_base64)
+                    if aggregate_bytes > _MAX_AGGREGATE_BYTES:
+                        raise ValueError(
+                            "report artifacts exceed the 150 MiB aggregate limit"
+                        )
+                    enhanced_image_key = (
+                        f"{report_prefix}/pages/page-{page_token}-enhanced.jpg"
+                    )
+                    s3.put_object(
+                        Bucket=output_bucket,
+                        Key=enhanced_image_key,
+                        Body=enhanced_bytes,
+                        ContentType="image/jpeg",
+                        CacheControl="private, max-age=3600",
+                    )
+                except ValueError as error:
+                    logger.warning(
+                        "Enhanced image omitted for page %s (%s): %s",
+                        page_number,
+                        enhanced_uri,
+                        error,
+                    )
+                    enhanced_image_key = ""
             s3.put_object(
                 Bucket=output_bucket,
                 Key=spine_key,
@@ -171,6 +213,9 @@ def lambda_handler(
                     "elements": parsed["elements"],
                     "audit": audit,
                     "image_key": image_key,
+                    # "" when the page was never enhanced. Consumers must treat it
+                    # as optional; older reports predate it entirely.
+                    "enhanced_image_key": enhanced_image_key,
                     "spine_key": spine_key,
                     "correlation_specialist_uri": correlation_uri,
                     "source_image_path": image_uri,
@@ -343,8 +388,14 @@ def _get_image(s3: Any, uri: str, expected_bucket: str) -> tuple[str, bytes]:
         except ValueError as error:
             raise ValueError(f"Invalid base64 image artifact: {uri}") from error
     content_type = str(response.get("ContentType") or "")
-    if content_type and content_type != "image/jpeg":
+    # Accept image/jpeg explicitly and tolerate binary/octet-stream (the S3
+    # default when an uploader omits ContentType).  JPEG identity is verified
+    # by the SOI marker below; rejecting on metadata alone caused enhanced
+    # images to be silently dropped from reports.
+    if content_type and content_type not in {"image/jpeg", "binary/octet-stream", "application/octet-stream"}:
         raise ValueError(f"Unsupported report image content type: {content_type}")
+    if body[:2] != b"\xff\xd8":
+        raise ValueError(f"Report image is not a valid JPEG (missing SOI marker): {uri}")
     return base64.b64encode(body).decode("ascii"), body
 
 
@@ -399,6 +450,31 @@ def _parse_spine(xml_text: str) -> dict[str, Any]:
         "specialists": specialists,
         "elements": elements,
     }
+
+
+def _enhanced_source(records: list[dict[str, Any]], image_uri: str) -> str:
+    """URI of the enhanced image produced from this page's source image, or "".
+
+    Derivable from the job record alone, with nothing supplied by the model: the
+    enhancer's subtask is keyed on the image it *read*, so its image_identifier
+    matches this page's source image, while its result_s3_key is the enhanced
+    object it wrote.
+
+    Returns "" when the page was never enhanced, which is the normal case for a
+    clean document — callers must treat the enhanced copy as optional.
+    """
+    image_id = job_state.image_identifier(image_uri)
+    for record in records:
+        if record.get("specialist") != "image_enhancer":
+            continue
+        if record.get("status") != "COMPLETE":
+            continue
+        if record.get("image_identifier") != image_id:
+            continue
+        uri = str(record.get("result_s3_key") or "").strip()
+        if uri.startswith("s3://"):
+            return uri
+    return ""
 
 
 def _page_audit(

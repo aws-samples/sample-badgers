@@ -85,4 +85,8 @@ disable = ["C0103", "R0903"]
 members = [".kiro/skills/markdown_converter"]
 
 [dependency-groups]
-dev = ["types-requests>=2.32.4.20260107"]
+dev = [
+    "pillow>=12.3.0",
+    "playwright>=1.62.0",
+    "types-requests>=2.32.4.20260107",
+]

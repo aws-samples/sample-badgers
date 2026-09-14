@@ -15,23 +15,74 @@ export default function SpecialistWizard({ runSSE, running }) {
   const [examples, setExamples] = useState([])
   const [preview, setPreview] = useState(null)
   const [deployOutput, setDeployOutput] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [progress, setProgress] = useState(null)
+  const [sectionLog, setSectionLog] = useState([])
+  const [sections, setSections] = useState([])
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
+  // Generation streams over SSE: each section reports before it starts so the
+  // status line can name what is being worked on.
   const generatePrompts = async () => {
     setGenerating(true)
+    setProgress(null)
+    setSectionLog([])
+    setSections([])
     setStatus('Generating prompts...')
+    let finished = null
+    let failure = null
     try {
       const res = await fetch('/api/wizard/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-      const data = await res.json()
-      if (data.error) { setStatus(`❌ ${data.error}`); setGenerating(false); return }
-      setPrompts(data.prompts || {})
-      setStatus('✓ Prompts generated')
-      setStep(1)
-    } catch (e) { setStatus(`❌ ${e.message}`) }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          let msg
+          try { msg = JSON.parse(line.slice(6)) } catch { continue }
+          if (msg.type === 'start') {
+            setSections(msg.sections || [])
+          } else if (msg.type === 'progress') {
+            setProgress(msg)
+            setStatus(`Generating ${msg.index}/${msg.total} — ${msg.label}: ${msg.purpose}`)
+          } else if (msg.type === 'section') {
+            setSectionLog(prev => [...prev, msg])
+          } else if (msg.type === 'done') {
+            finished = msg
+          } else if (msg.type === 'error') {
+            failure = msg.message
+          }
+        }
+      }
+    } catch (e) { failure = e.message }
+
+    setProgress(null)
+    if (failure) { setStatus(`❌ ${failure}`); setGenerating(false); return }
+
+    const generated = finished?.prompts || {}
+    // Don't advance on an empty result — an empty step 2 looks like a skipped
+    // step rather than a failure.
+    if (!Object.keys(generated).length) {
+      setStatus('❌ No prompts were returned')
+      setGenerating(false)
+      return
+    }
+    setPrompts(generated)
+    const warnings = finished?.warnings || []
+    setStatus(warnings.length
+      ? `⚠ Generated with ${warnings.length} problem(s): ${warnings.join('; ')}`
+      : `✓ Generated ${Object.keys(generated).length} prompts`)
+    setStep(1)
     setGenerating(false)
   }
 
@@ -39,24 +90,43 @@ export default function SpecialistWizard({ runSSE, running }) {
     try {
       const res = await fetch('/api/wizard/preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, prompts }),
+        body: JSON.stringify({ ...form, prompts, exampleCount: examples.length }),
       })
-      setPreview(await res.json())
+      const data = await res.json()
+      if (data.error) { setStatus(`❌ ${data.error}`); return }
+      setPreview(data)
       setStep(3)
-    } catch {}
+    } catch (e) { setStatus(`❌ ${e.message}`) }
   }
 
-  const deploy = async () => {
+  // Files are read here rather than sent as multipart so the save endpoint stays
+  // a plain JSON handler.
+  const readExamples = () => Promise.all(
+    examples.map(file => new Promise((res, rej) => {
+      const reader = new FileReader()
+      reader.onload = () => res({ name: file.name, data: reader.result })
+      reader.onerror = () => rej(new Error(`Could not read ${file.name}`))
+      reader.readAsDataURL(file)
+    }))
+  )
+
+  const save = async () => {
+    setSaved(false)
     setDeployOutput('Saving specialist...')
     try {
-      const res = await fetch('/api/wizard/deploy', {
+      const encoded = await readExamples()
+      const res = await fetch('/api/wizard/save', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, prompts, examples }),
+        body: JSON.stringify({ ...form, prompts, examples: encoded }),
       })
       const data = await res.json()
       setDeployOutput(data.output || data.error || 'Done')
+      if (!data.error) setSaved(true)
     } catch (e) { setDeployOutput(`Error: ${e.message}`) }
   }
+
+  // CDK runs for minutes, so this streams into the shared log panel.
+  const deploy = () => runSSE('/api/wizard/deploy', {})
 
   const steps = ['Basic Info', 'Review Prompts', 'Examples', 'Deploy']
 
@@ -76,7 +146,53 @@ export default function SpecialistWizard({ runSSE, running }) {
         ))}
       </div>
 
-      {status && <div style={{ fontSize: 12, marginBottom: 12, color: status.startsWith('❌') ? 'var(--red)' : 'var(--green)' }}>{status}</div>}
+      {/* Hidden while generating: the progress panel below already says the same
+          thing, and two copies of the same line read as a glitch. */}
+      {status && !generating && <div style={{ fontSize: 12, marginBottom: 12, color: status.startsWith('❌') ? 'var(--red)' : status.startsWith('⚠') ? 'var(--yellow, #b58900)' : 'var(--green)' }}>{status}</div>}
+
+      {(progress || sectionLog.length > 0) && generating && (
+        <div className="card" style={{ padding: 12, marginBottom: 12 }}>
+          {progress && (
+            <>
+              <div style={{ fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="activity-spinner" aria-hidden="true" />
+                <span style={{ color: 'var(--accent)' }}>Generating {progress.index}/{progress.total}</span>
+                <span>—</span><strong>{progress.label}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{progress.purpose}</div>
+              {/* One segment per prompt section, so the checkpoints are the bar
+                  rather than marks laid over it. Filled = done, half-lit = in
+                  flight, red = failed, empty = pending. */}
+              <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
+                {Array.from({ length: progress.total }, (_, i) => {
+                  const done = sectionLog[i]
+                  const current = i === progress.index - 1
+                  const background = done
+                    ? (done.ok ? 'var(--accent)' : 'var(--red)')
+                    : current ? 'var(--accent)' : 'var(--surface)'
+                  return (
+                    <div
+                      key={i}
+                      title={sections[i]?.label || `Prompt ${i + 1}`}
+                      style={{
+                        flex: 1, height: 6, borderRadius: 2, background,
+                        opacity: !done && current ? 0.4 : 1,
+                        border: '1px solid var(--border)',
+                        transition: 'background 200ms ease, opacity 200ms ease',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            </>
+          )}
+          {sectionLog.map((s, i) => (
+            <div key={i} style={{ fontSize: 11, fontFamily: 'SF Mono, Menlo, monospace', color: s.ok ? 'var(--text-dim)' : 'var(--red)' }}>
+              {s.ok ? `✓ ${s.label} (${s.chars.toLocaleString()} chars)` : `✗ ${s.label} — ${s.message}`}
+            </div>
+          ))}
+        </div>
+      )}
 
       {step === 0 && (
         <div className="card" style={{ padding: 16 }}>
@@ -155,7 +271,12 @@ export default function SpecialistWizard({ runSSE, running }) {
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <button onClick={() => setStep(2)}>← Back</button>
-            <button className="primary" onClick={deploy}>💾 Save Specialist</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="primary" onClick={save} disabled={running}>💾 Save Specialist</button>
+              <button onClick={deploy} disabled={!saved || running} title={saved ? 'Deploy the custom specialists stack' : 'Save first'}>
+                ☁️ Deploy Stack
+              </button>
+            </div>
           </div>
           {deployOutput && (
             <div className="card" style={{ padding: 12 }}>

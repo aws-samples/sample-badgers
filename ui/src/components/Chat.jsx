@@ -11,6 +11,7 @@ import {
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import ShikiHighlighter from 'react-shiki'
+import CopyButton from './CopyButton'
 
 function genSessionId() {
   return 'ws-session-' + crypto.randomUUID()
@@ -93,44 +94,7 @@ function LoadingDots() {
 }
 
 // ── Copy ──
-
-function CopyButton({ getText, label = 'Copy' }) {
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 1500)
-    return () => clearTimeout(timer)
-  }, [copied])
-
-  const copy = async () => {
-    const text = getText()
-    if (!text) return
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-    } catch {
-      // navigator.clipboard is undefined on insecure origins and can be denied
-      // by permission policy. Staying silent is better than a thrown error in
-      // the render tree; the user sees no tick and can select the text.
-    }
-  }
-
-  return (
-    <button
-      onClick={copy}
-      title={copied ? 'Copied' : label}
-      aria-label={label}
-      style={{
-        background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px',
-        fontSize: 12, lineHeight: 1,
-        color: copied ? 'var(--green)' : 'var(--text-dim)',
-      }}
-    >
-      {copied ? '✓' : '⧉'}
-    </button>
-  )
-}
+// CopyButton lives in ./CopyButton so the Reports Raw XML pane can share it.
 
 // ── Message text ──
 
@@ -530,11 +494,13 @@ function AnalyzerPills({ job }) {
 
 // ── Chat with adapter ──
 
-function ChatInner() {
+function ChatInner({ onNewSession }) {
   const [tools, setTools] = useState(null)
   const [toolsLoading, setToolsLoading] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const [sessionId, setSessionId] = useState(genSessionId)
+  // No setter: a new session remounts this component (see Chat below) rather than
+  // swapping the id in place, so the id is fixed for the lifetime of the instance.
+  const [sessionId] = useState(genSessionId)
   const [auditMode, setAuditMode] = useState(false)
   const [dynamicTokens, setDynamicTokens] = useState(false)
   // Non-null only while a turn is in flight; doubles as the "is running" flag.
@@ -625,8 +591,6 @@ function ChatInner() {
     adapters: { attachments: attachmentAdapter },
   })
 
-  const newSession = () => setSessionId(genSessionId())
-
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 12, height: 600 }}>
       <div className="card" style={{ minHeight: 0, overflow: 'hidden' }}>
@@ -670,7 +634,9 @@ function ChatInner() {
         <div className="card" style={{ padding: 12, fontSize: 12 }}>
           <div style={{ fontWeight: 500, marginBottom: 4 }}>Session</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', wordBreak: 'break-all', marginBottom: 8 }}>{sessionId}</div>
-          <button onClick={newSession} style={{ fontSize: 11, width: '100%' }}>🔄 New Session</button>
+          {/* Deliberately enabled mid-run: abandoning a stalled turn is a reason to
+              start a new session, not something to prevent. */}
+          <button onClick={onNewSession} style={{ fontSize: 11, width: '100%' }}>🔄 New Session</button>
         </div>
       </div>
     </div>
@@ -678,5 +644,21 @@ function ChatInner() {
 }
 
 export default function Chat() {
-  return <ChatInner />
+  // "New Session" remounts ChatInner instead of resetting state piecemeal. A session
+  // reset has to clear the thread, the composer's attachments and status line, the
+  // activity indicator, the analyzer pills, and S3AttachmentAdapter.lastDocId --
+  // and useLocalRuntime owns the message store, so no single call clears all of it.
+  // Keying the subtree is the only reset that cannot leave a fragment behind.
+  //
+  // lastDocId is the one that matters most: it survives on the adapter instance, so
+  // carrying it into a new session would attribute the next job to the previous
+  // document, which is exactly the doc_id mismatch that breaks report generation.
+  const [sessionInstance, setSessionInstance] = useState(0)
+
+  return (
+    <ChatInner
+      key={sessionInstance}
+      onNewSession={() => setSessionInstance(instance => instance + 1)}
+    />
+  )
 }
