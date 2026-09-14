@@ -54,6 +54,7 @@ Environment variables:
 | `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step. |
 | `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                           |
 | `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                              |
+| `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                            |
 | `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                  |
 | `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                              |
 
@@ -121,8 +122,13 @@ Builds and pushes a single container-based specialist image, then updates its fu
 
 ## deploy_custom_specialists.sh
 
-Syncs custom specialists from S3 and deploys the CustomSpecialists stack. That stack only
-exists when `custom_specialists/specialist_registry.json` is present.
+Deploys the CustomSpecialists stack from the **local** `custom_specialists/` tree. It does
+not touch S3: it reads `custom_specialists/specialist_registry.json`, exits cleanly with a
+warning if that file is missing or lists no specialists, resolves `DEPLOYMENT_ID` from the
+deployed stacks, then runs `cdk deploy --exclusively` on the CustomSpecialists stack. That
+stack only exists when the registry is present.
+
+This is what `POST /api/wizard/deploy` spawns, streaming its output over SSE.
 
 ## sync_s3_files.sh
 
@@ -157,3 +163,51 @@ stack is stuck.
 Sourced by the scripts above rather than executed. Provides logging, the deployment state
 file helpers, `_sn` for stack names, `resource_id` for resource names, CloudFormation
 output lookups, and the CDK wrappers.
+
+### Log-delivery preflight
+
+`preflight_log_delivery` runs in `step_gateway` and `step_runtime`. **It can stop the
+deploy, and it prompts.**
+
+A CloudWatch `DeliverySource` is unique per `(resourceArn, logType)`, not per name, so only
+one may exist for a given AgentCore resource and log type — whoever created it.
+CloudFormation creates new resources before deleting removed ones, so during an update both
+spellings exist at once, collide, and the deploy fails with *"This ResourceId has already
+been used in another Delivery Source in this account"* (`AlreadyExists`). Renaming cannot
+fix it.
+
+Two ways a foreign source gets there: enabling log delivery by hand in the console leaves
+`WdDeliverySource-*` entries, and a stack that previously used the CDK logging mixin leaves
+`cdk-<type>-source-<hash>` entries. Anything this deployment created is named
+`badgers-<deployment>-*` and is left alone.
+
+| Function                        | Behaviour                                                                                                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logs_foreign_delivery_sources` | Echoes `name<TAB>logType` per occupied slot, scoped by the exact `GatewayArn`/`RuntimeArn` this deployment publishes. Emits `!ERROR<TAB>reason` when it cannot tell. |
+| `logs_delete_delivery_source`   | Deletes the referencing delivery first, then the source — the delivery holds the reference.                                                                          |
+| `preflight_log_delivery`        | Lists what is in the way with a per-entry origin, prompts, remediates on confirmation, re-verifies, and returns non-zero if anything remains.                        |
+
+Removing a delivery source deletes **delivery configuration only** — log groups and
+everything already written to them are untouched. Log and trace delivery stops until the
+deploy finishes.
+
+It returns non-zero, stopping the deploy, both on decline and on `!ERROR`: "could not
+determine" is not "clear to proceed", and stopping costs a re-run where proceeding costs a
+failed stack update partway through.
+
+In `step_runtime` the check runs after `ecr_login` but **before** the image build, so a
+conflict does not surface after several minutes of building.
+
+Required IAM: `logs:DescribeDeliverySources` to check, plus `logs:DescribeDeliveries`,
+`logs:DeleteDelivery`, and `logs:DeleteDeliverySource` to remediate. Missing permission
+takes the `!ERROR` path and is a hard stop.
+
+> [!IMPORTANT]
+> `BADGERS_ASSUME_YES=1` answers this prompt too (`_confirm` returns yes without reading
+> stdin), so **it deletes the conflicting delivery sources without asking.** That is the
+> intended behaviour for the UI's Deploy All button, but it means an unattended run
+> remediates silently. Use `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1` instead if the sources
+> must be preserved — the deploy will then fail on `AlreadyExists`.
+>
+> An unattended invocation that sets neither will block on the prompt. The `!ERROR` path
+> stops the deploy regardless of `BADGERS_ASSUME_YES`, since it returns before prompting.

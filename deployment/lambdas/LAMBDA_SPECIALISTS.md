@@ -285,9 +285,12 @@ job_state.get_job_records(job_id)   # job row plus every subtask
 job_state.get_record(job_id, subtask)
 ```
 
-> **Custom specialists skip tracking.** The wizard generator (`/api/wizard/generate`) is
-> still a stub and does not emit `job_id`/`doc_id` on generated schemas, so wizard-created
-> specialists are not stamped and record nothing.
+> **Custom specialists skip tracking.** `/api/wizard/generate` is no longer a stub — it
+> generates and deploys working specialists — but the schema it writes declares only
+> `session_id`, where every built-in schema also declares `job_id` and `doc_id`. Those two
+> are what the foundation layer stamps records from, so wizard-created specialists are still
+> not stamped and record nothing. Adding both to `buildSchema` in
+> `ui/server/routes/wizard.js` is what would close this.
 
 ---
 

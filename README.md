@@ -487,11 +487,15 @@ Model ID to environment variable mapping:
 **Option 1: Use the Wizard (Recommended)**
 
 ```bash
-cd local_testing
+cd ui
 npm run dev
 ```
 
-The Specialist Creation Wizard is available as the 🧙 Create Specialist tab in the [UI](ui/UI_README.md).
+The Specialist Creation Wizard is the 🧙 Create Specialist tab in the [UI](ui/UI_README.md).
+It generates the six prompt sections with Bedrock, writes the manifest, schema, prompts, and
+registry entry under `deployment/custom_specialists/`, then deploys the CustomSpecialists
+stack. Save and Deploy are separate steps — see
+[Specialist Wizard Endpoints](ui/UI_README.md#specialist-wizard-endpoints).
 
 **Option 2: Manual Creation**
 

@@ -74,16 +74,31 @@ CDK will:
 
 Set in `lambda_stack.py` or override in AWS console:
 
-| Variable              | Default                          | Purpose                       |
-| --------------------- | -------------------------------- | ----------------------------- |
-| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID              |
-| `MAX_ITERATIONS`      | `2`                              | Max agent iterations          |
-| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM         |
-| `JPEG_QUALITY`        | `85`                             | LLM image encoding quality    |
-| `OUTPUT_QUALITY`      | `95`                             | Final output quality          |
-| `OUTPUT_BUCKET`       | (from CDK)                       | S3 bucket for enhanced images |
-| `AWS_REGION`          | `us-west-2`                      | Bedrock region                |
-| `LOGGING_LEVEL`       | `INFO`                           | Log level                     |
+| Variable              | Default                          | Purpose                                                                      |
+| --------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID                                                             |
+| `MAX_ITERATIONS`      | `2`                              | Max agent iterations                                                         |
+| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM                                                        |
+| `JPEG_QUALITY`        | `85`                             | LLM image encoding quality                                                   |
+| `OUTPUT_QUALITY`      | `95`                             | Final output quality                                                         |
+| `OUTPUT_BUCKET`       | (from CDK)                       | S3 bucket for enhanced images                                                |
+| `CONFIG_BUCKET`       | (from CDK)                       | S3 bucket holding the system prompt and `config/document_type_contexts.json` |
+| `AWS_REGION`          | `us-west-2`                      | Bedrock region                                                               |
+| `LOGGING_LEVEL`       | `INFO`                           | Log level                                                                    |
+
+### S3-sourced configuration
+
+Deploying the container is not sufficient to change enhancement behaviour. Two things are
+read from `CONFIG_BUCKET` at runtime, with in-code fallbacks:
+
+| Object                                     | Governs                                        |
+| ------------------------------------------ | ---------------------------------------------- |
+| `prompts/image_enhancer/system_prompt.xml` | Operation reference, pipelines, workflow rules |
+| `config/document_type_contexts.json`       | Per-`document_type` enhancement guidance       |
+
+Push both with `deploy.sh` step 3 — submenu `1) Prompts` and `6) Runtime Config`
+respectively. Because both fall back silently, a missing object or a missing
+`s3:GetObject` grant presents as "my config change had no effect" rather than an error.
 
 ### IAM Permissions Required
 
@@ -98,7 +113,11 @@ The Lambda execution role needs:
       "Action": [
         "s3:GetObject"
       ],
-      "Resource": "arn:aws:s3:::input-bucket/*"
+      "Resource": [
+        "arn:aws:s3:::input-bucket/*",
+        "arn:aws:s3:::config-bucket/prompts/image_enhancer/*",
+        "arn:aws:s3:::config-bucket/config/*"
+      ]
     },
     {
       "Effect": "Allow",
