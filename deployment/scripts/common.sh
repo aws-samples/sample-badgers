@@ -636,6 +636,15 @@ ensure_region() {
 
   export AWS_REGION
   log_info "Region ${AWS_REGION} (${source_desc})."
+  log_warn "Note: model inference does NOT stay in ${AWS_REGION}."
+  log_warn "  BADGERS invokes US geo cross-Region inference profiles (us.*), so Bedrock"
+  log_warn "  routes each request to a destination Region within the US geo -- typically"
+  log_warn "  us-east-1, us-east-2 or us-west-2 -- and may use Regions not enabled in"
+  log_warn "  this account. Every other resource stays in ${AWS_REGION}."
+  log_warn "  The Lambda role therefore grants bedrock:InvokeModel on the nine models"
+  log_warn "  with a wildcarded Region field. If your org restricts Bedrock by Region"
+  log_warn "  via SCP, allow all US destination Regions or inference will fail."
+  log_warn "  See DEPLOYMENT_README.md -> Inference Profiles and Regions."
 }
 
 ensure_account() {
@@ -1368,91 +1377,163 @@ preflight_service_quotas() {
 # region. Models with a "us." prefix are cross-region inference profiles and
 # always pass.
 #
-# BADGERS uses these models by default (configurable via inference profiles):
-BADGERS_DEFAULT_MODELS=(
-  "us.anthropic.claude-sonnet-4-5-20250514-v1:0"
-)
+# The model set comes from the registry, not from a list maintained here. The previous
+# hardcoded list held exactly one entry — "us.anthropic.claude-sonnet-4-5-20250514-v1:0",
+# a model that does not exist (real Sonnet 4.5 is 20250929) — and nothing noticed, because
+# neither preflight in this section was ever called from anywhere.
+_BADGERS_MODEL_REGISTRY="${DEPLOYMENT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/s3_files/config/model_registry.json"
+
+# Emits "<geo_model_id> <foundation_model_id>" per active model.
+_badgers_active_models() {
+  python3 -c "
+import json,sys
+path=sys.argv[1]
+try:
+    models=json.load(open(path))['models']
+except Exception as e:
+    print('REGISTRY_ERROR '+str(e).replace(chr(10),' '), file=sys.stderr); sys.exit(1)
+for mid,spec in models.items():
+    if spec.get('status')!='active': continue
+    base=mid.split('.',1)[1] if mid.startswith(('us.','eu.','jp.','au.','in.')) else mid
+    print(mid, base)
+" "${_BADGERS_MODEL_REGISTRY}"
+}
 
 preflight_model_access() {
-  log_info "Checking Bedrock model access in ${AWS_REGION}..."
+  log_info "Checking Bedrock model availability in ${AWS_REGION}..."
 
-  local missing=() model_id status
+  local missing=() model_id base_id rows
+  rows="$(_badgers_active_models)" || {
+    log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
+    return 1
+  }
 
-  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
-    # Cross-region inference profiles (us.*, eu.*) are always available.
-    if [[ "${model_id}" == us.* ]] || [[ "${model_id}" == eu.* ]]; then
-      echo "    ✓ ${model_id} (cross-region)"
+  # Every BADGERS model is invoked through a US geo cross-Region profile (us.*), and none
+  # of them supports In-Region inference on bedrock-runtime at all. So the question this
+  # preflight has to answer is not "is the base model in this Region's catalog" -- a
+  # CRIS-only model may or may not appear in ListFoundationModels for a Region it is not
+  # served in-Region from -- but "does the geo profile exist here", i.e. is this Region a
+  # valid source Region for it. GetInferenceProfile on the geo ID answers exactly that.
+  #
+  # The base-model catalog check is kept as a second chance, not a first: if the profile
+  # lookup fails for a reason unrelated to availability (an IAM role without
+  # bedrock:GetInferenceProfile, an old CLI), a model that the catalog does list still
+  # passes. Model *access* -- subscription, entitlement -- is a separate question and is
+  # what preflight_model_invocation answers with a real call.
+  while read -r model_id base_id; do
+    [ -z "${model_id}" ] && continue
+
+    local profile_status="" catalog_status=""
+    profile_status="$(aws bedrock get-inference-profile \
+      --inference-profile-identifier "${model_id}" \
+      --region "${AWS_REGION}" \
+      --query 'status' --output text 2>/dev/null | tr -d '\r' || true)"
+    profile_status="${profile_status%%[[:space:]]}"
+
+    if [ "${profile_status}" = "ACTIVE" ]; then
+      echo "    ✓ ${model_id}  (geo profile ACTIVE)"
       continue
     fi
 
-    # In-region model — verify it exists in the target region.
-    status="$(aws bedrock list-foundation-models --region "${AWS_REGION}" \
-      --query "modelSummaries[?modelId=='${model_id}'].modelLifecycle.status | [0]" \
-      --output text 2>/dev/null | tr -d '\r' || echo "NOT_FOUND")"
-    status="${status%%[[:space:]]}"  # strip trailing whitespace/CR
+    catalog_status="$(aws bedrock list-foundation-models --region "${AWS_REGION}" \
+      --query "modelSummaries[?modelId=='${base_id}'].modelLifecycle.status | [0]" \
+      --output text 2>/dev/null | tr -d '\r' || true)"
+    catalog_status="${catalog_status%%[[:space:]]}"
 
-    if [ "${status}" = "ACTIVE" ] || [ "${status}" = "LEGACY" ]; then
-      echo "    ✓ ${model_id}"
+    if [ "${catalog_status}" = "ACTIVE" ] || [ "${catalog_status}" = "LEGACY" ]; then
+      echo "    ✓ ${model_id}  (base model ${catalog_status} in catalog; profile lookup returned '${profile_status:-nothing}')"
     else
-      echo "    ✗ ${model_id} (not found in ${AWS_REGION})"
+      echo "    ✗ ${model_id}  (no geo profile here; base model ${base_id} not in the ${AWS_REGION} catalog)"
       missing+=("${model_id}")
     fi
-  done
+  done <<< "${rows}"
 
   if [ ${#missing[@]} -gt 0 ]; then
     echo ""
-    log_error "The following models are NOT available in ${AWS_REGION}:"
+    log_error "The following models are NOT available from ${AWS_REGION}:"
     for m in "${missing[@]}"; do
       log_error "    ${m}"
     done
     echo ""
-    log_error "Options:"
-    log_error "  1. Deploy to a region where these models are available"
-    log_error "  2. Use cross-region inference profiles (us.anthropic.* prefix)"
+    log_error "Every BADGERS model is already invoked through a US geo cross-Region profile"
+    log_error "(us.*), so this is not fixed by switching profile type. Likely causes:"
+    log_error "  1. ${AWS_REGION} is not a source Region for the US geo profile -- deploy from"
+    log_error "     a US Region (us-east-1, us-east-2, us-west-1, us-west-2) or ca-*."
+    log_error "  2. The deploying role lacks bedrock:GetInferenceProfile and"
+    log_error "     bedrock:ListFoundationModels, so neither lookup could succeed."
+    log_error "  3. The registry entry is misspelled; the IDs checked were printed above."
     log_error ""
     log_error "Model catalog: https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards.html"
     return 1
   fi
 
-  log_success "All configured models are accessible in ${AWS_REGION}"
+  log_success "All configured models are available from ${AWS_REGION}"
   return 0
 }
 
 # ── Model Invocation Test ────────────────────────────────────────────────────
 # Actually invokes each model with a minimal payload to confirm marketplace
 # subscriptions, inference profiles, and IAM permissions are all in place.
+#
+# Uses Converse, not InvokeModel. Two reasons: it is the transport BADGERS actually uses,
+# and no OpenAI model supports InvokeModel at all — so an Anthropic-shaped invoke_model
+# body could never smoke-test two thirds of the model set. It also avoids a trap in the
+# previous version, which passed raw JSON to `invoke-model --body`; under AWS CLI v2 that
+# fails base64 decoding, and the resulting error matched none of the greps below, so the
+# test reported success no matter what.
 preflight_model_invocation() {
   log_info "Testing model invocations (this may take 10-20 seconds)..."
-  local failed=0
+  local failed=0 rows model_id _base
 
-  local claude_body='{"anthropic_version":"bedrock-2023-05-31","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+  rows="$(_badgers_active_models)" || {
+    log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
+    return 1
+  }
 
-  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
-    local response
-    response="$(aws bedrock-runtime invoke-model \
+  # maxTokens is deliberately not 1: Opus 5 reasons by default, so an output budget of 1
+  # token has no room for a reasoning block and the call fails for the wrong reason.
+  local messages='[{"role":"user","content":[{"text":"hi"}]}]'
+  local inference_config='{"maxTokens":64}'
+
+  while read -r model_id _base; do
+    [ -z "${model_id}" ] && continue
+    local response rc=0
+    # `|| rc=$?` rather than a bare assignment: deploy.sh runs under `set -e`, and although
+    # errexit is suspended inside a function invoked as `preflight || return 1`, a caller
+    # that invokes this directly would otherwise abort on the first failing model instead
+    # of listing them all.
+    response="$(aws bedrock-runtime converse \
       --model-id "${model_id}" \
       --region "${AWS_REGION}" \
-      --content-type "application/json" \
-      --body "${claude_body}" \
-      --output json \
-      /dev/null 2>&1)" || true
+      --messages "${messages}" \
+      --inference-config "${inference_config}" \
+      --output json 2>&1)" || rc=$?
 
-    if echo "${response}" | grep -qi "AccessDeniedException\|ValidationException\|ResourceNotFoundException\|ServiceUnavailableException"; then
+    # Judge by exit code, not by grepping for a handful of exception names. The previous
+    # version swallowed the exit code with `|| true` and then looked for four specific
+    # exceptions, so anything else -- an expired token, a throttle, an AWS CLI too old to
+    # know `bedrock-runtime converse` -- printed a tick. A preflight that passes when the
+    # call failed is worse than no preflight.
+    if [ "${rc}" -ne 0 ]; then
       local err_msg
-      err_msg="$(echo "${response}" | grep -o '"[Mm]essage":"[^"]*"' | head -1 || echo "${response}")"
+      err_msg="$(echo "${response}" | grep -o '"[Mm]essage":"[^"]*"' | head -1)"
+      [ -z "${err_msg}" ] && err_msg="$(echo "${response}" | tail -1)"
       echo "    ✗ ${model_id}"
       echo "      Error: ${err_msg}"
-      ((failed++))
+      # Not ((failed++)): with failed=0 that expression evaluates to 0, which is a
+      # non-zero *exit status*, and under a live `set -e` it aborts the loop.
+      failed=$((failed + 1))
     else
       echo "    ✓ ${model_id}"
     fi
-  done
+  done <<< "${rows}"
 
   if [ "${failed}" -gt 0 ]; then
     log_error "${failed} model(s) failed invocation test."
     log_error "Common fixes:"
     log_error "  - Marketplace models (Anthropic): Subscribe at https://console.aws.amazon.com/bedrock/home#/modelaccess"
     log_error "  - IAM: Ensure your deploy role has bedrock:InvokeModel on the model ARN"
+    log_error "  - OpenAI models: also need bedrock:InvokeModel on arn:aws:bedrock:${AWS_REGION}:<account>:project/default"
     log_error "  - Region: Model may not be available in ${AWS_REGION}"
     return 1
   fi
