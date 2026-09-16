@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 from aws_cdk import (
@@ -106,6 +107,8 @@ class LambdaSpecialistStack(Stack):
                 "Run: cd lambdas && ./build_foundation_layer.sh"
             )
 
+        self._assert_layer_not_stale(layer_path)
+
         self.foundation_layer = lambda_.LayerVersion(
             self,
             "SpecialistFoundationLayer",
@@ -186,6 +189,58 @@ class LambdaSpecialistStack(Stack):
                 pdf_processing_layer_path,
             )
 
+    @staticmethod
+    def _assert_layer_not_stale(layer_path: Path) -> None:
+        """Refuse to ship a layer older than the sources it was built from.
+
+        `layer.zip` is a build artifact produced by `lambdas/build_foundation_layer.sh`,
+        which copies `badgers-foundation/` into it. Nothing invokes that script
+        automatically — not `deploy.sh`, not `scripts/common.sh` — so editing
+        `badgers-foundation/` and deploying used to upload the *previous* layer with no
+        warning. The existence check above passes, CloudFormation succeeds, and the
+        Lambdas run stale code. Silent, and easy to lose an afternoon to.
+
+        Comparing mtimes turns that into a synth-time failure naming the offending file.
+        Set BADGERS_ALLOW_STALE_LAYER=1 to bypass (useful when only comments changed).
+        """
+        if os.environ.get("BADGERS_ALLOW_STALE_LAYER") == "1":
+            return
+
+        # The inputs build_foundation_layer.sh actually copies.
+        source_root = Path("./badgers-foundation")
+        patterns = (
+            "foundation/**/*.py",
+            "config/config.py",
+            "foundation/core_system_prompts/**/*",
+        )
+        candidates: list[Path] = []
+        for pattern in patterns:
+            candidates.extend(p for p in source_root.glob(pattern) if p.is_file())
+
+        requirements = Path("./lambdas/requirements.txt")
+        if requirements.is_file():
+            candidates.append(requirements)
+
+        if not candidates:
+            # Sources not where expected — do not invent a failure, the existence check
+            # above is still in force.
+            return
+
+        layer_mtime = layer_path.stat().st_mtime
+        newer = [p for p in candidates if p.stat().st_mtime > layer_mtime]
+        if not newer:
+            return
+
+        newest = max(newer, key=lambda p: p.stat().st_mtime)
+        raise RuntimeError(
+            f"{layer_path} is older than {len(newer)} of its source file(s) — deploying "
+            f"now would ship the previous layer.\n"
+            f"  Most recently changed: {newest}\n"
+            f"  Rebuild:  cd lambdas && ./build_foundation_layer.sh\n"
+            f"  Override: BADGERS_ALLOW_STALE_LAYER=1 (only if the change cannot affect "
+            f"runtime behaviour)"
+        )
+
     def create_specialist_functions(self):
         """Create specialist Lambda functions (filtered by enabled_specialists if set)."""
         # Get list of specialists from lambdas/code directory
@@ -239,16 +294,13 @@ class LambdaSpecialistStack(Stack):
             "THROTTLE_DELAY": "1.0",
         }
 
-        # Add inference profile ARNs for cost tracking
+        # Point the specialist at the model ID -> profile ARN map in SSM. One
+        # deployment-shaped variable replaces five model-shaped ones, so changing the model
+        # set no longer touches this wiring — or any of the other three stacks that used to
+        # carry the same five.
         if self.inference_profiles_stack:
-            environment.update(
-                {
-                    "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
-                    "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
-                    "NOVA_PREMIER_PROFILE_ARN": self.inference_profiles_stack.nova_premier_profile_arn,
-                    "CLAUDE_OPUS_46_PROFILE_ARN": self.inference_profiles_stack.claude_opus_46_profile_arn,
-                    "CLAUDE_OPUS_45_PROFILE_ARN": self.inference_profiles_stack.claude_opus_45_profile_arn,
-                }
+            environment["MODEL_PROFILES_PARAM"] = (
+                self.inference_profiles_stack.model_profiles_param_name
             )
 
         # Add poppler paths for pdf_to_images_converter
@@ -370,23 +422,18 @@ class LambdaSpecialistStack(Stack):
             "TEMPERATURE": "0.1",
         }
 
-        # Add inference profile ARNs for cost tracking
         if self.inference_profiles_stack:
-            environment.update(
-                {
-                    "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
-                    "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
-                    "NOVA_PREMIER_PROFILE_ARN": self.inference_profiles_stack.nova_premier_profile_arn,
-                    "CLAUDE_OPUS_46_PROFILE_ARN": self.inference_profiles_stack.claude_opus_46_profile_arn,
-                    "CLAUDE_OPUS_45_PROFILE_ARN": self.inference_profiles_stack.claude_opus_45_profile_arn,
-                }
+            environment["MODEL_PROFILES_PARAM"] = (
+                self.inference_profiles_stack.model_profiles_param_name
             )
 
-            # Image enhancer uses VISION_MODEL to select its model - point it at the application inference profile
-            if func_name == "image_enhancer":
-                environment["VISION_MODEL"] = (
-                    self.inference_profiles_stack.claude_sonnet_46_profile_arn
-                )
+        # The image enhancer is the documented exception: it is a container, not
+        # manifest-aware, and drives Strands' BedrockModel directly, so it takes its model as
+        # a single env var rather than reading the map.
+        if self.inference_profiles_stack and func_name == "image_enhancer":
+            environment["VISION_MODEL"] = self.inference_profiles_stack.profile_arn(
+                "us.anthropic.claude-sonnet-4-6"
+            )
 
         # Container image functions do NOT support Lambda layers.
         # All dependencies (including foundation libs) must be baked into the container image.
