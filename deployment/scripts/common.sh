@@ -957,8 +957,13 @@ cdk_deploy() {
 }
 
 cdk_destroy() {
+  # `cdk destroy` still synthesizes the app, and LambdaSpecialistStack refuses to synth
+  # while lambdas/layer.zip is older than its sources. That guard protects a deploy from
+  # shipping a stale layer; a destroy ships nothing, so it must not block teardown. It
+  # did: a teardown of an old deployment aborted on the traceback before any DeleteStack
+  # was issued, with all twelve stacks left standing.
   (unset VIRTUAL_ENV; cd "${DEPLOYMENT_DIR}" \
-    && uv run cdk destroy --app "python app.py" --force "$@")
+    && BADGERS_ALLOW_STALE_LAYER=1 uv run cdk destroy --app "python app.py" --force "$@")
 }
 
 # ── X-Ray Transaction Search preflight ─────────────────────────────────────

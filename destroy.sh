@@ -314,10 +314,10 @@ if [ -z "${KMS_KEY_ARN}" ]; then
     --query 'KeyMetadata.Arn' --output text 2>/dev/null || true)"
   [ "${KMS_KEY_ARN}" = "None" ] && KMS_KEY_ARN=""
 fi
-  echo "  ✓ KMS alias: ${KMS_ALIAS}"
 [ "${KMS_KEY_ARN}" = "None" ] && KMS_KEY_ARN=""
 if [ -n "${KMS_KEY_ARN}" ]; then
-  echo "  ✓ KMS key: ${KMS_KEY_ARN}"
+  echo "  ✓ KMS key:   ${KMS_KEY_ARN}"
+  echo "  ✓ KMS alias: ${KMS_ALIAS}"
 else
   log_warn "Could not read S3KmsKeyArn — the key will not be scheduled by this script."
 fi
@@ -413,12 +413,38 @@ echo ""
 # ── Verify ─────────────────────────────────────────────────────────────────
 # Sets REMAINING. Returns 0 explicitly: the loop body ends in a conditional whose
 # failure would otherwise become the function's status under errexit.
+#
+# Two sources, not one. The hardcoded STACKS list gives dependency order for the
+# destroy and a status for each expected stack. But it is a list maintained by hand,
+# and a stack that exists in CloudFormation under this deployment's name pattern
+# without being in the list would otherwise survive under a "Teardown complete"
+# banner. So CloudFormation is also asked directly for anything still matching
+# ${STACK_PREFIX}-*-{id}-{suffix} -- the same query the explicit-DEPLOYMENT_ID path uses
+# to prove the deployment exists -- and anything it returns that the list did not is
+# reported as unexpected.
 _remaining_stacks() {
   local stack state
   REMAINING=()
   for stack in "${STACKS[@]}"; do
     state="$(stack_status "${stack}")"
     [ "${state}" != "DELETED" ] && REMAINING+=("${stack} (${state})")
+  done
+
+  local live name known
+  live="$(aws cloudformation list-stacks --region "${AWS_REGION}" \
+    --query "StackSummaries[?starts_with(StackName, '${STACK_PREFIX}-') \
+      && ends_with(StackName, '-${DEPLOYMENT_ID}-${STACK_SUFFIX}') \
+      && StackStatus != 'DELETE_COMPLETE'].StackName" \
+    --output text 2>/dev/null | tr '\t' '\n' || true)"
+  for name in ${live}; do
+    [ -z "${name}" ] || [ "${name}" = "None" ] && continue
+    known=false
+    for stack in "${STACKS[@]}"; do
+      [ "${stack}" = "${name}" ] && { known=true; break; }
+    done
+    if [ "${known}" = false ]; then
+      REMAINING+=("${name} (UNEXPECTED — not in this script's stack list; delete by hand)")
+    fi
   done
   return 0
 }
@@ -525,6 +551,13 @@ else
 fi
 # Also remove the stack outputs cache if it exists.
 rm -f "${REPO_ROOT}/.deploy-state/${DEPLOYMENT_ID}-outputs.json" 2>/dev/null || true
+echo ""
+
+# ── Account-level settings this script does not touch ──────────────────────
+# Everything above was owned by this deployment. Model access is account-wide and is
+# deliberately left alone: another deployment, or another project, may depend on it.
+echo "── Left in place (account-level) ─────────────────────────"
+echo "  Bedrock model access / Marketplace subscriptions enabled for this account."
 echo ""
 
 echo "════════════════════════════════════════════════════════"
