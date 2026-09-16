@@ -25,6 +25,8 @@ try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.p
 except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
     _HAVE_CDK_NAG = False
 
+from .nag_arn_renderings import account_renderings, region_renderings
+
 if TYPE_CHECKING:
     from .inference_profiles_stack import InferenceProfilesStack
 
@@ -104,26 +106,30 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         if not _HAVE_CDK_NAG:
             return
 
+        # The Bedrock statements on this role are added by
+        # InferenceProfilesStack.grant_invoke_to_role, so the ARNs to suppress come from
+        # there rather than being transcribed. Hand-listing them is what let this drift to
+        # five stale model IDs, three of which no longer exist in the registry.
+        applies_to = self.inference_profiles_stack.invoke_nag_applies_to()
+
         NagSuppressions.add_resource_suppressions(
             self.agent_role,
             [
                 {
                     "id": "AwsSolutions-IAM5",
                     "reason": (
-                        "Cross-Region inference requires bedrock:InvokeModel on the "
-                        "foundation model in every destination Region the inference "
-                        "profile can route to, so the Region field is wildcarded. The "
-                        "model ID itself is pinned exactly -- no model wildcard. See "
+                        "Geo cross-Region inference requires bedrock:InvokeModel on the "
+                        "foundation model in the source Region AND in every destination "
+                        "Region the geo profile can route to. The model ID is pinned "
+                        "exactly -- only the Region field is wildcarded. Wildcarding the "
+                        "Region is a deliberate choice rather than a requirement; the "
+                        "alternatives, and why they were not taken, are recorded on the "
+                        "matching suppression in iam_stack.py and in "
+                        "DEPLOYMENT_README.md -> Inference Profiles and Regions. See "
                         "https://docs.aws.amazon.com/bedrock/latest/userguide/"
                         "geographic-cross-region-inference.html"
                     ),
-                    "appliesTo": [
-                        "Resource::arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-5-20251101-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
-                    ],
+                    "appliesTo": applies_to["foundation_models"],
                 },
                 {
                     "id": "AwsSolutions-IAM5",
@@ -132,13 +138,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                         "the Region field is wildcarded while the profile ID stays "
                         "pinned. Scoped to this account."
                     ),
-                    "appliesTo": [
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.amazon.nova-premier-v1:0",
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-opus-4-5-20251101-v1:0",
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-opus-4-6-v1",
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-                    ],
+                    "appliesTo": applies_to["system_inference_profiles"],
                 },
                 {
                     "id": "AwsSolutions-IAM5",
@@ -148,8 +148,14 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                         "/aws/bedrock-agentcore/runtimes/ within this account and "
                         "Region."
                     ),
+                    # Built from self.region / self.account. This was hardcoded to
+                    # us-east-1 and <AWS::AccountId>, so it matched nothing on the deploy
+                    # path in any Region.
                     "appliesTo": [
-                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/bedrock-agentcore/runtimes/*",
+                        f"Resource::arn:aws:logs:{region}:{account}"
+                        f":log-group:/aws/bedrock-agentcore/runtimes/*"
+                        for region in region_renderings(self.region)
+                        for account in account_renderings(self.account)
                     ],
                 },
                 {
@@ -162,14 +168,48 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                         "keys in the three named buckets, and SSM parameters under the "
                         "/badgers/ prefix. All are scoped to this account and Region."
                     ),
+                    # Region and account built from self.region / self.account; these were
+                    # hardcoded to us-east-1 and <AWS::AccountId>.
                     "appliesTo": [
-                        "Resource::arn:aws:bedrock-agentcore:us-east-1:<AWS::AccountId>:memory/<badgersmemory.MemoryId>/*",
-                        "Resource::arn:aws:bedrock-agentcore:us-east-1:<AWS::AccountId>:workload-identity-directory/default/workload-identity/*",
                         "Resource::arn:aws:s3:::<ConfigBucket2112C5EC>/*",
                         "Resource::arn:aws:s3:::<OutputBucket7114EB27>/*",
                         "Resource::arn:aws:s3:::<SourceBucketDDD2130A>/*",
-                        "Resource::arn:aws:ssm:us-east-1:<AWS::AccountId>:parameter/badgers/*",
+                    ]
+                    + [
+                        f"Resource::arn:aws:{service}:{region}:{account}:{tail}"
+                        for service, tail in (
+                            (
+                                "bedrock-agentcore",
+                                "memory/<badgersmemory.MemoryId>/*",
+                            ),
+                            (
+                                "bedrock-agentcore",
+                                "workload-identity-directory/default"
+                                "/workload-identity/*",
+                            ),
+                            ("ssm", "parameter/badgers/*"),
+                        )
+                        for region in region_renderings(self.region)
+                        for account in account_renderings(self.account)
                     ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Three actions on this role do not support resource-level "
+                        'permissions, so Resource must be "*" -- a narrower ARN makes '
+                        "the statement match nothing. ecr:GetAuthorizationToken returns "
+                        "an account-scoped registry token and names no repository (the "
+                        "repository-scoped pull actions are in a separate statement, "
+                        "pinned to one repository ARN). The X-Ray sampling actions "
+                        "xray:GetSamplingRules and xray:GetSamplingTargets read "
+                        "account-level sampling configuration. cloudwatch:PutMetricData "
+                        "takes no resource and is instead constrained by a "
+                        "cloudwatch:namespace condition limiting it to the "
+                        "bedrock-agentcore namespace. This finding was previously "
+                        "unsuppressed."
+                    ),
+                    "appliesTo": ["Resource::*"],
                 },
             ],
             apply_to_children=True,
@@ -424,12 +464,11 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                 # foundation.job_state reads this at call time; when it is absent
                 # every write becomes a no-op and tracking is simply off.
                 "JOBS_TABLE_NAME": self.jobs_table.table_name,
-                # Inference profile ARNs for cost tracking
-                "CLAUDE_SONNET_PROFILE_ARN": self.inference_profiles_stack.claude_sonnet_profile_arn,
-                "CLAUDE_HAIKU_PROFILE_ARN": self.inference_profiles_stack.claude_haiku_profile_arn,
-                "NOVA_PREMIER_PROFILE_ARN": self.inference_profiles_stack.nova_premier_profile_arn,
-                "CLAUDE_OPUS_46_PROFILE_ARN": self.inference_profiles_stack.claude_opus_46_profile_arn,
-                "CLAUDE_OPUS_45_PROFILE_ARN": self.inference_profiles_stack.claude_opus_45_profile_arn,
+                # Model ID -> profile ARN map, for cost attribution. One deployment-shaped
+                # variable in place of five model-shaped ones.
+                "MODEL_PROFILES_PARAM": (
+                    self.inference_profiles_stack.model_profiles_param_name
+                ),
             },
         )
 

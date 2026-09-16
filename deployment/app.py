@@ -326,21 +326,6 @@ if custom_specialists_registry.exists():
         gateway_id=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayId"),
         gateway_role_arn=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayRoleArn"),
         kms_key_arn=cdk.Fn.import_value(f"{_sn('S3')}-S3KmsKeyArn"),
-        claude_sonnet_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeSonnetProfileArn"
-        ),
-        claude_haiku_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeHaikuProfileArn"
-        ),
-        nova_premier_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-NovaPremierProfileArn"
-        ),
-        claude_opus_46_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeOpus46ProfileArn"
-        ),
-        claude_opus_45_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeOpus45ProfileArn"
-        ),
         env=env,
         description="Custom specialists created via the wizard UI",
     )
