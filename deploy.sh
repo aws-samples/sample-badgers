@@ -112,6 +112,13 @@ step_infra() {
 
   # Service quotas for VPC, S3, ECR, Lambda, etc.
   preflight_service_quotas || return 1
+  # Bedrock model access, before anything is created. A model the account cannot reach
+  # otherwise surfaces as AccessDenied deep inside a document run, where _should_fallback
+  # correctly refuses to retry it — so a chain with a healthy fallback still hard-fails.
+  # Order matters: access (is the model there) → invocation (does a real call succeed).
+  # Each is cheap next to a failed deploy.
+  preflight_model_access || return 1
+  preflight_model_invocation || return 1
 
   # Decide about X-Ray before deploying anything. Enabling Transaction Search needs a
   # CloudWatch Logs resource policy from a hard quota of 10 per region, and finding that
@@ -688,6 +695,74 @@ show_status() {
   echo ""
 }
 
+# ══════════════════════════════════════════════════════════════════════════
+# Models — what the registry holds, and which steps a change to it requires
+# ══════════════════════════════════════════════════════════════════════════
+# The registry is the only place models are listed. Everything else -- profiles, IAM,
+# the SSM map, the wizard dropdown, prices -- derives from it at synth or at request
+# time. But "derives from it" means three different steps have to run for an edit to
+# take full effect, and nothing else in this menu says which. This does.
+show_models() {
+  local registry="${DEPLOYMENT_DIR}/s3_files/config/model_registry.json"
+  echo ""
+  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo -e "${BOLD}  Model Registry${NC}"
+  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo ""
+  echo "  ${registry#"${REPO_ROOT}/"}"
+  echo ""
+
+  if [ ! -f "${registry}" ]; then
+    log_error "Registry file not found."
+    return 1
+  fi
+
+  python3 - "${registry}" <<'PY' || { log_error "Could not parse the registry."; return 1; }
+import json, sys
+models = json.load(open(sys.argv[1]))["models"]
+rows = [(mid, s) for mid, s in models.items()]
+w = max(len(m) for m, _ in rows)
+print(f"  {'Model ID':<{w}}  {'Status':<9} {'Provider':<10} {'Thinking':<9} {'$/1M in':>8} {'$/1M out':>9}  Flags")
+print(f"  {'-'*w}  {'-'*9} {'-'*10} {'-'*9} {'-'*8} {'-'*9}  -----")
+for mid, s in rows:
+    flags = []
+    if s.get("thinking_default_on"):   flags.append("thinking-default-on")
+    if s.get("prompt_caching"):        flags.append("caching")
+    print(f"  {mid:<{w}}  {s.get('status','?'):<9} {s.get('provider','?'):<10} "
+          f"{str(s.get('thinking')):<9} {s.get('price_in',0):>8.2f} {s.get('price_out',0):>9.2f}  "
+          f"{', '.join(flags)}")
+by = {}
+for _, s in rows: by[s.get("status","?")] = by.get(s.get("status","?"), 0) + 1
+print()
+print("  " + ", ".join(f"{n} {k}" for k, n in sorted(by.items())))
+PY
+
+  echo ""
+  echo -e "${BOLD}  To change the model set${NC}"
+  echo ""
+  echo "  Edit the file above. status is one of:"
+  echo "    active    provisioned, granted, offered in the wizard"
+  echo "    retiring  provisioned and granted so existing manifests keep working; not offered"
+  echo "    disabled  nothing provisioned -- for a model this account declines to adopt"
+  echo ""
+  echo "  Then run these steps, in this order. Nothing else re-reads the registry:"
+  echo ""
+  echo "    2) Foundational Infra   profiles, IAM grants and the SSM model→profile map are"
+  echo "                            regenerated at synth. The model access and invocation"
+  echo "                            preflights re-run here."
+  echo "    3) Upload Config Files  option 6 (or 7) copies the registry to S3, which is what"
+  echo "                            GET /api/models and the wizard read. Skip this and the"
+  echo "                            UI keeps offering the old list."
+  echo "    6) Runtime              the agent role's Bedrock grants are generated into the"
+  echo "                            Runtime stack, so it must redeploy too. The image is"
+  echo "                            unchanged; step 6 will rebuild it anyway."
+  echo ""
+  echo "  Manifests under s3_files/manifests/ and custom_specialists/manifests/ name models"
+  echo "  by ID. A manifest naming a model that is not active fails with AccessDenied on"
+  echo "  its first call and does not fall back. grep them before deploying."
+  echo ""
+}
+
 reset_state() {
   log_warn "This resets deployment state and marks all steps incomplete."
   log_warn "It does NOT delete any AWS resources. The stack suffix is preserved."
@@ -739,7 +814,7 @@ EOF
   echo ""
   echo -e "  ${BOLD}10${NC}) Show Deployment Status"
   echo -e "  ${BOLD}11${NC}) Reset Deployment State (start fresh)"
-  echo -e "  ${BOLD} m${NC}) Model Configuration (placeholder)"
+  echo -e "  ${BOLD} m${NC}) Models — show the registry and how to change it"
   echo -e "  ${BOLD} 0${NC}) Exit"
   echo ""
   echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
@@ -760,8 +835,7 @@ dispatch() {
     10) show_status ;;
     11) reset_state ;;
     r|R|resume) step_resume ;;
-    m|M) echo ""; log_info "Model configuration not yet implemented for BADGERS."; echo ""
-      log_info "BADGERS currently uses models configured in the CDK stacks and manifests." ;;
+    m|M) show_models ;;
     0)  log_info "Exiting..."; exit 0 ;;
     *)  return 1 ;;
   esac
