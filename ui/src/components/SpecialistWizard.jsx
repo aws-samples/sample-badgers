@@ -1,12 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-const MODELS = ['Claude Sonnet 4.5', 'Claude Haiku 4.5', 'Amazon Nova Premier', 'Claude Opus 4.6', 'Claude Opus 4.5']
+// The model list comes from GET /api/models — the intersection of the registry and the
+// inference profiles this deployment actually provisioned. It is not hardcoded here, because
+// a hardcoded list can offer a model with no profile, which fails at first invocation rather
+// than at save.
+//
+// Defaults are model IDs, not indexes into the fetched list, so the order the endpoint
+// returns cannot change what a new specialist defaults to.
+const DEFAULT_PRIMARY = 'us.anthropic.claude-sonnet-4-6'
+const DEFAULT_FALLBACK_1 = 'us.openai.gpt-5.6-terra'
+const DEFAULT_FALLBACK_2 = 'us.amazon.nova-2-lite-v1:0'
 
 export default function SpecialistWizard({ runSSE, running }) {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState({
     displayName: '', description: '', details: '',
-    primaryModel: MODELS[0], fallback1: MODELS[1], fallback2: MODELS[2],
+    primaryModel: DEFAULT_PRIMARY, fallback1: DEFAULT_FALLBACK_1, fallback2: DEFAULT_FALLBACK_2,
     enhancement: false,
   })
   const [prompts, setPrompts] = useState({})
@@ -18,6 +27,25 @@ export default function SpecialistWizard({ runSSE, running }) {
   const [saved, setSaved] = useState(false)
   const [progress, setProgress] = useState(null)
   const [sectionLog, setSectionLog] = useState([])
+  const [models, setModels] = useState([])
+  const [modelsError, setModelsError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/models')
+      .then(async r => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`)
+        return body
+      })
+      .then(body => {
+        if (cancelled) return
+        setModels(body.models || [])
+        if (!body.models?.length) setModelsError('No models available')
+      })
+      .catch(e => { if (!cancelled) setModelsError(e.message) })
+    return () => { cancelled = true }
+  }, [])
   const [sections, setSections] = useState([])
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
@@ -213,8 +241,11 @@ export default function SpecialistWizard({ runSSE, running }) {
               {[['primaryModel', 'Primary Model'], ['fallback1', 'Fallback 1'], ['fallback2', 'Fallback 2']].map(([k, label]) => (
                 <div key={k}>
                   <label style={{ fontSize: 12, color: 'var(--text-dim)', display: 'block', marginBottom: 4 }}>{label}</label>
-                  <select value={form[k]} onChange={e => set(k, e.target.value)}>
-                    {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                  <select value={form[k]} onChange={e => set(k, e.target.value)} disabled={!models.length}>
+                    {models.length === 0 && <option value="">{modelsError || 'Loading…'}</option>}
+                    {models.map(m => (
+                      <option key={m.model_id} value={m.model_id}>{m.display_name}</option>
+                    ))}
                   </select>
                 </div>
               ))}

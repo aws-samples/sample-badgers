@@ -211,6 +211,15 @@ function AdvancedCalculator({ config }) {
   const specialists = config.specialist_defaults || {}
   const specialistNames = Object.keys(specialists).sort()
 
+  // Fallback for a specialist whose default_model is missing from specialist_defaults.
+  // Taken from the served model list rather than a literal: `config.models` now comes from
+  // /api/models via /api/pricing-config, so a hardcoded name goes stale the moment the
+  // registry changes. It previously read 'Claude Sonnet 4.5', a model that no longer exists
+  // -- getModelPricing falls through to `models[0]`, so that priced silently against an
+  // arbitrary model instead of the intended one.
+  const fallbackModelName = modelNames[0] || ''
+  const defaultModelFor = (name) => specialists[name]?.default_model || fallbackModelName
+
   const [numPages, setNumPages] = useState(100)
   const [numDocs, setNumDocs] = useState(1)
   const [included, setIncluded] = useState(() => {
@@ -220,7 +229,7 @@ function AdvancedCalculator({ config }) {
   })
   const [modelOverrides, setModelOverrides] = useState(() => {
     const m = {}
-    specialistNames.forEach(n => m[n] = specialists[n]?.default_model || 'Claude Sonnet 4.5')
+    specialistNames.forEach(n => m[n] = defaultModelFor(n))
     return m
   })
   const [result, setResult] = useState(null)
@@ -276,7 +285,7 @@ function AdvancedCalculator({ config }) {
     const inc = {}, mdl = {}
     specialistNames.forEach(n => {
       inc[n] = DEFAULT_INCLUDED.has(n)
-      mdl[n] = specialists[n]?.default_model || 'Claude Sonnet 4.5'
+      mdl[n] = defaultModelFor(n)
     })
     setIncluded(inc); setModelOverrides(mdl)
   }
