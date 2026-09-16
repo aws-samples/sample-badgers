@@ -23,6 +23,7 @@ import { SignatureV4 } from '@smithy/signature-v4';
 import { HttpRequest } from '@smithy/protocol-http';
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
+import { listModels } from './models.js';
 
 // The six prompt sections a specialist is built from, in load order.
 const PROMPT_TYPES = ['gestalt', 'job_role', 'context', 'rules', 'tasks', 'format'];
@@ -104,27 +105,36 @@ const PROMPT_TYPE_INSTRUCTIONS = {
         '- A comment noting to omit <elements> when element_count is 0',
 };
 
-// Display label -> Bedrock model ID. Labels match the dropdown in
-// SpecialistWizard.jsx; IDs match deployment/stacks/inference_profiles_stack.py.
-const MODEL_IDS = {
-    'Claude Opus 4.6': 'us.anthropic.claude-opus-4-6-v1',
-    'Claude Opus 4.5': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
-    'Claude Sonnet 4.6': 'us.anthropic.claude-sonnet-4-6-v1:0',
-    'Claude Sonnet 4.5': 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
-    'Claude Haiku 4.5': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
-    'Amazon Nova Premier': 'us.amazon.nova-premier-v1:0',
-    'Nova Premier': 'us.amazon.nova-premier-v1:0',
-    'Nova Pro': 'us.amazon.nova-pro-v1:0',
-    'Nova Lite': 'us.amazon.nova-lite-v1:0',
-    'Nova Micro': 'us.amazon.nova-micro-v1:0',
-};
+// Model used to write the prompts themselves, when nothing else says. Independent
+// of the model the generated specialist will run on. The resolved value is read
+// inside mountWizardRoutes: in ECS the task definition sets WIZARD_GENERATOR_MODEL_ID
+// from the same constant the task role's Bedrock grant was built from
+// (deployment/stacks/ecs_stack.py), so the call and the grant cannot name different
+// models. This literal is what local development uses.
+const DEFAULT_GENERATOR_MODEL_ID = 'us.anthropic.claude-sonnet-4-6';
 
-// Model used to write the prompts themselves. Independent of the model the
-// generated specialist will run on.
-const GENERATOR_MODEL_ID = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
+// The client now submits model IDs, not display labels, because the dropdown is populated
+// from GET /api/models. The label -> ID map that used to live here is gone: it was a second
+// hand-maintained list that disagreed with AWS in three ways (Sonnet 4.6 spelled with a
+// -v1:0 suffix the CDK never creates; Nova Pro/Lite/Micro mappable despite never having had
+// a profile; several entries naming retired models).
+//
+// Validation is against the same join the dropdown was built from, so the two cannot drift.
+async function assertModelsAvailable(ids) {
+    const wanted = ids.filter(Boolean);
+    if (wanted.length === 0) return;
 
-function toModelId(label) {
-    return MODEL_IDS[label] || label;
+    const available = await listModels();
+    const known = new Set(available.map((m) => m.model_id));
+    const unknown = wanted.filter((id) => !known.has(id));
+
+    if (unknown.length) {
+        throw new Error(
+            `Not available in this deployment: ${unknown.join(', ')}. ` +
+            `Available: ${[...known].join(', ')}. A model must be 'active' in the registry ` +
+            `and have a provisioned inference profile.`
+        );
+    }
 }
 
 // "Paleographic Specialist" -> "paleographic_specialist"
@@ -174,6 +184,7 @@ export function mountWizardRoutes(app, PROJECT_ROOT) {
     const REGION = process.env.AWS_REGION || 'us-west-2';
     const AWS_PROFILE = process.env.AWS_PROFILE || undefined;
     const credentials = fromNodeProviderChain({ profile: AWS_PROFILE });
+    const GENERATOR_MODEL_ID = process.env.WIZARD_GENERATOR_MODEL_ID || DEFAULT_GENERATOR_MODEL_ID;
 
     // Guard every write: resolve the final path and confirm it is still inside
     // custom_specialists/ before touching the filesystem.
@@ -302,8 +313,8 @@ export function mountWizardRoutes(app, PROJECT_ROOT) {
                 analysis_text: (details || description || short).toString().trim().slice(0, 120),
                 expected_output_tokens: 2500,
                 model_selections: {
-                    primary: toModelId(primaryModel),
-                    fallback_list: [fallback1, fallback2].filter(Boolean).map(toModelId),
+                    primary: primaryModel,
+                    fallback_list: [fallback1, fallback2].filter(Boolean),
                 },
                 output_extension: 'xml',
             },
@@ -449,12 +460,13 @@ export function mountWizardRoutes(app, PROJECT_ROOT) {
 
     // ── Step 3: assemble the config for review ──
 
-    app.post('/api/wizard/preview', (req, res) => {
+    app.post('/api/wizard/preview', async (req, res) => {
         try {
             const form = req.body || {};
             const specialistName = sanitizeName(form.displayName);
             if (!specialistName) return res.json({ error: 'Specialist name is required' });
             const exampleCount = Number(form.exampleCount) || 0;
+            await assertModelsAvailable([form.primaryModel, form.fallback1, form.fallback2]);
             res.json({
                 specialist_name: specialistName,
                 registry_entry: {
@@ -500,6 +512,7 @@ export function mountWizardRoutes(app, PROJECT_ROOT) {
                 mkdirSync(safePath(dir), { recursive: true });
             }
 
+            await assertModelsAvailable([form.primaryModel, form.fallback1, form.fallback2]);
             const manifest = buildManifest({ ...form, specialistName, exampleCount: examples.length });
             const manifestPath = safePath('manifests', `${specialistName}.json`);
             await writeFile(manifestPath, JSON.stringify(manifest, null, 4), 'utf-8');

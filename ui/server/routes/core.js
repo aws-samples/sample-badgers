@@ -13,6 +13,7 @@ import { CloudWatchLogsClient, StartQueryCommand, GetQueryResultsCommand } from 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import multer from 'multer';
+import { listModels } from './models.js';
 
 export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
@@ -796,10 +797,28 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
     // ── Pricing Config ──
 
+    // The file supplies `ingestion`, `presets` and `specialist_defaults` — calculator inputs
+    // with no equivalent anywhere else. The `models` block is NOT in the file: it is built
+    // from the same registry × SSM join that backs GET /api/models, so the calculator cannot
+    // price a model this deployment has no profile for, and prices cannot drift from the
+    // registry the way the checked-in copy did.
     app.get('/api/pricing-config', async (_req, res) => {
         const configPath = resolve(CONFIG_DIR, 'pricing_config.json');
-        try { res.json(JSON.parse(await readFile(configPath, 'utf-8'))); }
-        catch (e) { res.status(500).json({ error: 'Failed to load pricing config: ' + e.message }); }
+        try {
+            const config = JSON.parse(await readFile(configPath, 'utf-8'));
+            const models = await listModels(ENV);
+            config.models = Object.fromEntries(models.map((m) => [
+                m.model_id,
+                {
+                    name: m.display_name,
+                    input_cost_per_million: m.price_in,
+                    output_cost_per_million: m.price_out,
+                },
+            ]));
+            res.json(config);
+        } catch (e) {
+            res.status(500).json({ error: 'Failed to load pricing config: ' + e.message });
+        }
     });
 
     // Wizard routes live in ./wizard.js, mounted separately from index.js.
