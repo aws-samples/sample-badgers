@@ -1,6 +1,6 @@
 [project]
 name = "BADGERS"
-version = "4.0.0"
+version = "5.0.0"
 description = "BADGERS (Broad Agentic Document Generative Extraction & Recognition System) transforms document processing through vision-enabled AI and deep layout analysis. Unlike traditional text extraction tools, BADGERS understands document structure and meaning by recognizing visual hierarchies, reading patterns, and contextual relationships between elements. The system currently processes 21 distinct document elements including text extraction, handwriting recognition, mathematical equations, complex tables, diagrams, and accessibility compliance features. Built on Amazon Bedrock with vision-enabled LLMs, it maintains semantic connections and document hierarchy throughout extraction, delivering structured outputs that preserve original organization and meaning. BADGERS automates document processing workflows while improving accuracy and completeness, enabling organizations to focus on using information rather than extracting it. The system accelerates research, compliance, content management, and accessibility remediation across diverse document types from simple forms to complex scientific papers."
 authors = [{ name = "rbpotter-aws" }]
 readme = "README.md"
@@ -12,65 +12,44 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
+
+# This environment runs the CDK app and the deploy scripts. The Lambda layer, the two
+# container Lambdas, and the AgentCore runtime each install from their own requirements
+# file (lambdas/requirements.txt, lambdas/containers/*/requirements.txt,
+# runtime/requirements.txt); nothing declared here changes what ships in them.
 dependencies = [
-    "aws-cdk-lib",
-    "boto3",
-    "botocore",
-    "defusedxml>=0.7.1",
-    "gradio",
-    "gradio_pdf",
-    "lxml>=6.1.0",
-    "markdown2docx>=0.1.0",
-    "mcp>=1.28.1",
-    "networkx",
-    "opencv-python>=4.13.0.92",
-    "pdfreader>=0.1.15",
-    "pikepdf>=10.0.2",
-    "pillow",
-    "PyMuPDF",
-    "pypdf>=6.15.0",
-    "pdf2image",
-    "python-dotenv",
-    "pyvis",
-    "reportlab>=4.4.4",
-    "strands-agents",
-    "strands-agents[otel]",
-    "strands-agents-tools",
-    "tomli; python_version < '3.11'",
-    "xmlschema>=4.2.0",
-    "xmltoxsd>=0.1.1",
-    "aws-cdk-lib>=2.227.0",
+    # ── CDK app: deployment/app.py and deployment/stacks ───────────────────────
+    # 2.263.0 is the version the stable aws_bedrockagentcore Gateway L2 and
+    # Stack.add_stack_dependency were verified against. Both replaced deprecated
+    # APIs, and the lock file pins this version.
+    "aws-cdk-lib>=2.263.0",
     "constructs>=10.4.3",
-    "aws-cdk-aws-bedrock-agentcore-alpha>=2.230.0a0",
-    "aws-cdk-aws-bedrock-alpha>=2.230.0a0",
     # Capped below 3.x: cdk-nag 3.x changed the Aspect API and fails at synth
     # with "aspectApplication.aspect.visit is not a function" against
     # aws-cdk-lib 2.x. ASH's own [cdk] extra pins cdk-nag>=2.28.0,<3.0.0 too.
     "cdk-nag>=2.37.55,<3.0.0",
-    "pydantic>=2.13.4",
-    "gradio-pdf>=0.0.24",
-    "pymupdf>=1.26.6",
-    "jpype1>=1.6.0",
-    "websockets>=15.0.1",
+    "boto3",
+    # ── Lambda, container, and runtime code, mirrored here so it resolves in the
+    #    IDE and can be run locally. See the note above dependencies.
+    "botocore",
     "bedrock-agentcore>=1.18.1",
+    "defusedxml>=0.7.1",
+    "mcp>=1.28.1",
+    "opencv-python>=4.13.0.92",
+    "pdf2image",
+    "pikepdf>=10.0.2",
+    "pillow>=12.3.0",
+    "pymupdf>=1.26.6",
+    "strands-agents[otel]",
+    # ── Transitive floors. Not imported directly -- pydantic arrives via mcp,
+    #    strands-agents, and bedrock-agentcore; urllib3 via botocore. Set in 4.0.0 so
+    #    versions that dependabot flagged cannot regress when the lock is re-resolved.
+    "pydantic>=2.13.4",
     "urllib3>=2.7.0",
-    "pip-audit>=2.10.0",
-    "requests>=2.28.0",
-    "pyjwt>=2.13.0",
-    "uvicorn>=0.24.0",
-    "itsdangerous>=2.2.0",
-    "aws-cdk-mixins-preview==2.234.1a0",
-    "setuptools>=83.0.0",
-    "nbstripout>=0.9.1",
-    "pandas>=2.3.3",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "mypy", "pylint"]
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["tools*", "config*", "server*", "main*"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -83,10 +62,3 @@ disable = ["C0103", "R0903"]
 
 [tool.uv.workspace]
 members = [".kiro/skills/markdown_converter"]
-
-[dependency-groups]
-dev = [
-    "pillow>=12.3.0",
-    "playwright>=1.62.0",
-    "types-requests>=2.32.4.20260107",
-]
