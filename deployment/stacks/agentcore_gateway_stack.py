@@ -20,10 +20,10 @@ from .log_delivery import (
 )
 from .nag_arn_renderings import account_renderings, region_renderings
 
-try:
-    import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
-except ImportError:
-    import aws_cdk_aws_bedrock_agentcore_alpha as agentcore
+# The Gateway L2s graduated from @aws-cdk/aws-bedrock-agentcore-alpha into aws-cdk-lib.
+# Same class names and keyword parameters for everything this stack uses; the alpha
+# package is deprecated wholesale and emitted 27 warnings per synth.
+from aws_cdk import aws_bedrockagentcore as agentcore
 
 try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
     from cdk_nag import NagSuppressions

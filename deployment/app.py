@@ -155,7 +155,7 @@ iam_stack = IAMStack(
     env=env,
     description="IAM roles for BADGERS",
 )
-iam_stack.add_dependency(dynamodb_stack)
+iam_stack.add_stack_dependency(dynamodb_stack)
 
 # ECR repository for AgentCore Runtime container (and container Lambdas)
 ecr_stack = AgentCoreECRStack(
@@ -211,9 +211,9 @@ lambda_stack = LambdaSpecialistStack(
     env=env,
     description="Lambda specialists for BADGERS",
 )
-lambda_stack.add_dependency(ecr_stack)
-lambda_stack.add_dependency(inference_profiles_stack)
-lambda_stack.add_dependency(dynamodb_stack)
+lambda_stack.add_stack_dependency(ecr_stack)
+lambda_stack.add_stack_dependency(inference_profiles_stack)
+lambda_stack.add_stack_dependency(dynamodb_stack)
 
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
 #
@@ -253,8 +253,8 @@ gateway_stack = AgentCoreGatewayStack(
     env=env,
     description="AgentCore Gateway with Lambda tool targets",
 )
-gateway_stack.add_dependency(lambda_stack)
-gateway_stack.add_dependency(cognito_stack)
+gateway_stack.add_stack_dependency(lambda_stack)
+gateway_stack.add_stack_dependency(cognito_stack)
 
 # AgentCore Memory for session persistence
 memory_stack = AgentCoreMemoryStack(
@@ -291,19 +291,19 @@ runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     env=env,
     description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
 )
-runtime_websocket_stack.add_dependency(ecr_stack)
-runtime_websocket_stack.add_dependency(gateway_stack)
-runtime_websocket_stack.add_dependency(cognito_stack)
-runtime_websocket_stack.add_dependency(memory_stack)
-runtime_websocket_stack.add_dependency(inference_profiles_stack)
+runtime_websocket_stack.add_stack_dependency(ecr_stack)
+runtime_websocket_stack.add_stack_dependency(gateway_stack)
+runtime_websocket_stack.add_stack_dependency(cognito_stack)
+runtime_websocket_stack.add_stack_dependency(memory_stack)
+runtime_websocket_stack.add_stack_dependency(inference_profiles_stack)
 if xray_stack is not None:
-    runtime_websocket_stack.add_dependency(xray_stack)
-runtime_websocket_stack.add_dependency(dynamodb_stack)
+    runtime_websocket_stack.add_stack_dependency(xray_stack)
+runtime_websocket_stack.add_stack_dependency(dynamodb_stack)
 
 # Add dependencies
-iam_stack.add_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
-lambda_stack.add_dependency(iam_stack)  # Lambda needs IAM role
-lambda_stack.add_dependency(s3_stack)  # Lambda needs S3 bucket names
+iam_stack.add_stack_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
+lambda_stack.add_stack_dependency(iam_stack)  # Lambda needs IAM role
+lambda_stack.add_stack_dependency(s3_stack)  # Lambda needs S3 bucket names
 
 # Note: Gateway authentication with Cognito is configured separately
 # The Gateway stack creates the MCP endpoint
@@ -377,13 +377,14 @@ ecs_stack = ECSStack(
     env=env,
     description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
 )
-ecs_stack.add_dependency(vpc_stack)
-ecs_stack.add_dependency(cognito_stack)
-ecs_stack.add_dependency(ecr_stack)
-ecs_stack.add_dependency(s3_stack)
-ecs_stack.add_dependency(dynamodb_stack)
-ecs_stack.add_dependency(gateway_stack)
-ecs_stack.add_dependency(runtime_websocket_stack)
+ecs_stack.add_stack_dependency(vpc_stack)
+ecs_stack.add_stack_dependency(cognito_stack)
+ecs_stack.add_stack_dependency(ecr_stack)
+ecs_stack.add_stack_dependency(s3_stack)
+ecs_stack.add_stack_dependency(dynamodb_stack)
+ecs_stack.add_stack_dependency(gateway_stack)
+ecs_stack.add_stack_dependency(runtime_websocket_stack)
+ecs_stack.add_stack_dependency(inference_profiles_stack)
 
 # ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
 if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):
