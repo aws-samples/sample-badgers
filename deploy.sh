@@ -166,7 +166,7 @@ step_upload() {
   config_bucket="$(stack_output "$(_sn S3)" ConfigBucketName)"
   if [ -z "${config_bucket}" ] || [ "${config_bucket}" = "None" ]; then
     log_error "$(_sn S3) not found. Run Step 2 first."
-    exit 1
+    return 1
   fi
 
   # Submenu: which config to sync
@@ -181,20 +181,24 @@ step_upload() {
     echo "    3) Manifests (tool schemas, model selections, prompt file lists)"
     echo "    4) Schemas (MCP-compatible input schemas)"
     echo "    5) Agent Config (agent operating environment, model config)"
-    echo "    6) Runtime Config (document type contexts, enhancement settings)"
+    echo "    6) Runtime Config (model registry, document type contexts)"
     echo "    7) All"
     echo ""
     read -rp "  Choice [7]: " choice
     choice="${choice:-7}"
   fi
 
+  # Every arm must propagate failure. Arms 1-6 previously did not: a failed `aws s3 sync`
+  # inside _sync_config_category fell through to log_success and mark_complete, so the
+  # state file said "uploaded" while the bucket held the old files. Option 6 is how the
+  # model registry reaches S3 -- a silent miss there leaves GET /api/models serving 503.
   case "$choice" in
-    1) _sync_config_category "prompts" "$config_bucket" ;;
-    2) _sync_config_category "core_system_prompts" "$config_bucket" ;;
-    3) _sync_config_category "manifests" "$config_bucket" ;;
-    4) _sync_config_category "schemas" "$config_bucket" ;;
-    5) _sync_config_category "agent_config" "$config_bucket" ;;
-    6) _sync_config_category "config" "$config_bucket" ;;
+    1) _sync_config_category "prompts" "$config_bucket" || return 1 ;;
+    2) _sync_config_category "core_system_prompts" "$config_bucket" || return 1 ;;
+    3) _sync_config_category "manifests" "$config_bucket" || return 1 ;;
+    4) _sync_config_category "schemas" "$config_bucket" || return 1 ;;
+    5) _sync_config_category "agent_config" "$config_bucket" || return 1 ;;
+    6) _sync_config_category "config" "$config_bucket" || return 1 ;;
     7)
       log_info "Syncing all s3_files/ → s3://${config_bucket}/..."
       aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
@@ -209,18 +213,21 @@ step_upload() {
   mark_complete "s3_files_uploaded"
 }
 
-# Sync a single s3_files/ subdirectory to the config bucket (skips if absent).
+# Sync a single s3_files/ subdirectory to the config bucket. Returns non-zero on a sync
+# failure so the caller can refuse to mark the step complete. A missing directory is a
+# skip, not a failure -- not every category exists in every checkout.
 _sync_config_category() {
   local dir="$1" bucket="$2"
   local full_path="${DEPLOYMENT_DIR}/s3_files/${dir}"
-  if [ -d "${full_path}" ]; then
-    log_info "  Syncing ${dir}/ → s3://${bucket}/${dir}/"
-    aws s3 sync "${full_path}/" "s3://${bucket}/${dir}/" \
-      --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
-      --region "${AWS_REGION}" --quiet
-  else
+  if [ ! -d "${full_path}" ]; then
     log_warn "  Directory ${dir}/ not found in s3_files/ — skipping"
+    return 0
   fi
+  log_info "  Syncing ${dir}/ → s3://${bucket}/${dir}/"
+  aws s3 sync "${full_path}/" "s3://${bucket}/${dir}/" \
+    --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
+    --region "${AWS_REGION}" --quiet \
+    || { log_error "  Sync of ${dir}/ failed."; return 1; }
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -281,7 +288,7 @@ step_gateway() {
     log_success "Gateway URL: ${gateway_url}"
   else
     log_error "Could not read GatewayUrl from $(_sn Gateway) outputs"
-    exit 1
+    return 1
   fi
 
   mark_complete "gateway_complete"
@@ -293,9 +300,20 @@ step_gateway() {
 step_runtime() {
   log_step "Step 6: Runtime — Build, Push & Deploy"
 
+  # Both sub-steps, not just the image push. An earlier guard tested only
+  # runtime_image_pushed, so a run that pushed the image but never deployed the runtime
+  # was skipped on resume; the fix removed the guard entirely, which made every resume
+  # rebuild and push the image whether or not step 6 was done. Skip only when the whole
+  # step is recorded complete; re-enter otherwise.
+  if check_completed "runtime_image_pushed" && check_completed "runtime_deployed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already complete. Re-running rebuilds and pushes the runtime image, then updates the stack."
+    _confirm || return 0
+  fi
+
   if [ -z "$(get_state "gateway_url")" ]; then
     log_error "Gateway URL not found. Run Step 5 (Gateway) first."
-    exit 1
+    return 1
   fi
 
   ecr_login
@@ -319,7 +337,7 @@ step_runtime() {
       --image-ids imageTag="${RUNTIME_IMAGE_TAG}" \
       --region "${AWS_REGION}" --no-cli-pager > /dev/null 2>&1; then
     log_error "${ECR_REPO}:${RUNTIME_IMAGE_TAG} not found in ECR after push."
-    exit 1
+    return 1
   fi
   log_success "Image verified in ECR: ${RUNTIME_IMAGE_TAG}"
   mark_complete "runtime_image_pushed"
@@ -338,6 +356,15 @@ step_runtime() {
 # ══════════════════════════════════════════════════════════════════════════
 step_ui_build() {
   log_step "Step 7: UI — Build & Push Image"
+
+  # This guard is what gives _ui_deploy_failed's invalidate_state("ui_image_pushed") any
+  # effect: step 8 clears the flag so that resume re-runs step 7. Without the guard, step
+  # 7 re-ran on every resume regardless, and the flag was decorative.
+  if check_completed "ui_image_pushed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already pushed. Re-running rebuilds the bundle and image and pushes again."
+    _confirm || return 0
+  fi
 
   ecr_login
 
