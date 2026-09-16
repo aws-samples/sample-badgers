@@ -282,8 +282,12 @@ export STACK_SUFFIX=a1b
 
 ### 1️⃣ Install Dependencies
 
+From the repository root. The CDK app's dependencies are declared in the root
+`pyproject.toml` and pinned in `uv.lock`; `uv sync` installs exactly that set, and every
+`cdk` command below runs as `uv run cdk` against it.
+
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 
 ### 2️⃣ Build Lambda Layers
@@ -433,27 +437,31 @@ deployment/
 
 ## 📋 Specialist Manifest Configuration
 
-Each specialist has a manifest file in `s3_files/manifests/` that configures its behavior. The `model_selections` section supports extended thinking (Claude's chain-of-thought reasoning):
+Each specialist has a manifest file in `s3_files/manifests/` that configures its behavior. A manifest names **models only** — never a transport, an endpoint, or a provider. Everything else about a model lives in `s3_files/config/model_registry.json`, so a manifest cannot contradict what is deployed.
+
+Every entry must name a model that is `active` in the registry. `foundation/model_selection.py` is the single parser for this block, and it raises rather than defaulting: a silently defaulted model ID is how a specialist ends up invoking something nobody chose.
+
+The verbose form, one object per model, carries per-model reasoning settings:
 
 ```json
 {
     "specialist": {
-        "name": "page_specialist",
+        "name": "correlation_specialist",
         "model_selections": {
             "primary": {
-                "model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-                "extended_thinking": true,
-                "budget_tokens": 6400
+                "model_id": "us.anthropic.claude-sonnet-4-6",
+                "adaptive_thinking": true,
+                "effort": "high"
             },
             "fallback_list": [
                 {
-                    "model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                    "extended_thinking": true,
-                    "budget_tokens": 4000
+                    "model_id": "us.openai.gpt-5.6-terra",
+                    "extended_thinking": false
                 },
                 {
-                    "model_id": "amazon.nova-pro-v1:0",
-                    "extended_thinking": false
+                    "model_id": "us.amazon.nova-2-lite-v1:0",
+                    "extended_thinking": true,
+                    "budget_tokens": 4000
                 }
             ]
         }
@@ -461,53 +469,89 @@ Each specialist has a manifest file in `s3_files/manifests/` that configures its
 }
 ```
 
-| Field                    | Description                                                               |
-| ------------------------ | ------------------------------------------------------------------------- |
-| `model_id`               | Bedrock model identifier                                                  |
-| `extended_thinking`      | Enable Claude's reasoning traces (Claude models only)                     |
-| `budget_tokens`          | Max tokens for thinking content (required when extended_thinking is true) |
-| `expected_output_tokens` | Estimated output tokens for cost calculation (in `specialist` section)    |
-| `audit_mode`             | Boolean in `inputSchema` - enables confidence scoring and review flags    |
+| Field                    | Description                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| `model_id`               | A model ID that is `active` in the registry. Required                                      |
+| `extended_thinking`      | Request a fixed thinking budget. Needs a model whose registry `thinking` is `"extended"`   |
+| `budget_tokens`          | Max tokens for thinking content. Read when `extended_thinking` is true                     |
+| `adaptive_thinking`      | Let the model choose its own reasoning depth. Needs registry `thinking` of `"adaptive"`    |
+| `effort`                 | `low`, `medium`, or `high`. Defaults to `high`. An unknown value is rejected at parse time |
+| `expected_output_tokens` | Estimated output tokens for cost calculation (in the `specialist` section)                 |
+| `audit_mode`             | Boolean in `inputSchema` — enables confidence scoring and review flags                     |
 
-> [!NOTE]
-> Extended thinking is only supported on Claude models. When enabled, thinking content is saved to S3 alongside results: `{session_id}/{specialist_name}/{image}_thinking_{timestamp}.txt`
+The bare-string form carries no reasoning settings, and 26 of the 27 built-in manifests use it:
 
-Simple format (no extended thinking) is still supported for backward compatibility:
 ```json
 "model_selections": {
-    "primary": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-    "fallback_list": ["amazon.nova-pro-v1:0"]
+    "primary": "us.anthropic.claude-sonnet-4-6",
+    "fallback_list": ["us.openai.gpt-5.6-terra", "us.amazon.nova-2-lite-v1:0"]
 }
 ```
 
+> [!NOTE]
+> Thinking support is a property of the model, recorded in the registry's `thinking` field as `null`, `"extended"`, or `"adaptive"`. Claude Opus 5 also carries `thinking_default_on`: its adaptive thinking is on unless a request disables it, so the runtime treats every Opus 5 call as a thinking call and pins temperature to 1. The four OpenAI models document no reasoning parameter and take `thinking: null`.
+>
+> When thinking is active, the content is saved to S3 alongside results: `{session_id}/{specialist_name}/{image}_thinking_{timestamp}.txt`. Nova 2 returns `[REDACTED]` reasoning content — expected, and still billed.
+
+> [!WARNING]
+> Setting `effort: "high"` on a Nova model omits the output-token bound entirely, because Nova's highest reasoning effort requires `temperature` and `maxTokens` to be unset. AWS documents output reaching 128K tokens on that path. Use `medium` unless you want that.
+
 ## 📊 Inference Profiles for Cost Tracking
 
-BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring per model. The `inference_profiles_stack.py` creates trackable profiles that wrap cross-region system-defined profiles.
+BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring per model. `inference_profiles_stack.py` creates one trackable profile per model in `s3_files/config/model_registry.json`, each wrapping that model's US geo cross-Region system-defined profile (`us.*`).
 
 ### How It Works
 
-1. **CDK creates profiles** for each model (Claude Sonnet, Haiku, Opus, Nova Premier)
-2. **Profile ARNs are passed** to Runtime containers as environment variables
-3. **At invocation time**, `bedrock_client.py` maps model IDs to profile ARNs
-4. **Bedrock is invoked** using the profile ARN instead of raw model ID
+1. **CDK reads the registry** at synth and creates one profile per provisioned model
+2. **The same loop writes SSM** `/badgers-{deployment_id}/model-profiles` — a model ID → profile ARN map
+3. **At invocation time**, `bedrock_client.py` reads that parameter once and caches it, then resolves the model ID to a profile ARN
+4. **Bedrock is invoked** using the profile ARN instead of the raw model ID
 
-### Environment Variable Mapping
-
-| Model ID Pattern                   | Environment Variable         |
-| ---------------------------------- | ---------------------------- |
-| `us.anthropic.claude-sonnet-4-5-*` | `CLAUDE_SONNET_PROFILE_ARN`  |
-| `us.anthropic.claude-haiku-4-5-*`  | `CLAUDE_HAIKU_PROFILE_ARN`   |
-| `*claude-opus-4-6*`                | `CLAUDE_OPUS_46_PROFILE_ARN` |
-| `us.amazon.nova-premier-v1:0`      | `NOVA_PREMIER_PROFILE_ARN`   |
+There are no per-model `*_PROFILE_ARN` environment variables. Every consumer reads the one SSM parameter, whose name arrives as `MODEL_PROFILES_PARAM`. Adding or removing a model is a registry edit plus a deploy; no stack lists models by hand.
 
 ### Profile Naming
 
-Profiles are named: `badgers-{model}-{deployment_id}`
-
-Example: `badgers-claude-sonnet-abc12345`
+Profiles are named `badgers-{model}-{deployment_id}` — for example `badgers-claude-sonnet-4-6-abc12345`.
 
 > [!NOTE]
 > If no inference profile is configured for a model ID, the system falls back to using the model ID directly. This allows local development without deployed profiles.
+
+## 🌎 Inference Profiles and Regions
+
+**Model inference does not stay in your deployment Region.** This surprises people, so it is worth being explicit.
+
+Every model BADGERS ships is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
+
+For the three models whose cards publish a destination table (Sonnet 4.6, Opus 4.6, Nova 2 Lite), a source Region of `us-west-2` routes to `us-east-1`, `us-east-2`, or `us-west-2`. The other five document a `us.*` profile without publishing a destination list.
+
+Two consequences:
+
+- **Requests can route to Regions you have not enabled.** Per [cross-Region inference general considerations](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html), *"Cross-Region inference can route requests to AWS Regions that are not manually enabled in your AWS account."* Prompts and outputs may be stored in a destination Region for abuse detection. Data stays on the AWS network and is encrypted in transit.
+- **Nothing else moves.** S3, DynamoDB, Cognito, Lambda, ECR, the AgentCore Runtime and the UI all live in your deployment Region. Only Bedrock inference crosses Regions.
+
+### Why this is not In-Region inference
+
+In-Region inference would keep everything in one Region, and BADGERS does not use it because it is not available: all eight models report In-Region as **not-supported** on the `bedrock-runtime` endpoint in every US Region. Geo (`us.*`) is the most Region-restrictive option the model set actually offers. Global (`global.*`) is the same mechanism over every commercial Region worldwide.
+
+If you have hard data-residency requirements, this model set cannot meet them on `bedrock-runtime`.
+
+### Why the IAM policy wildcards the Region
+
+Geo cross-Region inference requires `bedrock:InvokeModel` on the foundation model in the source Region **and in every destination Region the profile can route to** ([IAM policy requirements](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html)). A foundation-model ARN has a mandatory Region field — `arn:aws:bedrock:{region}::foundation-model/{model}` — so granting "in every destination Region" means either enumerating those Regions or wildcarding the field.
+
+`iam_stack.py` wildcards it: `arn:aws:bedrock:*::foundation-model/{model}`. The model ID stays pinned exactly, and no action or account is wildcarded. This trips `AwsSolutions-IAM5`, which is suppressed with the reasoning recorded inline. The short version:
+
+- The destination set depends on both the model and the operator-chosen source Region, so it is not knowable when the code is written.
+- Only 3 of 8 model cards publish a destination-Region table, so a hardcoded list would cover less than half the set.
+- `bedrock:GetInferenceProfile` returns the Region-qualified foundation model ARNs in `models[].modelArn` for all eight, but that is a deploy-time API call and would require a CDK custom resource.
+
+### If your organization restricts Regions
+
+Service Control Policies and geo cross-Region inference interact badly by default:
+
+> If any destination Region in a cross-Region inference profile is blocked in your SCPs, the request will fail even if other Regions remain allowed.
+
+Allow Bedrock inference actions in all US destination Regions, or add an inference-profile exception. See [SCP requirements for Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html).
 
 ## 🎨 Custom Specialists
 

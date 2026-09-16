@@ -146,11 +146,13 @@ AgentCore Memory for session state:
 
 ### Inference Profiles (`inference_profiles_stack.py`)
 Application Inference Profiles for cost tracking and usage monitoring:
-- Creates trackable profiles wrapping cross-region system-defined profiles
-- 5 profiles: Claude Sonnet 4.5 (Global), Claude Haiku 4.5 (Global), Claude Opus 4.6 (Global), Claude Opus 4.5 (Global), Nova Premier (US)
+- One profile per model in `s3_files/config/model_registry.json`, created in a loop over the registry rather than hand-written — currently **8**
+- Each wraps that model's **US geo cross-Region** system-defined profile (`us.*`), not the global one (`global.*`). Both route across Regions; `us.*` bounds routing to the US geography
 - Naming convention: `badgers-{model}-{deployment_id}`
-- Grants invoke permissions to Runtime role
-- Profile ARNs passed to Runtime as environment variables
+- Writes `/badgers-{deployment_id}/model-profiles` in the same loop — the model ID → profile ARN map every consumer reads
+- `grant_invoke_to_role` generates all three Bedrock statements from the same iteration, plus `project/default` when any OpenAI model is provisioned
+- Consumers receive the SSM parameter **name** (`MODEL_PROFILES_PARAM`), not per-model ARNs
+- A registry entry with `status: "disabled"` produces no profile, no grant, and no SSM entry
 
 ### X-Ray (`xray_transaction_search_stack.py`)
 Enables X-Ray Transaction Search, a prerequisite for AgentCore tracing:
@@ -188,9 +190,12 @@ The unified UI, running as an ECS Express Gateway service:
 - All container configuration is injected from SSM Parameter Store via `valueFrom`
   references — no plaintext config in the service definition or deploy scripts
 - Task role scoped to what the UI server actually calls: `InvokeAgentRuntime`,
-  `ListGatewayTargets`, DynamoDB Query/GetItem/DeleteItem on the jobs table and its
-  GSIs, S3 on the three buckets, CloudWatch Logs Insights queries, KMS for the S3 CMK,
-  and SSM reads on the deployment prefix
+  `ListGatewayTargets`, `bedrock:InvokeModel` on the single model the Create Specialist
+  wizard writes prompts with (`WIZARD_GENERATOR_MODEL_ID`, granted through
+  `InferenceProfilesStack.grant_invoke_to_role(..., models=[...])`), DynamoDB
+  Query/GetItem/DeleteItem on the jobs table and its GSIs, S3 on the three buckets,
+  CloudWatch Logs Insights queries, KMS for the S3 CMK, and SSM reads on the deployment
+  prefix
 - After the service exists, an `AwsCustomResource` re-points the Cognito UI client's
   callback and logout URLs at the service endpoint
 

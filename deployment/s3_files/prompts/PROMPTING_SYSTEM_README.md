@@ -434,8 +434,8 @@ Each specialist has a manifest file in `manifests/` with this structure:
         "description": "Specialist description",
         "enhancement_eligible": true,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            "fallback_list": ["us.anthropic.claude-haiku-4-5-20251001-v1:0"]
+            "primary": "us.anthropic.claude-sonnet-4-6",
+            "fallback_list": ["us.openai.gpt-5.6-terra", "us.amazon.nova-2-lite-v1:0"]
         },
         "max_retries": 3,
         "prompt_specialist_prompt_base_path": "prompts",

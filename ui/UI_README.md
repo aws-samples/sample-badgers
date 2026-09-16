@@ -185,9 +185,13 @@ as content.
 Bedrock is called by **hand-signing an HTTPS Converse request with SigV4**, not through
 `@aws-sdk/client-bedrock-runtime`, which is deliberately not a dependency of this package.
 Region comes from `AWS_REGION` (default `us-west-2`), credentials from the node provider
-chain, profile from `AWS_PROFILE`. The generator model is fixed in `wizard.js`
-(`GENERATOR_MODEL_ID`); the separate `MODEL_IDS` map backs the primary/fallback dropdowns and
-must stay aligned with `deployment/stacks/inference_profiles_stack.py`.
+chain, profile from `AWS_PROFILE`. The generator model is `WIZARD_GENERATOR_MODEL_ID` when
+set, else the `DEFAULT_GENERATOR_MODEL_ID` literal in `wizard.js`. In ECS the task
+definition sets it from `WIZARD_GENERATOR_MODEL_ID` in `deployment/stacks/ecs_stack.py`,
+the same constant the task role's `bedrock:InvokeModel` grant is built from, so the deployed
+call and its grant cannot name different models; the literal is for local development. The
+primary/fallback dropdowns are populated from `GET /api/models` and validated against the
+same list, so there is no second model map to keep aligned.
 
 `save` and `deploy` are separate steps, and Deploy stays disabled until a save succeeds.
 Everything is written to the **local working tree**, never to S3 — see
