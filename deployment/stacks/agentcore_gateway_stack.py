@@ -18,6 +18,7 @@ from .log_delivery import (
     deliver_traces_to_xray,
     shared_delivery_policy,
 )
+from .nag_arn_renderings import account_renderings, region_renderings
 
 try:
     import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
@@ -165,18 +166,17 @@ class AgentCoreGatewayStack(Stack):
                         "specific specialist Lambdas -- the wildcard covers only the "
                         "version qualifier."
                     ),
+                    # Derived from the functions actually granted, not transcribed. The
+                    # hand-written list held 11 entries and never gained
+                    # html_report_specialist when that specialist was added, so its
+                    # finding sat unsuppressed. cdk-nag renders an Fn::GetAtt as
+                    # `<LogicalId.Arn>`, and the logical ID carries a CDK-computed hash
+                    # that cannot be spelled from the specialist name -- so ask the
+                    # producing stack for it rather than guessing.
                     "appliesTo": [
-                        "Resource::<ContainerFunctionimageenhancer2AFB4983.Arn>:*",
-                        "Resource::<ContainerFunctionremediationspecialistB67CD8CB.Arn>:*",
-                        "Resource::<FunctionchartsspecialistA6AA9F82.Arn>:*",
-                        "Resource::<FunctionclassifypdfcontentEC92FE26.Arn>:*",
-                        "Resource::<FunctioncorrelationspecialistE250ACCF.Arn>:*",
-                        "Resource::<FunctiondiagramspecialistB1D3C809.Arn>:*",
-                        "Resource::<Functionelementsspecialist2A88D0C1.Arn>:*",
-                        "Resource::<FunctionfulltextspecialistB95E9182.Arn>:*",
-                        "Resource::<Functionpdftoimagesconverter2E10A5D5.Arn>:*",
-                        "Resource::<FunctionscientificspecialistCB1826B1.Arn>:*",
-                        "Resource::<Functiontablespecialist6D08F0B2.Arn>:*",
+                        f"Resource::<{Stack.of(fn).get_logical_id(fn.node.default_child)}"
+                        f".Arn>:*"
+                        for fn in self.lambda_functions.values()
                     ],
                 },
                 {
@@ -189,6 +189,38 @@ class AgentCoreGatewayStack(Stack):
                     ),
                     "appliesTo": [
                         "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Action wildcards emitted by Bucket.grant_read, a CDK L2 grant "
+                        "rather than hand-written policy. Each expands to a fixed set of "
+                        "same-family read actions, scoped to the config bucket the Gateway "
+                        "reads tool schemas from. These were previously unsuppressed."
+                    ),
+                    "appliesTo": [
+                        "Action::s3:GetBucket*",
+                        "Action::s3:GetObject*",
+                        "Action::s3:List*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "lambda:InvokeFunction on function:badgers_* in this account and "
+                        "Region. The name-prefix wildcard is deliberate: the grant must "
+                        "exist before the Gateway creates its targets, target creation "
+                        "happens in the same deploy, and the CustomSpecialists stack adds "
+                        "further targets against this role in a later deploy, so the full "
+                        "set of function ARNs is not knowable here. Every specialist "
+                        "function, base and custom, is named badgers_<specialist>. Region "
+                        "and account are pinned."
+                    ),
+                    "appliesTo": [
+                        f"Resource::arn:aws:lambda:{region}:{account}:function:badgers_*"
+                        for region in region_renderings(self.region)
+                        for account in account_renderings(self.account)
                     ],
                 },
             ],
@@ -205,41 +237,33 @@ class AgentCoreGatewayStack(Stack):
             description="Execution role for AgentCore Gateway",
         )
 
-        # Lambda invoke permissions - wildcard for all badgers functions
-        # This ensures permission exists BEFORE targets are created (no race condition)
-        # Individual grant_invoke() calls in add_lambda_targets() are redundant but harmless
+        # Lambda invoke permission, by name prefix, so it exists BEFORE targets are created
+        # -- target creation and the per-function grant_invoke() calls in
+        # add_lambda_targets() land in the same deploy, and the CustomSpecialists stack
+        # adds its own targets against this role later. Region and account are pinned;
+        # only the function-name suffix is wildcarded. The name prefix `badgers_` is what
+        # every specialist function is named with, base and custom alike.
         role.add_to_policy(
             iam.PolicyStatement(
+                sid="InvokeSpecialistsByPrefix",
                 actions=["lambda:InvokeFunction"],
-                resources=["arn:aws:lambda:*:*:function:badgers_*"],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account}:function:badgers_*"
+                ],
             )
         )
 
         # S3 read for schemas
         self.config_bucket.grant_read(role)
 
-        # CloudWatch logging permissions
-        role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # X-Ray tracing permissions
-        role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "xray:PutTraceSegments",
-                    "xray:PutTelemetryRecords",
-                ],
-                resources=["*"],
-            )
-        )
+        # No CloudWatch Logs or X-Ray statements. Both used to be here on Resource "*",
+        # and neither had a caller: the Gateway's logs and traces are *vended* --
+        # add_gateway_logging() creates a CloudWatch Logs resource policy for
+        # delivery.logs.amazonaws.com and delivery sources/destinations, and that service
+        # principal writes the data. The execution role never calls PutLogEvents or
+        # PutTraceSegments. The AgentCore Gateway permissions guide lists only the trust
+        # policy, lambda:InvokeFunction on each target, and S3 read for schemas.
+        # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-prerequisites-permissions.html
 
         return role
 
