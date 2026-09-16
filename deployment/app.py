@@ -369,6 +369,9 @@ ecs_stack = ECSStack(
     ecr_repository_uri=ecr_stack.repository.repository_uri,
     agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
     agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
+    # The Create Specialist wizard calls Bedrock from the UI container; the task role's
+    # grant for that one model is generated from the registry, like every other grant.
+    inference_profiles_stack=inference_profiles_stack,
     stack_suffix=STACK_SUFFIX,
     image_tag="frontend",
     env=env,
