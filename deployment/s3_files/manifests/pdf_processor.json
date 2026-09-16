@@ -233,10 +233,10 @@
         "max_tools_per_batch": 4,
         "stop_on_first_error": true,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-6",
             "fallback_list": [
-                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                "us.amazon.nova-premier-v1:0"
+                "us.openai.gpt-5.6-terra",
+                "us.amazon.nova-2-lite-v1:0"
             ]
         },
         "output_extension": "xml"

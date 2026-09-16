@@ -1,76 +1,72 @@
 {
-    "tool": {
-        "name": "enhance_image_tool",
-        "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, researcher highlights/annotations overlaid on originals, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement — without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports 13 operations including desaturation (remove color tints), thresholding (binary B&W conversion to strip watermarks/background patterns), and levels (Photoshop-style tonal remapping with auto black/white point and gamma — ideal for maximizing ink-to-background contrast on aged manuscripts). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. For historical manuscripts with period handwriting, use document_type 'historical_manuscript'. Returns S3 URI of enhanced image to pass to subsequent specialists.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "image_path": {
-                    "type": "string",
-                    "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
-                },
-                "image_data": {
-                    "type": "string",
-                    "description": "Base64-encoded image data. Use this OR image_path, not both."
-                },
-                "document_type": {
-                    "type": "string",
-                    "enum": [
-                        "auto",
-                        "manuscript",
-                        "annotated",
-                        "sheet_music",
-                        "diagram",
-                        "printed",
-                        "mixed",
-                        "watermarked",
-                        "historical_manuscript",
-                        "photograph",
-                        "map",
-                        "legal",
-                        "newspaper"
-                    ],
-                    "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. 'historical_manuscript' optimizes for aged parchment/paper with period handwriting and possible researcher annotations. 'photograph' preserves continuous tonal gradations. 'map' preserves semantically meaningful color. 'legal' preserves multiple ink layers and faint stamps. 'newspaper' handles dense multi-column layouts on degraded newsprint. Default: auto (auto-detect)."
-                },
-                "enhancement_level": {
-                    "type": "string",
-                    "enum": [
-                        "minimal",
-                        "moderate",
-                        "aggressive"
-                    ],
-                    "description": "Enhancement intensity. Default: moderate."
-                },
-                "session_id": {
-                    "type": "string",
-                    "description": "Runtime session ID for organizing outputs in S3."
-                }
-            },
-            "required": [
-                "session_id"
-            ]
-        }
-    },
-    "specialist": {
-        "name": "image_enhancer",
-        "description": "Enhances historical document images using OpenCV for better vision LLM processing",
-        "enhancement_eligible": false,
-        "is_gateway_tool": true,
-        "model_selections": {
-            "primary": null,
-            "fallback_list": []
+  "tool": {
+    "name": "enhance_image_tool",
+    "description": "Pre-processes document images to improve quality before analysis. Use BEFORE calling specialists when the image shows: faded text, yellowing, noise, low contrast, skew, watermarks, tinted/colored backgrounds (blue security paper, etc.), repeating background text patterns, institutional seals overlapping content, researcher highlights/annotations overlaid on originals, or other degradation. CRITICAL for watermarked documents: official transcripts, certificates, and legal documents on security paper ALWAYS need enhancement \u2014 without it, extractors will misidentify content-rich pages as blank or as security/authentication pages. Supports 13 operations including desaturation (remove color tints), thresholding (binary B&W conversion to strip watermarks/background patterns), and levels (Photoshop-style tonal remapping with auto black/white point and gamma \u2014 ideal for maximizing ink-to-background contrast on aged manuscripts). For watermarked/security paper documents, use document_type 'watermarked' with 'aggressive' enhancement_level. For historical manuscripts with period handwriting, use document_type 'historical_manuscript'. Returns S3 URI of enhanced image to pass to subsequent specialists.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) or absolute file path to the image to enhance."
         },
-        "output_extension": "png"
-    },
-    "metadata": {
-        "version": "1.1.0",
-        "dependencies": [
-            "opencv-python-headless",
-            "numpy",
-            "boto3"
-        ],
-        "wizard_managed": false,
-        "specialist_type": "container",
-        "container_path": "deployment/lambdas/containers/image_enhancer"
+        "image_data": {
+          "type": "string",
+          "description": "Base64-encoded image data. Use this OR image_path, not both."
+        },
+        "document_type": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "manuscript",
+            "annotated",
+            "sheet_music",
+            "diagram",
+            "printed",
+            "mixed",
+            "watermarked",
+            "historical_manuscript",
+            "photograph",
+            "map",
+            "legal",
+            "newspaper"
+          ],
+          "description": "Type of document for optimized enhancement. 'watermarked' forces desaturate-then-threshold pipeline for security paper, watermarks, colored backgrounds. 'historical_manuscript' optimizes for aged parchment/paper with period handwriting and possible researcher annotations. 'photograph' preserves continuous tonal gradations. 'map' preserves semantically meaningful color. 'legal' preserves multiple ink layers and faint stamps. 'newspaper' handles dense multi-column layouts on degraded newsprint. Default: auto (auto-detect)."
+        },
+        "enhancement_level": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "moderate",
+            "aggressive"
+          ],
+          "description": "Enhancement intensity. Default: moderate."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID for organizing outputs in S3."
+        }
+      },
+      "required": [
+        "session_id"
+      ]
     }
+  },
+  "specialist": {
+    "name": "image_enhancer",
+    "description": "Enhances historical document images using OpenCV for better vision LLM processing",
+    "enhancement_eligible": false,
+    "is_gateway_tool": true,
+    "output_extension": "png"
+  },
+  "metadata": {
+    "version": "1.1.0",
+    "dependencies": [
+      "opencv-python-headless",
+      "numpy",
+      "boto3"
+    ],
+    "wizard_managed": false,
+    "specialist_type": "container",
+    "container_path": "deployment/lambdas/containers/image_enhancer"
+  }
 }
