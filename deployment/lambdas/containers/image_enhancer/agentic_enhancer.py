@@ -33,11 +33,14 @@ logger = logging.getLogger(__name__)
 
 # Lambda environment configuration
 AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
-# Use application inference profile ARN for cost tracking and cross-region routing
-# Falls back to system inference profile ID if not set
-VISION_MODEL = os.environ.get(
-    "CLAUDE_OPUS_46_PROFILE_ARN", "us.anthropic.claude-opus-4-6-v1"
-)
+# Read VISION_MODEL, which `lambda_stack.py` sets to the Claude Sonnet 4.6 application
+# inference profile ARN for cost tracking and cross-region routing. Falls back to the
+# Sonnet 4.6 geo inference ID when unset (local runs, or the container invoked directly).
+#
+# This previously read CLAUDE_OPUS_46_PROFILE_ARN despite being named VISION_MODEL, so the
+# VISION_MODEL the stack set was ignored and the enhancer ran on Opus 4.6 — disagreeing
+# with both this container's own README and the intended model assignment.
+VISION_MODEL = os.environ.get("VISION_MODEL", "us.anthropic.claude-sonnet-4-6")
 MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "2"))
 MAX_IMAGE_DIMENSION = int(os.environ.get("MAX_IMAGE_DIMENSION", "4000"))
 JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", "85"))

@@ -63,7 +63,7 @@
             },
             "fallback_list": [
                 {
-                    "model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+                    "model_id": "us.anthropic.claude-sonnet-4-6",
                     "extended_thinking": true,
                     "budget_tokens": 8192
                 }

@@ -20,6 +20,7 @@ from .prompt_loader import PromptLoader
 from .image_processor import ImageProcessor
 from .bedrock_client import BedrockClient
 from .message_chain_builder import MessageChainBuilder
+from .model_selection import ModelSelectionError, parse_model_selection
 from .response_processor import ResponseProcessor
 
 
@@ -572,9 +573,13 @@ class SpecialistFoundation:
             self.logger.debug("Invoking Bedrock model")
 
             # Get model selection config (new format) or fall back to legacy format
-            model_id, extended_thinking, budget_tokens, fallback_list = (
-                self._get_model_selection()
-            )
+            selection = self._get_model_selection()
+            model_id = selection["model_id"]
+            extended_thinking = selection["extended_thinking"]
+            budget_tokens = selection["budget_tokens"]
+            adaptive_thinking = selection["adaptive_thinking"]
+            adaptive_effort = selection["effort"]
+            fallback_list = selection["fallback_list"]
 
             # Validate all model IDs
             if model_id:
@@ -605,7 +610,9 @@ class SpecialistFoundation:
             # Get retry config from manifest (default: 3)
             max_retries = self.config.get("max_retries", 3)
 
-            # Invoke model with fallback support and extended thinking
+            # Invoke model with fallback support and thinking settings.
+            # adaptive_thinking and adaptive_effort were previously not passed at all, so a
+            # manifest declaring them had them dropped here — see R10.
             return self.bedrock_client.invoke_model(
                 model_id,
                 payload,
@@ -614,90 +621,26 @@ class SpecialistFoundation:
                 max_retries,
                 extended_thinking,
                 budget_tokens,
+                adaptive_thinking,
+                adaptive_effort,
             )
 
         except Exception as e:
             raise AnalysisError(f"Failed to invoke Bedrock model: {e}") from e
 
-    def _get_model_selection(self) -> tuple[str, bool, Optional[int], list]:
+    def _get_model_selection(self) -> Dict[str, Any]:
+        """Parse this specialist's model_selections block.
+
+        Delegates to foundation.model_selection, which is now the only parser. This method
+        previously returned a 4-tuple and read only extended_thinking/budget_tokens, so
+        adaptive_thinking and effort were dropped before reaching invoke_model. It returns a
+        dict for the reason given in that module: adding a field must not silently change
+        what a caller unpacks.
         """
-        Get primary model ID, extended thinking setting, budget tokens, and fallback list from config.
-
-        Supports both new format (model_selections with objects) and legacy format (model_id/fallback_model_id).
-
-        Returns:
-            Tuple of (primary_model_id, extended_thinking, budget_tokens, fallback_list)
-            fallback_list contains dicts with model_id, extended_thinking, and budget_tokens keys
-        """
-        # Check for new format: model_selections
-        if "model_selections" in self.config:
-            selections = self.config["model_selections"]
-
-            # Handle primary model
-            primary = selections.get("primary")
-            if not primary:
-                raise AnalysisError("model_selections.primary is required")
-
-            if isinstance(primary, dict):
-                primary_model_id = primary.get("model_id")
-                primary_extended_thinking = primary.get("extended_thinking", False)
-                primary_budget_tokens = primary.get("budget_tokens")
-            else:
-                # Legacy: primary is just a string
-                primary_model_id = primary
-                primary_extended_thinking = False
-                primary_budget_tokens = None
-
-            if not primary_model_id:
-                raise AnalysisError("model_selections.primary.model_id is required")
-
-            # Handle fallback list
-            fallback_list = selections.get("fallback_list", [])
-            # Normalize fallback list to always be list of dicts
-            normalized_fallbacks = []
-            for fb in fallback_list:
-                if isinstance(fb, dict):
-                    normalized_fallbacks.append(
-                        {
-                            "model_id": fb.get("model_id"),
-                            "extended_thinking": fb.get("extended_thinking", False),
-                            "budget_tokens": fb.get("budget_tokens"),
-                        }
-                    )
-                else:
-                    # Legacy: fallback is just a string
-                    normalized_fallbacks.append(
-                        {
-                            "model_id": fb,
-                            "extended_thinking": False,
-                            "budget_tokens": None,
-                        }
-                    )
-
-            return (
-                primary_model_id,
-                primary_extended_thinking,
-                primary_budget_tokens,
-                normalized_fallbacks,
-            )
-
-        # Legacy format: model_id + optional fallback_model_id
-        model_id = self.config.get("model_id")
-        if not model_id:
-            raise AnalysisError("model_id or model_selections.primary is required")
-
-        fallback_list = []
-        fallback_model_id = self.config.get("fallback_model_id")
-        if fallback_model_id:
-            fallback_list = [
-                {
-                    "model_id": fallback_model_id,
-                    "extended_thinking": False,
-                    "budget_tokens": None,
-                }
-            ]
-
-        return model_id, False, None, fallback_list
+        try:
+            return parse_model_selection(self.config)
+        except ModelSelectionError as e:
+            raise AnalysisError(str(e)) from e
 
     def _process_response(self, response: Dict[str, Any]) -> str:
         """Process the Bedrock response and extract the result."""
