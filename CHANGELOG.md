@@ -2,13 +2,107 @@
 
 ## [Unreleased]
 
-Everything on top of `[4.0.0]`: 15 commits, `f6ad01e` through `f352f2e`. None of it has
-shipped as a version — `pyproject.toml` still reads `4.0.0`.
+Everything on top of `[4.0.0]`, targeting **5.0.0**: 15 commits `f6ad01e` through `f352f2e`,
+plus the uncommitted model migration described first below. `pyproject.toml` reads `5.0.0`;
+nothing here has been tagged or released yet.
 
-Two items are breaking for anyone scripting the deploy entry points or referencing the UI
-env file; both are marked **BREAKING** below.
+> [!WARNING]
+> **5.0 is a fresh-install release. There is no upgrade path from 4.x.**
+> Every model 4.x used is retired, and no manifest, agent config, or custom specialist that
+> names one will work. Every bucket and the jobs table carry `RemovalPolicy.DESTROY`, so the
+> supported path is to destroy the 4.x deployment and deploy 5.0 clean. Custom specialists
+> created through the wizard under `deployment/custom_specialists/` are **not** rewritten by
+> anything and must be re-pointed at a current model by hand.
+
+Three further items are breaking for anyone scripting the deploy entry points, referencing
+the UI env file, or reading per-model profile environment variables; all are marked
+**BREAKING** below.
 
 ### Added
+
+- **A model registry as the single source of truth.**
+  `deployment/s3_files/config/model_registry.json` holds nine `active` models with display
+  name, provider, transport, prices (including long-context bands), thinking support, prompt
+  caching, and a `status` field. `deployment/stacks/model_registry.py` reads and validates it
+  **at synth**, so a malformed entry fails the build rather than a Lambda.
+
+  This replaces roughly seven hand-maintained model lists across CDK, the Lambda layer, and
+  the UI, several of which failed silently when missed and had already drifted — Claude Sonnet
+  4.6 had a profile but was absent from all three IAM statements, so it had never been
+  invocable. Adding or retiring a model is now one registry edit plus a deploy.
+
+  `status` is `active`, `retiring`, or `disabled`. `disabled` provisions nothing at all —
+  intended for a model an account declines to adopt on price, terms, or region footprint.
+
+- **`GET /api/models`.** Joins the deployed SSM profile map against the registry and returns
+  only models that are both `active` and actually provisioned, so the wizard cannot offer a
+  model this deployment has no profile for. 60-second cache; returns 503 rather than falling
+  back to a stale hardcoded list.
+
+- **Two deploy preflights, wired into `deploy.sh`.** Model access and a live invocation
+  check. Both already existed in `common.sh` but were never called from any entry point;
+  both now take their model list from the registry and run before anything is created.
+
+- **Layer staleness guard.** `lambda_stack._assert_layer_not_stale()` compares `layer.zip`
+  against the 19 files the build script copies and fails at synth. `deploy.sh` builds the
+  layer as step 1, so a normal deploy was never stale; this covers the two paths that skip it
+  (`DEPLOY_RESUME_MODE=1`, and calling `cdk` directly), where a deploy would otherwise ship
+  the previous layer silently.
+
+### Changed — model migration
+
+- **BREAKING: all eight models are new.** Retired: Claude Sonnet 4.5, Claude Sonnet 4,
+  Claude Haiku 4.5, Claude Opus 4.5, Amazon Nova Premier. Added: Claude Opus 5, Claude Opus
+  4.6, Claude Sonnet 4.6, Amazon Nova 2 Lite, GPT-6 Astra, GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6
+  Luna. Two behaviours arrive with them: Opus 5's adaptive thinking is on by default, so the
+  runtime pins its temperature to 1 on every call; and the OpenAI models document no
+  reasoning parameter and additionally require `bedrock:InvokeModel` on
+  `arn:aws:bedrock:{region}:{account}:project/default`.
+
+  Data retention: none of the eight models requires an account-level retention opt-in, and
+  none is subject to human review. Opus 5 is not on Bedrock's abuse-detection retention list.
+  The four OpenAI models do retain *classifier-flagged* traffic for up to 30 days for
+  automated abuse detection under the default retention mode; no opt-in is needed and no
+  human review occurs, and ZDR is available through your AWS account team.
+
+  Assignments: Sonnet 4.6 is the specialist workhorse (23 manifests), Opus 4.6 handles heavy
+  reasoning and the agent runtime, GPT-5.6 Terra is fallback 1 and Nova 2 Lite fallback 2.
+  Haiku 4.5 was replaced by GPT-5.6 Luna and Nova Premier by Sonnet 4.6 — capability matches,
+  not price matches.
+
+- **BREAKING: InvokeModel replaced by Converse** on the specialist path. Converse is the only
+  API all eight models support; the four OpenAI models have no Invoke support at all. One
+  request builder for every provider, and `_normalize_response` no longer branches by model
+  family — reasoning arrives as `reasoningContent` for both Claude and Nova 2. Deleted 193
+  lines of now-unreachable code, including the Nova 1 payload converter, which emitted a
+  `schemaVersion` Nova 2 does not accept.
+
+- **BREAKING: per-model `*_PROFILE_ARN` environment variables are gone.** Consumers receive
+  one variable, `MODEL_PROFILES_PARAM`, and read the SSM parameter
+  `/badgers-{deployment_id}/model-profiles`. This removes five `CfnOutput` exports, five
+  `Fn.import_value` calls in `app.py`, six named properties on `InferenceProfilesStack`, and
+  four hand-maintained env-wiring sites. `MODEL_TO_PROFILE_ENV_MAP` — an exact-string dict
+  whose misses silently lost cost attribution — is deleted.
+
+- **One model-selection parser.** There were two, drifted in opposite directions: one never
+  read `adaptive_thinking` or `effort`, the other read them for the primary model but
+  flattened `fallback_list` to bare strings. Between them no manifest could express *"fall
+  back to a different model and keep thinking on."* `foundation/model_selection.py` is now the
+  only parser. It returns a dict rather than a tuple, rejects an unknown `effort`, and no
+  longer silently defaults a missing `model_id` to Opus.
+
+- **The UI model list is served, not checked in.** The `models` block was removed from
+  `ui/config/pricing_config.json`; `/api/pricing-config` overlays live models from
+  `/api/models`. The file keeps only `ingestion`, `presets`, and `specialist_defaults`.
+  Prices can no longer drift from the registry — the checked-in copy understated every Claude
+  price by 10%, because it recorded Global CRIS prices while the code invokes geo profiles.
+
+- **`toModelId` no longer passes unknown labels through.** It wrote an unrecognised label into
+  the manifest verbatim as a model ID, producing a specialist that saved and deployed cleanly
+  then failed on first call — and the fallback chain correctly refuses to retry `AccessDenied`,
+  so nothing rescued it. It now throws and lists the known models.
+
+### Changed
 
 - **HTML document reports.** A new deterministic specialist, `html_report_specialist`,
   runs once per document after every page correlation and produces a durable report. It
@@ -169,8 +263,135 @@ env file; both are marked **BREAKING** below.
   `tap`. The hook `useMessage()` was replaced by `useAuiState()`.
 - `markitdown` and its dependency tree (`magika`, `onnxruntime`, `mammoth`, `openpyxl`,
   `pdfminer-six`, Azure Document Intelligence clients) added to the lock file.
-- `pypdf` `6.14.2` → `6.15.0`; `playwright>=1.62.0` and `pillow>=12.3.0` added to the
-  `dev` dependency group. `version` remains `4.0.0`.
+- `pypdf` `6.14.2` → `6.15.0`; `pillow>=12.3.0` added to the `dev` dependency group.
+  `version` was `4.0.0` across these commits and is now `5.0.0`.
+
+### Fixed — found during the model migration
+
+- **Claude Sonnet 4.6 had a profile but no IAM grant.** All three statements in
+  `grant_invoke_to_role` omitted it, so it had never been invocable. It was also the only
+  model in `pricing_config.json` with no profile at all. Found by generating the statements
+  from one list instead of maintaining three.
+- **`agent_model_config.json`'s `effort` and `adaptive_thinking` reached nothing.** The agent
+  forwarded only `{"thinking": ...}`. Both are now sent, as siblings — nesting `effort` inside
+  `thinking` raises `ValidationException`; it belongs in a separate `output_config` object.
+- **The image enhancer's model was pinned in code.** It read a hardcoded model ID rather than
+  the `VISION_MODEL` environment variable the stack already set.
+- **Converse requires raw image bytes where Invoke accepted a base64 string.** `ImageSource.bytes`
+  is a blob and boto3 encodes it, so forwarding the existing base64 string would have
+  double-encoded every page image. Now decoded, with invalid base64 rejected loudly.
+- **`fallback_models` in the agent config was dead.** Defined and read nowhere; its two entries
+  named retired models. Deleted rather than migrated. Strands already retries
+  `ModelThrottledException` six times with exponential backoff, so the gap it appeared to fill
+  did not exist.
+- **Every cdk-nag `appliesTo` string was matching nothing.** Two independent bugs. The model
+  lists were hand-written and stale — 5 entries against a registry of 9, three naming models
+  that no longer exist. And every entry wrote `<AWS::AccountId>`, with several hardcoding
+  `us-east-1`, while cdk-nag matches the *resolved* template — where `common.sh` has exported a
+  concrete account and Region. Model lists are now generated from the registry, and
+  `stacks/nag_arn_renderings.py` emits both ARN forms.
+
+  Also suppressed for the first time: the `Action::` wildcards CDK's `grant_read` /
+  `grant_read_write` L2 grants emit, and `Resource::*` on actions that take no resource
+  (`ecr:GetAuthorizationToken`, X-Ray sampling reads, `cloudwatch:PutMetricData`,
+  `aws-marketplace:*`). `custom_specialists_stack.py` had no `NagSuppressions` import at all,
+  so all 20 of its findings were unsuppressed — including L1 and IAM4 cases already justified
+  elsewhere. `agentcore_gateway_stack.py` had the same drift, having never gained
+  `html_report_specialist`.
+
+  Result: 0 cdk-nag findings across every stack that synthesizes, from 29.
+
+- **Two documentation claims were the inverse of the truth.** `README.md` and a comment in
+  `inference_profiles_stack.py` both stated that `us.*` inference profiles *"avoid
+  cross-region routing."* They do not — `us.*` is geo cross-Region inference; the prefix bounds
+  which Regions may be used, not whether Regions are crossed. The SCP troubleshooting section
+  built on that premise also quoted the *global* foundation-model ARN form, a shape a `us.*`
+  profile cannot produce, so its diagnosis pointed away from the real cause.
+- **The pricing calculator's fallback model was a retired one.** With no `default_model` for a
+  specialist it fell back to the literal `'Claude Sonnet 4.5'`, which then failed the lookup
+  and priced against whichever model happened to be first in the list. Now derived from the
+  served model list.
+- **The Converse rewrite dropped the temperature rule for extended thinking.** The old client
+  forced `temperature = 1` for both extended and adaptive thinking; the first Converse draft
+  carried over only adaptive. Claude rejects any other temperature when thinking is on, so the
+  correlation specialist's extended-thinking fallback would have failed with a
+  ValidationException that the fallback chain correctly refuses to retry. Caught by executing
+  the request builder before any live run. Opus 5, whose thinking is on by default, gets the
+  same treatment via a new `thinking_default_on()` check — a wizard-created Opus 5 specialist
+  would otherwise have inherited the 0.1 default and failed every call.
+- **`preflight_model_invocation` could report success on a failed call.** It discarded the
+  exit code and grepped for four exception names, so an expired token, a throttle, or an AWS
+  CLI too old to know `bedrock-runtime converse` all printed a tick. Now judged by exit code.
+- **`deploy.sh` step 3 marked a failed category sync as complete.** Options 1–6 called
+  `_sync_config_category` without checking its status, so a failed `aws s3 sync` fell through
+  to `mark_complete`. Option 6 is how the model registry reaches S3; a silent miss there left
+  `GET /api/models` returning 503 while the state file said uploaded. Every arm now propagates
+  failure.
+- **Resume rebuilt both Docker images every time.** Steps 6 and 7 had no `check_completed`
+  guard — every other step did — so `run_remaining` always rebuilt and pushed the runtime and
+  UI images even when both were recorded complete. It also made step 8's
+  `invalidate_state("ui_image_pushed")` inert, since step 7 re-ran regardless. Step 6 now
+  checks both `runtime_image_pushed` and `runtime_deployed`, which is the case the previous
+  guard got wrong before it was removed.
+- **Four step failure paths called `exit 1` instead of `return 1`**, killing the interactive
+  menu session and bypassing the "Resume stopped at" message. All step failures now return.
+- **`destroy.sh` verified only its hardcoded stack list.** A stack matching
+  `BADGERS-*-{id}-{suffix}` in CloudFormation but absent from the list survived under a
+  "Teardown complete" banner. The final check now also queries CloudFormation for the name
+  pattern and reports anything unexpected.
+- **The UI task role could not call Bedrock, so the deployed wizard could not generate.**
+  `POST /api/wizard/generate` invokes Claude Sonnet 4.6 from the ECS container, and the task
+  role had no `bedrock:InvokeModel` statement at all. Every section failed with
+  `AccessDeniedException` in a deployed environment while the same code worked locally on the
+  operator's credentials. `ECSStack` now takes `inference_profiles_stack` and calls
+  `grant_invoke_to_role(task_role, models=[WIZARD_GENERATOR_MODEL_ID])` — a new `models`
+  filter on the same registry-generated grant the agent role uses, narrowed to the one model
+  the container invokes (no OpenAI default-project statement, since none is needed). The
+  same constant is exported to the container as `WIZARD_GENERATOR_MODEL_ID`, which
+  `wizard.js` now reads ahead of its local-development literal, so the grant and the call
+  cannot name different models. `invoke_nag_applies_to` takes the same filter, so the
+  suppression lists exactly the ARNs that statement produces.
+- **`preflight_model_access` asked the wrong question.** It checked whether each *base* model
+  appeared in the Region's `list-foundation-models` catalog. Every BADGERS model is invoked
+  through a `us.*` geo profile and none supports In-Region inference, so a CRIS-only model
+  can be fully usable from a Region whose catalog does not list it — a false block. It now
+  checks `get-inference-profile` on the geo ID for `ACTIVE` first, which answers "is this a
+  valid source Region", and falls back to the catalog (`ACTIVE` or `LEGACY`) only when that
+  lookup fails for an unrelated reason such as a missing `bedrock:GetInferenceProfile`.
+- **`GET /api/models` read the wrong SSM parameter in local development.** The profile map
+  lives at `/badgers-{id}-{suffix}/model-profiles`. The ECS task definition sets
+  `DEPLOYMENT_ID` to the composite already; `ui/.env` sets the bare id and `STACK_SUFFIX`
+  separately, so the same code missed every parameter locally and the wizard dropdown was
+  empty. A `resourceId()` helper appends the suffix only when it is not already present.
+- **`destroy.sh` could not tear down a deployment while `lambdas/layer.zip` was stale.**
+  `cdk destroy` synthesizes the app first, and the stale-layer guard added in this release
+  aborted that synth — so the run ended on a traceback with every stack still standing,
+  before a single DeleteStack was issued. Observed tearing down a 4.x deployment from a
+  5.0 working tree. The guard exists to stop a deploy from shipping the previous layer; a
+  destroy ships nothing, so `cdk_destroy` in `common.sh` now sets
+  `BADGERS_ALLOW_STALE_LAYER=1` itself. Deploys are unaffected — step 1 rebuilds the layer
+  before the guard runs.
+
+### Changed — deploy and teardown
+
+- **The Gateway stack no longer uses `@aws-cdk/aws-bedrock-agentcore-alpha`.** The Gateway
+  L2s graduated into `aws-cdk-lib` as `aws_cdk.aws_bedrockagentcore`, which the Memory and
+  Runtime stacks already imported; the alpha package is deprecated wholesale and emitted 27
+  warnings on every synth. Every symbol the stack uses exists in the stable module under the
+  same name with the same keyword parameters. The synthesized Gateway template is identical
+  before and after — same 24 logical IDs, same properties — so an in-place update does not
+  replace the Gateway. The dependency is removed from `pyproject.toml`.
+- **`Stack.add_dependency` → `add_stack_dependency`** at all 24 call sites in `app.py`; the
+  former is deprecated in aws-cdk-lib 2.263. Construct-level `node.add_dependency` is a
+  different API and is unchanged. A full synth now emits zero deprecation warnings.
+
+- **Menu option `m` is now real.** It prints the model registry as a table — status,
+  provider, thinking mode, prices, flags — and states which steps a registry edit requires
+  and why: 2 (profiles, IAM, SSM map, preflights), 3 option 6 (registry to S3 for
+  `/api/models`), 6 (agent role grants live in the Runtime stack). Previously it said
+  "not yet implemented" and described models as living in the CDK stacks.
+- **`destroy.sh` now names what it leaves behind.** Bedrock model-access subscriptions are
+  account-level; teardown never touches them, and now says so.
 
 ### Fixed
 
@@ -267,6 +488,30 @@ env file; both are marked **BREAKING** below.
   removed. Every field was rendered as text and none was used by the browser, which never
   talks to S3, DynamoDB, or AgentCore directly.
 
+### Removed
+
+- **28 Python dependencies nothing imports or invokes.** An AST scan of every `.py` file
+  outside virtual environments, plus a grep of scripts, Dockerfiles, and docs for CLI use,
+  found no consumer for `gradio`, `gradio_pdf`/`gradio-pdf`, `uvicorn`, `itsdangerous`,
+  `pyjwt`, `python-dotenv`, `websockets`, `requests`, `pypdf`, `pdfreader`, `reportlab`,
+  `markdown2docx`, `lxml`, `xmlschema`, `xmltoxsd`, `jpype1`, `pandas`, `pyvis`, `networkx`,
+  `strands-agents-tools`, `aws-cdk-aws-bedrock-alpha`, `aws-cdk-mixins-preview`,
+  `pip-audit`, `nbstripout`, `playwright`, `types-requests`, a `tomli` entry whose
+  `python_version < '3.11'` marker can never match under `requires-python >= 3.12`, or
+  `setuptools`, which after the prune nothing in the tree required. Most date from the
+  pre-2.5.0 Gradio application; the `[tool.setuptools.packages.find]` table that listed its
+  packages (`tools*`, `config*`, `server*`, `main*` — none exist) is gone with them. Four
+  duplicate entries (`aws-cdk-lib`, `pymupdf`, `gradio-pdf`, `strands-agents`) are
+  collapsed to one each. `pydantic` and `urllib3` stay as documented transitive floors from
+  4.0.0. The lock file goes from 226 packages to 132; every import the Lambda, container,
+  runtime, and CDK code makes still resolves, and a full `CDK_NAG=1` synth is unchanged.
+  `pip-audit` and `nbstripout` are tools, not dependencies: `uvx pip-audit` and
+  `uv tool install nbstripout` provide them without entering the project tree.
+- **`deployment/requirements.txt`.** A second, stale dependency list — floors from
+  aws-cdk-lib 2.150 and the deprecated `aws-cdk.aws-bedrock-agentcore-alpha` package —
+  referenced only by the Manual Deployment step in `DEPLOYMENT_README.md`, which now says
+  `uv sync`. Each Lambda, container, and runtime target keeps its own requirements file.
+
 ### Known Issues
 
 - **Wizard-created specialists still skip job tracking**, but no longer because the
@@ -280,10 +525,27 @@ env file; both are marked **BREAKING** below.
 - The enhanced copy counts against the same 150 MiB `_MAX_AGGREGATE_BYTES` ceiling, so a
   second image per page effectively halves the page budget on enhanced runs. Exceeding it
   is caught and logged, and the page simply carries no enhanced key.
-- `preflight_model_access`, `preflight_model_invocation`, and `preflight_ecs_slr` are
+- ~~`preflight_model_access`, `preflight_model_invocation`, and `preflight_ecs_slr` are
   defined in `common.sh` but never called from any entry point. `BADGERS_DEFAULT_MODELS`
   also names `us.anthropic.claude-sonnet-4-5-20250514-v1:0`, a date that appears nowhere
-  else in the repository.
+  else in the repository.~~ **Resolved by the model migration** — the two model preflights
+  are wired into `deploy.sh` and take their list from the registry. `preflight_ecs_slr`
+  remains uncalled.
+- **Inference does not stay in the deployment Region.** All eight models are invoked through
+  US geo cross-Region inference profiles, and In-Region inference is unsupported for every one
+  of them on `bedrock-runtime` — so this is not a configuration choice. The Lambda role
+  therefore grants `bedrock:InvokeModel` with a wildcarded Region field. Enumerating the
+  destinations instead is possible but needs a deploy-time `GetInferenceProfile` call, because
+  only 3 of the 9 model cards publish a destination-Region table. See
+  `deployment/DEPLOYMENT_README.md` → Inference Profiles and Regions.
+- **The Gateway execution role's Logs and X-Ray statements were removed.** Both were
+  `Resource: "*"` and neither had a caller — the Gateway's logs and traces are vended
+  deliveries written by `delivery.logs.amazonaws.com`, not by the role. If a Gateway code path
+  does turn out to use the role for X-Ray, traces stop arriving silently; confirm a trace
+  appears in X-Ray Transaction Search after the first chat message on a fresh deploy.
+- **`BADGERS-Vpc` has no measured cdk-nag state.** `vpc_stack.py`'s `max_azs=2` resolves
+  availability zones through a context lookup, which fails without live credentials, so
+  cdk-nag never evaluates the stack. Every other stack reports 0 findings.
 - On resume, `step_runtime`'s guard tests only `runtime_image_pushed`, so a deployment
   that pushed the runtime image but never deployed the runtime is skipped rather than
   re-entered. The previous resume table checked both keys.

@@ -29,31 +29,31 @@ A single React + Express app is both the testing workbench and the deployment/op
 
 ### Testing tabs
 
-| Home | Chat |
-| --- | --- |
-| ![Home](.github/assets/BADGERS-screenshot-home-dashboard.png) | ![Chat](.github/assets/BADGERS-screenshot-chat-analysis-1.png) |
+| Home                                                                                                                 | Chat                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home](.github/assets/BADGERS-screenshot-home-dashboard.png)                                                        | ![Chat](.github/assets/BADGERS-screenshot-chat-analysis-1.png)                                                                                          |
 | Landing view with per-page navigation and the resolved environment (region, runtime ARN, gateway ID, config bucket). | Streams messages to the AgentCore Runtime over WebSocket, with extended-thinking blocks, the live gateway tool list, and audit / dynamic-token toggles. |
 
-| Create Specialist | Evaluations |
-| --- | --- |
-| ![Create Specialist](.github/assets/BADGERS-screenshot-create-specialist-1.png) | ![Evaluations](.github/assets/BADGERS-screenshot-evaluations.png) |
+| Create Specialist                                                                                                     | Evaluations                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| ![Create Specialist](.github/assets/BADGERS-screenshot-create-specialist-1.png)                                       | ![Evaluations](.github/assets/BADGERS-screenshot-evaluations.png)                                                          |
 | Four-step wizard — basic info, generated prompt review, examples, deploy — including primary model and two fallbacks. | Pages through a session's specialist output and scores accuracy, element identification, and contextual understanding 1–5. |
 
-| Observability | Edit Specialist |
-| --- | --- |
-| ![Observability](.github/assets/BADGERS-screenshot-observability.png) | ![Edit Specialist](.github/assets/BADGERS-screenshot-edit-specialist.png) |
+| Observability                                                                                                           | Edit Specialist                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| ![Observability](.github/assets/BADGERS-screenshot-observability.png)                                                   | ![Edit Specialist](.github/assets/BADGERS-screenshot-edit-specialist.png)                          |
 | Pulls traces and spans for a session from the CloudWatch `aws/spans` log group, with token usage and an event timeline. | Edit an existing specialist's prompt XML configuration, model selections, and deployment settings. |
 
 ### Report Viewer
 
-| Report Overview | Page Reader — Original vs Enhanced |
-| --- | --- |
-| ![Report Overview](.github/assets/BADGERS-screenshot-report-overview.png) | ![Page Reader Enhanced](.github/assets/BADGERS-screenshot-report-page-reader-enhanced.png) |
+| Report Overview                                                                                                       | Page Reader — Original vs Enhanced                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| ![Report Overview](.github/assets/BADGERS-screenshot-report-overview.png)                                             | ![Page Reader Enhanced](.github/assets/BADGERS-screenshot-report-page-reader-enhanced.png)                               |
 | Per-page analysis summary with element counts, specialist results, and structured XML output for each processed page. | Side-by-side original and enhanced page images — the image enhancer preprocesses pages for improved specialist accuracy. |
 
-| Page Reader — Audit Trail | Report Overview — Multi-Document |
-| --- | --- |
-| ![Audit Trail](.github/assets/BADGERS-screenshot-report-page-reader-audit-trail.png) | ![Report Tesla](.github/assets/BADGERS-screenshot-report-overview-tesla.png) |
+| Page Reader — Audit Trail                                                                                                 | Report Overview — Multi-Document                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ![Audit Trail](.github/assets/BADGERS-screenshot-report-page-reader-audit-trail.png)                                      | ![Report Tesla](.github/assets/BADGERS-screenshot-report-overview-tesla.png)                                          |
 | Specialist execution times, token usage, and model selections per page — useful for performance tuning and cost analysis. | The same report viewer on a different document type (textbook with diagrams), showing how analysis adapts to content. |
 
 ### Deployment CLI
@@ -71,7 +71,7 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 │                           AgentCore Runtime                                 │
 │   ┌─────────────────────────────────────────────────────────────────────┐   │
 │   │  PDF Analysis Agent (Strands)                                       │   │
-│   │  - Claude Sonnet 4.5 with Extended Thinking                         │   │
+│   │  - Claude Opus 4.6 with Adaptive Thinking                           │   │
 │   │  - Session state management                                         │   │
 │   │  - MCP tool orchestration                                           │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
@@ -112,51 +112,51 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 
 ## 🛠️ Tech Stack
 
-| Component | Technology |
-| --- | --- |
-| 🤖 Agent Framework | [Strands Agents](https://github.com/strands-agents/strands-agents) |
-| 🏠 Agent Hosting | Amazon Bedrock AgentCore Runtime |
-| 🚪 Tool Gateway | Amazon Bedrock AgentCore Gateway (MCP Protocol) |
-| 🧠 Foundation Model | Claude Sonnet 4.5 (via Amazon Bedrock) |
-| ⚡ Compute | AWS Lambda (modular specialist functions, including container-based) |
-| 📦 Storage | Amazon S3 (configs, prompts, outputs) |
-| 📋 Job Tracking | Amazon DynamoDB (document → job → subtask state) |
-| 🖥️ UI Hosting | Amazon ECS Express Gateway service (in a VPC) |
-| 🔐 Auth | Amazon Cognito (OIDC + PKCE for the UI, OAuth 2.0 M2M for the Gateway) |
-| 🏗️ IaC | AWS CDK (Python) |
-| 📈 Observability | CloudWatch Logs, X-Ray Transaction Search |
-| 📊 Cost Tracking | Bedrock Application Inference Profiles |
+| Component          | Technology                                                              |
+| ------------------ | ----------------------------------------------------------------------- |
+| 🤖 Agent Framework  | [Strands Agents](https://github.com/strands-agents/strands-agents)      |
+| 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                        |
+| 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                         |
+| 🧠 Foundation Model | Claude Opus 4.6 for the agent; eight models for specialists (see below) |
+| ⚡ Compute          | AWS Lambda (modular specialist functions, including container-based)    |
+| 📦 Storage          | Amazon S3 (configs, prompts, outputs)                                   |
+| 📋 Job Tracking     | Amazon DynamoDB (document → job → subtask state)                        |
+| 🖥️ UI Hosting       | Amazon ECS Express Gateway service (in a VPC)                           |
+| 🔐 Auth             | Amazon Cognito (OIDC + PKCE for the UI, OAuth 2.0 M2M for the Gateway)  |
+| 🏗️ IaC              | AWS CDK (Python)                                                        |
+| 📈 Observability    | CloudWatch Logs, X-Ray Transaction Search                               |
+| 📊 Cost Tracking    | Bedrock Application Inference Profiles                                  |
 
 ## 🔬 Specialists
 
-| Specialist | Purpose |
-| --- | --- |
-| 📸 `pdf_to_images_converter` | Convert PDF pages to images |
-| 🏷️ `classify_pdf_content` | Classify document content type |
-| 📝 `full_text_specialist` | Extract all text content |
-| 📊 `table_specialist` | Extract and structure tables |
-| 📈 `charts_specialist` | Analyze charts and graphs |
-| 🔀 `diagram_specialist` | Process diagrams and flowcharts |
-| 📐 `layout_specialist` | Document structure analysis |
-| 🏥 `decision_tree_specialist` | Medical/clinical document analysis |
-| 🔬 `scientific_specialist` | Scientific paper analysis |
-| ✍️ `handwriting_specialist` | Handwritten text recognition |
-| 🔢 `handwriting_math_specialist` | Handwritten mathematical notation recognition |
-| 💻 `code_block_specialist` | Extract code snippets |
-| 🗂️ `metadata_generic_specialist` | Generic metadata extraction |
-| 🗂️ `metadata_mads_specialist` | MADS metadata format extraction |
-| 🗂️ `metadata_mods_specialist` | MODS metadata format extraction |
-| 🔑 `keyword_topic_specialist` | Extract keywords and topics |
-| 🔧 `remediation_specialist` | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
-| 📄 `page_specialist` | Single page content analysis |
-| 🧱 `elements_specialist` | Document element detection |
-| 🧱 `robust_elements_specialist` | Enhanced element detection with fallbacks |
-| 👁️ `general_visual_analysis_specialist` | General-purpose visual content analysis |
-| ✏️ `editorial_specialist` | Editorial content and markup analysis |
-| 🗺️ `war_map_specialist` | Historical war map analysis |
-| 🎓 `edu_transcript_specialist` | Educational transcript analysis |
-| 🔗 `correlation_specialist` | Correlate multi-specialist results per page |
-| 🖼️ `image_enhancer` | Image enhancement and preprocessing |
+| Specialist                             | Purpose                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 📸 `pdf_to_images_converter`            | Convert PDF pages to images                                                                |
+| 🏷️ `classify_pdf_content`               | Classify document content type                                                             |
+| 📝 `full_text_specialist`               | Extract all text content                                                                   |
+| 📊 `table_specialist`                   | Extract and structure tables                                                               |
+| 📈 `charts_specialist`                  | Analyze charts and graphs                                                                  |
+| 🔀 `diagram_specialist`                 | Process diagrams and flowcharts                                                            |
+| 📐 `layout_specialist`                  | Document structure analysis                                                                |
+| 🏥 `decision_tree_specialist`           | Medical/clinical document analysis                                                         |
+| 🔬 `scientific_specialist`              | Scientific paper analysis                                                                  |
+| ✍️ `handwriting_specialist`             | Handwritten text recognition                                                               |
+| 🔢 `handwriting_math_specialist`        | Handwritten mathematical notation recognition                                              |
+| 💻 `code_block_specialist`              | Extract code snippets                                                                      |
+| 🗂️ `metadata_generic_specialist`        | Generic metadata extraction                                                                |
+| 🗂️ `metadata_mads_specialist`           | MADS metadata format extraction                                                            |
+| 🗂️ `metadata_mods_specialist`           | MODS metadata format extraction                                                            |
+| 🔑 `keyword_topic_specialist`           | Extract keywords and topics                                                                |
+| 🔧 `remediation_specialist`             | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
+| 📄 `page_specialist`                    | Single page content analysis                                                               |
+| 🧱 `elements_specialist`                | Document element detection                                                                 |
+| 🧱 `robust_elements_specialist`         | Enhanced element detection with fallbacks                                                  |
+| 👁️ `general_visual_analysis_specialist` | General-purpose visual content analysis                                                    |
+| ✏️ `editorial_specialist`               | Editorial content and markup analysis                                                      |
+| 🗺️ `war_map_specialist`                 | Historical war map analysis                                                                |
+| 🎓 `edu_transcript_specialist`          | Educational transcript analysis                                                            |
+| 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                |
+| 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                        |
 
 ## 🚀 Deployment
 
@@ -186,16 +186,16 @@ Pick option **9** for a full deployment, or **12** to run only what is still out
 
 The eight steps:
 
-| # | Step | What it does |
-| --- | --- | --- |
-| 1 | Lambda Layers | foundation, PDF processing, Poppler/qpdf |
-| 2 | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC |
-| 3 | Upload Config | prompts, manifests and schemas to the config bucket |
-| 4 | Specialist Lambdas | container images, then the Lambda stack (26 specialists) |
-| 5 | Gateway | AgentCore MCP Gateway, records the Gateway URL |
-| 6 | Runtime | builds and pushes the agent image, then deploys the Runtime |
-| 7 | UI — Build | generates `ui/.env` from Cognito, builds the bundle and image |
-| 8 | UI — Deploy | ECS Express Gateway service, forces the rollout, waits for it |
+| #   | Step               | What it does                                                            |
+| --- | ------------------ | ----------------------------------------------------------------------- |
+| 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                |
+| 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC |
+| 3   | Upload Config      | prompts, manifests and schemas to the config bucket                     |
+| 4   | Specialist Lambdas | container images, then the Lambda stack (26 specialists)                |
+| 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                          |
+| 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime             |
+| 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image           |
+| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it           |
 
 Plus **9** full deployment, **12** resume, **10** status, **11** reset state (deletes nothing in AWS), **0** exit.
 
@@ -378,10 +378,10 @@ Each specialist has a manifest file in S3:
         "name": "full_text_specialist",
         "enhancement_eligible": true,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-6",
             "fallback_list": [
-                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                "us.amazon.nova-premier-v1:0"
+                "us.openai.gpt-5.6-terra",
+                "us.amazon.nova-2-lite-v1:0"
             ]
         },
         "max_retries": 3,
@@ -456,41 +456,38 @@ Four metrics are combined into a complexity score: text pixel ratio, grayscale e
 
 ### 📊 Inference Profiles for Cost Tracking
 
-BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring. The system maps model IDs to profile ARNs at runtime:
+BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring. Every model in the registry gets one, and specialists resolve a model ID to its profile ARN at runtime:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        Inference Profile Flow                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  1. CDK deploys InferenceProfilesStack                                      │
-│     └─> Creates ApplicationInferenceProfile for each model                  │
-│         • badgers-claude-sonnet-{id}  (US)                               │
-│         • badgers-claude-haiku-{id}   (US)                               │
-│         • badgers-claude-opus-{id}    (US)                               │
-│         • badgers-nova-premier-{id}   (US)                               │
+│  1. CDK reads deployment/s3_files/config/model_registry.json at synth       │
+│     └─> One ApplicationInferenceProfile per model, in a loop                │
+│         badgers-claude-sonnet-4-6-{id}, badgers-claude-opus-4-6-{id},       │
+│         badgers-gpt-5-6-terra-{id}, badgers-nova-2-lite-{id}, ...           │
 │                                                                             │
-│  2. Runtime receives profile ARNs as environment variables                  │
-│     └─> CLAUDE_SONNET_PROFILE_ARN, CLAUDE_HAIKU_PROFILE_ARN, etc.           │
+│  2. The same loop writes one SSM parameter                                   │
+│     └─> /badgers-{id}/model-profiles  =  { model_id: profile_arn, ... }      │
 │                                                                             │
-│  3. At invocation, bedrock_client.py maps model_id → profile ARN            │
-│     └─> "us.anthropic.claude-sonnet-4-5-*" → $CLAUDE_SONNET_PROFILE_ARN    │
+│  3. Lambdas and the Runtime receive the parameter NAME, not the ARNs         │
+│     └─> MODEL_PROFILES_PARAM                                                │
 │                                                                             │
-│  4. Bedrock invoked with profile ARN (enables cost tracking)                │
-│     └─> Falls back to model ID if no profile configured                     │
+│  4. At invocation, bedrock_client.py reads the parameter once, caches it,    │
+│     and looks up the model ID                                               │
+│     └─> Falls back to the raw model ID if no profile is configured           │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ```
 
-Model ID to environment variable mapping:
+There are **no per-model `*_PROFILE_ARN` environment variables.** Adding or retiring a model is one registry edit plus a deploy — no stack, Lambda, or UI file lists models by hand.
 
-| Model Pattern | Environment Variable |
-| --- | --- |
-| `*claude-sonnet-4-5*` | `CLAUDE_SONNET_PROFILE_ARN` |
-| `*claude-haiku-4-5*` | `CLAUDE_HAIKU_PROFILE_ARN` |
-| `*claude-opus-4-6*` | `CLAUDE_OPUS_PROFILE_ARN` |
-| `*nova-premier*` | `NOVA_PREMIER_PROFILE_ARN` |
+The model list the UI offers comes from `GET /api/models`, which joins the SSM parameter against the registry, so the dropdown cannot offer a model this deployment has no profile for.
+
+> [!IMPORTANT]
+> Model inference does **not** stay in your deployment Region. All eight models are invoked through US geo cross-Region inference profiles (`us.*`), so Bedrock routes each request to a Region within the US geography. See [Inference Profiles and Regions](deployment/DEPLOYMENT_README.md#-inference-profiles-and-regions).
 
 ### ➕ Adding a New Specialist
 
@@ -519,16 +516,22 @@ The Specialist Creation Wizard is the 🧙 Create Specialist tab in the UI. It g
 
 ### Service Control Policy (SCP) Blocks Cross-Region Inference
 
-If your AWS organization uses strict SCPs that deny cross-region Bedrock operations, you may see:
+If your AWS organization uses strict SCPs that deny cross-Region Bedrock operations, you may see:
 
 ```
 AccessDeniedException: ... is not authorized to perform: bedrock:InvokeModelWithResponseStream
-on resource: arn:aws:bedrock:::foundation-model/anthropic.claude-* with an explicit deny
-in a service control policy
+on resource: arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-... with an
+explicit deny in a service control policy
 
 ```
 
-BADGERS defaults to regional (`us.anthropic.*`) inference profiles which avoid cross-region routing. If you previously deployed with `global.anthropic.*` profiles, redeploy after pulling the latest code.
+BADGERS invokes **US geo cross-Region inference profiles** (`us.*`), which route each request to a destination Region inside the US geography. That is cross-Region routing — the `us.` prefix restricts *which* Regions can be used, not *whether* Regions are crossed. An SCP that allows only your deployment Region will block it.
+
+Fix it on the SCP side: allow Bedrock inference actions in all US destination Regions for the profiles in use, or add an inference-profile exception. A denied ARN naming a Region you did not deploy into is the signature of this problem.
+
+A denial on `arn:aws:bedrock:::foundation-model/...` — no Region, no account — is a different failure. That ARN form belongs to *global* cross-Region inference, and BADGERS does not use `global.*` profiles. If you see it, something is invoking a `global.` model ID.
+
+See [Inference Profiles and Regions](deployment/DEPLOYMENT_README.md#-inference-profiles-and-regions) for what crosses Regions, what does not, and why the IAM policy wildcards the Region field.
 
 ### Marketplace Subscription Error on First Invocation
 
@@ -562,11 +565,14 @@ Customers are responsible for making their own independent assessment of the inf
 ### 🤖 Amazon Bedrock & Foundation Models
 
 - [Amazon Bedrock Developer Experience](https://aws.amazon.com/bedrock/developer-experience/) - Foundation model choice and customization
-- [Anthropic's Claude in Amazon Bedrock](https://aws.amazon.com/bedrock/anthropic/) - Claude Opus 4.6, Sonnet 4.5, Haiku 4.5 hybrid reasoning models
-- [Claude Sonnet 4.5 in Amazon Bedrock](https://aws.amazon.com/blogs/aws/introducing-claude-sonnet-4-5-in-amazon-bedrock-anthropics-most-intelligent-model-best-for-coding-and-complex-agents/) - Most intelligent model for coding and complex agents
-- [Claude Opus 4.6 in Amazon Bedrock](https://aws.amazon.com/blogs/machine-learning/claude-opus-4-5-now-in-amazon-bedrock/) - Tool search, extended thinking, and agent capabilities
-- [Amazon Nova Foundation Models](https://aws.amazon.com/blogs/aws/introducing-amazon-nova-frontier-intelligence-and-industry-leading-price-performance/) - Nova Micro, Lite, Pro, Premier - frontier intelligence
+- [Anthropic's Claude in Amazon Bedrock](https://aws.amazon.com/bedrock/anthropic/) - Claude Opus 5, Opus 4.6, and Sonnet 4.6 hybrid reasoning models
+- [Claude Sonnet 4.6 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html) - The default specialist workhorse: pricing, APIs, Regional availability
+- [Claude Opus 4.6 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-4-6.html) - Agent runtime and heavy-reasoning specialists
+- [Claude Opus 5 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5.html) - Anthropic's newest Opus, same price as 4.6; adaptive thinking on by default
+- [OpenAI models in Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-openai-gpt-56-terra.html) - GPT-5.6 Terra; the GPT models are Converse-only on `bedrock-runtime` and need `bedrock:InvokeModel` on `project/default`
+- [Amazon Nova 2 Lite model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html) - The cheapest fallback in the chain
 - [Using Amazon Nova in AI Agents](https://docs.aws.amazon.com/nova/latest/userguide/agents-use-nova.html) - Nova as foundation model for agents
+- [Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html) - How `us.*` profiles route, and the IAM grants they require
 
 ### 🚀 Amazon Bedrock AgentCore
 

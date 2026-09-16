@@ -26,10 +26,10 @@ s3_files/
 
 Contains configuration for the orchestrating agent that coordinates PDF analysis workflows.
 
-| File                                      | Purpose                                                                                                    |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration            |
-| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below. |
+| File                                      | Purpose                                                                                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_model_config.json`                 | Model selection (Claude Opus 4.6), temperature, max tokens, and adaptive-thinking `effort`. Read by `main-websocket.py`, which forwards `thinking` and `output_config.effort` to Bedrock as siblings — not nested |
+| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below.                                                                                                        |
 
 ### ⚠️ Operating Environment Configuration
 
