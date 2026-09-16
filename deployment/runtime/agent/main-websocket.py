@@ -258,19 +258,68 @@ DEFAULT_MODEL_CONFIG = {
     "temperature": 1.0,
     "max_tokens": 16000,
     "thinking": {"type": "adaptive"},
-    "fallback_models": [
-        {
-            "model_id": "us.anthropic.claude-opus-4-5-20251101-v1:0",
-            "thinking": {"type": "enabled", "budget_tokens": 8192},
-        },
-        {
-            "model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            "thinking": {"type": "enabled", "budget_tokens": 8192},
-        },
-    ],
+    "effort": "high",
 }
 
+# There is deliberately no "fallback_models" key. One used to be defined here and was read
+# by nothing — the string appeared exactly once in the whole repo, at its own definition —
+# so it advertised resilience the agent does not have. Its two entries also named models
+# being retired, which made it look like something that needed updating rather than
+# deleting.
+#
+# The agent is not without protection: Strands retries ModelThrottledException with
+# exponential backoff (6 attempts, 4s doubling to 240s, reset after each success), which
+# covers the dominant transient failure. What it has no answer for is a non-retryable error
+# — AccessDenied, ValidationException, a model reaching EOL — where a different model would
+# be the only escape. The chosen fix for that is resumable runs rather than a fallback
+# model, because resume also covers retry-budget exhaustion and avoids swapping models
+# mid-conversation through accumulated thinking blocks and tool results. Tracked separately;
+# do not reintroduce a fallback list here without that decision being revisited.
+
 DEFAULT_SYSTEM_PROMPT = """You are an intelligent BADGERS assistant with access to specialized tools via AgentCore Gateway."""
+
+# Effort levels Claude accepts. "xhigh" and "max" exist but only on specific Opus models,
+# and an unsupported value is an error rather than a downgrade, so they are not offered.
+VALID_EFFORT = ("low", "medium", "high")
+
+
+def _build_additional_request_fields(model_config: dict[str, Any]) -> dict[str, Any]:
+    """Build BedrockModel's additional_request_fields from the agent's model config.
+
+    This previously forwarded only ``{"thinking": ...}``, so the ``effort`` and
+    ``adaptive_thinking`` keys declared in agent_config/agent_model_config.json were read by
+    nothing. The value happened to match the model's default, which is why it went unnoticed
+    — anyone lowering effort to trim cost would have seen no change and no error.
+
+    ``effort`` must travel in its own ``output_config`` object. Putting it inside
+    ``thinking`` raises a ValidationException, so the two are siblings here, not nested.
+    """
+    thinking = model_config.get("thinking") or {}
+    fields: dict[str, Any] = {}
+
+    if thinking:
+        fields["thinking"] = thinking
+
+    # effort only means anything when the model is actually thinking. "adaptive_thinking" is
+    # accepted as an alias for thinking.type == "adaptive", since the config file carries
+    # both spellings.
+    is_adaptive = thinking.get("type") == "adaptive" or bool(
+        model_config.get("adaptive_thinking")
+    )
+    if is_adaptive and not thinking:
+        fields["thinking"] = {"type": "adaptive"}
+
+    effort = model_config.get("effort")
+    if effort and (is_adaptive or thinking):
+        if effort not in VALID_EFFORT:
+            log(
+                f"Ignoring invalid effort {effort!r}; expected one of {VALID_EFFORT}",
+                level="warning",
+            )
+        else:
+            fields["output_config"] = {"effort": effort}
+
+    return fields
 
 
 # =============================================================================
@@ -533,7 +582,7 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
         region_name=os.environ.get("AWS_REGION", "us-west-2"),
         temperature=model_config.get("temperature", 1.0),
         max_tokens=model_config.get("max_tokens", 8000),
-        additional_request_fields={"thinking": model_config.get("thinking", {})},
+        additional_request_fields=_build_additional_request_fields(model_config),
     )
 
     mcp_client = MCPClient(lambda: create_mcp_transport(gateway_url, access_token))
