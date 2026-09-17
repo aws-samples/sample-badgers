@@ -125,9 +125,10 @@ Then the menu:
 | `7`    | UI — Build & Push Image             | generates `ui/.env`, builds the Vite bundle and image, pushes          |
 | `8`    | UI — Deploy ECS                     | deploys the ECS stack, forces the image rollout, waits                 |
 | `9`    | Full Deployment                     | runs 1 → 8 in order, stopping at the first failure                     |
-| `12`   | Resume                              | runs only the steps still outstanding, without prompting on each       |
+| `r`    | Resume                              | runs only the steps still outstanding, without prompting on each       |
 | `10`   | Show Deployment Status              | current suffix, per-step completion with timestamps                    |
 | `11`   | Reset Deployment State              | marks all steps incomplete; **deletes nothing in AWS**                 |
+| `m`    | Models                              | prints the model registry and which steps a registry edit requires     |
 | `0`    | Exit                                |                                                                        |
 
 You can also run one directly — `./deploy.sh 8` or `./deploy.sh resume` — but the
@@ -141,7 +142,7 @@ Both get you to a complete deployment; they differ in friction.
 re-run, so resuming from step 4 costs you three prompts. Declining a prompt is treated as
 success and the run continues.
 
-**Option 12** skips completed steps *before* calling them, so those prompts never fire. It
+**Option `r`** skips completed steps *before* calling them, so those prompts never fire. It
 starts at the first outstanding step. A step counts as complete only when every state key
 it writes is set, so an interrupted step 6 (image pushed, runtime not deployed) is
 re-entered rather than skipped.
@@ -341,66 +342,81 @@ uv run cdk bootstrap
 > [!TIP]
 > New to CDK? See the [AWS CDK Developer Guide](https://docs.aws.amazon.com/cdk/v2/guide/home.html) for installation and concepts.
 >
-> This project uses alpha CDK modules:
-> - [aws-bedrock-agentcore-alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-bedrock-agentcore-alpha-readme.html)
-> - [aws-bedrock-alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-bedrock-alpha-readme.html)
+> No alpha CDK modules are required. The AgentCore Gateway, Runtime, and Memory constructs
+> come from [`aws_cdk.aws_bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html)
+> in `aws-cdk-lib` (2.263.0 or later), which is what `uv sync` installs.
 
-### 4️⃣ Deploy S3 + Upload Config
+### 4️⃣ Foundational Stacks + Upload Config
+
+Same set and order as `deploy.sh` step 2. `IAM` imports the DynamoDB table and the S3
+buckets, `Lambda` imports ECR and the inference profiles, so the order below is not
+optional. The manual path skips the two Bedrock model preflights `deploy.sh` runs here; if
+a model is not reachable from your account you find out from a specialist's
+`AccessDeniedException` instead.
 
 ```bash
-uv run cdk deploy BADGERS-S3-{id}-{suffix} --require-approval never
+for s in S3 Cognito DynamoDB IAM ECR InferenceProfiles Memory Vpc; do
+  uv run cdk deploy BADGERS-${s}-{id}-{suffix} --require-approval never
+done
+uv run cdk deploy BADGERS-XRay-{id}-{suffix} --require-approval never   # optional; see X-Ray section
 
-# Sync configuration files
+# Sync s3_files/ (prompts, manifests, schemas, agent config, model registry)
 ./sync_s3_files.sh
 ```
 
-### 5️⃣ Deploy Auth & IAM
+### 5️⃣ Container Images + Specialist Lambdas
+
+The Lambda stack references the two container images by tag, so they must be in ECR before
+it deploys. `build_container_lambdas.sh` takes the resource id (`{id}-{suffix}`).
 
 ```bash
-uv run cdk deploy BADGERS-Cognito-{id}-{suffix} --require-approval never
-uv run cdk deploy BADGERS-IAM-{id}-{suffix} --require-approval never
-```
-
-### 6️⃣ Deploy Lambda Functions
-
-```bash
+cd lambdas && ./build_container_lambdas.sh {id}-{suffix} && cd ..
 uv run cdk deploy BADGERS-Lambda-{id}-{suffix} --require-approval never
 ```
 
-### 7️⃣ Deploy Gateway
+### 6️⃣ Gateway
 
 ```bash
 uv run cdk deploy BADGERS-Gateway-{id}-{suffix} --require-approval never
 ```
 
-### 8️⃣ Deploy ECR + Build Container
+### 7️⃣ Runtime Image + Runtime
 
 ```bash
-uv run cdk deploy BADGERS-ECR-{id}-{suffix} --require-approval never
-
-cd runtime
-./build_and_push_websocket.sh
-cd ..
-```
-
-### 9️⃣ Deploy Memory + Runtime
-
-```bash
-uv run cdk deploy BADGERS-Memory-{id}-{suffix} --require-approval never
+cd runtime && ./build_and_push_websocket.sh && cd ..
 uv run cdk deploy BADGERS-RuntimeWebSocket-{id}-{suffix} --require-approval never
 ```
+
+### 8️⃣ UI Image + ECS
+
+`generate_ui_env.sh` must run after Cognito exists — the bundle compiles the authority and
+client id in. The image is `linux/amd64`, matching the Express Gateway service.
+
+```bash
+bash scripts/generate_ui_env.sh
+(cd ../ui && npm install && npm run build)
+aws ecr get-login-password --region {region} | docker login --username AWS --password-stdin {account}.dkr.ecr.{region}.amazonaws.com
+docker build --platform linux/amd64 --file ../ui/Dockerfile --tag {ecr-repo-uri}:frontend ../ui
+docker push {ecr-repo-uri}:frontend
+uv run cdk deploy BADGERS-ECS-{id}-{suffix} --require-approval never
+```
+
+The ECS stack pins the `frontend` tag, so pushing a new image later leaves the template
+unchanged; `deploy.sh` step 8 forces the rollout with `update-express-gateway-service`
+afterwards, and a manual redeploy has to do the same.
 
 ## 📤 Stack Outputs
 
 Key outputs after deployment:
 
-| Output                                  | Description                      |
-| --------------------------------------- | -------------------------------- |
-| `GatewayUrl`                            | MCP endpoint for tool invocation |
-| `RuntimeEndpoint`                       | Agent HTTP endpoint              |
-| `UserPoolId` / `UserPoolClientId`       | Cognito authentication           |
-| `ConfigBucketName` / `OutputBucketName` | S3 buckets                       |
-| `MemoryId`                              | AgentCore Memory ID              |
+| Output                                                       | Stack            | Description                                      |
+| ------------------------------------------------------------ | ---------------- | ------------------------------------------------ |
+| `GatewayUrl` / `GatewayId`                                   | Gateway          | MCP endpoint for tool invocation                 |
+| `RuntimeArn` / `RuntimeId`                                   | RuntimeWebSocket | AgentCore Runtime the UI opens its WebSocket to  |
+| `UserPoolId` / `UserPoolClientId` / `UIClientId`             | Cognito          | Cognito authentication (Gateway M2M and UI OIDC) |
+| `ConfigBucketName` / `SourceBucketName` / `OutputBucketName` | S3               | Config, upload, and results buckets              |
+| `MemoryId`                                                   | Memory           | AgentCore Memory ID                              |
+| `ServiceUrl`                                                 | ECS              | The UI                                           |
 
 ## 📁 Directory Structure
 
@@ -422,7 +438,7 @@ deployment/
 │   ├── deploy_foundation_layer.sh   # Manual layer deployment
 │   ├── deploy_poppler_layer.sh      # Manual layer deployment
 │   ├── containers/           # 🐳 Container Lambda Dockerfiles
-│   └── code/                 # ⚡ 24 specialist/utility functions (+2 containers)
+│   └── code/                 # ⚡ 25 specialist/utility functions (+2 containers); deployment_config.json picks which deploy
 ├── runtime/                  # 🐳 AgentCore container
 │   ├── Dockerfile.websocket
 │   ├── build_and_push_websocket.sh

@@ -42,17 +42,18 @@ BADGERS uses four types of Lambda functions:
 
 ### Vision Specialists
 
-| Variable                 | Required | Default     | Description                                          |
-| ------------------------ | -------- | ----------- | ---------------------------------------------------- |
-| `CONFIG_BUCKET`          | ✅        | -           | S3 bucket containing specialist configs              |
-| `OUTPUT_BUCKET`          | ✅        | -           | S3 bucket for saving results                         |
-| `SPECIALIST_NAME`        | ✅        | -           | Specialist identifier (e.g., `full_text_specialist`) |
-| `LOGGING_LEVEL`          | ❌        | `INFO`      | Log verbosity                                        |
-| `MAX_TOKENS`             | ❌        | `8000`      | Max response tokens from Bedrock                     |
-| `TEMPERATURE`            | ❌        | `0.1`       | Model temperature (lower = more deterministic)       |
-| `AWS_REGION`             | ❌        | `us-west-2` | Region for Bedrock calls                             |
-| `DYNAMIC_TOKENS_ENABLED` | ❌        | `false`     | Enable complexity-based dynamic token estimation     |
-| `JOBS_TABLE_NAME`        | ❌        | -           | DynamoDB jobs table. Unset disables job tracking     |
+| Variable                 | Required | Default     | Description                                                                                                                                                                                                                                                                                            |
+| ------------------------ | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CONFIG_BUCKET`          | ✅        | -           | S3 bucket containing specialist configs                                                                                                                                                                                                                                                                |
+| `OUTPUT_BUCKET`          | ✅        | -           | S3 bucket for saving results                                                                                                                                                                                                                                                                           |
+| `SPECIALIST_NAME`        | ✅        | -           | Specialist identifier (e.g., `full_text_specialist`)                                                                                                                                                                                                                                                   |
+| `MODEL_PROFILES_PARAM`   | ✅        | -           | Name of the SSM parameter mapping model ID → application inference profile ARN (`/badgers-{id}-{suffix}/model-profiles`). Set by the Lambda stack from the InferenceProfiles stack; the Bedrock client resolves the manifest's `model_id` through it. Replaces the per-model `*_PROFILE_ARN` variables |
+| `LOGGING_LEVEL`          | ❌        | `INFO`      | Log verbosity                                                                                                                                                                                                                                                                                          |
+| `MAX_TOKENS`             | ❌        | `16000`     | Max response tokens from Bedrock; the Lambda stack sets `16000`. Thinking models pin `temperature` to 1 regardless of `TEMPERATURE`                                                                                                                                                                    |
+| `TEMPERATURE`            | ❌        | `0.1`       | Model temperature as set by the Lambda stack (code default `0.3` if unset)                                                                                                                                                                                                                             |
+| `AWS_REGION`             | ❌        | `us-west-2` | Region for Bedrock calls                                                                                                                                                                                                                                                                               |
+| `DYNAMIC_TOKENS_ENABLED` | ❌        | `false`     | Enable complexity-based dynamic token estimation                                                                                                                                                                                                                                                       |
+| `JOBS_TABLE_NAME`        | ❌        | -           | DynamoDB jobs table. Unset disables job tracking                                                                                                                                                                                                                                                       |
 
 ### Input Parameters
 

@@ -186,16 +186,16 @@ Pick option **9** for a full deployment, or **12** to run only what is still out
 
 The eight steps:
 
-| #   | Step               | What it does                                                            |
-| --- | ------------------ | ----------------------------------------------------------------------- |
-| 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                |
-| 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC |
-| 3   | Upload Config      | prompts, manifests and schemas to the config bucket                     |
-| 4   | Specialist Lambdas | container images, then the Lambda stack (26 specialists)                |
-| 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                          |
-| 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime             |
-| 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image           |
-| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it           |
+| #   | Step               | What it does                                                                                                                         |
+| --- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                                                                             |
+| 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC                                                              |
+| 3   | Upload Config      | prompts, manifests and schemas to the config bucket                                                                                  |
+| 4   | Specialist Lambdas | container images, then the Lambda stack (12 of 26 specialists enabled by default; `deployment/deployment_config.json` selects which) |
+| 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                                                                                       |
+| 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime                                                                          |
+| 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image                                                                        |
+| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it                                                                        |
 
 Plus **9** full deployment, **12** resume, **10** status, **11** reset state (deletes nothing in AWS), **0** exit.
 

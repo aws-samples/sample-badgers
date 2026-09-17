@@ -129,6 +129,11 @@ the UI env file, or reading per-model profile environment variables; all are mar
     correlated spine, with Rendered Spine / Raw XML / Specialists / Audit tabs and
     ← → keyboard navigation), and Audit Trail — plus a single-file HTML download that
     inlines the CSS, JS, and every page image as base64 so it works offline.
+- **The agent prompt's `<available_tools>{{TOOLS_LIST}}</available_tools>` element is
+  removed.** Nothing ever substituted it — not the runtime, which prepends the operating
+  environment and appends the session id and otherwise sends the file verbatim, and not
+  Strands — so the model received the literal placeholder. Tools arrive as MCP tool
+  definitions from the Gateway; the prompt never needed a list.
 - **The specialist creation wizard works end to end.** Its three server endpoints were
   stubs returning `{prompts:{}}`, `{}`, and `{output:'Not yet wired'}`; they are now
   implemented in a new `ui/server/routes/wizard.js`, mounted by `mountWizardRoutes`.

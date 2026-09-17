@@ -13,6 +13,7 @@ This directory contains all configuration, prompts, schemas, and manifests that 
 s3_files/
 ├── agent_config/          # 🤖 Agent orchestrator configuration
 ├── agent_system_prompt/   # 💬 System prompt for the orchestrating agent
+├── config/                # 🗂️ Runtime config: model_registry.json, document_type_contexts.json
 ├── core_system_prompts/   # 🔧 Shared prompt components (rules, error handling, wrapper)
 ├── manifests/             # 📋 Tool and specialist configuration manifests
 ├── prompts/               # 📝 Specialist-specific prompt files
@@ -68,9 +69,21 @@ If the file is missing or the value is empty, the system operates without any en
 
 ## 💬 agent_system_prompt/
 
-| File                      | Purpose                                                                                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `agent_system_prompt.xml` | Defines the orchestrator agent's role, execution rules, workflow steps, error handling, and tool mapping examples. Contains `{{TOOLS_LIST}}` placeholder populated at runtime. |
+| File                      | Purpose                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_system_prompt.xml` | Defines the orchestrator agent's role, execution rules, workflow steps, the content-type → tool routing table, and error handling. Read from S3 by the runtime at the start of every session. It contains no tool list: the agent receives its tools as MCP tool definitions from the Gateway, not through the prompt. |
+
+---
+
+## 🗂️ config/
+
+Runtime configuration read from S3 by the UI server and the Lambdas. `deploy.sh` step 3
+option 6 syncs this directory on its own; option 7 syncs everything.
+
+| File                          | Purpose                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_registry.json`         | The single source of truth for the model set: ID, display name, provider, transport, thinking mode, prices, status. Read by the CDK app at synth (profiles, IAM grants, SSM map, cdk-nag suppressions) and by `GET /api/models` in the UI server at runtime, joined against the SSM profile map so the wizard and pricing calculator only offer models this deployment provisioned. |
+| `document_type_contexts.json` | Per-document-type guidance the image enhancer injects into its prompt. Cached in a module global for the life of a warm Lambda container, so an edit takes effect on the next cold start.                                                                                                                                                                                           |
 
 ---
 
