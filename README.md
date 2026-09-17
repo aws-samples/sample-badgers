@@ -6,7 +6,7 @@
 
 ---
 
-# 🦡 BADGERS v4.0 as of August 2026
+# 🦡 BADGERS v5.0 as of September 2026
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
