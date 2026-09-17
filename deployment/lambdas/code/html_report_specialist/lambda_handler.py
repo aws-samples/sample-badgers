@@ -14,6 +14,11 @@ from typing import Any
 
 import boto3
 
+# Parsing goes through defusedxml; the stdlib module above is kept for the Element type
+# and ParseError, which defusedxml re-exports unchanged. defusedxml ships in the
+# foundation layer (lambdas/requirements.txt).
+from defusedxml.ElementTree import fromstring as _defused_fromstring
+
 from foundation import job_state
 from renderer import render_report
 
@@ -392,10 +397,16 @@ def _get_image(s3: Any, uri: str, expected_bucket: str) -> tuple[str, bytes]:
     # default when an uploader omits ContentType).  JPEG identity is verified
     # by the SOI marker below; rejecting on metadata alone caused enhanced
     # images to be silently dropped from reports.
-    if content_type and content_type not in {"image/jpeg", "binary/octet-stream", "application/octet-stream"}:
+    if content_type and content_type not in {
+        "image/jpeg",
+        "binary/octet-stream",
+        "application/octet-stream",
+    }:
         raise ValueError(f"Unsupported report image content type: {content_type}")
     if body[:2] != b"\xff\xd8":
-        raise ValueError(f"Report image is not a valid JPEG (missing SOI marker): {uri}")
+        raise ValueError(
+            f"Report image is not a valid JPEG (missing SOI marker): {uri}"
+        )
     return base64.b64encode(body).decode("ascii"), body
 
 
@@ -403,8 +414,11 @@ def _parse_spine(xml_text: str) -> dict[str, Any]:
     upper = xml_text.upper()
     if "<!DOCTYPE" in upper or "<!ENTITY" in upper:
         raise ValueError("Correlation XML must not contain DTD or entity declarations")
+    # The string check above already refuses anything that could declare an entity, so
+    # expansion attacks cannot be expressed. defusedxml enforces the same at the parser
+    # (forbid_dtd) rather than by inspection, which is the layer bandit B314 asks for.
     try:
-        root = ET.fromstring(xml_text)
+        root = _defused_fromstring(xml_text, forbid_dtd=True)
     except ET.ParseError as error:
         raise ValueError(f"Invalid correlation XML: {error}") from error
     summary = (root.findtext("summary") or "Correlation completed.").strip()
