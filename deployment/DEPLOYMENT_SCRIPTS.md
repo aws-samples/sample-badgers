@@ -29,12 +29,23 @@ newest activity first, plus `n` to start a new one. A new id must match
 `^[a-z][a-z0-9-]{0,15}$` and must not already have state; pick it from the list instead.
 
 Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
-5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, 12 resume,
-10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), 0 exit.
+5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, `r` resume,
+10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), `m` models (prints
+the registry and which steps a registry edit requires), 0 exit.
 
-**9 vs 12** — both reach a complete deployment. Option 9 runs all eight steps and stops at
-each completed one to ask whether to re-run. Option 12 skips completed steps before calling
+**9 vs r** — both reach a complete deployment. Option 9 runs all eight steps and stops at
+each completed one to ask whether to re-run. Option `r` skips completed steps before calling
 them, so those prompts never fire, and starts at the first outstanding step.
+
+Step 2 runs two Bedrock preflights before any stack is created, both driven by the model
+registry: `preflight_model_access` checks that each `us.*` geo profile is ACTIVE from the
+deployment Region (falling back to the base-model catalog only when that lookup fails for
+an unrelated reason), and `preflight_model_invocation` sends a minimal Converse request
+(`"hi"`, 64 output tokens) to each model as the operator and judges the result by exit
+code. Either failing stops the
+deploy with the models named. The invocation preflight runs on *your* credentials, so for
+the OpenAI models the deploying principal needs `bedrock:InvokeModel` on
+`arn:aws:bedrock:{region}:{account}:project/default`, not only the Lambda role.
 
 Behaviour worth knowing:
 
@@ -54,6 +65,7 @@ Environment variables:
 | `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step. |
 | `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                           |
 | `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                              |
+| `BADGERS_ALLOW_STALE_LAYER`                      | `1` lets the Lambda stack synthesize while `lambdas/layer.zip` is older than its sources. Without it, synth refuses so a deploy cannot ship the previous layer. `deploy.sh` never needs it (step 1 rebuilds first); `destroy.sh` sets it itself, since a destroy ships nothing.     |
 | `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                            |
 | `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                  |
 | `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                              |
@@ -90,8 +102,17 @@ is why the compute goes first.
 - The KMS key is scheduled **only after** the stacks are confirmed gone (7 days by default,
   which frees the alias sooner than the 30-day maximum). Scheduling it after a failed
   teardown would mark a live deployment's in-use key for deletion.
+- Verification does not trust the script's own stack list: it also queries CloudFormation
+  for anything matching `BADGERS-*-{id}-{suffix}` and reports a stack it did not expect,
+  so a stack added to the app and forgotten here cannot survive under a "complete" banner.
 - A teardown leaving stacks standing prints `❌ Teardown incomplete`, lists them, states
   that the KMS key was left alone, and **exits non-zero**.
+- `cdk destroy` synthesizes the app first. The script sets `BADGERS_ALLOW_STALE_LAYER=1`
+  for that synth, because the Lambda stack's stale-layer guard is about deploys and a
+  destroy ships nothing; a teardown from a tree with an old `layer.zip` used to abort on
+  that guard with every stack still standing.
+- Bedrock model-access subscriptions are account-level and are left alone; the script says
+  so at the end rather than implying a clean account.
 
 `--vpc-cleanup-only` runs just the ENI sweep: deletes interface endpoints, then deletes
 or force-detaches whatever ENIs remain. Use it when a previous teardown left a VPC behind.

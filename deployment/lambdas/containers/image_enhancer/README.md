@@ -188,17 +188,17 @@ Maps to MAX_ITERATIONS for the agent:
 
 ## Environment Variables
 
-| Variable              | Default                          | Description                                                                                                               |
-| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID                                                                                                          |
-| `MAX_ITERATIONS`      | `2`                              | Max agent iterations (overridden by enhancement_level at runtime)                                                         |
-| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM submission                                                                                          |
-| `JPEG_QUALITY`        | `85`                             | Quality for LLM image encoding                                                                                            |
-| `OUTPUT_QUALITY`      | `95`                             | Quality for final output                                                                                                  |
-| `OUTPUT_BUCKET`       | -                                | S3 bucket for enhanced images (if not set, returns base64)                                                                |
-| `CONFIG_BUCKET`       | -                                | S3 bucket holding `config/document_type_contexts.json` and the system prompt. Unset means the in-code fallbacks are used. |
-| `AWS_REGION`          | `us-west-2`                      | AWS region for Bedrock                                                                                                    |
-| `LOGGING_LEVEL`       | `INFO`                           | Python log level                                                                                                          |
+| Variable              | Default                          | Description                                                                                                                                                                                                                           |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID or inference profile ARN. The Lambda stack sets it to the Sonnet 4.6 *application inference profile* ARN, so the enhancer's calls are cost-tracked with the rest of the deployment; the bare ID is the local default |
+| `MAX_ITERATIONS`      | `2`                              | Max agent iterations (overridden by enhancement_level at runtime)                                                                                                                                                                     |
+| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM submission                                                                                                                                                                                                      |
+| `JPEG_QUALITY`        | `85`                             | Quality for LLM image encoding                                                                                                                                                                                                        |
+| `OUTPUT_QUALITY`      | `95`                             | Quality for final output                                                                                                                                                                                                              |
+| `OUTPUT_BUCKET`       | -                                | S3 bucket for enhanced images (if not set, returns base64)                                                                                                                                                                            |
+| `CONFIG_BUCKET`       | -                                | S3 bucket holding `config/document_type_contexts.json` and the system prompt. Unset means the in-code fallbacks are used.                                                                                                             |
+| `AWS_REGION`          | `us-west-2`                      | AWS region for Bedrock                                                                                                                                                                                                                |
+| `LOGGING_LEVEL`       | `INFO`                           | Python log level                                                                                                                                                                                                                      |
 
 ## Comparison: Old vs. New
 

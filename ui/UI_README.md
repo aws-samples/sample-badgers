@@ -171,6 +171,19 @@ mounted by `mountWizardRoutes(app, PROJECT_ROOT)`.
 | `POST /api/wizard/preview`  | JSON      | Assembles the manifest and schema for review; writes nothing |
 | `POST /api/wizard/save`     | JSON      | Writes every artifact under `deployment/custom_specialists/` |
 | `POST /api/wizard/deploy`   | **SSE**   | Streams `deployment/deploy_custom_specialists.sh`            |
+| `GET /api/models`           | JSON      | The models the dropdowns offer (`server/routes/models.js`)   |
+
+`GET /api/models` joins the SSM profile map the InferenceProfiles stack writes against
+`config/model_registry.json` in the config bucket and returns only models that are both
+`active` in the registry and actually provisioned in this deployment. It is cached for 60
+seconds and answers 503 rather than falling back to a hardcoded list. The same list feeds
+the pricing calculator's `models` block through `GET /api/pricing-config`.
+
+`save` and `deploy` work from a developer checkout (`npm run dev`): they write to
+`deployment/custom_specialists/` and run CDK. In the ECS container neither the `deployment/`
+tree nor CDK exists — `ui/Dockerfile` copies `server/`, `dist/`, and `config/` — so there the
+wizard is generate and preview only, and both endpoints fail with a clear message. The admin
+tab's `deploy.sh` routes have the same boundary.
 
 `generate` streams because six calls take minutes, which no plain POST survives behind the
 load balancer. Its frames are `start` (carrying the full section list, so the client keeps no

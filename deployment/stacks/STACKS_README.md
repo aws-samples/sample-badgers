@@ -233,4 +233,4 @@ Set `CDK_NAG=1` to run `AwsSolutionsChecks` at synth time.
 
 1. Create `new_stack.py` in this directory
 2. Import and instantiate in `../app.py`
-3. Add dependencies with `new_stack.add_dependency(other_stack)`
+3. Add dependencies with `new_stack.add_stack_dependency(other_stack)` (`add_dependency` is deprecated in aws-cdk-lib 2.263)
