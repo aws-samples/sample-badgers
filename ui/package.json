@@ -30,7 +30,7 @@
     "express-rate-limit": "^8.5.1",
     "highlight.js": "^11.11.1",
     "jose": "^6.2.2",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "oidc-client-ts": "^3.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

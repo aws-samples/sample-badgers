@@ -487,6 +487,18 @@ the UI env file, or reading per-model profile environment variables; all are mar
 - The Home "Environment" panel that displayed region, gateway id, and bucket names was
   removed. Every field was rendered as text and none was used by the browser, which never
   talks to S3, DynamoDB, or AgentCore directly.
+- **ASH (`--mode local`, MEDIUM threshold) passes on every scanner: 0 actionable findings,
+  from 7.** `multer` 2.2.0 → 2.4.0 closes GHSA-qfvm-cv95-jqjf, GHSA-wc9g-mqfw-jrwm, and
+  GHSA-535w-7cp7-47q4 (all high) plus one low; the floor in `ui/package.json` is raised to
+  `^2.3.0` so a satisfied version cannot regress. `qs` 6.15.3 → 6.16.0, transitive via
+  express, closes GHSA-x5fp-wj9c-mxmx and GHSA-4mjr-xmp4-gh2g. `npm audit` had reported 0
+  on the same lock file; the advisories are in GitHub's database, which grype reads.
+  `html_report_specialist` parses correlation XML through `defusedxml` with `forbid_dtd`
+  instead of `xml.etree` (bandit B314); the existing pre-check that rejects `<!DOCTYPE` and
+  `<!ENTITY>` stays, so the parser enforces what the string check already refused.
+  `defusedxml` is added to the foundation layer's `requirements.txt`. The remaining
+  finding was in `.archive/`, gitignored scratch; the local ASH config (`.ash/`, also
+  gitignored) now excludes it.
 
 ### Removed
 
