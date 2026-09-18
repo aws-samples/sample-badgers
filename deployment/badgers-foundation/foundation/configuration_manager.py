@@ -173,10 +173,6 @@ class ConfigurationManager:
                 f"Specialist '{specialist_type}': 'max_examples' must be a non-negative integer"
             )
 
-        # Validate pdf_processor specific settings
-        if specialist_type == "pdf_processor":
-            self._validate_pdf_processor_config(specialist_config)
-
     def _validate_global_settings(self, global_settings: Dict[str, Any]) -> None:
         """Validate global settings configuration."""
         numeric_fields = [
@@ -206,46 +202,3 @@ class ConfigurationManager:
             quality = global_settings["jpeg_quality"]
             if not 1 <= quality <= 100:
                 raise ConfigurationError("JPEG quality must be between 1 and 100")
-
-    def _validate_pdf_processor_config(self, config: Dict[str, Any]) -> None:
-        """Validate pdf_processor specific configuration settings."""
-        # Validate classification confidence threshold
-        if "classification_confidence_threshold" in config:
-            threshold = config["classification_confidence_threshold"]
-            if not isinstance(threshold, (int, float)):
-                raise ConfigurationError(
-                    "classification_confidence_threshold must be numeric"
-                )
-            if not 0 <= threshold <= 1:
-                raise ConfigurationError(
-                    "classification_confidence_threshold must be between 0 and 1"
-                )
-
-        # Validate fallback analysis setting
-        if "enable_fallback_analysis" in config:
-            if not isinstance(config["enable_fallback_analysis"], bool):
-                raise ConfigurationError("enable_fallback_analysis must be a boolean")
-
-        # Validate default task timeout
-        if "default_task_timeout" in config:
-            timeout = config["default_task_timeout"]
-            if not isinstance(timeout, (int, float)):
-                raise ConfigurationError("default_task_timeout must be numeric")
-            if timeout <= 0:
-                raise ConfigurationError("default_task_timeout must be positive")
-
-        # Validate tool-specific timeouts
-        if "task_timeouts" in config:
-            timeouts = config["task_timeouts"]
-            if not isinstance(timeouts, dict):
-                raise ConfigurationError("task_timeouts must be a dictionary")
-
-            for tool_name, timeout in timeouts.items():
-                if not isinstance(timeout, (int, float)):
-                    raise ConfigurationError(
-                        f"Timeout for tool '{tool_name}' must be numeric"
-                    )
-                if timeout <= 0:
-                    raise ConfigurationError(
-                        f"Timeout for tool '{tool_name}' must be positive"
-                    )

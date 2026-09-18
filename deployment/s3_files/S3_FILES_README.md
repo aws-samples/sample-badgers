@@ -132,7 +132,6 @@ JSON configuration files defining each specialist tool's metadata, model selecti
 | 🗺️ `war_map_specialist.json`          | Historical military map analysis              |
 | 🔬 `scientific_specialist.json`       | Scientific notation and formulas              |
 | 🏷️ `classify_pdf_content.json`        | Page content classification                   |
-| 🖼️ `pdf_processor.json`               | PDF-to-image conversion orchestration         |
 | 🔗 `correlation_specialist.json`      | Multi-specialist result correlation per page  |
 
 Each manifest contains:

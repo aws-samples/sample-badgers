@@ -495,7 +495,10 @@ The verbose form, one object per model, carries per-model reasoning settings:
 | `expected_output_tokens` | Estimated output tokens for cost calculation (in the `specialist` section)                 |
 | `audit_mode`             | Boolean in `inputSchema` — enables confidence scoring and review flags                     |
 
-The bare-string form carries no reasoning settings, and 26 of the 27 built-in manifests use it:
+The bare-string form carries no reasoning settings, and 23 of the 24 built-in manifests that
+carry `model_selections` use it (`image_enhancer` takes its model from `VISION_MODEL` and
+`html_report_specialist` is deterministic, so neither has the block; the one exception is
+`correlation_specialist`, whose fallback entry is an object):
 
 ```json
 "model_selections": {

@@ -41,8 +41,7 @@
             "decision_tree_tasks.xml",
             "decision_tree_format.xml",
             "decision_tree_help.xml",
-            "decision_tree_verification.xml",
-            "decision_tree_notes.xml"
+            "decision_tree_verification.xml"
         ],
         "examples_path": "prompts",
         "max_examples": 3,

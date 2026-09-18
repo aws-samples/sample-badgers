@@ -5,7 +5,7 @@ const FIXED_IMAGE_TOKENS = 1600
 const DEFAULT_INCLUDED = new Set([
   'charts_specialist', 'classify_pdf_content', 'correlation_specialist',
   'diagram_specialist', 'elements_specialist', 'general_visual_analysis',
-  'handwriting_specialist', 'keyword_topic_specialist', 'pdf_processor',
+  'handwriting_specialist', 'keyword_topic_specialist',
   'robust_elements_specialist', 'table_specialist',
 ])
 

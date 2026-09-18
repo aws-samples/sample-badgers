@@ -176,11 +176,6 @@
             "expected_output_tokens": 1000,
             "default_model": "Claude Sonnet 4.6"
         },
-        "pdf_processor": {
-            "prompt_tokens": 7120,
-            "expected_output_tokens": 500,
-            "default_model": "Claude Sonnet 4.6"
-        },
         "remediation_specialist": {
             "prompt_tokens": 6315,
             "expected_output_tokens": 6000,

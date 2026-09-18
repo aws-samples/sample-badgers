@@ -411,6 +411,22 @@ the UI env file, or reading per-model profile environment variables; all are mar
 
 ### Fixed
 
+- **Three manifests referenced prompt files that do not exist.** `classify_pdf_content`
+  listed `classification_tools.xml` and `classification_tool_rules.xml`, which live only under
+  the legacy `prompts/pdf_processor/` directory; `decision_tree_specialist` listed
+  `decision_tree_notes.xml` and `table_specialist` listed `table_notes.xml`, which exist
+  nowhere. `PromptLoader` logs a warning per missing file and carries on, so nothing failed,
+  but every cold start of an enabled specialist logged it and the manifests claimed prompt
+  content the model never saw. The four references are removed; runtime behaviour is
+  unchanged. Every manifest's `prompt_files` now resolves on disk.
+- **The legacy `pdf_processor` specialist is removed.** It had a manifest and a prompts
+  directory (the only home of those two `classification_tool*.xml` files) but no handler, no
+  schema, and no `deployment_config.json` entry, so it had never deployed. Its remaining
+  footprints are gone with it: the `specialist_defaults` row in `pricing_config.json`, the
+  "PDF Processor" entry in the Editor tab's category map, its membership in the pricing
+  calculator's default selection, and `_validate_pdf_processor_config` in
+  `configuration_manager.py`, whose four checks applied to keys only that manifest carried.
+  26 built-in manifests remain.
 - **Job tracking was silently disabled in every deployed environment.**
   `foundation/__init__.py` eagerly re-exported every submodule, so
   `from foundation import job_state` in the orchestrator dragged in `image_processor`,
