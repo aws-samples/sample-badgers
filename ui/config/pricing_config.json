@@ -136,6 +136,11 @@
             "expected_output_tokens": 4000,
             "default_model": "Claude Sonnet 4.6"
         },
+        "handwriting_math_specialist": {
+            "prompt_tokens": 12700,
+            "expected_output_tokens": 3000,
+            "default_model": "Claude Sonnet 4.6"
+        },
         "handwriting_specialist": {
             "prompt_tokens": 6935,
             "expected_output_tokens": 3000,

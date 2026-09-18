@@ -30,7 +30,7 @@
     <enhancement_instructions>
         <description>Some pages benefit from image enhancement before analysis. The classifier indicates this with enhancement_recommended: true in its output.</description>
         <rule>When classification returns enhancement_recommended: true, call enhance_image_tool BEFORE calling the specialist tool for that page</rule>
-        <rule>Enhancement is only needed for enhancement-eligible specialists: handwriting, editorial, full_text, elements</rule>
+        <rule>Enhancement is only needed for enhancement-eligible specialists: handwriting, handwriting_math, editorial, full_text, elements</rule>
         <rule>Enhancement is NOT needed for: tables, charts, diagrams, code blocks</rule>
         <rule>The enhance_image_tool returns an S3 URI of the enhanced image - pass this URI to the subsequent specialist instead of the original image path</rule>
         <rule>When enhancement is needed and both full_text and elements run on the same page, call enhance_image_tool ONCE and pass the same enhanced URI to both specialists</rule>
@@ -54,7 +54,7 @@
             <step_logic> For each page, call the appropriate specialist tool(s) based on classification. </step_logic>
 
             <enhancement_check>
-                <condition>enhancement_recommended is true AND specialist is enhancement-eligible (handwriting, editorial, full_text, elements)</condition>
+                <condition>enhancement_recommended is true AND specialist is enhancement-eligible (handwriting, handwriting_math, editorial, full_text, elements)</condition>
                 <action>FIRST call enhance_image_tool ONCE, then use the returned S3 URI as input for ALL subsequent enhancement-eligible specialist calls on this page.</action>
             </enhancement_check>
 
@@ -100,6 +100,10 @@
                 <route content_type="handwriting"
                        tool="analyze_handwriting_tool"
                        note="Runs INSTEAD OF or IN ADDITION TO the full_text + elements pair, depending on whether the page also has printed text"
+                       />
+                <route content_type="handwritten_math"
+                       tool="analyze_handwriting_math_tool"
+                       note="Handwritten equations, algebraic working, labelled geometric figures, function graphs, or symbolic notation. Runs IN ADDITION TO analyze_handwriting_tool when the page also has handwritten prose; INSTEAD OF it when the handwriting is entirely mathematical"
                        />
                 <route content_type="clinical"
                        tool="analyze_clinical_tool"

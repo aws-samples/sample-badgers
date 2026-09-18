@@ -48,6 +48,17 @@ the UI env file, or reading per-model profile environment variables; all are mar
   layer as step 1, so a normal deploy was never stale; this covers the two paths that skip it
   (`DEPLOY_RESUME_MODE=1`, and calling `cdk` directly), where a deploy would otherwise ship
   the previous layer silently.
+- **`handwriting_math_specialist` is a first-class specialist, disabled by default.** It has
+  had a handler, a manifest, a schema, and ten prompt files since 2026-07, but never an entry
+  in `deployment_config.json` — and the Lambda stack deploys only names present there, so no
+  flag existed to flip. It now has one (`"enabled": false`, Text & Language), a
+  `specialist_defaults` row in `pricing_config.json` (prompt size measured at ~12,700 tokens;
+  its dictionary prompt makes it the largest specialist prompt), a `handwritten_math` route
+  in the agent prompt pointing at `analyze_handwriting_math_tool`, a place in both
+  enhancement-eligible lists to match its manifest's `enhancement_eligible: true`, and a
+  classifier guidance line so the classifier names handwritten mathematics explicitly.
+  Verified through the CDK filter: disabled, 12 functions and no target; flipped on, 13
+  functions and a `handwriting-math-specialist` Gateway target.
 
 ### Changed — model migration
 
