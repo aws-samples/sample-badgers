@@ -636,6 +636,15 @@ ensure_region() {
 
   export AWS_REGION
   log_info "Region ${AWS_REGION} (${source_desc})."
+  log_warn "Note: model inference does NOT stay in ${AWS_REGION}."
+  log_warn "  BADGERS invokes US geo cross-Region inference profiles (us.*), so Bedrock"
+  log_warn "  routes each request to a destination Region within the US geo -- typically"
+  log_warn "  us-east-1, us-east-2 or us-west-2 -- and may use Regions not enabled in"
+  log_warn "  this account. Every other resource stays in ${AWS_REGION}."
+  log_warn "  The Lambda role therefore grants bedrock:InvokeModel on the nine models"
+  log_warn "  with a wildcarded Region field. If your org restricts Bedrock by Region"
+  log_warn "  via SCP, allow all US destination Regions or inference will fail."
+  log_warn "  See DEPLOYMENT_README.md -> Inference Profiles and Regions."
 }
 
 ensure_account() {
@@ -729,6 +738,204 @@ preflight_bootstrap() {
   esac
 }
 
+# ── Log delivery preflight ─────────────────────────────────────────────────
+#
+# A CloudWatch DeliverySource is unique per (resourceArn, logType), NOT per name.
+# So only one delivery source may exist for a given AgentCore resource and log type,
+# whoever created it — the console, an older CDK revision, or this deployment.
+#
+# That breaks a stack update in a way renaming cannot fix, because CloudFormation
+# creates new resources first and only deletes removed ones in a cleanup phase
+# afterwards. During the update both spellings exist at once, the pair collides, and
+# the deploy fails with "This ResourceId has already been used in another Delivery
+# Source in this account" (HandlerErrorCode: AlreadyExists).
+#
+# Two ways in. Enabling log delivery by hand in the console leaves WdDeliverySource-*
+# entries, and a stack that previously used the CDK logging mixin leaves
+# cdk-<type>-source-<hash> entries. Both must be removed before the stack can own the
+# delivery itself.
+#
+# Anything this deployment's own CDK created is named badgers-<deployment>-*, so that
+# prefix is what distinguishes "ours, leave it alone" from "foreign, in the way".
+LOGS_DELIVERY_OWN_PREFIX="badgers-"
+
+# Echoes "name<TAB>logType" for every delivery source occupying a slot this
+# deployment needs, or nothing when the slot is free.
+#
+# Scoped by the exact resource ARNs this deployment's own stacks publish
+# (GatewayArn, RuntimeArn), not by guessing at names. Anything bound to a different
+# ARN is a different deployment's, occupies a different (resourceArn, logType) slot,
+# and therefore is not in this deployment's way.
+#
+# The ARNs come from the deployed stacks rather than the state file: the state file
+# records which steps ran, not what they produced. A stack that does not exist yet
+# yields no ARN, which correctly means "nothing of ours can be occupying a slot".
+logs_foreign_delivery_sources() {
+  local rid; rid="$(resource_id)"
+  local ours="${LOGS_DELIVERY_OWN_PREFIX}${rid}-"
+
+  local gateway_arn runtime_arn
+  gateway_arn="$(stack_output "$(_sn Gateway)" GatewayArn)"
+  runtime_arn="$(stack_output "$(_sn RuntimeWebSocket)" RuntimeArn)"
+  [ "${gateway_arn}" = "None" ] && gateway_arn=""
+  [ "${runtime_arn}" = "None" ] && runtime_arn=""
+
+  # Neither stack deployed yet, so this deployment owns no AgentCore resource that a
+  # delivery source could be attached to.
+  [ -z "${gateway_arn}" ] && [ -z "${runtime_arn}" ] && return 0
+
+  # Emits "!ERROR<TAB>reason" when the answer could not be determined. Callers must
+  # not read that as "nothing in the way": an earlier revision of this function
+  # crashed in the filter, printed nothing, and was indistinguishable from a clean
+  # account — a preflight that silently passes when broken is worse than none.
+  local json out
+  json="$(aws logs describe-delivery-sources --region "${AWS_REGION}" --output json 2>/dev/null)" || {
+    printf '!ERROR\tcould not list delivery sources (credentials or logs:DescribeDeliverySources)\n'
+    return 0
+  }
+  if [ -z "${json}" ]; then
+    printf '!ERROR\tempty response from logs:DescribeDeliverySources\n'
+    return 0
+  fi
+
+  out="$(printf '%s' "${json}" \
+    | GATEWAY_ARN="${gateway_arn}" RUNTIME_ARN="${runtime_arn}" OURS="${ours}" python3 -c '
+import json, os, sys
+
+sources = json.load(sys.stdin).get("deliverySources", [])
+ours = os.environ["OURS"]
+# Exact match. A workload identity ARN embeds the gateway name but is a different
+# resource, so substring matching would wrongly claim its deliveries; nothing here
+# manages those.
+mine = {a for a in (os.environ.get("GATEWAY_ARN"), os.environ.get("RUNTIME_ARN")) if a}
+
+for source in sources:
+    arns = source.get("resourceArns") or []
+    if not any(arn in mine for arn in arns):
+        continue
+    name = source.get("name", "")
+    if name.startswith(ours):
+        continue
+    log_type = source.get("logType", "?")
+    print(f"{name}\t{log_type}")
+')" || {
+    printf '!ERROR\tdelivery source filter failed\n'
+    return 0
+  }
+
+  printf '%s' "${out}"
+}
+
+# Deletes one delivery source and whatever delivery references it. The delivery holds
+# the reference, so it goes first or the source delete is rejected.
+logs_delete_delivery_source() {
+  local name="$1"
+  [ -z "${name}" ] && return 1
+
+  local ids
+  ids="$(aws logs describe-deliveries --region "${AWS_REGION}" \
+    --query "deliveries[?deliverySourceName=='${name}'].id" --output text 2>/dev/null)"
+  for id in ${ids}; do
+    [ -z "${id}" ] || [ "${id}" = "None" ] && continue
+    aws logs delete-delivery --id "${id}" --region "${AWS_REGION}" >/dev/null 2>&1 \
+      || log_warn "    could not delete delivery ${id}"
+  done
+
+  aws logs delete-delivery-source --name "${name}" --region "${AWS_REGION}" >/dev/null 2>&1
+}
+
+# Called before deploying a stack that creates delivery sources. Reports what is in
+# the way, explains what removing it does and does not destroy, then clears it on
+# confirmation. Returns non-zero when the caller should stop.
+preflight_log_delivery() {
+  if [ "${BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT:-}" = "1" ]; then
+    log_warn "BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 — not checking for conflicting delivery sources"
+    return 0
+  fi
+
+  local found; found="$(logs_foreign_delivery_sources)"
+
+  # "Could not determine" is not "clear to proceed". Stopping here costs a re-run;
+  # proceeding costs a failed stack update partway through.
+  if printf '%s' "${found}" | grep -q '^!ERROR'; then
+    echo ""
+    log_error "Could not determine whether conflicting delivery sources exist:"
+    log_error "      ${found#*$'\t'}"
+    log_error "Verify with:  aws sts get-caller-identity"
+    log_error "To deploy anyway (it will fail with AlreadyExists if any exist):"
+    log_error "      BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 ./deploy.sh"
+    echo ""
+    return 1
+  fi
+
+  [ -z "${found}" ] && return 0
+
+  echo ""
+  log_warn "Existing CloudWatch delivery sources occupy slots this deployment needs:"
+  echo ""
+  while IFS=$'\t' read -r name logtype; do
+    [ -z "${name}" ] && continue
+    case "${name}" in
+      WdDeliverySource-*) origin="enabled by hand in the console" ;;
+      cdk-*)              origin="left by the previous CDK logging mixin" ;;
+      *)                  origin="unrecognised origin" ;;
+    esac
+    echo "      ${logtype}  ${name}"
+    echo "          ${origin}"
+  done <<< "${found}"
+  echo ""
+  log_warn "A delivery source is unique per resource and log type, so the stack cannot"
+  log_warn "create its own while these exist — CloudFormation creates before it deletes,"
+  log_warn "and the deploy fails with AlreadyExists."
+  echo ""
+  log_info "Removing them deletes the delivery configuration only. Existing log groups"
+  log_info "and everything already written to them are left untouched. New logs will go"
+  log_info "to the log groups this deployment manages, so anything previously delivered"
+  log_info "stays where it is and remains readable."
+  echo ""
+  log_warn "Log and trace delivery stops until the deploy finishes."
+  echo ""
+
+  _confirm "Delete these delivery sources and continue? (y/n): " || {
+    log_error "Stopped. To keep them and skip this check (the deploy will then fail"
+    log_error "on AlreadyExists):  BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 ./deploy.sh"
+    return 1
+  }
+
+  while IFS=$'\t' read -r name logtype; do
+    [ -z "${name}" ] && continue
+    log_info "Deleting ${logtype} delivery source ${name}..."
+    logs_delete_delivery_source "${name}"
+  done <<< "${found}"
+
+  local remaining; remaining="$(logs_foreign_delivery_sources)"
+  if [ -n "${remaining}" ]; then
+    log_error "Some delivery sources could not be removed:"
+    echo "${remaining}" | sed 's/^/      /'
+    log_error "Delete them manually, then re-run."
+    return 1
+  fi
+
+  log_success "Conflicting delivery sources removed."
+  return 0
+}
+
+# A unique image tag per deploy.sh invocation.
+#
+# AgentCore runtime versions are immutable and CfnRuntime only creates a new one
+# when container_uri changes. With a fixed ":websocket" tag, re-pushing the image
+# left CloudFormation with an identical property, so it made no update and the
+# runtime went on serving the digest pinned at the version it already had — a
+# rebuilt agent silently never went live.
+#
+# Deliberately time-based rather than a hash of the build inputs. A hash is only
+# correct while it covers every input, and the failure it would reintroduce is
+# exactly the one this exists to prevent: a stale runtime that looks deployed.
+# The cost of being wrong the other way is one surplus ECR image.
+runtime_image_tag() {
+  echo "websocket-$(date -u +%Y%m%d%H%M%S)"
+}
+
 export_cdk_env() {
   ensure_account
   export DEPLOYMENT_ID
@@ -750,8 +957,13 @@ cdk_deploy() {
 }
 
 cdk_destroy() {
+  # `cdk destroy` still synthesizes the app, and LambdaSpecialistStack refuses to synth
+  # while lambdas/layer.zip is older than its sources. That guard protects a deploy from
+  # shipping a stale layer; a destroy ships nothing, so it must not block teardown. It
+  # did: a teardown of an old deployment aborted on the traceback before any DeleteStack
+  # was issued, with all twelve stacks left standing.
   (unset VIRTUAL_ENV; cd "${DEPLOYMENT_DIR}" \
-    && uv run cdk destroy --app "python app.py" --force "$@")
+    && BADGERS_ALLOW_STALE_LAYER=1 uv run cdk destroy --app "python app.py" --force "$@")
 }
 
 # ── X-Ray Transaction Search preflight ─────────────────────────────────────
@@ -774,8 +986,20 @@ LOGS_RESOURCE_POLICY_QUOTA_FALLBACK=10
 # other people's policies to the operator, who can go and identify the owners.
 LOGS_RESOURCE_POLICY_AWS_MANAGED="XRayToLogsIngestion_DO-NOT-EDIT_*"
 
-# The single policy this project creates — see stacks/xray_transaction_search_stack.py.
+# The policies this project creates. Two, not one:
+#
+#   TransactionSearchAccess  — stacks/xray_transaction_search_stack.py, account-wide
+#                              and shared by every deployment in the region.
+#   BadgersLogDelivery-*     — stacks/log_delivery.py via the Gateway stack, one per
+#                              deployment, covering every AgentCore log group it
+#                              delivers to.
+#
+# This was previously declared as a single policy while the runtime stack silently
+# created a second one through the CDK logging mixin, so logs_resource_policy_report
+# attributed BADGERS' own delivery policy to an unknown third party — the opposite of
+# helpful when the report exists to answer "which of these can I remove?".
 LOGS_RESOURCE_POLICY_OWN="TransactionSearchAccess"
+LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX="BadgersLogDelivery-"
 
 # Echoes the count, or nothing at all when the call fails. An empty result means
 # "could not determine", which callers must not conflate with zero — treating a
@@ -784,6 +1008,18 @@ LOGS_RESOURCE_POLICY_OWN="TransactionSearchAccess"
 logs_resource_policy_count() {
   aws logs describe-resource-policies --region "${AWS_REGION}" \
     --query 'length(resourcePolicies)' --output text 2>/dev/null || echo ""
+}
+
+# True when a policy of exactly this name already exists. Returns false when the call
+# fails, which over-projects rather than under-projects: callers use this to decide how
+# many slots BADGERS still needs, and claiming a policy already exists when the account
+# could not be read is how a preflight passes and CloudFormation then fails.
+logs_resource_policy_exists() {
+  local name="$1"
+  [ -z "${name}" ] && return 1
+  aws logs describe-resource-policies --region "${AWS_REGION}" \
+    --query "resourcePolicies[?policyName=='${name}'] | length(@)" \
+    --output text 2>/dev/null | grep -qx "1"
 }
 
 logs_resource_policy_quota() {
@@ -811,6 +1047,7 @@ logs_resource_policy_quota() {
 logs_resource_policy_report() {
   aws logs describe-resource-policies --region "${AWS_REGION}" --output json 2>/dev/null \
     | BADGERS_OWN="${LOGS_RESOURCE_POLICY_OWN}" \
+      BADGERS_OWN_DELIVERY_PREFIX="${LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX}" \
       python3 -c '
 import json, os, sys
 from datetime import datetime, timezone
@@ -822,6 +1059,7 @@ except Exception:
     raise SystemExit
 
 OWN = os.environ.get("BADGERS_OWN", "")
+OWN_DELIVERY_PREFIX = os.environ.get("BADGERS_OWN_DELIVERY_PREFIX", "")
 
 
 def summarise(doc):
@@ -860,7 +1098,12 @@ for p in rows:
     name = p["policyName"]
     dt = datetime.fromtimestamp(p.get("lastUpdatedTime", 0) / 1000, tz=timezone.utc)
     who, where = summarise(p.get("policyDocument", ""))
-    mark = "  (*) created by this deployment" if name == OWN else ""
+    # Two shapes belong to BADGERS: the shared account-wide X-Ray policy, and one
+    # log-delivery policy per deployment (name carries the deployment id).
+    own = name == OWN or (
+        bool(OWN_DELIVERY_PREFIX) and name.startswith(OWN_DELIVERY_PREFIX)
+    )
+    mark = "  (*) created by BADGERS" if own else ""
     print(f"      {name}{mark}")
     print(f"          updated {dt:%Y-%m-%d} ({(now - dt).days}d ago)")
     print(f"          grants  {who}")
@@ -959,8 +1202,18 @@ preflight_xray() {
     return 1
   fi
 
-  # BADGERS' X-Ray stack creates exactly one resource policy.
-  local projected=$((count + 1))
+  # BADGERS creates two policies, not one: the account-wide X-Ray policy from this
+  # stack, and one log-delivery policy per deployment owned by the Gateway stack.
+  # Only count the ones that do not exist yet — re-running a deployment that already
+  # has its delivery policy adds nothing, and projecting it again would report a
+  # deployment as unable to proceed when it has room.
+  local delivery_policy="${LOGS_RESOURCE_POLICY_OWN_DELIVERY_PREFIX}${DEPLOYMENT_ID:-}-${STACK_SUFFIX:-}"
+  local to_create=1 # the X-Ray policy; this function already returned if it exists
+  if ! logs_resource_policy_exists "${delivery_policy}"; then
+    to_create=$((to_create + 1))
+  fi
+
+  local projected=$((count + to_create))
   log_info "Transaction Search status: ${status}"
   log_info "CloudWatch Logs resource policies: ${count}/${quota} (BADGERS would make it ${projected})"
 
@@ -1129,91 +1382,163 @@ preflight_service_quotas() {
 # region. Models with a "us." prefix are cross-region inference profiles and
 # always pass.
 #
-# BADGERS uses these models by default (configurable via inference profiles):
-BADGERS_DEFAULT_MODELS=(
-  "us.anthropic.claude-sonnet-4-5-20250514-v1:0"
-)
+# The model set comes from the registry, not from a list maintained here. The previous
+# hardcoded list held exactly one entry — "us.anthropic.claude-sonnet-4-5-20250514-v1:0",
+# a model that does not exist (real Sonnet 4.5 is 20250929) — and nothing noticed, because
+# neither preflight in this section was ever called from anywhere.
+_BADGERS_MODEL_REGISTRY="${DEPLOYMENT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/s3_files/config/model_registry.json"
+
+# Emits "<geo_model_id> <foundation_model_id>" per active model.
+_badgers_active_models() {
+  python3 -c "
+import json,sys
+path=sys.argv[1]
+try:
+    models=json.load(open(path))['models']
+except Exception as e:
+    print('REGISTRY_ERROR '+str(e).replace(chr(10),' '), file=sys.stderr); sys.exit(1)
+for mid,spec in models.items():
+    if spec.get('status')!='active': continue
+    base=mid.split('.',1)[1] if mid.startswith(('us.','eu.','jp.','au.','in.')) else mid
+    print(mid, base)
+" "${_BADGERS_MODEL_REGISTRY}"
+}
 
 preflight_model_access() {
-  log_info "Checking Bedrock model access in ${AWS_REGION}..."
+  log_info "Checking Bedrock model availability in ${AWS_REGION}..."
 
-  local missing=() model_id status
+  local missing=() model_id base_id rows
+  rows="$(_badgers_active_models)" || {
+    log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
+    return 1
+  }
 
-  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
-    # Cross-region inference profiles (us.*, eu.*) are always available.
-    if [[ "${model_id}" == us.* ]] || [[ "${model_id}" == eu.* ]]; then
-      echo "    ✓ ${model_id} (cross-region)"
+  # Every BADGERS model is invoked through a US geo cross-Region profile (us.*), and none
+  # of them supports In-Region inference on bedrock-runtime at all. So the question this
+  # preflight has to answer is not "is the base model in this Region's catalog" -- a
+  # CRIS-only model may or may not appear in ListFoundationModels for a Region it is not
+  # served in-Region from -- but "does the geo profile exist here", i.e. is this Region a
+  # valid source Region for it. GetInferenceProfile on the geo ID answers exactly that.
+  #
+  # The base-model catalog check is kept as a second chance, not a first: if the profile
+  # lookup fails for a reason unrelated to availability (an IAM role without
+  # bedrock:GetInferenceProfile, an old CLI), a model that the catalog does list still
+  # passes. Model *access* -- subscription, entitlement -- is a separate question and is
+  # what preflight_model_invocation answers with a real call.
+  while read -r model_id base_id; do
+    [ -z "${model_id}" ] && continue
+
+    local profile_status="" catalog_status=""
+    profile_status="$(aws bedrock get-inference-profile \
+      --inference-profile-identifier "${model_id}" \
+      --region "${AWS_REGION}" \
+      --query 'status' --output text 2>/dev/null | tr -d '\r' || true)"
+    profile_status="${profile_status%%[[:space:]]}"
+
+    if [ "${profile_status}" = "ACTIVE" ]; then
+      echo "    ✓ ${model_id}  (geo profile ACTIVE)"
       continue
     fi
 
-    # In-region model — verify it exists in the target region.
-    status="$(aws bedrock list-foundation-models --region "${AWS_REGION}" \
-      --query "modelSummaries[?modelId=='${model_id}'].modelLifecycle.status | [0]" \
-      --output text 2>/dev/null | tr -d '\r' || echo "NOT_FOUND")"
-    status="${status%%[[:space:]]}"  # strip trailing whitespace/CR
+    catalog_status="$(aws bedrock list-foundation-models --region "${AWS_REGION}" \
+      --query "modelSummaries[?modelId=='${base_id}'].modelLifecycle.status | [0]" \
+      --output text 2>/dev/null | tr -d '\r' || true)"
+    catalog_status="${catalog_status%%[[:space:]]}"
 
-    if [ "${status}" = "ACTIVE" ] || [ "${status}" = "LEGACY" ]; then
-      echo "    ✓ ${model_id}"
+    if [ "${catalog_status}" = "ACTIVE" ] || [ "${catalog_status}" = "LEGACY" ]; then
+      echo "    ✓ ${model_id}  (base model ${catalog_status} in catalog; profile lookup returned '${profile_status:-nothing}')"
     else
-      echo "    ✗ ${model_id} (not found in ${AWS_REGION})"
+      echo "    ✗ ${model_id}  (no geo profile here; base model ${base_id} not in the ${AWS_REGION} catalog)"
       missing+=("${model_id}")
     fi
-  done
+  done <<< "${rows}"
 
   if [ ${#missing[@]} -gt 0 ]; then
     echo ""
-    log_error "The following models are NOT available in ${AWS_REGION}:"
+    log_error "The following models are NOT available from ${AWS_REGION}:"
     for m in "${missing[@]}"; do
       log_error "    ${m}"
     done
     echo ""
-    log_error "Options:"
-    log_error "  1. Deploy to a region where these models are available"
-    log_error "  2. Use cross-region inference profiles (us.anthropic.* prefix)"
+    log_error "Every BADGERS model is already invoked through a US geo cross-Region profile"
+    log_error "(us.*), so this is not fixed by switching profile type. Likely causes:"
+    log_error "  1. ${AWS_REGION} is not a source Region for the US geo profile -- deploy from"
+    log_error "     a US Region (us-east-1, us-east-2, us-west-1, us-west-2) or ca-*."
+    log_error "  2. The deploying role lacks bedrock:GetInferenceProfile and"
+    log_error "     bedrock:ListFoundationModels, so neither lookup could succeed."
+    log_error "  3. The registry entry is misspelled; the IDs checked were printed above."
     log_error ""
     log_error "Model catalog: https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards.html"
     return 1
   fi
 
-  log_success "All configured models are accessible in ${AWS_REGION}"
+  log_success "All configured models are available from ${AWS_REGION}"
   return 0
 }
 
 # ── Model Invocation Test ────────────────────────────────────────────────────
 # Actually invokes each model with a minimal payload to confirm marketplace
 # subscriptions, inference profiles, and IAM permissions are all in place.
+#
+# Uses Converse, not InvokeModel. Two reasons: it is the transport BADGERS actually uses,
+# and no OpenAI model supports InvokeModel at all — so an Anthropic-shaped invoke_model
+# body could never smoke-test two thirds of the model set. It also avoids a trap in the
+# previous version, which passed raw JSON to `invoke-model --body`; under AWS CLI v2 that
+# fails base64 decoding, and the resulting error matched none of the greps below, so the
+# test reported success no matter what.
 preflight_model_invocation() {
   log_info "Testing model invocations (this may take 10-20 seconds)..."
-  local failed=0
+  local failed=0 rows model_id _base
 
-  local claude_body='{"anthropic_version":"bedrock-2023-05-31","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+  rows="$(_badgers_active_models)" || {
+    log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
+    return 1
+  }
 
-  for model_id in "${BADGERS_DEFAULT_MODELS[@]}"; do
-    local response
-    response="$(aws bedrock-runtime invoke-model \
+  # maxTokens is deliberately not 1: Opus 5 reasons by default, so an output budget of 1
+  # token has no room for a reasoning block and the call fails for the wrong reason.
+  local messages='[{"role":"user","content":[{"text":"hi"}]}]'
+  local inference_config='{"maxTokens":64}'
+
+  while read -r model_id _base; do
+    [ -z "${model_id}" ] && continue
+    local response rc=0
+    # `|| rc=$?` rather than a bare assignment: deploy.sh runs under `set -e`, and although
+    # errexit is suspended inside a function invoked as `preflight || return 1`, a caller
+    # that invokes this directly would otherwise abort on the first failing model instead
+    # of listing them all.
+    response="$(aws bedrock-runtime converse \
       --model-id "${model_id}" \
       --region "${AWS_REGION}" \
-      --content-type "application/json" \
-      --body "${claude_body}" \
-      --output json \
-      /dev/null 2>&1)" || true
+      --messages "${messages}" \
+      --inference-config "${inference_config}" \
+      --output json 2>&1)" || rc=$?
 
-    if echo "${response}" | grep -qi "AccessDeniedException\|ValidationException\|ResourceNotFoundException\|ServiceUnavailableException"; then
+    # Judge by exit code, not by grepping for a handful of exception names. The previous
+    # version swallowed the exit code with `|| true` and then looked for four specific
+    # exceptions, so anything else -- an expired token, a throttle, an AWS CLI too old to
+    # know `bedrock-runtime converse` -- printed a tick. A preflight that passes when the
+    # call failed is worse than no preflight.
+    if [ "${rc}" -ne 0 ]; then
       local err_msg
-      err_msg="$(echo "${response}" | grep -o '"[Mm]essage":"[^"]*"' | head -1 || echo "${response}")"
+      err_msg="$(echo "${response}" | grep -o '"[Mm]essage":"[^"]*"' | head -1)"
+      [ -z "${err_msg}" ] && err_msg="$(echo "${response}" | tail -1)"
       echo "    ✗ ${model_id}"
       echo "      Error: ${err_msg}"
-      ((failed++))
+      # Not ((failed++)): with failed=0 that expression evaluates to 0, which is a
+      # non-zero *exit status*, and under a live `set -e` it aborts the loop.
+      failed=$((failed + 1))
     else
       echo "    ✓ ${model_id}"
     fi
-  done
+  done <<< "${rows}"
 
   if [ "${failed}" -gt 0 ]; then
     log_error "${failed} model(s) failed invocation test."
     log_error "Common fixes:"
     log_error "  - Marketplace models (Anthropic): Subscribe at https://console.aws.amazon.com/bedrock/home#/modelaccess"
     log_error "  - IAM: Ensure your deploy role has bedrock:InvokeModel on the model ARN"
+    log_error "  - OpenAI models: also need bedrock:InvokeModel on arn:aws:bedrock:${AWS_REGION}:<account>:project/default"
     log_error "  - Region: Model may not be available in ${AWS_REGION}"
     return 1
   fi

@@ -5,6 +5,8 @@
 
 # 🚀 BADGERS Deployment Guide
 
+![Deployment CLI](../.github/assets/07_sample-badgers-deployment-cli.png)
+
 Step-by-step AWS CDK deployment for BADGERS. For architecture overview and technical details, see the [main README](../README.md).
 
 ## ☁️ AWS Services
@@ -123,9 +125,10 @@ Then the menu:
 | `7`    | UI — Build & Push Image             | generates `ui/.env`, builds the Vite bundle and image, pushes          |
 | `8`    | UI — Deploy ECS                     | deploys the ECS stack, forces the image rollout, waits                 |
 | `9`    | Full Deployment                     | runs 1 → 8 in order, stopping at the first failure                     |
-| `12`   | Resume                              | runs only the steps still outstanding, without prompting on each       |
+| `r`    | Resume                              | runs only the steps still outstanding, without prompting on each       |
 | `10`   | Show Deployment Status              | current suffix, per-step completion with timestamps                    |
 | `11`   | Reset Deployment State              | marks all steps incomplete; **deletes nothing in AWS**                 |
+| `m`    | Models                              | prints the model registry and which steps a registry edit requires     |
 | `0`    | Exit                                |                                                                        |
 
 You can also run one directly — `./deploy.sh 8` or `./deploy.sh resume` — but the
@@ -139,7 +142,7 @@ Both get you to a complete deployment; they differ in friction.
 re-run, so resuming from step 4 costs you three prompts. Declining a prompt is treated as
 success and the run continues.
 
-**Option 12** skips completed steps *before* calling them, so those prompts never fire. It
+**Option `r`** skips completed steps *before* calling them, so those prompts never fire. It
 starts at the first outstanding step. A step counts as complete only when every state key
 it writes is set, so an interrupted step 6 (image pushed, runtime not deployed) is
 re-entered rather than skipped.
@@ -260,9 +263,10 @@ local-dev bypass.
 `/badgers-{id}-{suffix}/`, so there is no `.env` to ship into the image beyond the
 build-time `VITE_*` values.
 
-> **Note:** `update_frontend_env.sh` writes `ui/config/.env` for local development only.
-> It does not write the Cognito values, which are build-time inputs to the Vite bundle —
-> that is `scripts/generate_ui_env.sh`. The deployed service reads everything from SSM.
+> **Note:** `scripts/generate_ui_env.sh` also writes the local-development runtime values
+> (buckets, Runtime ARN, Gateway ID, jobs table) into the same `ui/.env`. Vite ignores the
+> non-`VITE_` lines, `ui/server/index.js` reads them when run outside ECS, and the deployed
+> service reads everything from SSM.
 
 ## 🔧 Manual Deployment
 
@@ -279,8 +283,12 @@ export STACK_SUFFIX=a1b
 
 ### 1️⃣ Install Dependencies
 
+From the repository root. The CDK app's dependencies are declared in the root
+`pyproject.toml` and pinned in `uv.lock`; `uv sync` installs exactly that set, and every
+`cdk` command below runs as `uv run cdk` against it.
+
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 
 ### 2️⃣ Build Lambda Layers
@@ -334,66 +342,81 @@ uv run cdk bootstrap
 > [!TIP]
 > New to CDK? See the [AWS CDK Developer Guide](https://docs.aws.amazon.com/cdk/v2/guide/home.html) for installation and concepts.
 >
-> This project uses alpha CDK modules:
-> - [aws-bedrock-agentcore-alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-bedrock-agentcore-alpha-readme.html)
-> - [aws-bedrock-alpha](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-bedrock-alpha-readme.html)
+> No alpha CDK modules are required. The AgentCore Gateway, Runtime, and Memory constructs
+> come from [`aws_cdk.aws_bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html)
+> in `aws-cdk-lib` (2.263.0 or later), which is what `uv sync` installs.
 
-### 4️⃣ Deploy S3 + Upload Config
+### 4️⃣ Foundational Stacks + Upload Config
+
+Same set and order as `deploy.sh` step 2. `IAM` imports the DynamoDB table and the S3
+buckets, `Lambda` imports ECR and the inference profiles, so the order below is not
+optional. The manual path skips the two Bedrock model preflights `deploy.sh` runs here; if
+a model is not reachable from your account you find out from a specialist's
+`AccessDeniedException` instead.
 
 ```bash
-uv run cdk deploy BADGERS-S3-{id}-{suffix} --require-approval never
+for s in S3 Cognito DynamoDB IAM ECR InferenceProfiles Memory Vpc; do
+  uv run cdk deploy BADGERS-${s}-{id}-{suffix} --require-approval never
+done
+uv run cdk deploy BADGERS-XRay-{id}-{suffix} --require-approval never   # optional; see X-Ray section
 
-# Sync configuration files
+# Sync s3_files/ (prompts, manifests, schemas, agent config, model registry)
 ./sync_s3_files.sh
 ```
 
-### 5️⃣ Deploy Auth & IAM
+### 5️⃣ Container Images + Specialist Lambdas
+
+The Lambda stack references the two container images by tag, so they must be in ECR before
+it deploys. `build_container_lambdas.sh` takes the resource id (`{id}-{suffix}`).
 
 ```bash
-uv run cdk deploy BADGERS-Cognito-{id}-{suffix} --require-approval never
-uv run cdk deploy BADGERS-IAM-{id}-{suffix} --require-approval never
-```
-
-### 6️⃣ Deploy Lambda Functions
-
-```bash
+cd lambdas && ./build_container_lambdas.sh {id}-{suffix} && cd ..
 uv run cdk deploy BADGERS-Lambda-{id}-{suffix} --require-approval never
 ```
 
-### 7️⃣ Deploy Gateway
+### 6️⃣ Gateway
 
 ```bash
 uv run cdk deploy BADGERS-Gateway-{id}-{suffix} --require-approval never
 ```
 
-### 8️⃣ Deploy ECR + Build Container
+### 7️⃣ Runtime Image + Runtime
 
 ```bash
-uv run cdk deploy BADGERS-ECR-{id}-{suffix} --require-approval never
-
-cd runtime
-./build_and_push_websocket.sh
-cd ..
-```
-
-### 9️⃣ Deploy Memory + Runtime
-
-```bash
-uv run cdk deploy BADGERS-Memory-{id}-{suffix} --require-approval never
+cd runtime && ./build_and_push_websocket.sh && cd ..
 uv run cdk deploy BADGERS-RuntimeWebSocket-{id}-{suffix} --require-approval never
 ```
+
+### 8️⃣ UI Image + ECS
+
+`generate_ui_env.sh` must run after Cognito exists — the bundle compiles the authority and
+client id in. The image is `linux/amd64`, matching the Express Gateway service.
+
+```bash
+bash scripts/generate_ui_env.sh
+(cd ../ui && npm install && npm run build)
+aws ecr get-login-password --region {region} | docker login --username AWS --password-stdin {account}.dkr.ecr.{region}.amazonaws.com
+docker build --platform linux/amd64 --file ../ui/Dockerfile --tag {ecr-repo-uri}:frontend ../ui
+docker push {ecr-repo-uri}:frontend
+uv run cdk deploy BADGERS-ECS-{id}-{suffix} --require-approval never
+```
+
+The ECS stack pins the `frontend` tag, so pushing a new image later leaves the template
+unchanged; `deploy.sh` step 8 forces the rollout with `update-express-gateway-service`
+afterwards, and a manual redeploy has to do the same.
 
 ## 📤 Stack Outputs
 
 Key outputs after deployment:
 
-| Output                                  | Description                      |
-| --------------------------------------- | -------------------------------- |
-| `GatewayUrl`                            | MCP endpoint for tool invocation |
-| `RuntimeEndpoint`                       | Agent HTTP endpoint              |
-| `UserPoolId` / `UserPoolClientId`       | Cognito authentication           |
-| `ConfigBucketName` / `OutputBucketName` | S3 buckets                       |
-| `MemoryId`                              | AgentCore Memory ID              |
+| Output                                                       | Stack            | Description                                      |
+| ------------------------------------------------------------ | ---------------- | ------------------------------------------------ |
+| `GatewayUrl` / `GatewayId`                                   | Gateway          | MCP endpoint for tool invocation                 |
+| `RuntimeArn` / `RuntimeId`                                   | RuntimeWebSocket | AgentCore Runtime the UI opens its WebSocket to  |
+| `UserPoolId` / `UserPoolClientId` / `UIClientId`             | Cognito          | Cognito authentication (Gateway M2M and UI OIDC) |
+| `ConfigBucketName` / `SourceBucketName` / `OutputBucketName` | S3               | Config, upload, and results buckets              |
+| `MemoryId`                                                   | Memory           | AgentCore Memory ID                              |
+| `ServiceUrl`                                                 | ECS              | The UI                                           |
 
 ## 📁 Directory Structure
 
@@ -404,7 +427,7 @@ deployment/
 ├── deploy_specialist.sh      # 🔬 Single specialist deployment
 ├── deploy_custom_specialists.sh # 🎨 Wizard-created specialist deployment
 ├── scripts/
-│   └── generate_ui_env.sh    # 🔐 Writes ui/.env from BADGERS-Cognito-{id}-{suffix} outputs
+│   └── generate_ui_env.sh    # 🔐 Writes ui/.env (VITE_* Cognito + local runtime values) from stack outputs
 ├── stacks/                   # 📦 CDK stack definitions
 ├── lambdas/
 │   ├── build_foundation_layer.sh    # Core framework layer
@@ -415,7 +438,7 @@ deployment/
 │   ├── deploy_foundation_layer.sh   # Manual layer deployment
 │   ├── deploy_poppler_layer.sh      # Manual layer deployment
 │   ├── containers/           # 🐳 Container Lambda Dockerfiles
-│   └── code/                 # ⚡ 24 specialist/utility functions (+2 containers)
+│   └── code/                 # ⚡ 25 specialist/utility functions (+2 containers); deployment_config.json picks which deploy
 ├── runtime/                  # 🐳 AgentCore container
 │   ├── Dockerfile.websocket
 │   ├── build_and_push_websocket.sh
@@ -430,27 +453,31 @@ deployment/
 
 ## 📋 Specialist Manifest Configuration
 
-Each specialist has a manifest file in `s3_files/manifests/` that configures its behavior. The `model_selections` section supports extended thinking (Claude's chain-of-thought reasoning):
+Each specialist has a manifest file in `s3_files/manifests/` that configures its behavior. A manifest names **models only** — never a transport, an endpoint, or a provider. Everything else about a model lives in `s3_files/config/model_registry.json`, so a manifest cannot contradict what is deployed.
+
+Every entry must name a model that is `active` in the registry. `foundation/model_selection.py` is the single parser for this block, and it raises rather than defaulting: a silently defaulted model ID is how a specialist ends up invoking something nobody chose.
+
+The verbose form, one object per model, carries per-model reasoning settings:
 
 ```json
 {
     "specialist": {
-        "name": "page_specialist",
+        "name": "correlation_specialist",
         "model_selections": {
             "primary": {
-                "model_id": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-                "extended_thinking": true,
-                "budget_tokens": 6400
+                "model_id": "us.anthropic.claude-sonnet-4-6",
+                "adaptive_thinking": true,
+                "effort": "high"
             },
             "fallback_list": [
                 {
-                    "model_id": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                    "extended_thinking": true,
-                    "budget_tokens": 4000
+                    "model_id": "us.openai.gpt-5.6-terra",
+                    "extended_thinking": false
                 },
                 {
-                    "model_id": "amazon.nova-pro-v1:0",
-                    "extended_thinking": false
+                    "model_id": "us.amazon.nova-2-lite-v1:0",
+                    "extended_thinking": true,
+                    "budget_tokens": 4000
                 }
             ]
         }
@@ -458,53 +485,92 @@ Each specialist has a manifest file in `s3_files/manifests/` that configures its
 }
 ```
 
-| Field                    | Description                                                               |
-| ------------------------ | ------------------------------------------------------------------------- |
-| `model_id`               | Bedrock model identifier                                                  |
-| `extended_thinking`      | Enable Claude's reasoning traces (Claude models only)                     |
-| `budget_tokens`          | Max tokens for thinking content (required when extended_thinking is true) |
-| `expected_output_tokens` | Estimated output tokens for cost calculation (in `specialist` section)    |
-| `audit_mode`             | Boolean in `inputSchema` - enables confidence scoring and review flags    |
+| Field                    | Description                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------ |
+| `model_id`               | A model ID that is `active` in the registry. Required                                      |
+| `extended_thinking`      | Request a fixed thinking budget. Needs a model whose registry `thinking` is `"extended"`   |
+| `budget_tokens`          | Max tokens for thinking content. Read when `extended_thinking` is true                     |
+| `adaptive_thinking`      | Let the model choose its own reasoning depth. Needs registry `thinking` of `"adaptive"`    |
+| `effort`                 | `low`, `medium`, or `high`. Defaults to `high`. An unknown value is rejected at parse time |
+| `expected_output_tokens` | Estimated output tokens for cost calculation (in the `specialist` section)                 |
+| `audit_mode`             | Boolean in `inputSchema` — enables confidence scoring and review flags                     |
 
-> [!NOTE]
-> Extended thinking is only supported on Claude models. When enabled, thinking content is saved to S3 alongside results: `{session_id}/{specialist_name}/{image}_thinking_{timestamp}.txt`
+The bare-string form carries no reasoning settings, and 23 of the 24 built-in manifests that
+carry `model_selections` use it (`image_enhancer` takes its model from `VISION_MODEL` and
+`html_report_specialist` is deterministic, so neither has the block; the one exception is
+`correlation_specialist`, whose fallback entry is an object):
 
-Simple format (no extended thinking) is still supported for backward compatibility:
 ```json
 "model_selections": {
-    "primary": "us.anthropic.claude-sonnet-4-20250514-v1:0",
-    "fallback_list": ["amazon.nova-pro-v1:0"]
+    "primary": "us.anthropic.claude-sonnet-4-6",
+    "fallback_list": ["us.openai.gpt-5.6-terra", "us.amazon.nova-2-lite-v1:0"]
 }
 ```
 
+> [!NOTE]
+> Thinking support is a property of the model, recorded in the registry's `thinking` field as `null`, `"extended"`, or `"adaptive"`. Claude Opus 5 also carries `thinking_default_on`: its adaptive thinking is on unless a request disables it, so the runtime treats every Opus 5 call as a thinking call and pins temperature to 1. The four OpenAI models document no reasoning parameter and take `thinking: null`.
+>
+> When thinking is active, the content is saved to S3 alongside results: `{session_id}/{specialist_name}/{image}_thinking_{timestamp}.txt`. Nova 2 returns `[REDACTED]` reasoning content — expected, and still billed.
+
+> [!WARNING]
+> Setting `effort: "high"` on a Nova model omits the output-token bound entirely, because Nova's highest reasoning effort requires `temperature` and `maxTokens` to be unset. AWS documents output reaching 128K tokens on that path. Use `medium` unless you want that.
+
 ## 📊 Inference Profiles for Cost Tracking
 
-BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring per model. The `inference_profiles_stack.py` creates trackable profiles that wrap cross-region system-defined profiles.
+BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring per model. `inference_profiles_stack.py` creates one trackable profile per model in `s3_files/config/model_registry.json`, each wrapping that model's US geo cross-Region system-defined profile (`us.*`).
 
 ### How It Works
 
-1. **CDK creates profiles** for each model (Claude Sonnet, Haiku, Opus, Nova Premier)
-2. **Profile ARNs are passed** to Runtime containers as environment variables
-3. **At invocation time**, `bedrock_client.py` maps model IDs to profile ARNs
-4. **Bedrock is invoked** using the profile ARN instead of raw model ID
+1. **CDK reads the registry** at synth and creates one profile per provisioned model
+2. **The same loop writes SSM** `/badgers-{deployment_id}/model-profiles` — a model ID → profile ARN map
+3. **At invocation time**, `bedrock_client.py` reads that parameter once and caches it, then resolves the model ID to a profile ARN
+4. **Bedrock is invoked** using the profile ARN instead of the raw model ID
 
-### Environment Variable Mapping
-
-| Model ID Pattern                   | Environment Variable         |
-| ---------------------------------- | ---------------------------- |
-| `us.anthropic.claude-sonnet-4-5-*` | `CLAUDE_SONNET_PROFILE_ARN`  |
-| `us.anthropic.claude-haiku-4-5-*`  | `CLAUDE_HAIKU_PROFILE_ARN`   |
-| `*claude-opus-4-6*`                | `CLAUDE_OPUS_46_PROFILE_ARN` |
-| `us.amazon.nova-premier-v1:0`      | `NOVA_PREMIER_PROFILE_ARN`   |
+There are no per-model `*_PROFILE_ARN` environment variables. Every consumer reads the one SSM parameter, whose name arrives as `MODEL_PROFILES_PARAM`. Adding or removing a model is a registry edit plus a deploy; no stack lists models by hand.
 
 ### Profile Naming
 
-Profiles are named: `badgers-{model}-{deployment_id}`
-
-Example: `badgers-claude-sonnet-abc12345`
+Profiles are named `badgers-{model}-{deployment_id}` — for example `badgers-claude-sonnet-4-6-abc12345`.
 
 > [!NOTE]
 > If no inference profile is configured for a model ID, the system falls back to using the model ID directly. This allows local development without deployed profiles.
+
+## 🌎 Inference Profiles and Regions
+
+**Model inference does not stay in your deployment Region.** This surprises people, so it is worth being explicit.
+
+Every model BADGERS ships is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
+
+For the three models whose cards publish a destination table (Sonnet 4.6, Opus 4.6, Nova 2 Lite), a source Region of `us-west-2` routes to `us-east-1`, `us-east-2`, or `us-west-2`. The other five document a `us.*` profile without publishing a destination list.
+
+Two consequences:
+
+- **Requests can route to Regions you have not enabled.** Per [cross-Region inference general considerations](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html), *"Cross-Region inference can route requests to AWS Regions that are not manually enabled in your AWS account."* Prompts and outputs may be stored in a destination Region for abuse detection. Data stays on the AWS network and is encrypted in transit.
+- **Nothing else moves.** S3, DynamoDB, Cognito, Lambda, ECR, the AgentCore Runtime and the UI all live in your deployment Region. Only Bedrock inference crosses Regions.
+
+### Why this is not In-Region inference
+
+In-Region inference would keep everything in one Region, and BADGERS does not use it because it is not available: all eight models report In-Region as **not-supported** on the `bedrock-runtime` endpoint in every US Region. Geo (`us.*`) is the most Region-restrictive option the model set actually offers. Global (`global.*`) is the same mechanism over every commercial Region worldwide.
+
+If you have hard data-residency requirements, this model set cannot meet them on `bedrock-runtime`.
+
+### Why the IAM policy wildcards the Region
+
+Geo cross-Region inference requires `bedrock:InvokeModel` on the foundation model in the source Region **and in every destination Region the profile can route to** ([IAM policy requirements](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html)). A foundation-model ARN has a mandatory Region field — `arn:aws:bedrock:{region}::foundation-model/{model}` — so granting "in every destination Region" means either enumerating those Regions or wildcarding the field.
+
+`iam_stack.py` wildcards it: `arn:aws:bedrock:*::foundation-model/{model}`. The model ID stays pinned exactly, and no action or account is wildcarded. This trips `AwsSolutions-IAM5`, which is suppressed with the reasoning recorded inline. The short version:
+
+- The destination set depends on both the model and the operator-chosen source Region, so it is not knowable when the code is written.
+- Only 3 of 8 model cards publish a destination-Region table, so a hardcoded list would cover less than half the set.
+- `bedrock:GetInferenceProfile` returns the Region-qualified foundation model ARNs in `models[].modelArn` for all eight, but that is a deploy-time API call and would require a CDK custom resource.
+
+### If your organization restricts Regions
+
+Service Control Policies and geo cross-Region inference interact badly by default:
+
+> If any destination Region in a cross-Region inference profile is blocked in your SCPs, the request will fail even if other Regions remain allowed.
+
+Allow Bedrock inference actions in all US destination Regions, or add an inference-profile exception. See [SCP requirements for Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html).
 
 ## 🎨 Custom Specialists
 
@@ -512,33 +578,49 @@ BADGERS ships with 5 base specialists. Organizations can create additional speci
 
 ### Architecture
 
+The wizard writes to the **local working tree**, not to S3. `CustomSpecialistsStack` reads
+these paths at synth time, so the artifacts must exist on disk before a deploy:
+
 ```
-s3://{config-bucket}/
-├── manifests/              # Base specialists (deployed with BADGERS-Lambda-{id}-{suffix})
-├── schemas/
-├── prompts/
-└── custom-specialists/       # Wizard-created specialists
-    ├── specialist_registry.json
-    ├── manifests/
-    ├── schemas/
-    └── prompts/
+deployment/custom_specialists/
+├── specialist_registry.json      # top-level key: "specialists"
+├── manifests/{name}.json         # 2nd top-level key: "specialist"
+├── schemas/{name}.json           # a single-element list
+└── prompts/{name}/
+    ├── {short}_gestalt.xml       # the six generated prompt sections
+    ├── {short}_job_role.xml
+    ├── {short}_context.xml
+    ├── {short}_rules.xml
+    ├── {short}_tasks.xml
+    ├── {short}_format.xml
+    └── few-shot-images/          # up to 6 example images, optional
 ```
+
+Nothing writes `code/` — the stack generates `lambda_handler.py` at synth.
 
 ### Workflow
 
-1. **Create specialist** via the 🧙 Create Specialist tab in the [UI](../ui/UI_README.md)
-   - Wizard uploads files to S3 under `custom-specialists/` prefix
+1. **Create the specialist** via the 🧙 Create Specialist tab in the
+   [UI](../ui/UI_README.md). The wizard generates the six prompts with Bedrock, then
+   **💾 Save Specialist** writes the tree above. Save is a distinct step from deploy, and
+   **☁️ Deploy Stack** stays disabled until a save succeeds.
 
-2. **Sync to local** for CDK deployment:
+2. **Deploy**, either from the wizard's Deploy Stack button or directly:
    ```bash
    cd deployment
-   ./sync_custom_specialists.sh
+   ./deploy_custom_specialists.sh
    ```
+   The script reads the local `custom_specialists/specialist_registry.json`, exits cleanly
+   if it is missing or lists no specialists, and runs `cdk deploy --exclusively` on the
+   CustomSpecialists stack.
 
-3. **Deploy custom stack**:
-   ```bash
-   uv run cdk deploy BADGERS-CustomSpecialists-{id}-{suffix}
-   ```
+> [!NOTE]
+> Creating `specialist_registry.json` is what makes the CustomSpecialists stack join
+> `cdk deploy --all`. Delete test artifacts when you are finished with them.
+
+`sync_custom_specialists.sh` pulls specialists *down* from a deployed config bucket into
+`custom_specialists/`. That is for adopting specialists created elsewhere — it is not a step
+in the wizard flow, which never uploads to S3 in the first place.
 
 The custom stack:
 - Creates Lambda functions for each custom specialist

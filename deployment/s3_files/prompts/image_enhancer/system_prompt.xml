@@ -121,6 +121,13 @@
             <intensity>0.0 = no change, 1.0 = aggressive removal</intensity>
             <use_for>Age spots, foxing, uneven staining on historical documents</use_for>
         </op>
+
+        <op name="levels">
+            <purpose>Photoshop-style Levels adjustment. Remaps the tonal range using auto-computed black point, white point, and gamma. More precise than contrast or brightness for documents where you need to crush a specific tonal band (e.g., push aged parchment background to white while preserving dark ink).</purpose>
+            <intensity>0.0 = gentle tonal tightening, 0.5 = moderate background cleanup with midtone brightening, 1.0 = aggressive near-binary remapping</intensity>
+            <use_for>Historical manuscripts on aged parchment, documents with warm-toned backgrounds, faded ink needing ink-to-background contrast maximization, post-desaturation tonal cleanup</use_for>
+            <note>Returns percentile-based tonal distribution analysis (like threshold) so you can evaluate and refine on retry. Auto-computes black/white points from image histogram — more aggressive clipping as intensity increases. Gamma shifts midtones lighter (1.0-1.8 scaling with intensity). Prefer over contrast+brightness stacking when you need precise tonal control. Unlike threshold, preserves continuous tonal gradation — does not destroy stroke weight variation in historical ink.</note>
+        </op>
     </operations_reference>
 
     <!-- ================================================================== -->
@@ -170,6 +177,15 @@
                   >
             <operations>[{"op": "invert", "intensity": 1.0}, {"op": "contrast", "intensity": 0.3}]</operations>
             <explanation>Invert to get dark-on-light, then gentle contrast to improve readability.</explanation>
+        </pipeline>
+
+        <pipeline name="F"
+                  title="Historical Manuscript Restoration"
+                  trigger="Suggested for aged manuscripts on parchment/rag paper, especially with colored researcher highlights or warm-toned backgrounds"
+                  >
+            <operations>[{"op": "desaturate", "intensity": 1.0}, {"op": "levels", "intensity": 0.5}, {"op": "remove_stains", "intensity": 0.4}]</operations>
+            <explanation>Desaturate at full intensity neutralizes parchment color cast AND colored researcher highlights (yellow/pink highlighter, sticky note residue). Levels then precisely remaps the tonal range — auto-computed black/white points push the lightened parchment background toward white while preserving dark ink strokes. Stain removal handles foxing and bleed-through. Unlike Pipeline A (watermark removal), this preserves continuous tonal gradation in the ink — critical for paleographic reading where stroke weight carries information.</explanation>
+            <tuning>If ink appears clipped (thin strokes lost): lower levels intensity to 0.3. If background remains too dark: raise to 0.7. For severely faded ink, add contrast at 0.3 after levels. Add sharpen at 0.2 as final step only if strokes are genuinely soft — do not sharpen aged manuscripts by default.</tuning>
         </pipeline>
     </pipelines>
 

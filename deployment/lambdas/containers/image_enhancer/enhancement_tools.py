@@ -702,6 +702,102 @@ def threshold(image: np.ndarray, intensity: float = 0.5) -> np.ndarray:
     return cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
 
 
+def levels(image: np.ndarray, intensity: float = 0.5) -> np.ndarray:
+    """
+    Photoshop-style Levels adjustment: remap the tonal range with black point,
+    white point, and gamma controls.
+
+    This is the most precise tonal correction tool — superior to brightness
+    or contrast for documents where you need to crush a specific tonal band
+    (e.g., push aged parchment backgrounds to white while preserving dark ink).
+
+    How it works:
+        1. Input pixels in [black_point, white_point] are remapped to [0, 255].
+        2. Gamma curve is applied (gamma > 1 lightens midtones, < 1 darkens them).
+        3. The result is blended with the original using the intensity parameter.
+
+    Parameter mapping (intensity → presets):
+        The intensity parameter selects from a range of increasingly aggressive
+        presets designed for document enhancement:
+
+        0.0-0.2:  Gentle — slight black/white point tightening (good starting point)
+        0.3-0.5:  Moderate — noticeable background cleanup, midtone brightening
+        0.6-0.8:  Strong — aggressive background removal, high contrast ink
+        0.9-1.0:  Maximum — near-binary for severely degraded documents
+
+    The operation also logs percentile-based analysis (like threshold) so the
+    LLM can evaluate the tonal distribution and refine parameters on retry.
+
+    Args:
+        image: RGB numpy array
+        intensity: 0.0 (no change) to 1.0 (aggressive levels adjustment)
+
+    Returns:
+        Levels-adjusted image
+    """
+    if intensity <= 0.01:
+        return image
+
+    gray_for_analysis = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+    # Auto-compute black/white points from the image histogram
+    # More aggressive clipping as intensity increases
+    low_pct = 1.0 + intensity * 14.0     # 1% to 15% (black point percentile)
+    high_pct = 99.0 - intensity * 14.0   # 99% to 85% (white point percentile)
+
+    black_point = float(np.percentile(gray_for_analysis, low_pct))
+    white_point = float(np.percentile(gray_for_analysis, high_pct))
+
+    # Ensure minimum separation to avoid division issues
+    if white_point - black_point < 10:
+        white_point = black_point + 10
+
+    # Gamma: slight midtone brightening that increases with intensity
+    # (documents usually need background pushed lighter)
+    gamma = 1.0 + intensity * 0.8  # 1.0 to 1.8
+
+    # Apply levels to each channel
+    arr = image.astype(np.float32)
+    arr = np.clip((arr - black_point) / (white_point - black_point), 0, 1)
+    arr = np.power(arr, 1.0 / gamma)
+    adjusted = (arr * 255).astype(np.uint8)
+
+    # Blend with original based on intensity
+    result = cv2.addWeighted(image, 1 - intensity, adjusted, intensity, 0)
+
+    # Log analysis for LLM feedback (same pattern as threshold)
+    percentiles = [5, 10, 25, 50, 75, 90, 95]
+    pct_values = {f"p{p}": int(np.percentile(gray_for_analysis, p)) for p in percentiles}
+    mean_val = int(np.mean(gray_for_analysis))
+    std_val = int(np.std(gray_for_analysis))
+
+    levels._last_analysis = {  # type: ignore[attr-defined]
+        "black_point": round(black_point, 1),
+        "white_point": round(white_point, 1),
+        "gamma": round(gamma, 2),
+        "mean": mean_val,
+        "std": std_val,
+        "distribution": pct_values,
+        "hint": (
+            f"Levels applied: black_point={black_point:.0f}, "
+            f"white_point={white_point:.0f}, gamma={gamma:.2f}. "
+            f"Median pixel intensity was {pct_values['p50']}. "
+            "Higher intensity = tighter input range = more aggressive remapping."
+        ),
+    }
+
+    logger.info(
+        "Levels analysis: black=%.1f, white=%.1f, gamma=%.2f, mean=%d, std=%d",
+        black_point,
+        white_point,
+        gamma,
+        mean_val,
+        std_val,
+    )
+
+    return result
+
+
 OPERATIONS = {
     "contrast": adjust_contrast,
     "brightness": adjust_brightness,
@@ -715,6 +811,7 @@ OPERATIONS = {
     "remove_stains": remove_background_stains,
     "desaturate": desaturate,
     "threshold": threshold,
+    "levels": levels,
 }
 
 
@@ -777,6 +874,18 @@ def execute_operations(
                 notes = (
                     f"Applied threshold at intensity {intensity:.2f} "
                     f"(cutoff={analysis['cutoff']}). "
+                    f"{analysis['hint']} "
+                    f"Distribution: {analysis['distribution']}"
+                )
+
+            # Enrich notes with levels analysis if available
+            if op_name == "levels" and hasattr(levels, "_last_analysis"):
+                analysis = levels._last_analysis  # type: ignore[attr-defined]
+                notes = (
+                    f"Applied levels at intensity {intensity:.2f} "
+                    f"(black={analysis['black_point']}, "
+                    f"white={analysis['white_point']}, "
+                    f"gamma={analysis['gamma']}). "
                     f"{analysis['hint']} "
                     f"Distribution: {analysis['distribution']}"
                 )

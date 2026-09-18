@@ -4,8 +4,11 @@ AWS Bedrock client management for specialist system.
 Handles Bedrock client creation, invocation, and error handling for different specialist types.
 """
 
+import base64
+import binascii
 import json
 import logging
+import os
 import time
 from typing import Dict, Any, Optional, Callable
 from functools import lru_cache
@@ -15,39 +18,91 @@ from botocore.exceptions import ClientError
 print("BEDROCK_CLIENT MODULE LOADING - TOP OF FILE")
 
 
-# Model ID to inference profile ARN mapping via environment variables
-MODEL_TO_PROFILE_ENV_MAP = {
-    # Claude Sonnet 4.5 variants
-    "us.anthropic.claude-sonnet-4-5-20250929-v1:0": "CLAUDE_SONNET_PROFILE_ARN",
-    "anthropic.claude-sonnet-4-5-20250929-v1:0": "CLAUDE_SONNET_PROFILE_ARN",
-    # Claude Haiku 4.5 variants (note: date is 20251001)
-    "us.anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
-    "anthropic.claude-haiku-4-5-20251001-v1:0": "CLAUDE_HAIKU_PROFILE_ARN",
-    # Claude Opus 4.6 variants
-    "us.anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
-    "anthropic.claude-opus-4-6-v1": "CLAUDE_OPUS_46_PROFILE_ARN",
-    # Nova Premier variants
-    "us.amazon.nova-premier-v1:0": "NOVA_PREMIER_PROFILE_ARN",
-    "amazon.nova-premier-v1:0": "NOVA_PREMIER_PROFILE_ARN",
-}
+# Model ID -> application inference profile ARN, read once per container from the SSM
+# parameter that InferenceProfilesStack writes in the same loop that creates the profiles.
+#
+# This replaces MODEL_TO_PROFILE_ENV_MAP, a hand-maintained dict of eight model-ID spellings
+# pointing at five per-model environment variables. That map covered only four models, so it
+# had two failure modes at once: a model absent from it silently lost cost attribution even
+# when its profile existed (Claude Sonnet 4.6 was in exactly that state — profile created,
+# environment variable set by CDK, and no entry here to read it), and adding a model meant
+# editing CDK wiring in four stacks plus this dict.
+#
+# One parameter replaces all of it. Because the parameter is written in the same loop that
+# creates the profiles, it cannot name a model that has no profile.
+_MODEL_PROFILES_PARAM_ENV = "MODEL_PROFILES_PARAM"
+
+# Module-level cache. Populated on first lookup and reused for the life of the container, so
+# a warm Lambda makes no further SSM calls.
+_profile_map_cache: Optional[Dict[str, str]] = None
+
+
+def _load_profile_map() -> Dict[str, str]:
+    """Read and cache the model ID -> profile ARN map from SSM.
+
+    Returns an empty dict on any failure and caches that too, so a missing parameter or a
+    denied read costs one call rather than one per invocation. Failure is non-fatal by
+    design: without the map, `_invoke_single_model` falls through to the model ID itself,
+    which is a valid geo inference ID. That loses cost attribution but still works — a hard
+    failure here would be worse than the problem being solved.
+    """
+    global _profile_map_cache
+    if _profile_map_cache is not None:
+        return _profile_map_cache
+
+    logger = logging.getLogger(__name__)
+    param_name = os.environ.get(_MODEL_PROFILES_PARAM_ENV)
+    if not param_name:
+        logger.warning(
+            "%s is not set; inference profile ARNs unavailable and cost attribution "
+            "will be lost",
+            _MODEL_PROFILES_PARAM_ENV,
+        )
+        _profile_map_cache = {}
+        return _profile_map_cache
+
+    try:
+        ssm = boto3.client("ssm")
+        raw = ssm.get_parameter(Name=param_name)["Parameter"]["Value"]
+        loaded = json.loads(raw)
+        if not isinstance(loaded, dict):
+            raise ValueError(f"expected a JSON object, got {type(loaded).__name__}")
+        _profile_map_cache = loaded
+        logger.info("Loaded %d inference profile ARNs from %s", len(loaded), param_name)
+    except Exception as e:  # noqa: BLE001 - any failure degrades to no attribution
+        logger.warning(
+            "Could not read inference profile map from %s: %s. Cost attribution will be "
+            "lost; invocations continue using geo model IDs.",
+            param_name,
+            e,
+        )
+        _profile_map_cache = {}
+
+    return _profile_map_cache
+
+
+def clear_profile_map_cache() -> None:
+    """Drop the cached profile map. For tests."""
+    global _profile_map_cache
+    _profile_map_cache = None
 
 
 def get_inference_profile_arn(model_id: str) -> Optional[str]:
     """
-    Get inference profile ARN for a model ID if configured via environment variable.
+    Get the application inference profile ARN for a model ID, if one is provisioned.
 
     Args:
-        model_id: The Bedrock model ID
+        model_id: The Bedrock model ID, as named in the manifest (a `us.`-prefixed geo ID)
 
     Returns:
-        Inference profile ARN if available, None otherwise
-    """
-    import os
+        Inference profile ARN if the deployment provisioned one, None otherwise.
 
-    env_var = MODEL_TO_PROFILE_ENV_MAP.get(model_id)
-    if env_var:
-        return os.environ.get(env_var)
-    return None
+    Note:
+        Reads the SSM map on first call and caches it for the container's lifetime. Returning
+        None is not an error — the caller invokes the geo model ID directly, which works but
+        is not attributed to a profile.
+    """
+    return _load_profile_map().get(model_id)
 
 
 def get_default_aws_profile() -> Optional[str]:
@@ -81,10 +136,16 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude' or 'nova'
+        'claude', 'nova', or 'openai'
 
     Raises:
         BedrockError: If model family cannot be determined
+
+    Note:
+        Under Converse the family no longer selects a request *shape* — Converse normalises
+        that. It selects only which provider-specific fields go into
+        ``additionalModelRequestFields``, which is why 'openai' can be a family that adds
+        nothing at all.
     """
     model_lower = model_id.lower()
 
@@ -92,8 +153,28 @@ def get_model_family(model_id: str) -> str:
         return "claude"
     elif "nova" in model_lower or "amazon.nova" in model_lower:
         return "nova"
+    elif "openai" in model_lower or "gpt-" in model_lower:
+        return "openai"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
+
+
+def thinking_default_on(model_id: str) -> bool:
+    """Whether the model reasons unless the request explicitly turns it off.
+
+    Mirrors the ``thinking_default_on`` flag in ``s3_files/config/model_registry.json``.
+    The registry is read by CDK at synth and by the UI at request time, but is not shipped
+    in the Lambda layer, so this is the one place its content is repeated in runtime code.
+    It exists for a single consequence: Claude requires ``temperature`` to be 1 whenever
+    thinking is on, and on a default-on model a request that asks for no thinking is still
+    a thinking request. Without this, a wizard-created specialist on such a model inherits
+    the specialist default temperature of 0.1 and every call is rejected.
+
+    Claude Opus 5 is the one such model in the current set -- its model card reads
+    "adaptive thinking is on by default; can be disabled". Add here whenever the registry
+    flag is set on a new entry.
+    """
+    return "claude-opus-5" in model_id.lower()
 
 
 class BedrockClient:
@@ -247,13 +328,15 @@ class BedrockClient:
 
         last_error = None
 
-        for (
+        last_index = len(model_chain) - 1
+
+        for chain_index, (
             current_model_id,
             current_extended_thinking,
             current_budget_tokens,
             current_adaptive_thinking,
             current_effort,
-        ) in model_chain:
+        ) in enumerate(model_chain):
             try:
                 self.logger.info("current_model_id: %s", current_model_id)
                 self.logger.info("payload: %s", payload)
@@ -278,13 +361,12 @@ class BedrockClient:
                 return result
             except BedrockError as e:
                 last_error = e
-                is_last = (
-                    current_model_id,
-                    current_extended_thinking,
-                    current_budget_tokens,
-                    current_adaptive_thinking,
-                    current_effort,
-                ) == model_chain[-1]
+                # Compare by position, not by value. This previously tested the current
+                # 5-tuple against model_chain[-1], so any earlier entry that happened to
+                # equal the last one — a repeated model ID with the same thinking settings —
+                # reported itself as last, and the loop raised instead of continuing. The
+                # remaining fallbacks were silently skipped.
+                is_last = chain_index == last_index
                 self.logger.info("last error is: %s", last_error)
                 # Only fallback for specific transient errors (throttling, service unavailable)
                 # For other errors (access denied, validation, etc.), fail immediately
@@ -365,37 +447,33 @@ class BedrockClient:
                 adaptive_thinking,
             )
 
-            # Convert payload to model-specific format
-            model_payload = self._convert_payload_for_model(
+            # Build the Converse request. Converse is used for every model, not InvokeModel:
+            # it is the only API all eight supported models share — the four OpenAI models
+            # support no Invoke API at all — and application inference profiles work with
+            # Converse only, which is what preserves cost attribution.
+            request = self._build_converse_request(
                 payload,
                 model_family,
                 extended_thinking,
                 budget_tokens,
                 adaptive_thinking,
                 adaptive_effort,
-            )
-            self.logger.debug(
-                "Payload size: %d characters", len(json.dumps(model_payload))
+                default_on_thinking=thinking_default_on(model_id),
             )
 
             # Add throttling delay to prevent rate limiting
             time.sleep(self.throttle_delay)
 
             response = self.handle_throttling(
-                client.invoke_model,
+                client.converse,
                 modelId=invoke_model_id,
-                body=json.dumps(model_payload),
                 max_retries=max_retries,
+                **request,
             )
 
-            # Parse response - read streaming body in chunks for reliability
-            self.logger.info("Reading response body from Bedrock...")
-            raw_body = self._read_streaming_body(response["body"])
-            self.logger.info("Response body received: %d bytes", len(raw_body))
-            response_body = json.loads(raw_body)
-
-            # Normalize response to common format
-            normalized = self._normalize_response(response_body, model_family)
+            # Converse returns a parsed dict — no streaming body to read and no JSON to
+            # decode, which is why _read_streaming_body is no longer on this path.
+            normalized = self._normalize_response(response, model_family)
 
             self.logger.info("Model invocation successful")
             return normalized
@@ -405,7 +483,178 @@ class BedrockClient:
         except Exception as e:
             raise BedrockError(f"Model invocation failed: {e}") from e
 
-    def _convert_payload_for_model(
+    # Anthropic media types -> Converse image formats. Converse names the format
+    # separately from the bytes, where the Anthropic body carried a MIME type.
+    _IMAGE_FORMATS = {
+        "image/jpeg": "jpeg",
+        "image/jpg": "jpeg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/webp": "webp",
+    }
+
+    def _to_content_blocks(self, content: Any) -> list:
+        """Convert Anthropic-style message content into Converse ContentBlocks.
+
+        Accepts either a bare string (correlation_specialist passes one) or a list of
+        Anthropic blocks, and returns Converse blocks:
+
+            {"type": "text",  "text": t}   ->  {"text": t}
+            {"type": "image", "source": {"media_type": m, "data": b64}}
+                                           ->  {"image": {"format": f,
+                                                          "source": {"bytes": raw}}}
+
+        The image case is the one that matters. ``ImageSource.bytes`` is a blob, and the
+        API reference is explicit: *"If you use an AWS SDK, you don't need to encode the
+        image bytes in base64."* boto3 base64-encodes whatever it is handed, so forwarding
+        the base64 **string** that message_chain_builder.py produces would encode it twice
+        and the model would receive garbage. That string is correct for invoke_model, where
+        the body is hand-built JSON — which is exactly why this bug is invisible until the
+        transport changes.
+        """
+        if isinstance(content, str):
+            return [{"text": content}]
+
+        if not isinstance(content, list):
+            raise BedrockError(
+                f"Message content must be a string or a list, got {type(content).__name__}"
+            )
+
+        blocks = []
+        for index, item in enumerate(content):
+            if isinstance(item, str):
+                blocks.append({"text": item})
+                continue
+
+            if not isinstance(item, dict):
+                raise BedrockError(
+                    f"Content block {index} must be a string or an object, "
+                    f"got {type(item).__name__}"
+                )
+
+            # Already a Converse block — pass through untouched.
+            if "text" in item and "type" not in item:
+                blocks.append(item)
+                continue
+            if "image" in item and "type" not in item:
+                blocks.append(item)
+                continue
+
+            block_type = item.get("type")
+
+            if block_type == "text":
+                blocks.append({"text": item.get("text", "")})
+
+            elif block_type == "image":
+                source = item.get("source", {}) or {}
+                media_type = source.get("media_type", "image/png")
+                image_format = self._IMAGE_FORMATS.get(media_type)
+                if image_format is None:
+                    raise BedrockError(
+                        f"Content block {index}: unsupported image media type "
+                        f"{media_type!r}. Supported: {sorted(self._IMAGE_FORMATS)}"
+                    )
+
+                data = source.get("data", "")
+                if isinstance(data, bytes):
+                    raw = data
+                else:
+                    try:
+                        raw = base64.b64decode(data, validate=True)
+                    except (binascii.Error, ValueError) as exc:
+                        raise BedrockError(
+                            f"Content block {index}: image data is not valid base64 — "
+                            f"{exc}"
+                        ) from exc
+                if not raw:
+                    raise BedrockError(f"Content block {index}: image data is empty")
+
+                blocks.append(
+                    {"image": {"format": image_format, "source": {"bytes": raw}}}
+                )
+
+            else:
+                raise BedrockError(
+                    f"Content block {index}: unsupported block type {block_type!r}"
+                )
+
+        if not blocks:
+            raise BedrockError("Message content produced no Converse content blocks")
+
+        return blocks
+
+    def _thinking_fields(
+        self,
+        model_family: str,
+        extended_thinking: bool,
+        budget_tokens: Optional[int],
+        adaptive_thinking: bool,
+        adaptive_effort: str,
+    ) -> Dict[str, Any]:
+        """Build the provider-specific reasoning fields for additionalModelRequestFields.
+
+        Converse normalises the request shape but not reasoning configuration, so this is
+        the one place that still branches on provider.
+
+        Claude: ``thinking``, plus ``effort`` inside a **separate** ``output_config``
+        object. Putting ``effort`` inside ``thinking`` raises ValidationException.
+
+        Nova 2: ``reasoningConfig`` with ``type`` and ``maxReasoningEffort``. There is no
+        ``budget_tokens`` analogue — Nova expresses depth as three named levels — so a
+        budget-based request is mapped to a level and the loss is logged rather than
+        silently absorbed.
+
+        OpenAI: nothing. The four GPT model cards document no reasoning parameter at all
+        (unlike every Anthropic card, which has an explicit ``Reasoning:`` field), and an
+        unrecognised key in additionalModelRequestFields earns a ValidationException.
+        """
+        if not (extended_thinking or adaptive_thinking):
+            return {}
+
+        if model_family == "claude":
+            if adaptive_thinking:
+                return {
+                    "thinking": {"type": "adaptive"},
+                    "output_config": {"effort": adaptive_effort},
+                }
+            fields: Dict[str, Any] = {"thinking": {"type": "enabled"}}
+            if budget_tokens:
+                fields["thinking"]["budget_tokens"] = budget_tokens
+            return fields
+
+        if model_family == "nova":
+            # R8: the previous code logged "not supported for Nova models" and dropped the
+            # request. That was true of Nova Premier and is false of Nova 2 Lite, which is
+            # the fallback floor beneath thinking-enabled specialists.
+            if adaptive_thinking:
+                effort = adaptive_effort
+            else:
+                effort = "medium"
+                self.logger.info(
+                    "Nova has no budget_tokens equivalent (requested %s); using "
+                    "maxReasoningEffort=medium",
+                    budget_tokens,
+                )
+            if effort not in ("low", "medium", "high"):
+                self.logger.warning(
+                    "Nova maxReasoningEffort must be low/medium/high, got %r; using medium",
+                    effort,
+                )
+                effort = "medium"
+            return {
+                "reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}
+            }
+
+        if model_family == "openai":
+            self.logger.info(
+                "Thinking requested for an OpenAI model; the model cards document no "
+                "reasoning parameter, so none is sent"
+            )
+            return {}
+
+        raise BedrockError(f"Unknown model family: {model_family}")
+
+    def _build_converse_request(
         self,
         payload: Dict[str, Any],
         model_family: str,
@@ -413,237 +662,158 @@ class BedrockClient:
         budget_tokens: Optional[int] = None,
         adaptive_thinking: bool = False,
         adaptive_effort: str = "high",
+        default_on_thinking: bool = False,
     ) -> Dict[str, Any]:
+        """Turn the internal payload into keyword arguments for ``client.converse``.
+
+        ``payload`` is the Anthropic-shaped dict that ``create_anthropic_payload`` still
+        produces. Under Converse it is no longer a wire format — it is an internal
+        intermediate representation, so its callers did not have to change.
+
+        ``default_on_thinking`` is ``thinking_default_on(model_id)``: the model reasons
+        unless explicitly told not to, which matters only for the temperature rule below.
+
+        Returns a dict suitable for ``client.converse(modelId=..., **request)``.
         """
-        Convert a base payload to model-specific format.
-
-        Args:
-            payload: Base payload with system, messages, max_tokens, temperature
-            model_family: 'claude' or 'nova'
-            extended_thinking: Whether to enable extended thinking (Claude only)
-            budget_tokens: Optional budget tokens for extended thinking
-            adaptive_thinking: Whether to enable adaptive thinking (Claude only)
-            adaptive_effort: Effort level for adaptive thinking
-
-        Returns:
-            Model-specific payload
-        """
-        if model_family == "claude":
-            # Payload is already in Claude format from create_anthropic_payload
-            if adaptive_thinking:
-                return self._add_adaptive_thinking_to_payload(payload, adaptive_effort)
-            if extended_thinking:
-                return self._add_extended_thinking_to_payload(payload, budget_tokens)
-            return payload
-        elif model_family == "nova":
-            # Nova doesn't support extended/adaptive thinking
-            if extended_thinking or adaptive_thinking:
-                self.logger.warning(
-                    "Extended/adaptive thinking not supported for Nova models, ignoring"
-                )
-            return self._convert_to_nova_payload(payload)
-        else:
-            raise BedrockError(f"Unknown model family: {model_family}")
-
-    def _add_extended_thinking_to_payload(
-        self, payload: Dict[str, Any], budget_tokens: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Add extended thinking configuration to Claude payload.
-
-        Args:
-            payload: Claude-format payload
-            budget_tokens: Optional budget tokens (defaults to 80% of max_tokens)
-
-        Returns:
-            Payload with extended thinking enabled
-        """
-        max_tokens = payload.get("max_tokens", 8000)
-
-        # Use provided budget or default to 80% of max_tokens
-        if budget_tokens is None:
-            budget_tokens = int(max_tokens * 0.8)
-
-        thinking_payload = dict(payload)
-        thinking_payload["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": budget_tokens,
-        }
-        # Extended thinking requires temperature = 1
-        thinking_payload["temperature"] = 1
-
-        self.logger.info(
-            "Extended thinking enabled with budget_tokens=%d", budget_tokens
-        )
-        return thinking_payload
-
-    def _add_adaptive_thinking_to_payload(
-        self, payload: Dict[str, Any], effort: str = "high"
-    ) -> Dict[str, Any]:
-        """
-        Add adaptive thinking configuration to Claude payload.
-
-        Args:
-            payload: Claude-format payload
-            effort: Effort level ("low", "medium", "high")
-
-        Returns:
-            Payload with adaptive thinking enabled
-        """
-        thinking_payload = dict(payload)
-
-        thinking_payload["thinking"] = {
-            "type": "adaptive",
-        }
-        # Effort goes in output_config, not inside thinking
-        thinking_payload["output_config"] = {
-            "effort": effort,
-        }
-        # Add the required beta header
-        thinking_payload["anthropic_beta"] = ["effort-2025-11-24"]
-        # Adaptive thinking requires temperature = 1
-        thinking_payload["temperature"] = 1
-
-        self.logger.info("Adaptive thinking enabled with effort=%s", effort)
-        return thinking_payload
-
-    def _convert_to_nova_payload(
-        self, claude_payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """
-        Convert Claude-format payload to Nova format.
-
-        Args:
-            claude_payload: Payload in Claude/Anthropic format
-
-        Returns:
-            Payload in Nova format
-        """
-        # Convert messages content format
-        nova_messages: list[Dict[str, Any]] = []
-        for msg in claude_payload.get("messages", []):
-            nova_content: list[Dict[str, Any]] = []
-            content = msg.get("content", [])
-
-            # Handle both list and string content
-            if isinstance(content, str):
-                nova_content.append({"text": content})
-            else:
-                for item in content:
-                    if item.get("type") == "image":
-                        # Convert Claude image format to Nova format
-                        source = item.get("source", {})
-                        media_type = source.get("media_type", "image/png")
-                        image_format = (
-                            media_type.split("/")[1] if "/" in media_type else "png"
-                        )
-                        nova_content.append(
-                            {
-                                "image": {
-                                    "format": image_format,
-                                    "source": {"bytes": source.get("data", "")},
-                                }
-                            }
-                        )
-                    elif item.get("type") == "text":
-                        nova_content.append({"text": item.get("text", "")})
-                    elif "text" in item:
-                        nova_content.append({"text": item["text"]})
-
-            nova_messages.append(
-                {"role": msg.get("role", "user"), "content": nova_content}
+        messages = []
+        for index, message in enumerate(payload.get("messages") or []):
+            role = message.get("role")
+            if role not in ("user", "assistant"):
+                raise BedrockError(f"Message {index} has invalid role: {role!r}")
+            messages.append(
+                {
+                    "role": role,
+                    "content": self._to_content_blocks(message.get("content")),
+                }
             )
 
-        # Build Nova payload
-        system_text = claude_payload.get("system", "")
-        nova_payload = {
-            "schemaVersion": "messages-v1",
-            "system": [{"text": system_text}] if system_text else [],
-            "messages": nova_messages,
-            "inferenceConfig": {
-                "maxTokens": claude_payload.get("max_tokens", 4096),
-                "temperature": claude_payload.get("temperature", 0.7),
-            },
-        }
+        if not messages:
+            raise BedrockError("Converse requires at least one message")
 
-        return nova_payload
+        request: Dict[str, Any] = {"messages": messages}
+
+        system_prompt = payload.get("system")
+        if system_prompt:
+            request["system"] = [{"text": system_prompt}]
+
+        inference_config: Dict[str, Any] = {}
+        max_tokens = payload.get("max_tokens")
+        temperature = payload.get("temperature")
+
+        # Claude requires temperature 1 whenever thinking is on -- extended (type
+        # "enabled") and adaptive alike. The pre-Converse code forced this in both
+        # _add_extended_thinking_to_payload and _add_adaptive_thinking_to_payload; the first
+        # Converse draft carried over only the adaptive case, which would have failed the
+        # correlation specialist's extended-thinking fallback with a ValidationException
+        # that _should_fallback correctly refuses to retry.
+        #
+        # A default-on model (Opus 5) thinks unless told not to, so it is a thinking request
+        # even when the manifest asked for nothing -- hence default_on_thinking.
+        if model_family == "claude" and (
+            extended_thinking or adaptive_thinking or default_on_thinking
+        ):
+            temperature = 1
+
+        nova_high_effort = (
+            model_family == "nova"
+            and (extended_thinking or adaptive_thinking)
+            and adaptive_thinking
+            and adaptive_effort == "high"
+        )
+        if nova_high_effort:
+            # Nova 2 rejects temperature, topP, topK and maxTokens together with
+            # maxReasoningEffort="high". Omitting maxTokens removes the output bound, and
+            # the docs warn output can reach 128K tokens, so this is logged loudly rather
+            # than applied quietly.
+            self.logger.warning(
+                "Nova maxReasoningEffort=high requires temperature and maxTokens to be "
+                "unset; omitting both. Output is unbounded and may reach 128K tokens."
+            )
+        else:
+            if max_tokens:
+                inference_config["maxTokens"] = max_tokens
+            if temperature is not None:
+                inference_config["temperature"] = temperature
+
+        if inference_config:
+            request["inferenceConfig"] = inference_config
+
+        extra = self._thinking_fields(
+            model_family,
+            extended_thinking,
+            budget_tokens,
+            adaptive_thinking,
+            adaptive_effort,
+        )
+        if extra:
+            request["additionalModelRequestFields"] = extra
+
+        return request
 
     def _normalize_response(
-        self, response_body: Dict[str, Any], model_family: str
+        self, response: Dict[str, Any], model_family: str
     ) -> Dict[str, Any]:
         """
-        Normalize model response to common format (Claude format).
+        Normalize a Converse response to the internal format callers already expect.
+
+        Converse returns one response shape for every provider, so this no longer branches
+        on family — the parameter is kept only for logging. The previous version had a
+        Claude branch that read a native ``content`` array and a Nova branch that walked
+        ``output.message.content``; both collapse into the single path below.
 
         Args:
-            response_body: Raw response from model
-            model_family: 'claude' or 'nova'
+            response: Raw Converse response
+            model_family: 'claude', 'nova', or 'openai' — logging only
 
         Returns:
-            Normalized response with 'content' key and optional 'thinking' key
+            ``{"content": [{"type": "text", "text": ...}], ...}`` with an optional
+            ``thinking`` key, matching what response_processor and the specialists parse.
         """
-        if model_family == "claude":
-            # Validate Claude response structure
-            if "content" not in response_body or not response_body["content"]:
-                raise BedrockError("Empty response from Claude model")
+        try:
+            blocks = response["output"]["message"]["content"]
+        except (KeyError, TypeError) as exc:
+            raise BedrockError(
+                f"Invalid Converse response structure ({model_family}): {exc}"
+            ) from exc
 
-            result = dict(response_body)
+        text_blocks = []
+        reasoning_parts = []
+        for item in blocks:
+            if not isinstance(item, dict):
+                continue
+            if "text" in item:
+                text_blocks.append({"type": "text", "text": item["text"]})
+            elif "reasoningContent" in item:
+                # Claude and Nova 2 both return reasoning here. Nova 2 redacts the text to
+                # "[REDACTED]" while still billing for the tokens, so an empty or redacted
+                # value is expected rather than an error.
+                reasoning_text = (
+                    (item.get("reasoningContent") or {}).get("reasoningText") or {}
+                ).get("text")
+                if reasoning_text:
+                    reasoning_parts.append(reasoning_text)
 
-            # Extract thinking content if present
-            thinking_content = self._extract_thinking_from_claude_response(
-                response_body
+        if not text_blocks:
+            raise BedrockError(
+                f"Converse returned no text content ({model_family}); "
+                f"stopReason={response.get('stopReason')!r}"
             )
-            if thinking_content:
-                result["thinking"] = thinking_content
-                self.logger.info(
-                    "Extracted thinking content: %d characters", len(thinking_content)
-                )
 
-            return result
+        result: Dict[str, Any] = {"content": text_blocks}
 
-        elif model_family == "nova":
-            # Convert Nova response to Claude format
-            try:
-                nova_content = response_body["output"]["message"]["content"]
-                # Convert Nova content format to Claude format
-                claude_content = []
-                for item in nova_content:
-                    if "text" in item:
-                        claude_content.append({"type": "text", "text": item["text"]})
+        if reasoning_parts:
+            result["thinking"] = "\n\n".join(reasoning_parts)
+            self.logger.info(
+                "Extracted reasoning content: %d characters", len(result["thinking"])
+            )
 
-                if not claude_content:
-                    raise BedrockError("Empty response from Nova model")
+        # Carry through the metadata callers may want, under the names Converse uses.
+        if "stopReason" in response:
+            result["stopReason"] = response["stopReason"]
+        if "usage" in response:
+            result["usage"] = response["usage"]
 
-                return {"content": claude_content}
-            except KeyError as e:
-                raise BedrockError(f"Invalid Nova response structure: {e}") from e
-
-        else:
-            raise BedrockError(f"Unknown model family: {model_family}")
-
-    def _extract_thinking_from_claude_response(
-        self, response_body: Dict[str, Any]
-    ) -> Optional[str]:
-        """
-        Extract thinking content from Claude response with extended thinking.
-
-        Args:
-            response_body: Raw Claude response
-
-        Returns:
-            Thinking content as string, or None if not present
-        """
-        content = response_body.get("content", [])
-        thinking_parts = []
-
-        for item in content:
-            if item.get("type") == "thinking":
-                thinking_text = item.get("thinking", "")
-                if thinking_text:
-                    thinking_parts.append(thinking_text)
-
-        if thinking_parts:
-            return "\n\n".join(thinking_parts)
-        return None
+        return result
 
     def _should_fallback(self, error: BedrockError) -> bool:
         """
@@ -749,6 +919,11 @@ class BedrockClient:
             "amazon.nova-",
             "us.amazon.nova-",
             "global.amazon.nova-",
+            # OpenAI. Reachable only through Converse — these models support no Invoke API
+            # at all — and only via a geo or global inference profile, since they offer no
+            # in-Region inference on bedrock-runtime.
+            "us.openai.gpt-",
+            "global.openai.gpt-",
             # Other supported models
             "amazon.titan-",
             "ai21.j2-",
@@ -831,48 +1006,3 @@ class BedrockClient:
         """Clear the cached Bedrock clients."""
         self.get_client.cache_clear()
         self.logger.info("Cleared Bedrock client cache")
-
-    def _read_streaming_body(self, streaming_body, chunk_size: int = 65536) -> bytes:
-        """
-        Read streaming body in chunks for better reliability with large responses.
-
-        Args:
-            streaming_body: botocore StreamingBody object
-            chunk_size: Size of chunks to read (default 64KB)
-
-        Returns:
-            Complete response body as bytes
-
-        Raises:
-            BedrockError: If reading fails
-        """
-        chunks = []
-        total_bytes = 0
-        chunk_count = 0
-
-        try:
-            while True:
-                chunk = streaming_body.read(chunk_size)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                total_bytes += len(chunk)
-                chunk_count += 1
-
-                if chunk_count % 10 == 0:
-                    self.logger.debug(
-                        "Read %d chunks, %d bytes so far...", chunk_count, total_bytes
-                    )
-
-            self.logger.debug(
-                "Finished reading: %d chunks, %d total bytes", chunk_count, total_bytes
-            )
-            return b"".join(chunks)
-
-        except Exception as e:
-            self.logger.error(
-                "Failed reading streaming body after %d bytes: %s", total_bytes, e
-            )
-            raise BedrockError(
-                f"Failed to read response body after {total_bytes} bytes: {e}"
-            ) from e

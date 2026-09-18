@@ -29,12 +29,23 @@ newest activity first, plus `n` to start a new one. A new id must match
 `^[a-z][a-z0-9-]{0,15}$` and must not already have state; pick it from the list instead.
 
 Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
-5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, 12 resume,
-10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), 0 exit.
+5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, `r` resume,
+10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), `m` models (prints
+the registry and which steps a registry edit requires), 0 exit.
 
-**9 vs 12** — both reach a complete deployment. Option 9 runs all eight steps and stops at
-each completed one to ask whether to re-run. Option 12 skips completed steps before calling
+**9 vs r** — both reach a complete deployment. Option 9 runs all eight steps and stops at
+each completed one to ask whether to re-run. Option `r` skips completed steps before calling
 them, so those prompts never fire, and starts at the first outstanding step.
+
+Step 2 runs two Bedrock preflights before any stack is created, both driven by the model
+registry: `preflight_model_access` checks that each `us.*` geo profile is ACTIVE from the
+deployment Region (falling back to the base-model catalog only when that lookup fails for
+an unrelated reason), and `preflight_model_invocation` sends a minimal Converse request
+(`"hi"`, 64 output tokens) to each model as the operator and judges the result by exit
+code. Either failing stops the
+deploy with the models named. The invocation preflight runs on *your* credentials, so for
+the OpenAI models the deploying principal needs `bedrock:InvokeModel` on
+`arn:aws:bedrock:{region}:{account}:project/default`, not only the Lambda role.
 
 Behaviour worth knowing:
 
@@ -54,6 +65,8 @@ Environment variables:
 | `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step. |
 | `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                           |
 | `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                              |
+| `BADGERS_ALLOW_STALE_LAYER`                      | `1` lets the Lambda stack synthesize while `lambdas/layer.zip` is older than its sources. Without it, synth refuses so a deploy cannot ship the previous layer. `deploy.sh` never needs it (step 1 rebuilds first); `destroy.sh` sets it itself, since a destroy ships nothing.     |
+| `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                            |
 | `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                  |
 | `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                              |
 
@@ -89,8 +102,17 @@ is why the compute goes first.
 - The KMS key is scheduled **only after** the stacks are confirmed gone (7 days by default,
   which frees the alias sooner than the 30-day maximum). Scheduling it after a failed
   teardown would mark a live deployment's in-use key for deletion.
+- Verification does not trust the script's own stack list: it also queries CloudFormation
+  for anything matching `BADGERS-*-{id}-{suffix}` and reports a stack it did not expect,
+  so a stack added to the app and forgotten here cannot survive under a "complete" banner.
 - A teardown leaving stacks standing prints `❌ Teardown incomplete`, lists them, states
   that the KMS key was left alone, and **exits non-zero**.
+- `cdk destroy` synthesizes the app first. The script sets `BADGERS_ALLOW_STALE_LAYER=1`
+  for that synth, because the Lambda stack's stale-layer guard is about deploys and a
+  destroy ships nothing; a teardown from a tree with an old `layer.zip` used to abort on
+  that guard with every stack still standing.
+- Bedrock model-access subscriptions are account-level and are left alone; the script says
+  so at the end rather than implying a clean account.
 
 `--vpc-cleanup-only` runs just the ENI sweep: deletes interface endpoints, then deletes
 or force-detaches whatever ENIs remain. Use it when a previous teardown left a VPC behind.
@@ -121,8 +143,13 @@ Builds and pushes a single container-based specialist image, then updates its fu
 
 ## deploy_custom_specialists.sh
 
-Syncs custom specialists from S3 and deploys the CustomSpecialists stack. That stack only
-exists when `custom_specialists/specialist_registry.json` is present.
+Deploys the CustomSpecialists stack from the **local** `custom_specialists/` tree. It does
+not touch S3: it reads `custom_specialists/specialist_registry.json`, exits cleanly with a
+warning if that file is missing or lists no specialists, resolves `DEPLOYMENT_ID` from the
+deployed stacks, then runs `cdk deploy --exclusively` on the CustomSpecialists stack. That
+stack only exists when the registry is present.
+
+This is what `POST /api/wizard/deploy` spawns, streaming its output over SSE.
 
 ## sync_s3_files.sh
 
@@ -136,16 +163,15 @@ can see them.
 
 ## scripts/generate_ui_env.sh
 
-Writes `ui/.env` from the Cognito stack outputs. Vite only exposes `VITE_`-prefixed
-variables and bakes them in at build time, so this must run after Cognito is deployed and
-before the UI image is built. `deploy.sh` step 7 calls it.
-
-## update_frontend_env.sh
-
-Writes `ui/config/.env` for local development — bucket names, the Runtime ARN, the Gateway
-ID and the jobs table name. Local convenience only: the deployed UI reads all of these
-from SSM Parameter Store. It does not write the Cognito values, which are build-time
-inputs (see `scripts/generate_ui_env.sh`).
+Writes `ui/.env`, the single UI env file, from the deployed stacks. Two kinds of value
+land in it: the `VITE_*` Cognito values, which Vite bakes into the bundle at build time
+(it only exposes `VITE_`-prefixed variables), and the local-development runtime values
+read by `ui/server/index.js` — bucket names, the Runtime ARN, the Gateway ID, the jobs
+table. Must run after Cognito is deployed and before the UI image is built; `deploy.sh`
+step 7 calls it. Operator-owned lines (`AWS_PROFILE`, `CORS_ALLOWED_ORIGIN`,
+`BADGERS_UI_ROLE`, `WS_TIMEOUT_MINUTES`) are carried over on regeneration. The deployed
+container reads the runtime values from SSM Parameter Store instead; `ui/.env` is never
+copied into the image.
 
 ## cleanup-stack.sh
 
@@ -158,3 +184,51 @@ stack is stuck.
 Sourced by the scripts above rather than executed. Provides logging, the deployment state
 file helpers, `_sn` for stack names, `resource_id` for resource names, CloudFormation
 output lookups, and the CDK wrappers.
+
+### Log-delivery preflight
+
+`preflight_log_delivery` runs in `step_gateway` and `step_runtime`. **It can stop the
+deploy, and it prompts.**
+
+A CloudWatch `DeliverySource` is unique per `(resourceArn, logType)`, not per name, so only
+one may exist for a given AgentCore resource and log type — whoever created it.
+CloudFormation creates new resources before deleting removed ones, so during an update both
+spellings exist at once, collide, and the deploy fails with *"This ResourceId has already
+been used in another Delivery Source in this account"* (`AlreadyExists`). Renaming cannot
+fix it.
+
+Two ways a foreign source gets there: enabling log delivery by hand in the console leaves
+`WdDeliverySource-*` entries, and a stack that previously used the CDK logging mixin leaves
+`cdk-<type>-source-<hash>` entries. Anything this deployment created is named
+`badgers-<deployment>-*` and is left alone.
+
+| Function                        | Behaviour                                                                                                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logs_foreign_delivery_sources` | Echoes `name<TAB>logType` per occupied slot, scoped by the exact `GatewayArn`/`RuntimeArn` this deployment publishes. Emits `!ERROR<TAB>reason` when it cannot tell. |
+| `logs_delete_delivery_source`   | Deletes the referencing delivery first, then the source — the delivery holds the reference.                                                                          |
+| `preflight_log_delivery`        | Lists what is in the way with a per-entry origin, prompts, remediates on confirmation, re-verifies, and returns non-zero if anything remains.                        |
+
+Removing a delivery source deletes **delivery configuration only** — log groups and
+everything already written to them are untouched. Log and trace delivery stops until the
+deploy finishes.
+
+It returns non-zero, stopping the deploy, both on decline and on `!ERROR`: "could not
+determine" is not "clear to proceed", and stopping costs a re-run where proceeding costs a
+failed stack update partway through.
+
+In `step_runtime` the check runs after `ecr_login` but **before** the image build, so a
+conflict does not surface after several minutes of building.
+
+Required IAM: `logs:DescribeDeliverySources` to check, plus `logs:DescribeDeliveries`,
+`logs:DeleteDelivery`, and `logs:DeleteDeliverySource` to remediate. Missing permission
+takes the `!ERROR` path and is a hard stop.
+
+> [!IMPORTANT]
+> `BADGERS_ASSUME_YES=1` answers this prompt too (`_confirm` returns yes without reading
+> stdin), so **it deletes the conflicting delivery sources without asking.** That is the
+> intended behaviour for the UI's Deploy All button, but it means an unattended run
+> remediates silently. Use `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1` instead if the sources
+> must be preserved — the deploy will then fail on `AlreadyExists`.
+>
+> An unattended invocation that sets neither will block on the prompt. The `!ERROR` path
+> stops the deploy regardless of `BADGERS_ASSUME_YES`, since it returns before prompting.

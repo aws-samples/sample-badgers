@@ -41,18 +41,17 @@
             "decision_tree_tasks.xml",
             "decision_tree_format.xml",
             "decision_tree_help.xml",
-            "decision_tree_verification.xml",
-            "decision_tree_notes.xml"
+            "decision_tree_verification.xml"
         ],
         "examples_path": "prompts",
         "max_examples": 3,
         "analysis_text": "clinical decision tree",
         "expected_output_tokens": 2500,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "primary": "us.anthropic.claude-sonnet-4-6",
             "fallback_list": [
-                "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                "us.amazon.nova-premier-v1:0"
+                "us.openai.gpt-5.6-terra",
+                "us.amazon.nova-2-lite-v1:0"
             ]
         },
         "output_extension": "xml"

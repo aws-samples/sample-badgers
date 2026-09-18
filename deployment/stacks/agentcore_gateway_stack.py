@@ -4,17 +4,26 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     Fn,
+    RemovalPolicy,
     Tags,
     aws_lambda as lambda_,
     aws_iam as iam,
+    aws_logs as logs,
     aws_s3 as s3,
 )
 from constructs import Construct
 
-try:
-    import aws_cdk.aws_bedrock_agentcore_alpha as agentcore
-except ImportError:
-    import aws_cdk_aws_bedrock_agentcore_alpha as agentcore
+from .log_delivery import (
+    deliver_to_log_group,
+    deliver_traces_to_xray,
+    shared_delivery_policy,
+)
+from .nag_arn_renderings import account_renderings, region_renderings
+
+# The Gateway L2s graduated from @aws-cdk/aws-bedrock-agentcore-alpha into aws-cdk-lib.
+# Same class names and keyword parameters for everything this stack uses; the alpha
+# package is deprecated wholesale and emitted 27 warnings per synth.
+from aws_cdk import aws_bedrockagentcore as agentcore
 
 try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
     from cdk_nag import NagSuppressions
@@ -25,7 +34,12 @@ except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
 
 
 class AgentCoreGatewayStack(Stack):
-    """Stack for AgentCore Gateway with Lambda tool targets and logging."""
+    """Stack for AgentCore Gateway with Lambda tool targets, logs and traces.
+
+    Also owns the deployment's single CloudWatch Logs delivery resource policy
+    (see log_delivery), which the Runtime stack's deliveries rely on. Every stack
+    that delivers logs already depends on this one.
+    """
 
     def __init__(
         self,
@@ -59,6 +73,10 @@ class AgentCoreGatewayStack(Stack):
 
         # Add Lambda targets
         self.add_lambda_targets()
+
+        # Observability. Owns the deployment's single log-delivery resource policy
+        # because every other stack that delivers logs already depends on this one.
+        self.create_log_delivery()
 
         # Apply resource-specific tags
         self._apply_resource_tags(
@@ -148,18 +166,17 @@ class AgentCoreGatewayStack(Stack):
                         "specific specialist Lambdas -- the wildcard covers only the "
                         "version qualifier."
                     ),
+                    # Derived from the functions actually granted, not transcribed. The
+                    # hand-written list held 11 entries and never gained
+                    # html_report_specialist when that specialist was added, so its
+                    # finding sat unsuppressed. cdk-nag renders an Fn::GetAtt as
+                    # `<LogicalId.Arn>`, and the logical ID carries a CDK-computed hash
+                    # that cannot be spelled from the specialist name -- so ask the
+                    # producing stack for it rather than guessing.
                     "appliesTo": [
-                        "Resource::<ContainerFunctionimageenhancer2AFB4983.Arn>:*",
-                        "Resource::<ContainerFunctionremediationspecialistB67CD8CB.Arn>:*",
-                        "Resource::<FunctionchartsspecialistA6AA9F82.Arn>:*",
-                        "Resource::<FunctionclassifypdfcontentEC92FE26.Arn>:*",
-                        "Resource::<FunctioncorrelationspecialistE250ACCF.Arn>:*",
-                        "Resource::<FunctiondiagramspecialistB1D3C809.Arn>:*",
-                        "Resource::<Functionelementsspecialist2A88D0C1.Arn>:*",
-                        "Resource::<FunctionfulltextspecialistB95E9182.Arn>:*",
-                        "Resource::<Functionpdftoimagesconverter2E10A5D5.Arn>:*",
-                        "Resource::<FunctionscientificspecialistCB1826B1.Arn>:*",
-                        "Resource::<Functiontablespecialist6D08F0B2.Arn>:*",
+                        f"Resource::<{Stack.of(fn).get_logical_id(fn.node.default_child)}"
+                        f".Arn>:*"
+                        for fn in self.lambda_functions.values()
                     ],
                 },
                 {
@@ -172,6 +189,38 @@ class AgentCoreGatewayStack(Stack):
                     ),
                     "appliesTo": [
                         "Resource::<ConfigBucket2112C5EC.Arn>/*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Action wildcards emitted by Bucket.grant_read, a CDK L2 grant "
+                        "rather than hand-written policy. Each expands to a fixed set of "
+                        "same-family read actions, scoped to the config bucket the Gateway "
+                        "reads tool schemas from. These were previously unsuppressed."
+                    ),
+                    "appliesTo": [
+                        "Action::s3:GetBucket*",
+                        "Action::s3:GetObject*",
+                        "Action::s3:List*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "lambda:InvokeFunction on function:badgers_* in this account and "
+                        "Region. The name-prefix wildcard is deliberate: the grant must "
+                        "exist before the Gateway creates its targets, target creation "
+                        "happens in the same deploy, and the CustomSpecialists stack adds "
+                        "further targets against this role in a later deploy, so the full "
+                        "set of function ARNs is not knowable here. Every specialist "
+                        "function, base and custom, is named badgers_<specialist>. Region "
+                        "and account are pinned."
+                    ),
+                    "appliesTo": [
+                        f"Resource::arn:aws:lambda:{region}:{account}:function:badgers_*"
+                        for region in region_renderings(self.region)
+                        for account in account_renderings(self.account)
                     ],
                 },
             ],
@@ -188,41 +237,33 @@ class AgentCoreGatewayStack(Stack):
             description="Execution role for AgentCore Gateway",
         )
 
-        # Lambda invoke permissions - wildcard for all badgers functions
-        # This ensures permission exists BEFORE targets are created (no race condition)
-        # Individual grant_invoke() calls in add_lambda_targets() are redundant but harmless
+        # Lambda invoke permission, by name prefix, so it exists BEFORE targets are created
+        # -- target creation and the per-function grant_invoke() calls in
+        # add_lambda_targets() land in the same deploy, and the CustomSpecialists stack
+        # adds its own targets against this role later. Region and account are pinned;
+        # only the function-name suffix is wildcarded. The name prefix `badgers_` is what
+        # every specialist function is named with, base and custom alike.
         role.add_to_policy(
             iam.PolicyStatement(
+                sid="InvokeSpecialistsByPrefix",
                 actions=["lambda:InvokeFunction"],
-                resources=["arn:aws:lambda:*:*:function:badgers_*"],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account}:function:badgers_*"
+                ],
             )
         )
 
         # S3 read for schemas
         self.config_bucket.grant_read(role)
 
-        # CloudWatch logging permissions
-        role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                ],
-                resources=["*"],
-            )
-        )
-
-        # X-Ray tracing permissions
-        role.add_to_policy(
-            iam.PolicyStatement(
-                actions=[
-                    "xray:PutTraceSegments",
-                    "xray:PutTelemetryRecords",
-                ],
-                resources=["*"],
-            )
-        )
+        # No CloudWatch Logs or X-Ray statements. Both used to be here on Resource "*",
+        # and neither had a caller: the Gateway's logs and traces are *vended* --
+        # add_gateway_logging() creates a CloudWatch Logs resource policy for
+        # delivery.logs.amazonaws.com and delivery sources/destinations, and that service
+        # principal writes the data. The execution role never calls PutLogEvents or
+        # PutTraceSegments. The AgentCore Gateway permissions guide lists only the trust
+        # policy, lambda:InvokeFunction on each target, and S3 read for schemas.
+        # https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-prerequisites-permissions.html
 
         return role
 
@@ -256,6 +297,61 @@ class AgentCoreGatewayStack(Stack):
         )
 
         return gateway
+
+    def create_log_delivery(self) -> None:
+        """Deliver Gateway application logs to CloudWatch and traces to X-Ray.
+
+        Without this the Gateway emits nothing: the stack previously granted the
+        IAM permissions to write logs and claimed "full observability" in the
+        Gateway description, but never configured a delivery, so the console
+        showed "Log delivery (0)" and "Tracing: Not enabled". A Gateway that
+        accepts an MCP request and never answers left no trace anywhere.
+
+        Uses the L1 delivery chain rather than CfnGatewayLogsMixin so the grant can
+        be the deployment-wide policy created here instead of a second stack
+        singleton — see log_delivery for why that quota matters.
+
+        Identity (workload identity directory) logs are deliberately absent. The
+        directory is named "default" and appears to be account-and-region scoped
+        rather than per-deployment, so creating that delivery here would have every
+        deployment in the account contend for the same one. It needs to be owned
+        outside the per-deployment stacks, or gated so exactly one deployment owns
+        it, and that scoping is unconfirmed.
+        """
+        self.log_delivery_policy = shared_delivery_policy(
+            self,
+            "BadgersLogDeliveryPolicy",
+            self.deployment_id,
+        )
+
+        self.gateway_log_group = logs.LogGroup(
+            self,
+            "GatewayAppLogs",
+            log_group_name=f"/aws/bedrock-agentcore/gateways/{self.deployment_id}/app",
+            retention=logs.RetentionDays.TWO_YEARS,
+            removal_policy=RemovalPolicy.RETAIN,
+        )
+
+        app_logs = deliver_to_log_group(
+            self,
+            "GatewayApplicationLogs",
+            deployment_id=self.deployment_id,
+            source_resource_arn=self.gateway.gateway_arn,
+            log_type="APPLICATION_LOGS",
+            log_group=self.gateway_log_group,
+        )
+        # The grant has to exist before the delivery that relies on it.
+        app_logs.node.add_dependency(self.log_delivery_policy)
+
+        # Free of the resource-policy quota: the destination is X-Ray, not a log
+        # group. This is the signal that shows whether the Gateway received an MCP
+        # request and dropped it.
+        deliver_traces_to_xray(
+            self,
+            "GatewayTraces",
+            deployment_id=self.deployment_id,
+            source_resource_arn=self.gateway.gateway_arn,
+        )
 
     def add_lambda_targets(self) -> None:
         """Add all Lambda functions as gateway targets."""

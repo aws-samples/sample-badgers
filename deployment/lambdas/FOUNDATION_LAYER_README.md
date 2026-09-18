@@ -27,6 +27,8 @@ layer/python/
 ├── botocore/                      # ☁️ AWS core library
 ├── PIL/                           # 🖼️ Pillow image processing
 ├── pdf2image/                     # 📄 PDF to image conversion
+├── numpy/                         # 🔢 Array operations
+├── defusedxml/                    # 🛡️ Hardened XML parsing
 └── [other dependencies]
 ```
 
@@ -194,15 +196,22 @@ New specialists require only:
 
 ## 📚 Dependencies Included
 
-| Package         | Version | Purpose                             |
-| --------------- | ------- | ----------------------------------- |
-| boto3           | 1.42.5  | ☁️ AWS SDK for Bedrock, S3           |
-| botocore        | 1.42.5  | ☁️ AWS core functionality            |
-| pillow          | 12.0.0  | 🖼️ Image processing and optimization |
-| pdf2image       | 1.17.0  | 📄 PDF to image conversion           |
-| jmespath        | 1.0.1   | 🔍 JSON query (boto3 dependency)     |
-| urllib3         | 2.6.1   | 🌐 HTTP client (boto3 dependency)    |
-| python-dateutil | 2.9.0   | 📅 Date utilities                    |
+Declared in `lambdas/requirements.txt` with floors; the versions below are what a build on
+2026-09-16 resolved. `pip` pulls the current release at build time, so expect newer.
+
+| Package         | Version     | Purpose                                                           |
+| --------------- | ----------- | ----------------------------------------------------------------- |
+| boto3           | 1.43.96     | ☁️ AWS SDK for Bedrock, S3                                         |
+| botocore        | 1.43.96     | ☁️ AWS core functionality                                          |
+| pillow          | 12.3.0      | 🖼️ Image processing and optimization                               |
+| pdf2image       | 1.17.0      | 📄 PDF to image conversion                                         |
+| numpy           | 2.5.3       | 🔢 Array operations in `specialist_foundation`                     |
+| defusedxml      | 0.7.1       | 🛡️ Hardened XML parsing (`html_report_specialist` correlation XML) |
+| jmespath        | 1.1.0       | 🔍 JSON query (boto3 dependency)                                   |
+| urllib3         | 2.8.0       | 🌐 HTTP client (boto3 dependency)                                  |
+| s3transfer      | 0.19.2      | 📤 Managed S3 transfers (boto3 dependency)                         |
+| python-dateutil | 2.9.0.post0 | 📅 Date parsing (botocore dependency)                              |
+| six             | 1.17.0      | 🔧 Compatibility shim (python-dateutil dependency)                 |
 
 ---
 

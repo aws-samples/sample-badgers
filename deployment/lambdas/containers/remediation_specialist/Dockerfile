@@ -23,6 +23,12 @@ COPY utils/ ${LAMBDA_TASK_ROOT}/utils/
 # ./layer/python/foundation before docker build.
 COPY foundation/ ${LAMBDA_TASK_ROOT}/foundation/
 
+# foundation/__init__.py eagerly imports specialist_foundation, which resolves
+# SPECIALIST_CONFIG_PATH from config.config at module import time. Even though
+# this container reads no specialist manifests, omitting config produces
+# "Runtime.ImportModuleError: No module named 'config'" at cold start.
+COPY config/ ${LAMBDA_TASK_ROOT}/config/
+
 # Copy the Lambda handler
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
 

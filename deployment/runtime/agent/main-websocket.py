@@ -34,10 +34,17 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 # build_and_push_websocket.sh (the same way build_container_lambdas.sh supplies it
 # to the container Lambdas). Guarded so the agent still imports outside that build
 # — job tracking then degrades to a no-op rather than breaking the runtime.
+#
+# The reason is retained and logged rather than assumed. A missing directory and a
+# missing transitive dependency both land here, and reporting only the first sent
+# an investigation to the build script when the actual cause was foundation's
+# package __init__ importing Pillow, which this image does not install.
+_JOB_STATE_IMPORT_ERROR: str = ""
 try:
     from foundation import job_state
-except ImportError:  # pragma: no cover - foundation is present in the container
+except ImportError as e:  # pragma: no cover - foundation is present in the container
     job_state = None  # type: ignore[assignment]
+    _JOB_STATE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -251,19 +258,68 @@ DEFAULT_MODEL_CONFIG = {
     "temperature": 1.0,
     "max_tokens": 16000,
     "thinking": {"type": "adaptive"},
-    "fallback_models": [
-        {
-            "model_id": "us.anthropic.claude-opus-4-5-20251101-v1:0",
-            "thinking": {"type": "enabled", "budget_tokens": 8192},
-        },
-        {
-            "model_id": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-            "thinking": {"type": "enabled", "budget_tokens": 8192},
-        },
-    ],
+    "effort": "high",
 }
 
+# There is deliberately no "fallback_models" key. One used to be defined here and was read
+# by nothing — the string appeared exactly once in the whole repo, at its own definition —
+# so it advertised resilience the agent does not have. Its two entries also named models
+# being retired, which made it look like something that needed updating rather than
+# deleting.
+#
+# The agent is not without protection: Strands retries ModelThrottledException with
+# exponential backoff (6 attempts, 4s doubling to 240s, reset after each success), which
+# covers the dominant transient failure. What it has no answer for is a non-retryable error
+# — AccessDenied, ValidationException, a model reaching EOL — where a different model would
+# be the only escape. The chosen fix for that is resumable runs rather than a fallback
+# model, because resume also covers retry-budget exhaustion and avoids swapping models
+# mid-conversation through accumulated thinking blocks and tool results. Tracked separately;
+# do not reintroduce a fallback list here without that decision being revisited.
+
 DEFAULT_SYSTEM_PROMPT = """You are an intelligent BADGERS assistant with access to specialized tools via AgentCore Gateway."""
+
+# Effort levels Claude accepts. "xhigh" and "max" exist but only on specific Opus models,
+# and an unsupported value is an error rather than a downgrade, so they are not offered.
+VALID_EFFORT = ("low", "medium", "high")
+
+
+def _build_additional_request_fields(model_config: dict[str, Any]) -> dict[str, Any]:
+    """Build BedrockModel's additional_request_fields from the agent's model config.
+
+    This previously forwarded only ``{"thinking": ...}``, so the ``effort`` and
+    ``adaptive_thinking`` keys declared in agent_config/agent_model_config.json were read by
+    nothing. The value happened to match the model's default, which is why it went unnoticed
+    — anyone lowering effort to trim cost would have seen no change and no error.
+
+    ``effort`` must travel in its own ``output_config`` object. Putting it inside
+    ``thinking`` raises a ValidationException, so the two are siblings here, not nested.
+    """
+    thinking = model_config.get("thinking") or {}
+    fields: dict[str, Any] = {}
+
+    if thinking:
+        fields["thinking"] = thinking
+
+    # effort only means anything when the model is actually thinking. "adaptive_thinking" is
+    # accepted as an alias for thinking.type == "adaptive", since the config file carries
+    # both spellings.
+    is_adaptive = thinking.get("type") == "adaptive" or bool(
+        model_config.get("adaptive_thinking")
+    )
+    if is_adaptive and not thinking:
+        fields["thinking"] = {"type": "adaptive"}
+
+    effort = model_config.get("effort")
+    if effort and (is_adaptive or thinking):
+        if effort not in VALID_EFFORT:
+            log(
+                f"Ignoring invalid effort {effort!r}; expected one of {VALID_EFFORT}",
+                level="warning",
+            )
+        else:
+            fields["output_config"] = {"effort": effort}
+
+    return fields
 
 
 # =============================================================================
@@ -302,17 +358,27 @@ class JobTrackingHook:
     # about, since nothing else in the request path changes when it happens.
     _warned_unavailable = False
 
-    def __init__(self, *, doc_id: str = "", session_id: str = "") -> None:
+    def __init__(
+        self,
+        *,
+        doc_id: str = "",
+        session_id: str = "",
+        actor_id: str = "local",
+        user_name: str = "local",
+    ) -> None:
         self.doc_id = doc_id
         self.session_id = session_id
+        self.actor_id = actor_id
+        self.user_name = user_name
         self.job_id = ""
 
         if job_state is None and not JobTrackingHook._warned_unavailable:
             JobTrackingHook._warned_unavailable = True
             log(
-                "foundation.job_state is not importable — job tracking is DISABLED. "
-                "The build did not copy deployment/badgers-foundation/foundation "
-                "into the container context.",
+                "foundation.job_state is not importable — job tracking is DISABLED, "
+                "so no job_id is minted and specialists that require it (such as "
+                "html_report_specialist) will fail. Cause: "
+                f"{_JOB_STATE_IMPORT_ERROR or 'unknown'}",
                 level="warning",
             )
 
@@ -328,20 +394,20 @@ class JobTrackingHook:
         self.job_id = ""
 
     @staticmethod
-    def _declares_job_id(tool: Any) -> bool:
-        """True when the tool's input schema accepts a ``job_id`` parameter."""
+    def _declared_properties(tool: Any) -> dict[str, Any]:
+        """Return declared input properties for Gateway or native tool schemas."""
         try:
             schema = tool.tool_spec.get("inputSchema") or {}
         except Exception:  # tool_spec is a property and may raise
-            return False
-        # Gateway/MCP tool specs nest the JSON Schema under a "json" key; accept
-        # either shape so this keeps working for natively defined tools.
-        properties = (schema.get("json") or schema).get("properties") or {}
-        return "job_id" in properties
+            return {}
+        return (schema.get("json") or schema).get("properties") or {}
 
     def _on_before_tool_call(self, event: Any) -> None:
-        """Stamp job_id/doc_id into the tool input, minting the job if needed."""
-        if job_state is None or not self._declares_job_id(event.selected_tool):
+        """Stamp job, document, and verified user identity into tool input."""
+        if job_state is None:
+            return
+        properties = self._declared_properties(event.selected_tool)
+        if "job_id" not in properties:
             return
 
         tool_name = event.tool_use.get("name", "unknown")
@@ -359,6 +425,8 @@ class JobTrackingHook:
                 doc_id=self.doc_id,
                 session_id=self.session_id,
                 reason=f"first specialist tool call: {tool_name}",
+                owner_sub=self.actor_id,
+                user_name=self.user_name,
             )
 
         # The executor reads tool_use back off the event after callbacks run, so
@@ -367,6 +435,10 @@ class JobTrackingHook:
         tool_input["job_id"] = self.job_id
         if self.doc_id:
             tool_input["doc_id"] = self.doc_id
+        if "user_id" in properties:
+            tool_input["user_id"] = self.actor_id
+        if "user_name" in properties:
+            tool_input["user_name"] = self.user_name
 
 
 def load_config_from_s3() -> tuple[str, dict[str, Any]]:
@@ -477,6 +549,7 @@ async def stream_agent_events(
     query: str,
     session_id: str,
     actor_id: str,
+    user_name: str,
     runtime_session_id: str,
     doc_id: str = "",
 ) -> AsyncIterator[dict[str, Any]]:
@@ -509,7 +582,7 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
         region_name=os.environ.get("AWS_REGION", "us-west-2"),
         temperature=model_config.get("temperature", 1.0),
         max_tokens=model_config.get("max_tokens", 8000),
-        additional_request_fields={"thinking": model_config.get("thinking", {})},
+        additional_request_fields=_build_additional_request_fields(model_config),
     )
 
     mcp_client = MCPClient(lambda: create_mcp_transport(gateway_url, access_token))
@@ -546,7 +619,12 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
 
         # Mints job_id on the first specialist tool call and stamps job_id/doc_id
         # into the tool input for every specialist invocation in this turn.
-        job_hook = JobTrackingHook(doc_id=doc_id, session_id=session_id)
+        job_hook = JobTrackingHook(
+            doc_id=doc_id,
+            session_id=session_id,
+            actor_id=actor_id,
+            user_name=user_name,
+        )
 
         # Create agent
         agent = Agent(
@@ -714,6 +792,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
     query = "Hello!"
     session_id = f"session_{uuid.uuid4().hex}"
     actor_id = "default_user"
+    user_name = "local"
 
     doc_id = ""
 
@@ -721,6 +800,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
         query = str(payload.get("prompt", "Hello!"))
         session_id = str(payload.get("session_id") or f"session_{uuid.uuid4().hex}")
         actor_id = str(payload.get("actor_id", "default_user"))
+        user_name = str(payload.get("user_name", "local"))
         # Top level of the job hierarchy, minted by the UI server at upload time.
         doc_id = str(payload.get("doc_id") or "")
 
@@ -745,6 +825,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 query=query,
                 session_id=session_id,
                 actor_id=actor_id,
+                user_name=user_name,
                 runtime_session_id=runtime_session_id,
                 doc_id=doc_id,
             ):
@@ -786,6 +867,7 @@ async def websocket_handler(websocket, context) -> None:
             query = data.get("prompt", "Hello!")
             session_id = data.get("session_id") or f"session_{uuid.uuid4().hex}"
             actor_id = data.get("actor_id", "default_user")
+            user_name = data.get("user_name", "local")
             runtime_session_id = context.session_id or f"ws-{uuid.uuid4().hex}"
             # Top level of the job hierarchy, minted by the UI server at upload time.
             doc_id = str(data.get("doc_id") or "")
@@ -820,6 +902,7 @@ async def websocket_handler(websocket, context) -> None:
                         query=query,
                         session_id=session_id,
                         actor_id=actor_id,
+                        user_name=user_name,
                         runtime_session_id=runtime_session_id,
                         doc_id=doc_id,
                     ):

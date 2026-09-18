@@ -13,6 +13,7 @@ This directory contains all configuration, prompts, schemas, and manifests that 
 s3_files/
 ├── agent_config/          # 🤖 Agent orchestrator configuration
 ├── agent_system_prompt/   # 💬 System prompt for the orchestrating agent
+├── config/                # 🗂️ Runtime config: model_registry.json, document_type_contexts.json
 ├── core_system_prompts/   # 🔧 Shared prompt components (rules, error handling, wrapper)
 ├── manifests/             # 📋 Tool and specialist configuration manifests
 ├── prompts/               # 📝 Specialist-specific prompt files
@@ -26,10 +27,10 @@ s3_files/
 
 Contains configuration for the orchestrating agent that coordinates PDF analysis workflows.
 
-| File                                      | Purpose                                                                                                    |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `agent_model_config.json`                 | Model selection (Claude Sonnet 4.5), temperature, max tokens, and thinking budget configuration            |
-| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below. |
+| File                                      | Purpose                                                                                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_model_config.json`                 | Model selection (Claude Opus 4.6), temperature, max tokens, and adaptive-thinking `effort`. Read by `main-websocket.py`, which forwards `thinking` and `output_config.effort` to Bedrock as siblings — not nested |
+| `agent_operating_environment_config.json` | ⚠️ **Critical** — Operating environment context injected into all prompts (agent + specialists). See below.                                                                                                        |
 
 ### ⚠️ Operating Environment Configuration
 
@@ -68,9 +69,21 @@ If the file is missing or the value is empty, the system operates without any en
 
 ## 💬 agent_system_prompt/
 
-| File                      | Purpose                                                                                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `agent_system_prompt.xml` | Defines the orchestrator agent's role, execution rules, workflow steps, error handling, and tool mapping examples. Contains `{{TOOLS_LIST}}` placeholder populated at runtime. |
+| File                      | Purpose                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_system_prompt.xml` | Defines the orchestrator agent's role, execution rules, workflow steps, the content-type → tool routing table, and error handling. Read from S3 by the runtime at the start of every session. It contains no tool list: the agent receives its tools as MCP tool definitions from the Gateway, not through the prompt. |
+
+---
+
+## 🗂️ config/
+
+Runtime configuration read from S3 by the UI server and the Lambdas. `deploy.sh` step 3
+option 6 syncs this directory on its own; option 7 syncs everything.
+
+| File                          | Purpose                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_registry.json`         | The single source of truth for the model set: ID, display name, provider, transport, thinking mode, prices, status. Read by the CDK app at synth (profiles, IAM grants, SSM map, cdk-nag suppressions) and by `GET /api/models` in the UI server at runtime, joined against the SSM profile map so the wizard and pricing calculator only offer models this deployment provisioned. |
+| `document_type_contexts.json` | Per-document-type guidance the image enhancer injects into its prompt. Cached in a module global for the life of a warm Lambda container, so an edit takes effect on the next cold start.                                                                                                                                                                                           |
 
 ---
 
@@ -103,23 +116,23 @@ The wrapper uses placeholder injection:
 
 JSON configuration files defining each specialist tool's metadata, model selection, prompt files, and runtime settings.
 
-| Manifest                          | Specialist Purpose                           |
-| --------------------------------- | -------------------------------------------- |
-| 📄 `full_text_specialist.json`     | General text extraction with reading order   |
-| 📊 `table_specialist.json`         | Structured table data extraction             |
-| 📈 `charts_specialist.json`        | Chart and graph data extraction              |
-| 🔀 `diagram_specialist.json`       | Flowchart and diagram interpretation         |
-| ✍️ `handwriting_specialist.json`   | Handwritten text OCR                         |
-| 🏥 `decision_tree_specialist.json` | Clinical decision trees and medical content  |
-| 💻 `code_block_specialist.json`    | Source code extraction                       |
-| 📐 `layout_specialist.json`        | Page layout structure analysis               |
-| 🧩 `elements_specialist.json`      | Document element identification              |
-| 🏷️ `metadata_*_specialist.json`    | MODS/MADS/Generic metadata extraction        |
-| 🗺️ `war_map_specialist.json`       | Historical military map analysis             |
-| 🔬 `scientific_specialist.json`    | Scientific notation and formulas             |
-| 🏷️ `classify_pdf_content.json`     | Page content classification                  |
-| 🖼️ `pdf_processor.json`            | PDF-to-image conversion orchestration        |
-| 🔗 `correlation_specialist.json`   | Multi-specialist result correlation per page |
+| Manifest                             | Specialist Purpose                            |
+| ------------------------------------ | --------------------------------------------- |
+| 📄 `full_text_specialist.json`        | General text extraction with reading order    |
+| 📊 `table_specialist.json`            | Structured table data extraction              |
+| 📈 `charts_specialist.json`           | Chart and graph data extraction               |
+| 🔀 `diagram_specialist.json`          | Flowchart and diagram interpretation          |
+| ✍️ `handwriting_specialist.json`      | Handwritten text OCR                          |
+| 🔢 `handwriting_math_specialist.json` | Handwritten mathematical notation and working |
+| 🏥 `decision_tree_specialist.json`    | Clinical decision trees and medical content   |
+| 💻 `code_block_specialist.json`       | Source code extraction                        |
+| 📐 `layout_specialist.json`           | Page layout structure analysis                |
+| 🧩 `elements_specialist.json`         | Document element identification               |
+| 🏷️ `metadata_*_specialist.json`       | MODS/MADS/Generic metadata extraction         |
+| 🗺️ `war_map_specialist.json`          | Historical military map analysis              |
+| 🔬 `scientific_specialist.json`       | Scientific notation and formulas              |
+| 🏷️ `classify_pdf_content.json`        | Page content classification                   |
+| 🔗 `correlation_specialist.json`      | Multi-specialist result correlation per page  |
 
 Each manifest contains:
 - `tool`: MCP tool definition (name, description, inputSchema including `audit_mode` boolean)
@@ -169,7 +182,7 @@ Used by the MCP server for request validation and by clients for understanding t
 
 ### Job tracking parameters
 
-All 26 schemas declare `job_id` and `doc_id` alongside `session_id`:
+All 27 schemas declare `job_id` and `doc_id` alongside `session_id`:
 
 ```json
 "job_id": {

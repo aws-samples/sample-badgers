@@ -134,7 +134,16 @@ validate_specialist() {
 
     [ ! -f "$SCRIPT_DIR/s3_files/manifests/${name}.json" ] && missing+=("manifest")
     [ ! -f "$SCRIPT_DIR/s3_files/schemas/${name}.json" ] && missing+=("schema")
-    [ ! -d "$SCRIPT_DIR/s3_files/prompts/${name}" ] && missing+=("prompts")
+    if [ -f "$SCRIPT_DIR/s3_files/manifests/${name}.json" ] && \
+       python3 - "$SCRIPT_DIR/s3_files/manifests/${name}.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    manifest = json.load(f)
+raise SystemExit(0 if manifest.get("specialist", {}).get("prompt_files") else 1)
+PY
+    then
+        [ ! -d "$SCRIPT_DIR/s3_files/prompts/${name}" ] && missing+=("prompts")
+    fi
     [ ! -f "$SCRIPT_DIR/lambdas/code/${name}/lambda_handler.py" ] && missing+=("lambda_handler.py")
 
     if [ ${#missing[@]} -gt 0 ]; then
@@ -198,7 +207,9 @@ deploy_specialist() {
         --exclude "*" --include "${name}.json" --quiet
     aws s3 sync "$SCRIPT_DIR/s3_files/schemas/" "s3://$CONFIG_BUCKET/schemas/" \
         --exclude "*" --include "${name}.json" --quiet
-    aws s3 sync "$SCRIPT_DIR/s3_files/prompts/${name}/" "s3://$CONFIG_BUCKET/prompts/${name}/" --quiet
+    if [ -d "$SCRIPT_DIR/s3_files/prompts/${name}" ]; then
+        aws s3 sync "$SCRIPT_DIR/s3_files/prompts/${name}/" "s3://$CONFIG_BUCKET/prompts/${name}/" --quiet
+    fi
     aws s3 sync "$SCRIPT_DIR/s3_files/prompts/shared/" "s3://$CONFIG_BUCKET/prompts/shared/" --quiet
     log_success "S3 files uploaded to s3://$CONFIG_BUCKET"
 

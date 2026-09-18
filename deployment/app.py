@@ -155,7 +155,7 @@ iam_stack = IAMStack(
     env=env,
     description="IAM roles for BADGERS",
 )
-iam_stack.add_dependency(dynamodb_stack)
+iam_stack.add_stack_dependency(dynamodb_stack)
 
 # ECR repository for AgentCore Runtime container (and container Lambdas)
 ecr_stack = AgentCoreECRStack(
@@ -211,9 +211,9 @@ lambda_stack = LambdaSpecialistStack(
     env=env,
     description="Lambda specialists for BADGERS",
 )
-lambda_stack.add_dependency(ecr_stack)
-lambda_stack.add_dependency(inference_profiles_stack)
-lambda_stack.add_dependency(dynamodb_stack)
+lambda_stack.add_stack_dependency(ecr_stack)
+lambda_stack.add_stack_dependency(inference_profiles_stack)
+lambda_stack.add_stack_dependency(dynamodb_stack)
 
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
 #
@@ -253,8 +253,8 @@ gateway_stack = AgentCoreGatewayStack(
     env=env,
     description="AgentCore Gateway with Lambda tool targets",
 )
-gateway_stack.add_dependency(lambda_stack)
-gateway_stack.add_dependency(cognito_stack)
+gateway_stack.add_stack_dependency(lambda_stack)
+gateway_stack.add_stack_dependency(cognito_stack)
 
 # AgentCore Memory for session persistence
 memory_stack = AgentCoreMemoryStack(
@@ -283,23 +283,27 @@ runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
     s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
     inference_profiles_stack=inference_profiles_stack,
     jobs_table=dynamodb_stack.jobs_table,
-    image_tag="websocket",
+    # Set by common.sh export_cdk_env from the same value the build step tagged.
+    # This has to vary per build: AgentCore runtime versions are immutable and
+    # CfnRuntime only cuts a new one when container_uri changes, so a hardcoded
+    # tag here meant a rebuilt image was pushed but never actually served.
+    image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
     env=env,
     description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
 )
-runtime_websocket_stack.add_dependency(ecr_stack)
-runtime_websocket_stack.add_dependency(gateway_stack)
-runtime_websocket_stack.add_dependency(cognito_stack)
-runtime_websocket_stack.add_dependency(memory_stack)
-runtime_websocket_stack.add_dependency(inference_profiles_stack)
+runtime_websocket_stack.add_stack_dependency(ecr_stack)
+runtime_websocket_stack.add_stack_dependency(gateway_stack)
+runtime_websocket_stack.add_stack_dependency(cognito_stack)
+runtime_websocket_stack.add_stack_dependency(memory_stack)
+runtime_websocket_stack.add_stack_dependency(inference_profiles_stack)
 if xray_stack is not None:
-    runtime_websocket_stack.add_dependency(xray_stack)
-runtime_websocket_stack.add_dependency(dynamodb_stack)
+    runtime_websocket_stack.add_stack_dependency(xray_stack)
+runtime_websocket_stack.add_stack_dependency(dynamodb_stack)
 
 # Add dependencies
-iam_stack.add_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
-lambda_stack.add_dependency(iam_stack)  # Lambda needs IAM role
-lambda_stack.add_dependency(s3_stack)  # Lambda needs S3 bucket names
+iam_stack.add_stack_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
+lambda_stack.add_stack_dependency(iam_stack)  # Lambda needs IAM role
+lambda_stack.add_stack_dependency(s3_stack)  # Lambda needs S3 bucket names
 
 # Note: Gateway authentication with Cognito is configured separately
 # The Gateway stack creates the MCP endpoint
@@ -322,21 +326,6 @@ if custom_specialists_registry.exists():
         gateway_id=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayId"),
         gateway_role_arn=cdk.Fn.import_value(f"{_sn('Gateway')}-GatewayRoleArn"),
         kms_key_arn=cdk.Fn.import_value(f"{_sn('S3')}-S3KmsKeyArn"),
-        claude_sonnet_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeSonnetProfileArn"
-        ),
-        claude_haiku_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeHaikuProfileArn"
-        ),
-        nova_premier_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-NovaPremierProfileArn"
-        ),
-        claude_opus_46_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeOpus46ProfileArn"
-        ),
-        claude_opus_45_profile_arn=cdk.Fn.import_value(
-            f"{_sn('InferenceProfiles')}-ClaudeOpus45ProfileArn"
-        ),
         env=env,
         description="Custom specialists created via the wizard UI",
     )
@@ -380,18 +369,22 @@ ecs_stack = ECSStack(
     ecr_repository_uri=ecr_stack.repository.repository_uri,
     agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
     agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
+    # The Create Specialist wizard calls Bedrock from the UI container; the task role's
+    # grant for that one model is generated from the registry, like every other grant.
+    inference_profiles_stack=inference_profiles_stack,
     stack_suffix=STACK_SUFFIX,
     image_tag="frontend",
     env=env,
     description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
 )
-ecs_stack.add_dependency(vpc_stack)
-ecs_stack.add_dependency(cognito_stack)
-ecs_stack.add_dependency(ecr_stack)
-ecs_stack.add_dependency(s3_stack)
-ecs_stack.add_dependency(dynamodb_stack)
-ecs_stack.add_dependency(gateway_stack)
-ecs_stack.add_dependency(runtime_websocket_stack)
+ecs_stack.add_stack_dependency(vpc_stack)
+ecs_stack.add_stack_dependency(cognito_stack)
+ecs_stack.add_stack_dependency(ecr_stack)
+ecs_stack.add_stack_dependency(s3_stack)
+ecs_stack.add_stack_dependency(dynamodb_stack)
+ecs_stack.add_stack_dependency(gateway_stack)
+ecs_stack.add_stack_dependency(runtime_websocket_stack)
+ecs_stack.add_stack_dependency(inference_profiles_stack)
 
 # ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
 if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):
