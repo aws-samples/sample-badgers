@@ -33,27 +33,36 @@ The agent can choose to skip enhancement if the original is already good, or ret
                │
                ▼
 ┌────────────────────────────────────┐
-│  10 Enhancement Operations         │  ← Image processing
+│  13 Enhancement Operations         │  ← Image processing
 │  contrast, brightness, sharpen,    │     OpenCV operations
 │  denoise, deskew, white_balance,   │
-│  equalize, crop, invert, stains    │
+│  equalize, crop, invert, stains,   │
+│  desaturate, threshold, levels     │
 └────────────────────────────────────┘
 ```
 
 ## Available Operations
 
-| Operation | Purpose | Use Case |
-|-----------|---------|----------|
-| **contrast** (CLAHE) | Adaptive contrast enhancement | Uneven lighting, fading |
-| **brightness** | Overall brightness adjustment | Dark/light documents |
-| **sharpen** | Unsharp mask edge enhancement | Blurry text/diagrams |
-| **denoise** | Non-local means noise removal | Scanner noise, grain |
-| **deskew** | Rotation correction via Hough lines | Skewed scans |
-| **white_balance** | Gray-world color correction | Yellowing/aging |
-| **equalize_histogram** | Global tonal range spread | Severely faded docs |
-| **auto_crop** | Document boundary detection | Remove borders |
-| **invert** | Negative inversion | Dark-background docs |
-| **remove_stains** | Morphological background removal | Foxing, age spots |
+| Operation              | Purpose                             | Use Case                                  |
+| ---------------------- | ----------------------------------- | ----------------------------------------- |
+| **contrast** (CLAHE)   | Adaptive contrast enhancement       | Uneven lighting, fading                   |
+| **brightness**         | Overall brightness adjustment       | Dark/light documents                      |
+| **sharpen**            | Unsharp mask edge enhancement       | Blurry text/diagrams                      |
+| **denoise**            | Non-local means noise removal       | Scanner noise, grain                      |
+| **deskew**             | Rotation correction via Hough lines | Skewed scans                              |
+| **white_balance**      | Gray-world color correction         | Yellowing/aging                           |
+| **equalize_histogram** | Global tonal range spread           | Severely faded docs                       |
+| **auto_crop**          | Document boundary detection         | Remove borders                            |
+| **invert**             | Negative inversion                  | Dark-background docs                      |
+| **remove_stains**      | Morphological background removal    | Foxing, age spots                         |
+| **desaturate**         | Collapse colour into brightness     | Watermarks, colour casts                  |
+| **threshold**          | Binarisation at a computed cutoff   | Separating light watermark from dark text |
+| **levels**             | Black/white point + gamma remap     | Aged parchment, faded ink                 |
+
+`threshold` and `levels` both return percentile-based tonal analysis to the agent, so it
+can evaluate the result and retune intensity on the next iteration. Unlike `threshold`,
+`levels` preserves continuous tonal gradation — it does not destroy stroke weight
+variation in historical ink.
 
 Each operation supports:
 - **Intensity control** (0.0 to 1.0)
@@ -72,29 +81,58 @@ Each operation supports:
 
 ### Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `image_path` | string | Yes* | - | S3 URI (e.g., `s3://bucket/key`) |
-| `image_data` | string | Yes* | - | Base64-encoded image (alternative to image_path) |
-| `document_type` | string | No | "auto" | Document type hint for LLM context |
-| `enhancement_level` | string | No | "moderate" | Enhancement aggressiveness |
-| `session_id` | string | Yes | "no_session" | Session identifier for S3 organization |
-| `output_quality` | integer | No | 85 | JPEG quality (1-100) |
-| `skip_upscale` | boolean | No | true | Skip pre-processing upscale |
+| Parameter           | Type    | Required | Default      | Description                                      |
+| ------------------- | ------- | -------- | ------------ | ------------------------------------------------ |
+| `image_path`        | string  | Yes*     | -            | S3 URI (e.g., `s3://bucket/key`)                 |
+| `image_data`        | string  | Yes*     | -            | Base64-encoded image (alternative to image_path) |
+| `document_type`     | string  | No       | "auto"       | Document type hint for LLM context               |
+| `enhancement_level` | string  | No       | "moderate"   | Enhancement aggressiveness                       |
+| `session_id`        | string  | Yes      | "no_session" | Session identifier for S3 organization           |
+| `output_quality`    | integer | No       | 85           | JPEG quality (1-100)                             |
+| `skip_upscale`      | boolean | No       | true         | Skip pre-processing upscale                      |
 
 *Either `image_path` or `image_data` is required.
 
 ### Document Types
 
-Maps to LLM context for better enhancement decisions:
+Each `document_type` maps to a paragraph of enhancement guidance the agent reads before
+choosing operations — what degradation to expect, which operations to prefer, and which to
+avoid. `map`, for instance, instructs the agent *not* to desaturate, because colour there
+is semantically meaningful.
 
-- `"manuscript"` → "18th century handwritten manuscript"
-- `"annotated"` → "historical document with handwritten annotations"
-- `"sheet_music"` → "musical score with performance annotations"
-- `"diagram"` → "technical diagram or chart"
-- `"printed"` → "printed historical document"
-- `"mixed"` → "mixed media document with multiple content types"
-- `"auto"` → No context provided, LLM assesses independently
+**The mapping is operator-editable and lives in S3**, not in this container:
+
+```
+s3://{CONFIG_BUCKET}/config/document_type_contexts.json
+```
+
+Source of truth in the repo is `deployment/s3_files/config/document_type_contexts.json`;
+push changes with `deploy.sh` step 3, submenu option `6) Runtime Config`. The in-code
+`_FALLBACK_DOC_TYPE_CONTEXTS` map is only a fallback for when `CONFIG_BUCKET` is unset or
+the object cannot be read, so the container still works without it.
+
+Recognised values:
+
+| Value                   | Notes                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`                  | No context supplied; the agent assesses independently                                                                                                     |
+| `manuscript`            | Handwritten manuscript                                                                                                                                    |
+| `historical_manuscript` | Period handwriting on aged parchment or rag paper                                                                                                         |
+| `annotated`             | Historical document with handwritten annotations                                                                                                          |
+| `sheet_music`           | Musical score with performance annotations                                                                                                                |
+| `diagram`               | Technical diagram or chart                                                                                                                                |
+| `printed`               | Printed historical document                                                                                                                               |
+| `mixed`                 | Mixed media, multiple content types                                                                                                                       |
+| `photograph`            | Continuous tonal gradation                                                                                                                                |
+| `map`                   | Cartographic; colour is meaningful, do not desaturate                                                                                                     |
+| `legal`                 | Legal or administrative document with multiple ink layers                                                                                                 |
+| `newspaper`             | Newsprint, degraded                                                                                                                                       |
+| `watermarked`           | Accepted by the schema but **has no context entry** — it resolves to an empty string. Watermark handling lives in the system prompt's Pipeline A instead. |
+
+> [!NOTE]
+> The loaded map is cached in a module global for the life of the execution environment,
+> so editing the S3 object does not affect warm Lambda containers until the next cold
+> start.
 
 ### Enhancement Levels
 
@@ -150,30 +188,31 @@ Maps to MAX_ITERATIONS for the agent:
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VISION_MODEL` | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID |
-| `MAX_ITERATIONS` | `2` | Max agent iterations (overridden by enhancement_level at runtime) |
-| `MAX_IMAGE_DIMENSION` | `4000` | Max dimension for LLM submission |
-| `JPEG_QUALITY` | `85` | Quality for LLM image encoding |
-| `OUTPUT_QUALITY` | `95` | Quality for final output |
-| `OUTPUT_BUCKET` | - | S3 bucket for enhanced images (if not set, returns base64) |
-| `AWS_REGION` | `us-west-2` | AWS region for Bedrock |
-| `LOGGING_LEVEL` | `INFO` | Python log level |
+| Variable              | Default                          | Description                                                                                                                                                                                                                           |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VISION_MODEL`        | `us.anthropic.claude-sonnet-4-6` | Bedrock model ID or inference profile ARN. The Lambda stack sets it to the Sonnet 4.6 *application inference profile* ARN, so the enhancer's calls are cost-tracked with the rest of the deployment; the bare ID is the local default |
+| `MAX_ITERATIONS`      | `2`                              | Max agent iterations (overridden by enhancement_level at runtime)                                                                                                                                                                     |
+| `MAX_IMAGE_DIMENSION` | `4000`                           | Max dimension for LLM submission                                                                                                                                                                                                      |
+| `JPEG_QUALITY`        | `85`                             | Quality for LLM image encoding                                                                                                                                                                                                        |
+| `OUTPUT_QUALITY`      | `95`                             | Quality for final output                                                                                                                                                                                                              |
+| `OUTPUT_BUCKET`       | -                                | S3 bucket for enhanced images (if not set, returns base64)                                                                                                                                                                            |
+| `CONFIG_BUCKET`       | -                                | S3 bucket holding `config/document_type_contexts.json` and the system prompt. Unset means the in-code fallbacks are used.                                                                                                             |
+| `AWS_REGION`          | `us-west-2`                      | AWS region for Bedrock                                                                                                                                                                                                                |
+| `LOGGING_LEVEL`       | `INFO`                           | Python log level                                                                                                                                                                                                                      |
 
 ## Comparison: Old vs. New
 
-| Feature | Old (Fixed Pipeline) | New (Agentic) |
-|---------|---------------------|---------------|
-| **Operations** | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 10 available, agent selects |
-| **Decision Making** | Hardcoded sequence | LLM vision analysis per image |
-| **Iterations** | 1 (single pass) | 1-3 (with feedback loop) |
-| **Regional Operations** | No | Yes (normalized 0-1 coords) |
-| **Quality Metrics** | Basic (shape, skew) | Comprehensive (contrast, sharpness, brightness, saturation, edges, yellowing) |
-| **Winner Selection** | Always enhanced | Agent chooses original or enhanced based on metrics |
-| **Adaptability** | Same for all images | Tailored to document type and condition |
-| **Skip Option** | Must always process | Can skip if original is already good |
-| **Failure Recovery** | N/A | Resets and retries with different approach |
+| Feature                 | Old (Fixed Pipeline)                                           | New (Agentic)                                                                 |
+| ----------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Operations**          | 6 fixed (upscale, deskew, denoise, contrast, balance, sharpen) | 13 available, agent selects                                                   |
+| **Decision Making**     | Hardcoded sequence                                             | LLM vision analysis per image                                                 |
+| **Iterations**          | 1 (single pass)                                                | 1-3 (with feedback loop)                                                      |
+| **Regional Operations** | No                                                             | Yes (normalized 0-1 coords)                                                   |
+| **Quality Metrics**     | Basic (shape, skew)                                            | Comprehensive (contrast, sharpness, brightness, saturation, edges, yellowing) |
+| **Winner Selection**    | Always enhanced                                                | Agent chooses original or enhanced based on metrics                           |
+| **Adaptability**        | Same for all images                                            | Tailored to document type and condition                                       |
+| **Skip Option**         | Must always process                                            | Can skip if original is already good                                          |
+| **Failure Recovery**    | N/A                                                            | Resets and retries with different approach                                    |
 
 ### Key Advantages
 
@@ -236,7 +275,7 @@ Key log entries:
 
 ### Key Metrics
 - **Duration**: 30-180 seconds depending on iterations
-- **Memory**: 512-1536MB (2048MB allocated)
+- **Memory**: 512-1536MB (6144MB allocated)
 - **Bedrock Calls**: 2-6 per image (2-3 iterations × 2 calls per iteration)
 - **Cost**: ~$0.015-0.045 per image
 
@@ -251,7 +290,7 @@ Key log entries:
 
 2. **Memory Issues**
    - Large images may require more memory
-   - Increase Lambda memory allocation (currently 2048MB)
+   - Increase Lambda memory allocation (currently 6144MB)
 
 3. **Agent Doesn't Finish**
    - Automatic fallback after MAX_ITERATIONS

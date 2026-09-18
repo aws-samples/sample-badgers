@@ -33,7 +33,6 @@ const SPECIALIST_CATALOG = {
   },
   'Processing': {
     image_enhancer: 'Image Enhancer',
-    pdf_processor: 'PDF Processor',
     remediation_specialist: 'Remediation',
   },
 }

@@ -15,7 +15,7 @@ Single React + Express application that serves as both the developer testing wor
 | **Auth**          | Bypassed — defaults to `admin` role (all tabs visible) | Cognito OIDC authorization code + PKCE             |
 | **Role override** | `BADGERS_UI_ROLE=tester` env var                       | Cognito group membership (`admin` / `tester`)      |
 | **Ports**         | Vite 5175 / Express 7860                               | Container exposes 7860                             |
-| **Config**        | `config/.env`                                          | SSM Parameter Store, injected as container secrets |
+| **Config**        | `ui/.env` (`deployment/scripts/generate_ui_env.sh`)    | SSM Parameter Store, injected as container secrets |
 
 Auth is bypassed only when `COGNITO_USER_POOL_ID` is unset **and** the process is not
 running on ECS. On ECS a missing user pool is treated as a misconfiguration, not a dev
@@ -60,8 +60,13 @@ Every `/api/*` route is behind `requireAuth`, mounted before the route groups so
 individual handler can be reached unauthenticated.
 
 The Vite build needs the Cognito values at build time — `deployment/scripts/generate_ui_env.sh`
-writes `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, and `VITE_COGNITO_DOMAIN`.
-A bundle built without them falls through to the server's local-dev bypass.
+writes `VITE_COGNITO_AUTHORITY`, `VITE_COGNITO_CLIENT_ID`, and `VITE_COGNITO_DOMAIN` to
+`ui/.env`. A bundle built without them falls through to the server's local-dev bypass.
+
+`ui/.env` is the only env file. Vite only exposes `VITE_`-prefixed lines to the bundle;
+the remaining lines (bucket names, Runtime ARN, Gateway ID, jobs table, `AWS_PROFILE`) are
+read by `server/index.js` when running locally. Nothing copies the file into the Docker
+image — the deployed container gets those values from SSM.
 
 ## Docker Deployment
 
@@ -120,6 +125,110 @@ log as `[job] job_id=… doc_id=…`, so a chat transcript can be traced to its 
 Job status is computed at read time rather than stored — see the endpoint comments in
 `server/routes/core.js` for why.
 
+## Report Endpoints
+
+The Reports tab reads the artifacts written by `html_report_specialist`. Every endpoint is
+authenticated and scoped to the caller.
+
+| Endpoint                                       | Returns                                    |
+| ---------------------------------------------- | ------------------------------------------ |
+| `GET /api/reports`                             | Every report the caller owns, newest first |
+| `GET /api/reports/:id/manifest`                | One report's manifest                      |
+| `GET /api/reports/:id/pages/:n/image`          | The durable analysis image for one page    |
+| `GET /api/reports/:id/pages/:n/enhanced-image` | The enhanced copy, when the run made one   |
+| `GET /api/reports/:id/pages/:n/xml`            | The correlated page spine for one page     |
+| `GET /api/reports/:id/download`                | The offline single-file HTML report        |
+
+`enhanced-image` returns **404 rather than an error** when the page has no
+`enhanced_image_key`: a clean page is never enhanced, and reports generated before that
+field existed have none. The Page Reader only requests it when the manifest declares one, so
+un-enhanced and legacy reports cost no extra round trip, and it offers Original/Enhanced
+tabs only when a second image exists.
+
+The image the correlation artifact names as its source is the *original*, so before this
+existed a report showed the page as scanned while most specialists had read the enhanced
+copy. Persisting both is what makes that provenance visible rather than implied.
+
+The listing is a keyed DynamoDB query on the `owner-index` GSI, partitioned by the
+caller's `owner_sub` and filtered to job rows carrying a `report_id`. Ownership therefore
+comes from the job record rather than from the bucket layout, and no S3 listing is
+involved. A job whose owner was never recorded is absent from the index, so its reports do
+not list — the deliberate fail-closed case.
+
+The remaining endpoints load the manifest and re-check its `owner_sub` against the caller,
+then serve only keys the manifest itself declares under that report's prefix. Nothing
+accepts a caller-supplied S3 key, and no presigned URLs are issued: the listing decides
+what may be enumerated, the manifest decides what may be opened.
+
+## Specialist Wizard Endpoints
+
+The 🧙 Create Specialist tab's four steps map to four endpoints in `server/routes/wizard.js`,
+mounted by `mountWizardRoutes(app, PROJECT_ROOT)`.
+
+| Endpoint                    | Transport | Does                                                         |
+| --------------------------- | --------- | ------------------------------------------------------------ |
+| `POST /api/wizard/generate` | **SSE**   | Six sequential Bedrock calls, one per prompt section         |
+| `POST /api/wizard/preview`  | JSON      | Assembles the manifest and schema for review; writes nothing |
+| `POST /api/wizard/save`     | JSON      | Writes every artifact under `deployment/custom_specialists/` |
+| `POST /api/wizard/deploy`   | **SSE**   | Streams `deployment/deploy_custom_specialists.sh`            |
+| `GET /api/models`           | JSON      | The models the dropdowns offer (`server/routes/models.js`)   |
+
+`GET /api/models` joins the SSM profile map the InferenceProfiles stack writes against
+`config/model_registry.json` in the config bucket and returns only models that are both
+`active` in the registry and actually provisioned in this deployment. It is cached for 60
+seconds and answers 503 rather than falling back to a hardcoded list. The same list feeds
+the pricing calculator's `models` block through `GET /api/pricing-config`.
+
+`save` and `deploy` work from a developer checkout (`npm run dev`): they write to
+`deployment/custom_specialists/` and run CDK. In the ECS container neither the `deployment/`
+tree nor CDK exists — `ui/Dockerfile` copies `server/`, `dist/`, and `config/` — so there the
+wizard is generate and preview only, and both endpoints fail with a clear message. The admin
+tab's `deploy.sh` routes have the same boundary.
+
+`generate` streams because six calls take minutes, which no plain POST survives behind the
+load balancer. Its frames are `start` (carrying the full section list, so the client keeps no
+second copy), then `progress` and `section` per prompt, then `done` or `error`. Sections are
+generated in load order: `gestalt`, `job_role`, `context`, `rules`, `tasks`, `format`.
+
+A single failed section becomes an `<!-- ERROR ... -->` stub and is reported in `warnings`, so
+one bad generation does not lose the other five. All six failing is a hard error instead —
+that means credentials, region, or model access is broken, and six comment stubs would read
+as content.
+
+Bedrock is called by **hand-signing an HTTPS Converse request with SigV4**, not through
+`@aws-sdk/client-bedrock-runtime`, which is deliberately not a dependency of this package.
+Region comes from `AWS_REGION` (default `us-west-2`), credentials from the node provider
+chain, profile from `AWS_PROFILE`. The generator model is `WIZARD_GENERATOR_MODEL_ID` when
+set, else the `DEFAULT_GENERATOR_MODEL_ID` literal in `wizard.js`. In ECS the task
+definition sets it from `WIZARD_GENERATOR_MODEL_ID` in `deployment/stacks/ecs_stack.py`,
+the same constant the task role's `bedrock:InvokeModel` grant is built from, so the deployed
+call and its grant cannot name different models; the literal is for local development. The
+primary/fallback dropdowns are populated from `GET /api/models` and validated against the
+same list, so there is no second model map to keep aligned.
+
+`save` and `deploy` are separate steps, and Deploy stays disabled until a save succeeds.
+Everything is written to the **local working tree**, never to S3 — see
+[Custom Specialists](../deployment/DEPLOYMENT_README.md#-custom-specialists). Every write
+target is resolved and confirmed to be inside `custom_specialists/` first, and the shared
+`specialist_registry.json` is read-modify-written so other entries are never clobbered.
+
+## Streaming and Timeouts
+
+The chat SSE stream writes a `: ping` comment every 15 seconds. Two reasons, both load-bearing:
+
+- The deployed load balancer closes any connection idle in **either** direction for 60
+  seconds (`idle_timeout.timeout_seconds`, the AWS default, which `CfnExpressGatewayService`
+  does not expose). This stream writes nothing for the whole of a tool call, and `full_text`
+  has taken 115 seconds on a dense page — so a slow specialist dropped the connection every
+  time.
+- Writing is the only way to notice the client has gone. TCP does not report a closed peer
+  until you write to it, so without a heartbeat an abandoned request surfaced only when the
+  next real event arrived. A `[client-gone]` line is now logged when the browser leaves
+  mid-run.
+
+`POST /api/wizard/deploy` sends the same kind of heartbeat and kills the child process when
+the client disconnects.
+
 ## Tech Stack
 
 | Component         | Technology                                                                                                     |
@@ -148,8 +257,10 @@ ui/
 │   └── components/
 │       ├── Home.jsx               # Dashboard
 │       ├── Chat.jsx               # Agent chat interface, PDF upload, doc_id
+│       ├── CopyButton.jsx         # Shared copy-to-clipboard control
+│       ├── Reports.jsx            # Report index and Page Reader
 │       ├── SpecialistEditor.jsx   # Manifest/prompt editor
-│       ├── SpecialistWizard.jsx   # New specialist wizard
+│       ├── SpecialistWizard.jsx   # New specialist wizard (consumes the SSE stream)
 │       ├── Evaluator.jsx          # Test runner
 │       ├── PricingCalculator.jsx  # Cost estimator
 │       ├── Observability.jsx      # CloudWatch queries
@@ -166,6 +277,7 @@ ui/
 │   ├── auth.js                    # Cognito JWT verification / local-dev bypass
 │   └── routes/
 │       ├── core.js                # Core API routes (all roles)
+│       ├── wizard.js              # Specialist wizard routes (SSE generate/deploy)
 │       └── admin.js               # Admin API routes (admin only)
 ├── config/
 │   ├── .env                       # Local environment variables

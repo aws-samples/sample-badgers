@@ -10,6 +10,14 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+from .model_registry import (
+    foundation_model_id,
+    has_provider,
+    load_registry,
+    provisioned_models,
+)
+from .nag_arn_renderings import account_renderings, region_renderings
+
 try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
     from cdk_nag import NagSuppressions
 
@@ -37,6 +45,12 @@ class IAMStack(Stack):
 
         self.deployment_id = deployment_id
         self.deployment_tags = deployment_tags
+
+        # The model set is read from the registry at synth, not transcribed here. This was
+        # previously a third and fourth hand-maintained copy of the list, and both had
+        # drifted from InferenceProfilesStack. `disabled` entries are excluded, so
+        # declining a model removes its grants as well as its profile.
+        self.models = provisioned_models(load_registry())
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -69,15 +83,8 @@ class IAMStack(Stack):
                     "bedrock:InvokeModelWithResponseStream",
                 ],
                 resources=[
-                    # Primary model (regional inference profile)
-                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-                    # Fallback models (inference profiles)
-                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                    "arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
-                    # Claude Opus 4.6 (regional inference profile for vision)
-                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-opus-4-6-v1",
-                    # Cell grid resolver (cross-region Sonnet)
-                    "arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
+                    f"arn:aws:bedrock:*:*:inference-profile/{model_id}"
+                    for model_id in self.models
                 ],
             )
         )
@@ -112,16 +119,41 @@ class IAMStack(Stack):
                     "bedrock:InvokeModelWithResponseStream",
                 ],
                 resources=[
-                    # Claude Sonnet 4.5 foundation model (regional profile routes here)
-                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
-                    # Claude Haiku 4.5 foundation model
-                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-                    # Nova Premier foundation model
-                    "arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
-                    # Claude Opus 4.6 foundation model (with and without version suffix)
-                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
-                    # Claude Sonnet 4 foundation model (cell grid resolver)
-                    "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+                    f"arn:aws:bedrock:*::foundation-model/{foundation_model_id(model_id)}"
+                    for model_id in self.models
+                ],
+            )
+        )
+
+        # OpenAI models additionally require bedrock:InvokeModel on the account's default
+        # project. Without it every OpenAI invocation returns AccessDenied even with a
+        # correct profile grant, and `_should_fallback` does not retry AccessDenied — so a
+        # GPT primary would not fall back to a Claude secondary, it would just fail.
+        # Source: the GPT-5.6 Terra model card, Programmatic Access section.
+        if has_provider(self.models, "openai"):
+            self.lambda_role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="BedrockInvokeDefaultProject",
+                    effect=iam.Effect.ALLOW,
+                    actions=["bedrock:InvokeModel"],
+                    resources=[
+                        f"arn:aws:bedrock:{self.region}:{self.account}:project/default"
+                    ],
+                )
+            )
+
+        # Specialists resolve model ID -> application inference profile ARN by reading the
+        # parameter InferenceProfilesStack writes. This replaces the per-model
+        # *_PROFILE_ARN environment variables, which arrived for free; a network read does
+        # not. Scoped to the single parameter, no wildcard.
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ReadModelProfilesParameter",
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}"
+                    f":parameter/badgers-{deployment_id}/model-profiles"
                 ],
             )
         )
@@ -222,6 +254,13 @@ class IAMStack(Stack):
 
         AwsSolutions-IAM5 requires suppressions carry *evidence*, so each entry
         names the exact resource it applies to and why the wildcard is needed.
+
+        Every `appliesTo` entry that names a model is generated from the registry, in the
+        same iteration order as the policy statement it justifies. Hand-listing them meant
+        a suppression could claim to cover ARNs the policy no longer contained while the
+        ARNs it did contain went unsuppressed -- which is how this drifted to five stale
+        strings and 28 unsuppressed findings. A generated list cannot disagree with the
+        policy it describes.
         """
         if not _HAVE_CDK_NAG:
             return
@@ -232,19 +271,34 @@ class IAMStack(Stack):
                 {
                     "id": "AwsSolutions-IAM5",
                     "reason": (
-                        "Cross-Region inference requires bedrock:InvokeModel on the "
-                        "foundation model in every destination Region the inference "
-                        "profile can route to, so the Region field is wildcarded. The "
-                        "model ID itself is pinned exactly -- no model wildcard. See "
+                        "Geo cross-Region inference requires bedrock:InvokeModel on the "
+                        "foundation model in the source Region AND in every destination "
+                        "Region the geo profile can route to. The model ID is pinned "
+                        "exactly -- only the Region field is wildcarded, and no action "
+                        "or account is wildcarded. Wildcarding the Region is a "
+                        "deliberate choice, not a requirement: the destination set could "
+                        "be enumerated instead. It is not, for two reasons. (1) The "
+                        "destination set is a function of (model, source Region), and "
+                        "BADGERS' source Region is chosen by the operator at deploy "
+                        "time. (2) Only 3 of the 8 models in model_registry.json publish "
+                        "a destination-Region table on their model card; the other 5 "
+                        "document a us.* profile with no destination list, so a "
+                        "hardcoded list would cover under half the set. Enumerating all "
+                        "eight is possible via bedrock:GetInferenceProfile, whose "
+                        "models[].modelArn field returns the Region-qualified foundation "
+                        "model ARNs, but that is a deploy-time API call and would need a "
+                        "custom resource. Switching to global.* profiles would also "
+                        "remove the wildcard -- the global foundation-model ARN form is "
+                        "arn:aws:bedrock:::foundation-model/<model>, with empty Region "
+                        "and account fields -- at the cost of routing outside the US "
+                        "geo. See "
                         "https://docs.aws.amazon.com/bedrock/latest/userguide/"
                         "geographic-cross-region-inference.html"
                     ),
                     "appliesTo": [
-                        "Resource::arn:aws:bedrock:*::foundation-model/amazon.nova-premier-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-opus-4-6-v1",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
-                        "Resource::arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+                        f"Resource::arn:aws:bedrock:*::foundation-model/"
+                        f"{foundation_model_id(model_id)}"
+                        for model_id in self.models
                     ],
                 },
                 {
@@ -254,15 +308,20 @@ class IAMStack(Stack):
                         "the Region field is wildcarded while the profile ID stays "
                         "pinned. The application-inference-profile/* entry is scoped to "
                         "this account -- profile IDs are generated at runtime and "
-                        "cannot be enumerated at deploy time."
+                        "cannot be enumerated at deploy time. Same Region-wildcard "
+                        "rationale as BedrockInvokeFoundationModels above."
                     ),
                     "appliesTo": [
-                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.amazon.nova-premier-v1:0",
-                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-opus-4-6-v1",
-                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-                        "Resource::arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-sonnet-4-6",
-                        "Resource::arn:aws:bedrock:*:<AWS::AccountId>:application-inference-profile/*",
+                        f"Resource::arn:aws:bedrock:*:*:inference-profile/{model_id}"
+                        for model_id in self.models
+                    ]
+                    # Hand-written: not a model ARN, and deliberately account-scoped
+                    # rather than per-profile. Application inference profile IDs are
+                    # generated by Bedrock at create time.
+                    + [
+                        f"Resource::arn:aws:bedrock:*:{account}"
+                        f":application-inference-profile/*"
+                        for account in account_renderings(self.account)
                     ],
                 },
                 {
@@ -274,11 +333,16 @@ class IAMStack(Stack):
                         "are generated at runtime, so neither can be enumerated at "
                         "deploy time. Scoped to this account and Region."
                     ),
+                    # Built from self.region / self.account. These were hardcoded to
+                    # us-east-1 and <AWS::AccountId>, so they matched nothing on the
+                    # deploy path in any Region.
                     "appliesTo": [
-                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*",
-                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers-*:*",
-                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*",
-                        "Resource::arn:aws:logs:us-east-1:<AWS::AccountId>:log-group:/aws/lambda/badgers_*:*",
+                        f"Resource::arn:aws:logs:{region}:{account}"
+                        f":log-group:/aws/lambda/{prefix}{suffix}"
+                        for region in region_renderings(self.region)
+                        for account in account_renderings(self.account)
+                        for prefix in ("badgers-*", "badgers_*")
+                        for suffix in ("", ":*")
                     ],
                 },
                 {
@@ -295,6 +359,46 @@ class IAMStack(Stack):
                         "Resource::<OutputBucket7114EB27.Arn>/*",
                         "Resource::<SourceBucketDDD2130A.Arn>/*",
                     ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Action wildcards emitted by the CDK L2 grants "
+                        "Bucket.grant_read / grant_read_write on the three named buckets, "
+                        "not written by this stack. Each expands to a fixed, documented "
+                        "set of same-family read or write actions -- s3:GetObject* covers "
+                        "GetObject, GetObjectVersion and GetObjectTagging, for example -- "
+                        "and the KMS pair is required to read and write objects encrypted "
+                        "with the customer-managed key. Resources stay scoped to the "
+                        "three bucket ARNs and the one key. Replacing the grants with "
+                        "hand-written statements would pin the actions but silently break "
+                        "whenever a bucket feature needs an action the grant would have "
+                        "added. These were previously unsuppressed and are 8 of the "
+                        "findings this pass closes."
+                    ),
+                    "appliesTo": [
+                        "Action::s3:Abort*",
+                        "Action::s3:DeleteObject*",
+                        "Action::s3:GetBucket*",
+                        "Action::s3:GetObject*",
+                        "Action::s3:List*",
+                        "Action::kms:GenerateDataKey*",
+                        "Action::kms:ReEncrypt*",
+                    ],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "aws-marketplace:ViewSubscriptions and aws-marketplace:Subscribe "
+                        "do not support resource-level permissions, so Resource must be "
+                        '"*" -- a narrower ARN makes the statement match nothing. The '
+                        "grant exists because Bedrock subscribes the account through "
+                        "Marketplace on a model's first invocation; without it that "
+                        "invocation fails with AccessDeniedException. See "
+                        "github.com/aws-samples/sample-badgers/issues/33 and the "
+                        "AWS Marketplace actions in the Service Authorization Reference."
+                    ),
+                    "appliesTo": ["Resource::*"],
                 },
             ],
             apply_to_children=True,

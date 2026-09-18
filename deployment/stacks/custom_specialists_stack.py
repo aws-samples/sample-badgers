@@ -19,6 +19,19 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+# Wizard-generated specialists run the same handler shape as the built-in ones, so
+# they get the same memory. Imported rather than repeated so the two cannot diverge.
+from .lambda_stack import SPECIALIST_MEMORY_MB
+from .model_registry import model_profiles_param_name
+from .nag_arn_renderings import nag_resource_string
+
+try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
+    from cdk_nag import NagSuppressions
+
+    _HAVE_CDK_NAG = True
+except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
+    _HAVE_CDK_NAG = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,11 +51,6 @@ class CustomSpecialistsStack(Stack):
         gateway_id: str,
         gateway_role_arn: str,
         kms_key_arn: str,
-        claude_sonnet_profile_arn: str,
-        claude_haiku_profile_arn: str,
-        nova_premier_profile_arn: str,
-        claude_opus_46_profile_arn: str,
-        claude_opus_45_profile_arn: str,
         **kwargs: Any,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -54,11 +62,6 @@ class CustomSpecialistsStack(Stack):
         self.gateway_id = gateway_id
 
         # Store inference profile ARNs
-        self.claude_sonnet_profile_arn = claude_sonnet_profile_arn
-        self.claude_haiku_profile_arn = claude_haiku_profile_arn
-        self.nova_premier_profile_arn = nova_premier_profile_arn
-        self.claude_opus_46_profile_arn = claude_opus_46_profile_arn
-        self.claude_opus_45_profile_arn = claude_opus_45_profile_arn
 
         self._apply_common_tags()
 
@@ -133,6 +136,7 @@ class CustomSpecialistsStack(Stack):
 
         if not has_files:
             logger.warning("No runtime files found to upload")
+            self._s3_deployment_role = None
             return None
 
         # Create a role for the deployment with explicit S3 permissions
@@ -179,6 +183,8 @@ class CustomSpecialistsStack(Stack):
             )
         )
 
+        self._s3_deployment_role = deployment_role
+
         # Upload all runtime files to S3 under custom-specialists/ prefix
         return s3deploy.BucketDeployment(
             self,
@@ -217,12 +223,9 @@ class CustomSpecialistsStack(Stack):
             "TEMPERATURE": "0.1",
             "THROTTLE_DELAY": "1.0",
             "CUSTOM_SPECIALIST": "true",
-            # Inference profile ARNs for cost tracking
-            "CLAUDE_SONNET_PROFILE_ARN": self.claude_sonnet_profile_arn,
-            "CLAUDE_HAIKU_PROFILE_ARN": self.claude_haiku_profile_arn,
-            "NOVA_PREMIER_PROFILE_ARN": self.nova_premier_profile_arn,
-            "CLAUDE_OPUS_46_PROFILE_ARN": self.claude_opus_46_profile_arn,
-            "CLAUDE_OPUS_45_PROFILE_ARN": self.claude_opus_45_profile_arn,
+            # Model ID -> profile ARN map, for cost attribution. Replaces five per-model
+            # ARNs that had to be imported across stack boundaries to get here.
+            "MODEL_PROFILES_PARAM": model_profiles_param_name(self.deployment_id),
         }
 
         function = lambda_.Function(
@@ -235,13 +238,39 @@ class CustomSpecialistsStack(Stack):
             role=self.lambda_role,
             layers=[self.foundation_layer, self.pillow_layer],
             timeout=Duration.seconds(900),
-            memory_size=2048,
+            memory_size=SPECIALIST_MEMORY_MB,
             reserved_concurrent_executions=5,
             description=description,
             environment=environment,
         )
         Tags.of(function).add("resource_name", f"custom-lambda-{specialist_name}")
         Tags.of(function).add("specialist_type", "custom")
+
+        if _HAVE_CDK_NAG:
+            # Same justification as the base specialists in lambda_stack.py, which has
+            # carried this suppression since before the model migration. Custom
+            # specialists attach the same foundation layer, so the runtime constraint is
+            # identical -- this stack simply had no suppressions of any kind.
+            NagSuppressions.add_resource_suppressions(
+                function,
+                [
+                    {
+                        "id": "AwsSolutions-L1",
+                        "reason": (
+                            "Runtime is pinned to Python 3.12 to match the shared Lambda "
+                            "layers this function attaches (foundation and pillow), which "
+                            "declare compatible_runtimes=[PYTHON_3_12] and ship "
+                            "runtime-specific native artifacts. Bumping this function "
+                            "alone would break layer compatibility -- the runtime and the "
+                            "layers must be rebuilt and revalidated together. Python 3.12 "
+                            "is a supported runtime and is not deprecated. Identical to "
+                            "the suppression on the base specialists in lambda_stack.py; "
+                            "the two are pinned by the same layers."
+                        ),
+                    }
+                ],
+            )
+
         return function
 
     def _generate_lambda_code(self, specialist_name: str) -> Path:
@@ -399,6 +428,9 @@ def _initialize_specialist(config: dict, s3_bucket: str, specialist_name: str, i
             self, "GatewayTargetCustomProvider", on_event_handler=provider_fn
         )
 
+        if _HAVE_CDK_NAG:
+            self._add_nag_suppressions(provider_fn, provider)
+
         for specialist_name, lambda_function in self.functions.items():
             short_name = specialist_name
             if short_name.endswith("_specialist"):
@@ -420,6 +452,205 @@ def _initialize_specialist(config: dict, s3_bucket: str, specialist_name: str, i
             # Ensure S3 files are uploaded before creating gateway target
             if self.s3_deployment:
                 gateway_target.node.add_dependency(self.s3_deployment)
+
+    def _add_nag_suppressions(
+        self, provider_fn: lambda_.Function, provider: cr.Provider
+    ) -> None:
+        """Suppress, with evidence, every AwsSolutions finding this stack produces.
+
+        This stack previously had no suppressions at all -- no ``NagSuppressions`` import --
+        so every finding in it was unsuppressed. It only synthesizes when
+        ``custom_specialists/specialist_registry.json`` exists, which is why the gap went
+        unnoticed: a clean clone has no custom specialists and the stack contributes
+        nothing.
+
+        Every suppression is scoped to a construct and, for IAM5, to the exact finding
+        string. Nothing is suppressed at stack scope. The one entry that cannot be a fixed
+        string -- the CDK assets bucket, whose name embeds the bootstrap qualifier, account
+        and Region -- uses cdk-nag's regex form rather than widening to the whole stack.
+        Logical IDs that carry a CDK-computed hash are obtained from the construct with
+        ``get_logical_id`` instead of being transcribed.
+        """
+        managed_policy = (
+            "Policy::arn:<AWS::Partition>:iam::aws:policy/service-role"
+            "/AWSLambdaBasicExecutionRole"
+        )
+        basic_execution_reason = (
+            "AWSLambdaBasicExecutionRole grants only CloudWatch Logs "
+            "CreateLogGroup/CreateLogStream/PutLogEvents on *, which is what a Lambda "
+            "needs to emit logs at all. Replacing it with a scoped statement would "
+            "require the log group ARN, which for a CDK-managed function is created at "
+            "first invocation and not knowable at synth."
+        )
+
+        def version_qualifier(fn: lambda_.Function) -> str:
+            # cdk-nag renders an Fn::GetAtt as <LogicalId.Arn>; the logical ID embeds a
+            # CDK hash, so ask the construct rather than spelling it.
+            return f"Resource::<{Stack.of(fn).get_logical_id(fn.node.default_child)}.Arn>:*"
+
+        # ── The gateway-target provider handler (ours, inline boto3) ─────────────────
+        NagSuppressions.add_resource_suppressions(
+            provider_fn,
+            [
+                {
+                    "id": "AwsSolutions-L1",
+                    "reason": (
+                        "Runtime is pinned to Python 3.12 to match the specialist "
+                        "functions and shared layers this stack deploys alongside, so the "
+                        "whole stack moves runtime together or not at all. The handler is "
+                        "inline boto3 with no native dependencies. Python 3.12 is "
+                        "supported and not deprecated."
+                    ),
+                },
+                {
+                    "id": "AwsSolutions-IAM4",
+                    "reason": basic_execution_reason,
+                    "appliesTo": [managed_policy],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "Two wildcard classes here, both from CDK rather than hand-written "
+                        "policy. (1) Action wildcards emitted by Bucket.grant_read and "
+                        "Key.grant_decrypt, each expanding to a fixed set of same-family "
+                        'read actions on one bucket and one key. (2) Resource "*" on the '
+                        "bedrock-agentcore gateway-target actions: CreateGatewayTarget and "
+                        "its siblings are called against a gateway whose ID arrives as a "
+                        "custom-resource property at deploy time, and the target ARN does "
+                        "not exist until Create succeeds, so neither can be enumerated at "
+                        "synth. The S3 object prefix is scoped to the config bucket, whose "
+                        "keys are per-specialist values written by the wizard."
+                    ),
+                    "appliesTo": [
+                        "Action::s3:GetBucket*",
+                        "Action::s3:GetObject*",
+                        "Action::s3:List*",
+                        "Resource::*",
+                        "Resource::" + nag_resource_string(self, f"arn:aws:s3:::{self.config_bucket_name}/*"),
+                    ],
+                },
+            ],
+            apply_to_children=True,
+        )
+
+        # ── The custom-resource Provider framework (CDK-owned function + role) ────────
+        NagSuppressions.add_resource_suppressions(
+            provider,
+            [
+                {
+                    "id": "AwsSolutions-L1",
+                    "reason": (
+                        "The Provider framework's onEvent function is created by "
+                        "aws-cdk-lib and its runtime is pinned by the library version, "
+                        "not by this stack."
+                    ),
+                },
+                {
+                    "id": "AwsSolutions-IAM4",
+                    "reason": basic_execution_reason,
+                    "appliesTo": [managed_policy],
+                },
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "The framework grants itself lambda:InvokeFunction on the onEvent "
+                        "handler with the :* version qualifier CDK appends to every Lambda "
+                        "invoke grant. The function ARN is a resolved reference; only the "
+                        "version qualifier is wildcarded."
+                    ),
+                    "appliesTo": [version_qualifier(provider_fn)],
+                },
+            ],
+            apply_to_children=True,
+        )
+
+        # ── The gateway role (imported, mutable) invoking each custom specialist ──────
+        NagSuppressions.add_resource_suppressions(
+            self.gateway_role,
+            [
+                {
+                    "id": "AwsSolutions-IAM5",
+                    "reason": (
+                        "lambda:InvokeFunction granted per custom specialist with the :* "
+                        "version qualifier CDK appends to every Lambda invoke grant. Each "
+                        "function ARN is a resolved reference to one specialist; only the "
+                        "version qualifier is wildcarded. Generated from self.functions so "
+                        "the list cannot drift from the grants."
+                    ),
+                    "appliesTo": [version_qualifier(fn) for fn in self.functions.values()],
+                },
+            ],
+            apply_to_children=True,
+        )
+
+        # ── The BucketDeployment role (ours) and its CDK singleton function ───────────
+        if self._s3_deployment_role is not None:
+            NagSuppressions.add_resource_suppressions(
+                self._s3_deployment_role,
+                [
+                    {
+                        "id": "AwsSolutions-IAM4",
+                        "reason": basic_execution_reason,
+                        "appliesTo": [managed_policy],
+                    },
+                    {
+                        "id": "AwsSolutions-IAM5",
+                        "reason": (
+                            "This role is authored here for the BucketDeployment that "
+                            "copies custom-specialist prompts, manifests and schemas into "
+                            "the config bucket. Hand-written: s3:GetObject*/PutObject*/"
+                            "DeleteObject* on the config bucket, and kms:GenerateDataKey* "
+                            'with Resource "*" constrained by a kms:ViaService condition '
+                            "to S3 in this Region -- the bucket key ARN is imported and "
+                            "the deployment needs the same grant for any key S3 may use. "
+                            "Added by BucketDeployment itself: the read family on the CDK "
+                            "assets bucket it stages from, and the write family on the "
+                            "destination. Object keys are per-specialist and created at "
+                            "deploy time, hence the /* prefixes. The assets bucket name "
+                            "embeds the bootstrap qualifier, account and Region, so it is "
+                            "matched by regex rather than widened to stack scope."
+                        ),
+                        "appliesTo": [
+                            "Action::s3:Abort*",
+                            "Action::s3:DeleteObject*",
+                            "Action::s3:GetBucket*",
+                            "Action::s3:GetObject*",
+                            "Action::s3:List*",
+                            "Action::s3:PutObject*",
+                            "Action::kms:GenerateDataKey*",
+                            "Resource::*",
+                            "Resource::" + nag_resource_string(self, f"arn:aws:s3:::{self.config_bucket_name}/*"),
+                            {
+                                "regex": (
+                                    r"/^Resource::arn:aws:s3:::cdk-[a-z0-9]+-assets-"
+                                    r"(\d{12}|<AWS::AccountId>)-[a-z0-9-]+\/\*$/g"
+                                )
+                            },
+                        ],
+                    },
+                ],
+                apply_to_children=True,
+            )
+
+            # BucketDeployment installs one stack-scoped singleton Lambda whose construct
+            # id starts with "Custom::CDKBucketDeployment" followed by a CDK hash. Find it
+            # by prefix rather than hardcoding the hash.
+            for child in self.node.children:
+                if child.node.id.startswith("Custom::CDKBucketDeployment"):
+                    NagSuppressions.add_resource_suppressions(
+                        child,
+                        [
+                            {
+                                "id": "AwsSolutions-L1",
+                                "reason": (
+                                    "The BucketDeployment singleton function is created "
+                                    "by aws-cdk-lib and its runtime is pinned by the "
+                                    "library version, not by this stack."
+                                ),
+                            },
+                        ],
+                        apply_to_children=True,
+                    )
 
     def _get_provider_code(self) -> str:
         return """

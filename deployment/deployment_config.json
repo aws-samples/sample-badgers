@@ -52,6 +52,10 @@
             "enabled": false,
             "category": "Text & Language"
         },
+        "handwriting_math_specialist": {
+            "enabled": false,
+            "category": "Text & Language"
+        },
         "code_block_specialist": {
             "enabled": false,
             "category": "Text & Language"
@@ -79,6 +83,10 @@
         "correlation_specialist": {
             "enabled": true,
             "category": "Structured Data"
+        },
+        "html_report_specialist": {
+            "enabled": true,
+            "category": "Post-Processing"
         },
         "metadata_generic_specialist": {
             "enabled": false,

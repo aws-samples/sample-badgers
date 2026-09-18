@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { readFileSync, existsSync, mkdirSync, realpathSync } from 'fs';
 import { readFile, readdir, appendFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
@@ -13,10 +13,15 @@ import { CloudWatchLogsClient, StartQueryCommand, GetQueryResultsCommand } from 
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import multer from 'multer';
+import { listModels } from './models.js';
 
 export function mountCoreRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
     const CONFIG_DIR = resolve(PROJECT_ROOT, 'ui', 'config');
+    // ui/.env is the single local-dev env file (written by
+    // deployment/scripts/generate_ui_env.sh). index.js has already merged it into
+    // process.env; this second read only fills keys the shell left unset.
+    const ENV_FILE = resolve(PROJECT_ROOT, 'ui', '.env');
     // In the container the server is copied to /app/server (no `ui/` prefix),
     // so PROJECT_ROOT resolves to `/` and the default ui/logs path lands on the
     // read-only filesystem root, crashing /api/chat with EACCES on mkdir. Allow
@@ -29,7 +34,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     // ── Load env config ──
 
     function loadEnvFile() {
-        const envPath = resolve(CONFIG_DIR, '.env');
+        const envPath = ENV_FILE;
         if (!existsSync(envPath)) return {};
         const env = {};
         for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
@@ -121,6 +126,54 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     async function s3GetJson(bucket, key) {
         const resp = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
         return JSON.parse(await resp.Body.transformToString());
+    }
+
+    function reportOwnerKey(user) {
+        if (!user?.sub || user.sub === 'local') return 'local';
+        return createHash('sha256').update(user.sub).digest('hex').slice(0, 24);
+    }
+
+    function validReportId(value) {
+        return typeof value === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(value);
+    }
+
+    async function loadReportManifest(req, reportId) {
+        if (!OUTPUT_BUCKET) throw Object.assign(new Error('S3_OUTPUT_BUCKET not configured'), { status: 503 });
+        if (!validReportId(reportId)) throw Object.assign(new Error('Invalid report id'), { status: 400 });
+        const ownerKey = reportOwnerKey(req.user);
+        const prefix = `reports/${ownerKey}/${reportId}/`;
+        const manifestKey = `${prefix}manifest.json`;
+        let manifest;
+        try {
+            manifest = await s3GetJson(OUTPUT_BUCKET, manifestKey);
+        } catch {
+            throw Object.assign(new Error('Report not found'), { status: 404 });
+        }
+        if (manifest.owner_sub !== req.user.sub || manifest.report_id !== reportId) {
+            throw Object.assign(new Error('Report not found'), { status: 404 });
+        }
+        const declaredKeys = [manifest.manifest_key, manifest.html_key];
+        for (const page of manifest.pages || []) {
+            declaredKeys.push(page.image_key, page.spine_key);
+            // Optional and absent from reports generated before it existed, so it is
+            // only confined when present — pushing undefined would fail the manifest
+            // outright on every older report.
+            if (page.enhanced_image_key) declaredKeys.push(page.enhanced_image_key);
+        }
+        if (declaredKeys.some(key => typeof key !== 'string' || !key.startsWith(prefix))) {
+            throw Object.assign(new Error('Invalid report manifest'), { status: 500 });
+        }
+        return { manifest, prefix };
+    }
+
+    async function sendReportObject(res, key, contentType, filename = '') {
+        const object = await s3Client.send(new GetObjectCommand({ Bucket: OUTPUT_BUCKET, Key: key }));
+        const bytes = Buffer.from(await object.Body.transformToByteArray());
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        if (filename) res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(bytes);
     }
 
     // ── Routes ──
@@ -235,6 +288,27 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
         if (!RUNTIME_ARN) { send('error', 'AGENTCORE_RUNTIME_WEBSOCKET_ARN not configured'); res.end(); return; }
 
+        // An SSE comment line. The client parser ignores anything not starting with
+        // "data: ", so the content is irrelevant — the bytes are the point.
+        //
+        // Two reasons this has to exist. The deployed load balancer closes any
+        // connection with no data in EITHER direction for 60s (idle_timeout
+        // .timeout_seconds, the AWS default, which CfnExpressGatewayService does not
+        // expose), and this stream writes nothing for the whole of a tool call:
+        // full_text has taken 115s on a dense page, so a slow specialist dropped the
+        // connection every time. AWS's documented remedy is to send at least one byte
+        // per idle period.
+        //
+        // Second, writing is the only way to notice the client has gone. TCP does not
+        // report a closed peer until you write to it, so without a heartbeat an
+        // abandoned request is discovered only when the next real event arrives — which
+        // is how a completed specialist's result was thrown away with no error shown.
+        const HEARTBEAT_MS = 15000;
+        const heartbeat = setInterval(() => {
+            if (res.writableEnded) return;
+            res.write(': ping\n\n');
+        }, HEARTBEAT_MS);
+
         try {
             send('status', 'Connecting...');
             const wsUrl = await getPresignedWsUrl(session_id);
@@ -244,11 +318,19 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             }, WS_TIMEOUT_MIN * 60 * 1000);
 
             let ended = false;
-            const finish = () => { if (ended) return; ended = true; clearTimeout(wsTimeout); send('done', ''); res.end(); };
+            const finish = () => { if (ended) return; ended = true; clearTimeout(wsTimeout); clearInterval(heartbeat); send('done', ''); res.end(); };
 
             ws.on('open', () => {
                 send('status', 'Thinking...');
-                ws.send(JSON.stringify({ prompt: message, session_id, actor_id: 'local_testing_user', audit_mode: audit_mode || false, dynamic_tokens_enabled: dynamic_tokens || false, doc_id: doc_id || '' }));
+                ws.send(JSON.stringify({
+                    prompt: message,
+                    session_id,
+                    actor_id: req.user?.sub || 'local',
+                    user_name: req.user?.email || 'local',
+                    audit_mode: audit_mode || false,
+                    dynamic_tokens_enabled: dynamic_tokens || false,
+                    doc_id: doc_id || '',
+                }));
             });
 
             ws.on('message', (raw) => {
@@ -283,9 +365,133 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
             ws.on('error', (e) => { send('error', e.message); finish(); });
             ws.on('close', () => { finish(); });
-            req.on('close', () => { if (ws.readyState === WebSocket.OPEN) ws.close(); });
+            req.on('close', () => {
+                clearInterval(heartbeat);
+                // Recorded because an abandoned request and a clean finish were
+                // previously indistinguishable in the log: both simply stopped. `ended`
+                // is set only once the agent reported completion, so reaching here
+                // without it means the browser went away mid-run — the agent then dies
+                // on its next send with a WebSocketDisconnect whose str() is empty.
+                if (!ended) log(`[client-gone] ${new Date().toISOString()} browser closed the stream before the run finished`);
+                if (ws.readyState === WebSocket.OPEN) ws.close();
+            });
         } catch (e) {
+            clearInterval(heartbeat);
             send('error', e.message); res.end();
+        }
+    });
+
+    // ── Reports ──
+
+    // Every report owned by the caller, newest first, via the owner-index GSI.
+    //
+    // Ownership is asserted from DynamoDB, not inferred from the bucket layout.
+    // The job-level row carries owner_sub (foundation/job_state.create_job) and
+    // the report pointer (job_state.set_report), so one keyed query returns
+    // exactly this caller's reports and nothing else. This replaced a paginated
+    // LIST of reports/{ownerKey}/ followed by a GetObject on every manifest found
+    // to re-check its owner_sub — a cost linear in the number of reports, on a
+    // path scoped by a hashed key segment rather than by the identity itself.
+    //
+    // The detail routes below still read the manifest, and still re-verify
+    // owner_sub against it: this query decides what the caller may enumerate, not
+    // what they may open.
+    app.get('/api/reports', async (req, res) => {
+        const table = jobsTable();
+        if (!table) return res.status(503).json({ error: 'JOBS_TABLE_NAME not configured' });
+        // No identity, no partition key, no listing. An unauthenticated caller
+        // cannot reach a query that would return another user's rows.
+        const ownerSub = req.user?.sub;
+        if (!ownerSub) return res.status(403).json({ error: 'Forbidden' });
+        try {
+            const reports = [];
+            let key;
+            do {
+                const page = await ddbClient.send(new QueryCommand({
+                    TableName: table,
+                    IndexName: 'owner-index',
+                    KeyConditionExpression: 'owner_sub = :owner',
+                    // Job rows exist from the moment analysis starts; only those
+                    // that produced a report belong in this list.
+                    FilterExpression: 'attribute_exists(report_id)',
+                    ExpressionAttributeValues: { ':owner': ownerSub },
+                    ScanIndexForward: false,
+                    ExclusiveStartKey: key,
+                }));
+                for (const item of page.Items || []) {
+                    if (!validReportId(item.report_id)) continue;
+                    reports.push({
+                        report_id: item.report_id,
+                        title: item.report_title || item.report_id,
+                        created_at: item.report_created_at || item.started_at,
+                        page_count: item.report_page_count ?? 0,
+                        doc_id: item.doc_id || '',
+                        session_id: item.session_id || '',
+                    });
+                }
+                key = page.LastEvaluatedKey;
+            } while (key);
+            // The index sorts on started_at, which is when the job began; the list
+            // shows when the report was generated. Order by what is displayed.
+            reports.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+            res.json({ reports });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/manifest', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            res.json(manifest);
+        } catch (e) {
+            res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/pages/:pageNumber/image', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            await sendReportObject(res, page.image_key, 'image/jpeg');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    // The enhanced copy of the page, when the run enhanced it. 404 rather than an
+    // error when absent: a clean page is never enhanced, and reports predating
+    // enhanced_image_key have none at all.
+    app.get('/api/reports/:reportId/pages/:pageNumber/enhanced-image', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            if (!page.enhanced_image_key) return res.status(404).json({ error: 'Page has no enhanced image' });
+            await sendReportObject(res, page.enhanced_image_key, 'image/jpeg');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/pages/:pageNumber/xml', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            await sendReportObject(res, page.spine_key, 'application/xml; charset=utf-8');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/download', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            await sendReportObject(res, manifest.html_key, 'text/html; charset=utf-8', `${manifest.report_id}.html`);
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
         }
     });
 
@@ -591,17 +797,31 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
 
     // ── Pricing Config ──
 
+    // The file supplies `ingestion`, `presets` and `specialist_defaults` — calculator inputs
+    // with no equivalent anywhere else. The `models` block is NOT in the file: it is built
+    // from the same registry × SSM join that backs GET /api/models, so the calculator cannot
+    // price a model this deployment has no profile for, and prices cannot drift from the
+    // registry the way the checked-in copy did.
     app.get('/api/pricing-config', async (_req, res) => {
         const configPath = resolve(CONFIG_DIR, 'pricing_config.json');
-        try { res.json(JSON.parse(await readFile(configPath, 'utf-8'))); }
-        catch (e) { res.status(500).json({ error: 'Failed to load pricing config: ' + e.message }); }
+        try {
+            const config = JSON.parse(await readFile(configPath, 'utf-8'));
+            const models = await listModels(ENV);
+            config.models = Object.fromEntries(models.map((m) => [
+                m.model_id,
+                {
+                    name: m.display_name,
+                    input_cost_per_million: m.price_in,
+                    output_cost_per_million: m.price_out,
+                },
+            ]));
+            res.json(config);
+        } catch (e) {
+            res.status(500).json({ error: 'Failed to load pricing config: ' + e.message });
+        }
     });
 
-    // ── Wizard stubs ──
-
-    app.post('/api/wizard/generate', (_req, res) => res.json({ prompts: {} }));
-    app.post('/api/wizard/preview', (_req, res) => res.json({}));
-    app.post('/api/wizard/deploy', (_req, res) => res.json({ output: 'Not yet wired' }));
+    // Wizard routes live in ./wizard.js, mounted separately from index.js.
 
     // ── Evaluator ──
 

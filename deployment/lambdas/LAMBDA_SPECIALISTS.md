@@ -42,17 +42,18 @@ BADGERS uses four types of Lambda functions:
 
 ### Vision Specialists
 
-| Variable                 | Required | Default     | Description                                          |
-| ------------------------ | -------- | ----------- | ---------------------------------------------------- |
-| `CONFIG_BUCKET`          | ✅        | -           | S3 bucket containing specialist configs              |
-| `OUTPUT_BUCKET`          | ✅        | -           | S3 bucket for saving results                         |
-| `SPECIALIST_NAME`        | ✅        | -           | Specialist identifier (e.g., `full_text_specialist`) |
-| `LOGGING_LEVEL`          | ❌        | `INFO`      | Log verbosity                                        |
-| `MAX_TOKENS`             | ❌        | `8000`      | Max response tokens from Bedrock                     |
-| `TEMPERATURE`            | ❌        | `0.1`       | Model temperature (lower = more deterministic)       |
-| `AWS_REGION`             | ❌        | `us-west-2` | Region for Bedrock calls                             |
-| `DYNAMIC_TOKENS_ENABLED` | ❌        | `false`     | Enable complexity-based dynamic token estimation     |
-| `JOBS_TABLE_NAME`        | ❌        | -           | DynamoDB jobs table. Unset disables job tracking     |
+| Variable                 | Required | Default     | Description                                                                                                                                                                                                                                                                                            |
+| ------------------------ | -------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CONFIG_BUCKET`          | ✅        | -           | S3 bucket containing specialist configs                                                                                                                                                                                                                                                                |
+| `OUTPUT_BUCKET`          | ✅        | -           | S3 bucket for saving results                                                                                                                                                                                                                                                                           |
+| `SPECIALIST_NAME`        | ✅        | -           | Specialist identifier (e.g., `full_text_specialist`)                                                                                                                                                                                                                                                   |
+| `MODEL_PROFILES_PARAM`   | ✅        | -           | Name of the SSM parameter mapping model ID → application inference profile ARN (`/badgers-{id}-{suffix}/model-profiles`). Set by the Lambda stack from the InferenceProfiles stack; the Bedrock client resolves the manifest's `model_id` through it. Replaces the per-model `*_PROFILE_ARN` variables |
+| `LOGGING_LEVEL`          | ❌        | `INFO`      | Log verbosity                                                                                                                                                                                                                                                                                          |
+| `MAX_TOKENS`             | ❌        | `16000`     | Max response tokens from Bedrock; the Lambda stack sets `16000`. Thinking models pin `temperature` to 1 regardless of `TEMPERATURE`                                                                                                                                                                    |
+| `TEMPERATURE`            | ❌        | `0.1`       | Model temperature as set by the Lambda stack (code default `0.3` if unset)                                                                                                                                                                                                                             |
+| `AWS_REGION`             | ❌        | `us-west-2` | Region for Bedrock calls                                                                                                                                                                                                                                                                               |
+| `DYNAMIC_TOKENS_ENABLED` | ❌        | `false`     | Enable complexity-based dynamic token estimation                                                                                                                                                                                                                                                       |
+| `JOBS_TABLE_NAME`        | ❌        | -           | DynamoDB jobs table. Unset disables job tracking                                                                                                                                                                                                                                                       |
 
 ### Input Parameters
 
@@ -223,6 +224,13 @@ The agent stamps `job_id` and `doc_id` into the tool input via a Strands
 asked to supply them — it would have to invent and then remember a UUID across turns,
 which is not something to depend on for the integrity of a tracking record.
 
+The same hook stamps `user_id` and `user_name`, but only into tools whose schema declares
+them, so ordinary specialists never receive an identity they have no use for. `user_id` is
+the caller's Cognito sub (`local` in local development); the hook also passes it to
+`create_job` as `owner_sub`, which is the sole record of who a run belongs to and the
+partition key of the `owner-index` GSI. Identity reaches the runtime from the UI server as
+`actor_id`/`user_name` on the invoke and WebSocket payloads — never from the model.
+
 ### What a specialist writes
 
 ```python
@@ -246,6 +254,19 @@ Status moves `PENDING → RUNNING → COMPLETE | FAILED`. On failure the excepti
 stored in the `error` attribute (truncated to 1024 characters), so a failed page carries
 its own reason.
 
+One specialist writes to the job-level row as well. After `html_report_specialist` has
+made both the report HTML and its manifest durable in S3, it records the report on that
+row so the UI can enumerate a user's reports from `owner-index` alone:
+
+```python
+job_state.set_report(job_id, report_id=report_id, title=title,
+                     created_at=created_at, page_count=len(pages))
+```
+
+The write is conditional on the job-level row already existing. An unconditional
+`update_item` is an upsert and would create a row carrying no `owner_sub` — invisible in
+the sparse index, and a job record for a job that was never tracked.
+
 ### Two properties worth relying on
 
 **Tracking never breaks analysis.** Every `job_state` write is wrapped so it logs a
@@ -265,9 +286,12 @@ job_state.get_job_records(job_id)   # job row plus every subtask
 job_state.get_record(job_id, subtask)
 ```
 
-> **Custom specialists skip tracking.** The wizard generator (`/api/wizard/generate`) is
-> still a stub and does not emit `job_id`/`doc_id` on generated schemas, so wizard-created
-> specialists are not stamped and record nothing.
+> **Custom specialists skip tracking.** `/api/wizard/generate` is no longer a stub — it
+> generates and deploys working specialists — but the schema it writes declares only
+> `session_id`, where every built-in schema also declares `job_id` and `doc_id`. Those two
+> are what the foundation layer stamps records from, so wizard-created specialists are still
+> not stamped and record nothing. Adding both to `buildSchema` in
+> `ui/server/routes/wizard.js` is what would close this.
 
 ---
 

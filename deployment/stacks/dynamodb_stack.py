@@ -45,6 +45,18 @@ Attributes (written by the orchestrator runtime and each specialist Lambda):
   reason           : why a new run was opened (job-level row only)
   ttl              : epoch seconds — records auto-expire after 30 days
 
+Job-level row only, written at create_job time and never on a subtask:
+  owner_sub        : Cognito sub of the user who started the run ('local' in
+                     local development). The only record of ownership, and the
+                     partition key of owner-index.
+  user_name        : that user's email, for display in reports
+
+Job-level row only, written once an HTML report has been generated:
+  report_id         : report identifier, also its S3 prefix segment
+  report_title      : report title as rendered
+  report_created_at : ISO-8601 timestamp of report generation
+  report_page_count : pages in the report
+
 GSI: status-index
   PK  status      — all subtasks in a given state (ops/monitoring, UI filters)
   SK  started_at
@@ -53,8 +65,14 @@ GSI: doc-index
   PK  doc_id      — every job and subtask belonging to one document
   SK  started_at
 
+GSI: owner-index
+  PK  owner_sub   — every job belonging to one user. Sparse: owner_sub exists
+                    only on the job-level row, so subtask rows never appear.
+  SK  started_at
+
 Query patterns: all subtasks of a job (Query on the table), all runs of a
-document (doc-index), everything currently RUNNING or FAILED (status-index).
+document (doc-index), everything currently RUNNING or FAILED (status-index),
+every report a user owns (owner-index, filtered to rows carrying report_id).
 """
 
 from aws_cdk import (
@@ -152,6 +170,43 @@ class DynamoDBStack(Stack):
                 "result_s3_key",
                 "error",
                 "completed_at",
+            ],
+        )
+
+        # GSI to list the reports belonging to one authenticated user.
+        #
+        # Sparse by design. owner_sub is written only on the job-level
+        # ('orchestrator') row by foundation/job_state.create_job, so this index
+        # holds exactly one entry per job and none of the per-page subtask rows.
+        # Jobs recorded before owner_sub propagation have no owner_sub at all and
+        # are absent from the index, which is the intended fail-closed outcome:
+        # a row whose owner cannot be established is not attributed to anybody.
+        #
+        # The report attributes are projected so the UI's report list is answered
+        # by this query alone. Adding a field to that list means adding it here
+        # too, and changing a GSI projection forces CloudFormation to replace the
+        # index — so the projection is deliberately the whole set the list route
+        # needs rather than the minimum it happens to render today.
+        self.jobs_table.add_global_secondary_index(
+            index_name="owner-index",
+            partition_key=dynamodb.Attribute(
+                name="owner_sub",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            sort_key=dynamodb.Attribute(
+                name="started_at",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            projection_type=dynamodb.ProjectionType.INCLUDE,
+            non_key_attributes=[
+                "doc_id",
+                "session_id",
+                "user_name",
+                "status",
+                "report_id",
+                "report_title",
+                "report_created_at",
+                "report_page_count",
             ],
         )
 

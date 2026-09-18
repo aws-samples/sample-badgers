@@ -112,6 +112,13 @@ step_infra() {
 
   # Service quotas for VPC, S3, ECR, Lambda, etc.
   preflight_service_quotas || return 1
+  # Bedrock model access, before anything is created. A model the account cannot reach
+  # otherwise surfaces as AccessDenied deep inside a document run, where _should_fallback
+  # correctly refuses to retry it — so a chain with a healthy fallback still hard-fails.
+  # Order matters: access (is the model there) → invocation (does a real call succeed).
+  # Each is cheap next to a failed deploy.
+  preflight_model_access || return 1
+  preflight_model_invocation || return 1
 
   # Decide about X-Ray before deploying anything. Enabling Transaction Search needs a
   # CloudWatch Logs resource policy from a hard quota of 10 per region, and finding that
@@ -159,13 +166,13 @@ step_upload() {
   config_bucket="$(stack_output "$(_sn S3)" ConfigBucketName)"
   if [ -z "${config_bucket}" ] || [ "${config_bucket}" = "None" ]; then
     log_error "$(_sn S3) not found. Run Step 2 first."
-    exit 1
+    return 1
   fi
 
   # Submenu: which config to sync
   local choice
   if [ "${DEPLOY_RESUME_MODE:-}" = "1" ]; then
-    choice="6"
+    choice="7"
   else
     echo ""
     echo "  Which config to upload?"
@@ -174,19 +181,25 @@ step_upload() {
     echo "    3) Manifests (tool schemas, model selections, prompt file lists)"
     echo "    4) Schemas (MCP-compatible input schemas)"
     echo "    5) Agent Config (agent operating environment, model config)"
-    echo "    6) All"
+    echo "    6) Runtime Config (model registry, document type contexts)"
+    echo "    7) All"
     echo ""
-    read -rp "  Choice [6]: " choice
-    choice="${choice:-6}"
+    read -rp "  Choice [7]: " choice
+    choice="${choice:-7}"
   fi
 
+  # Every arm must propagate failure. Arms 1-6 previously did not: a failed `aws s3 sync`
+  # inside _sync_config_category fell through to log_success and mark_complete, so the
+  # state file said "uploaded" while the bucket held the old files. Option 6 is how the
+  # model registry reaches S3 -- a silent miss there leaves GET /api/models serving 503.
   case "$choice" in
-    1) _sync_config_category "prompts" "$config_bucket" ;;
-    2) _sync_config_category "core_system_prompts" "$config_bucket" ;;
-    3) _sync_config_category "manifests" "$config_bucket" ;;
-    4) _sync_config_category "schemas" "$config_bucket" ;;
-    5) _sync_config_category "agent_config" "$config_bucket" ;;
-    6)
+    1) _sync_config_category "prompts" "$config_bucket" || return 1 ;;
+    2) _sync_config_category "core_system_prompts" "$config_bucket" || return 1 ;;
+    3) _sync_config_category "manifests" "$config_bucket" || return 1 ;;
+    4) _sync_config_category "schemas" "$config_bucket" || return 1 ;;
+    5) _sync_config_category "agent_config" "$config_bucket" || return 1 ;;
+    6) _sync_config_category "config" "$config_bucket" || return 1 ;;
+    7)
       log_info "Syncing all s3_files/ → s3://${config_bucket}/..."
       aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
         --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
@@ -200,18 +213,21 @@ step_upload() {
   mark_complete "s3_files_uploaded"
 }
 
-# Sync a single s3_files/ subdirectory to the config bucket (skips if absent).
+# Sync a single s3_files/ subdirectory to the config bucket. Returns non-zero on a sync
+# failure so the caller can refuse to mark the step complete. A missing directory is a
+# skip, not a failure -- not every category exists in every checkout.
 _sync_config_category() {
   local dir="$1" bucket="$2"
   local full_path="${DEPLOYMENT_DIR}/s3_files/${dir}"
-  if [ -d "${full_path}" ]; then
-    log_info "  Syncing ${dir}/ → s3://${bucket}/${dir}/"
-    aws s3 sync "${full_path}/" "s3://${bucket}/${dir}/" \
-      --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
-      --region "${AWS_REGION}" --quiet
-  else
+  if [ ! -d "${full_path}" ]; then
     log_warn "  Directory ${dir}/ not found in s3_files/ — skipping"
+    return 0
   fi
+  log_info "  Syncing ${dir}/ → s3://${bucket}/${dir}/"
+  aws s3 sync "${full_path}/" "s3://${bucket}/${dir}/" \
+    --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
+    --region "${AWS_REGION}" --quiet \
+    || { log_error "  Sync of ${dir}/ failed."; return 1; }
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -257,6 +273,9 @@ step_gateway() {
   fi
 
   ensure_xray_decision || return 1
+  # This stack creates the Gateway's delivery sources and owns the deployment's
+  # log-delivery resource policy, so it is the first place a conflicting source bites.
+  preflight_log_delivery || return 1
   export_cdk_env
 
   log_info "Deploying $(_sn Gateway)..."
@@ -269,7 +288,7 @@ step_gateway() {
     log_success "Gateway URL: ${gateway_url}"
   else
     log_error "Could not read GatewayUrl from $(_sn Gateway) outputs"
-    exit 1
+    return 1
   fi
 
   mark_complete "gateway_complete"
@@ -281,12 +300,27 @@ step_gateway() {
 step_runtime() {
   log_step "Step 6: Runtime — Build, Push & Deploy"
 
+  # Both sub-steps, not just the image push. An earlier guard tested only
+  # runtime_image_pushed, so a run that pushed the image but never deployed the runtime
+  # was skipped on resume; the fix removed the guard entirely, which made every resume
+  # rebuild and push the image whether or not step 6 was done. Skip only when the whole
+  # step is recorded complete; re-enter otherwise.
+  if check_completed "runtime_image_pushed" && check_completed "runtime_deployed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already complete. Re-running rebuilds and pushes the runtime image, then updates the stack."
+    _confirm || return 0
+  fi
+
   if [ -z "$(get_state "gateway_url")" ]; then
     log_error "Gateway URL not found. Run Step 5 (Gateway) first."
-    exit 1
+    return 1
   fi
 
   ecr_login
+
+  # Checked before the image build, which takes minutes — a conflicting delivery
+  # source would otherwise fail the deploy after all that work.
+  preflight_log_delivery || return 1
 
   # Ensure ARM64 cross-compilation works (QEMU on x86 hosts / WSL)
   preflight_docker_cross_platform arm64 || return 1
@@ -303,7 +337,7 @@ step_runtime() {
       --image-ids imageTag="${RUNTIME_IMAGE_TAG}" \
       --region "${AWS_REGION}" --no-cli-pager > /dev/null 2>&1; then
     log_error "${ECR_REPO}:${RUNTIME_IMAGE_TAG} not found in ECR after push."
-    exit 1
+    return 1
   fi
   log_success "Image verified in ECR: ${RUNTIME_IMAGE_TAG}"
   mark_complete "runtime_image_pushed"
@@ -322,6 +356,15 @@ step_runtime() {
 # ══════════════════════════════════════════════════════════════════════════
 step_ui_build() {
   log_step "Step 7: UI — Build & Push Image"
+
+  # This guard is what gives _ui_deploy_failed's invalidate_state("ui_image_pushed") any
+  # effect: step 8 clears the flag so that resume re-runs step 7. Without the guard, step
+  # 7 re-ran on every resume regardless, and the flag was decorative.
+  if check_completed "ui_image_pushed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already pushed. Re-running rebuilds the bundle and image and pushes again."
+    _confirm || return 0
+  fi
 
   ecr_login
 
@@ -679,6 +722,74 @@ show_status() {
   echo ""
 }
 
+# ══════════════════════════════════════════════════════════════════════════
+# Models — what the registry holds, and which steps a change to it requires
+# ══════════════════════════════════════════════════════════════════════════
+# The registry is the only place models are listed. Everything else -- profiles, IAM,
+# the SSM map, the wizard dropdown, prices -- derives from it at synth or at request
+# time. But "derives from it" means three different steps have to run for an edit to
+# take full effect, and nothing else in this menu says which. This does.
+show_models() {
+  local registry="${DEPLOYMENT_DIR}/s3_files/config/model_registry.json"
+  echo ""
+  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo -e "${BOLD}  Model Registry${NC}"
+  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo ""
+  echo "  ${registry#"${REPO_ROOT}/"}"
+  echo ""
+
+  if [ ! -f "${registry}" ]; then
+    log_error "Registry file not found."
+    return 1
+  fi
+
+  python3 - "${registry}" <<'PY' || { log_error "Could not parse the registry."; return 1; }
+import json, sys
+models = json.load(open(sys.argv[1]))["models"]
+rows = [(mid, s) for mid, s in models.items()]
+w = max(len(m) for m, _ in rows)
+print(f"  {'Model ID':<{w}}  {'Status':<9} {'Provider':<10} {'Thinking':<9} {'$/1M in':>8} {'$/1M out':>9}  Flags")
+print(f"  {'-'*w}  {'-'*9} {'-'*10} {'-'*9} {'-'*8} {'-'*9}  -----")
+for mid, s in rows:
+    flags = []
+    if s.get("thinking_default_on"):   flags.append("thinking-default-on")
+    if s.get("prompt_caching"):        flags.append("caching")
+    print(f"  {mid:<{w}}  {s.get('status','?'):<9} {s.get('provider','?'):<10} "
+          f"{str(s.get('thinking')):<9} {s.get('price_in',0):>8.2f} {s.get('price_out',0):>9.2f}  "
+          f"{', '.join(flags)}")
+by = {}
+for _, s in rows: by[s.get("status","?")] = by.get(s.get("status","?"), 0) + 1
+print()
+print("  " + ", ".join(f"{n} {k}" for k, n in sorted(by.items())))
+PY
+
+  echo ""
+  echo -e "${BOLD}  To change the model set${NC}"
+  echo ""
+  echo "  Edit the file above. status is one of:"
+  echo "    active    provisioned, granted, offered in the wizard"
+  echo "    retiring  provisioned and granted so existing manifests keep working; not offered"
+  echo "    disabled  nothing provisioned -- for a model this account declines to adopt"
+  echo ""
+  echo "  Then run these steps, in this order. Nothing else re-reads the registry:"
+  echo ""
+  echo "    2) Foundational Infra   profiles, IAM grants and the SSM model→profile map are"
+  echo "                            regenerated at synth. The model access and invocation"
+  echo "                            preflights re-run here."
+  echo "    3) Upload Config Files  option 6 (or 7) copies the registry to S3, which is what"
+  echo "                            GET /api/models and the wizard read. Skip this and the"
+  echo "                            UI keeps offering the old list."
+  echo "    6) Runtime              the agent role's Bedrock grants are generated into the"
+  echo "                            Runtime stack, so it must redeploy too. The image is"
+  echo "                            unchanged; step 6 will rebuild it anyway."
+  echo ""
+  echo "  Manifests under s3_files/manifests/ and custom_specialists/manifests/ name models"
+  echo "  by ID. A manifest naming a model that is not active fails with AccessDenied on"
+  echo "  its first call and does not fall back. grep them before deploying."
+  echo ""
+}
+
 reset_state() {
   log_warn "This resets deployment state and marks all steps incomplete."
   log_warn "It does NOT delete any AWS resources. The stack suffix is preserved."
@@ -730,7 +841,7 @@ EOF
   echo ""
   echo -e "  ${BOLD}10${NC}) Show Deployment Status"
   echo -e "  ${BOLD}11${NC}) Reset Deployment State (start fresh)"
-  echo -e "  ${BOLD} m${NC}) Model Configuration (placeholder)"
+  echo -e "  ${BOLD} m${NC}) Models — show the registry and how to change it"
   echo -e "  ${BOLD} 0${NC}) Exit"
   echo ""
   echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
@@ -751,8 +862,7 @@ dispatch() {
     10) show_status ;;
     11) reset_state ;;
     r|R|resume) step_resume ;;
-    m|M) echo ""; log_info "Model configuration not yet implemented for BADGERS."; echo ""
-      log_info "BADGERS currently uses models configured in the CDK stacks and manifests." ;;
+    m|M) show_models ;;
     0)  log_info "Exiting..."; exit 0 ;;
     *)  return 1 ;;
   esac

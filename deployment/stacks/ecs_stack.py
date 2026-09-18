@@ -29,6 +29,8 @@ The task role is scoped to exactly what the UI server calls:
   - bedrock-agentcore:InvokeAgentRuntime                   (HTTP invoke)
   - bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream (presigned wss:// chat)
   - bedrock-agentcore:ListGatewayTargets  (tool listing)
+  - bedrock:InvokeModel on the one model the Create Specialist wizard writes
+    prompts with (WIZARD_GENERATOR_MODEL_ID) -- profile and foundation model
   - dynamodb Query/GetItem/DeleteItem on the jobs table (+ GSI)
   - s3 Get/Put/List on the config, source and output buckets
   - logs StartQuery/GetQueryResults (observability tab)
@@ -38,6 +40,8 @@ The task role is scoped to exactly what the UI server calls:
 After the Express service exists, an AwsCustomResource re-points the Cognito UI
 client callback/logout URLs at the service endpoint (not known at synth time).
 """
+
+from typing import TYPE_CHECKING
 
 from aws_cdk import (
     Stack,
@@ -53,6 +57,9 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+if TYPE_CHECKING:
+    from .inference_profiles_stack import InferenceProfilesStack
+
 try:  # cdk-nag is an optional synth-time aspect (enabled via CDK_NAG=1 in app.py)
     from cdk_nag import NagSuppressions
 
@@ -61,6 +68,13 @@ except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
     _HAVE_CDK_NAG = False
 
 CONTAINER_PORT = 7860
+
+# The model the Create Specialist wizard writes prompts with (ui/server/routes/wizard.js,
+# POST /api/wizard/generate). It is the only Bedrock call the UI container makes, so it
+# is the only model the task role is granted. The same value is exported to the container
+# as WIZARD_GENERATOR_MODEL_ID, so the grant and the call cannot name different models.
+# Must be a model the registry provisions; InferenceProfilesStack raises at synth if not.
+WIZARD_GENERATOR_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 
 
 class ECSStack(Stack):
@@ -87,6 +101,7 @@ class ECSStack(Stack):
         ecr_repository_uri: str,
         agentcore_runtime_websocket_arn: str,
         agentcore_gateway_id: str,
+        inference_profiles_stack: "InferenceProfilesStack",
         stack_suffix: str,
         image_tag: str = "frontend",
         ws_timeout_minutes: str = "30",
@@ -306,6 +321,15 @@ class ECSStack(Stack):
             )
         )
 
+        # Bedrock — the Create Specialist wizard's prompt generator, and nothing else.
+        # Granted through the registry so the statements match the profiles that exist;
+        # `models=` narrows them to the one model wizard.js invokes. Without this the
+        # deployed wizard fails every section with AccessDeniedException while the same
+        # code works locally on the operator's own credentials.
+        inference_profiles_stack.grant_invoke_to_role(
+            self.task_role, models=[WIZARD_GENERATOR_MODEL_ID]
+        )
+
         # ── Infrastructure role (ECS manages the load balancer) ────
         self.infra_role = iam.Role(
             self,
@@ -371,6 +395,11 @@ class ECSStack(Stack):
                     ecs.CfnExpressGatewayService.KeyValuePairProperty(
                         name="STACK_SUFFIX",
                         value=stack_suffix,
+                    ),
+                    # Same constant the task role's Bedrock grant was built from.
+                    ecs.CfnExpressGatewayService.KeyValuePairProperty(
+                        name="WIZARD_GENERATOR_MODEL_ID",
+                        value=WIZARD_GENERATOR_MODEL_ID,
                     ),
                 ],
                 secrets=[
@@ -529,6 +558,11 @@ class ECSStack(Stack):
 
         # ── CDK Nag suppressions ───────────────────────────────────
         if _HAVE_CDK_NAG:
+            # Same source as the grant above, filtered to the same model, so the
+            # suppression cannot name an ARN the statement does not produce.
+            bedrock_applies_to = inference_profiles_stack.invoke_nag_applies_to(
+                models=[WIZARD_GENERATOR_MODEL_ID]
+            )
             NagSuppressions.add_resource_suppressions(
                 self.task_role,
                 [
@@ -540,6 +574,27 @@ class ECSStack(Stack):
                             "queries cannot be scoped to a single group at policy time."
                         ),
                         "appliesTo": ["Resource::*"],
+                    },
+                    {
+                        "id": "AwsSolutions-IAM5",
+                        "reason": (
+                            "Geo cross-Region inference requires bedrock:InvokeModel on "
+                            "the foundation model in the source Region AND in every "
+                            "destination Region the geo profile can route to. The model "
+                            "ID is pinned; only the Region field is wildcarded. Rationale "
+                            "and rejected alternatives: iam_stack.py and "
+                            "DEPLOYMENT_README.md -> Inference Profiles and Regions."
+                        ),
+                        "appliesTo": bedrock_applies_to["foundation_models"],
+                    },
+                    {
+                        "id": "AwsSolutions-IAM5",
+                        "reason": (
+                            "Cross-Region inference profiles are resolved per Region, so "
+                            "the Region field is wildcarded while the profile ID stays "
+                            "pinned. Scoped to this account."
+                        ),
+                        "appliesTo": bedrock_applies_to["system_inference_profiles"],
                     },
                     {
                         "id": "AwsSolutions-IAM5",

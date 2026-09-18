@@ -13,6 +13,7 @@ from typing import Any
 import boto3
 
 from foundation.bedrock_client import BedrockClient
+from foundation.model_selection import max_tokens_from, parse_model_selection
 from foundation.s3_config_loader import load_manifest_from_s3
 from foundation import job_state
 
@@ -263,41 +264,21 @@ def _load_config_from_s3(bucket: str, specialist_name: str) -> dict[str, Any]:
 def _get_model_config(config: dict) -> dict:
     """Extract model configuration from manifest.
 
+    Delegates to foundation.model_selection, the single parser. This function used to be a
+    second implementation, and it lost information the other one kept and vice versa: it
+    read adaptive_thinking and effort for the primary model, but flattened fallback_list to
+    bare model-ID strings and so discarded every per-fallback thinking setting.
+
+    It also defaulted a missing model_id to Opus 4.6 in both branches. That is now an error
+    instead — a silently defaulted model is how a specialist ends up invoking something
+    nobody chose, and it hid manifest mistakes.
+
     Returns:
-        Dict with model_id, max_tokens, and thinking settings
+        Dict with model_id, max_tokens, fallback_list, and thinking settings.
     """
-    model_selections = config.get("model_selections", {})
-    primary = model_selections.get("primary", {})
-
-    # Extract fallback list - handle both string and dict formats
-    fallback_raw = model_selections.get("fallback_list", [])
-    fallback_list = []
-    for item in fallback_raw:
-        if isinstance(item, dict):
-            fallback_list.append(item.get("model_id", item))
-        else:
-            fallback_list.append(item)
-
-    result = {
-        "max_tokens": config.get("expected_output_tokens", 12000),
-        "fallback_list": fallback_list,
-    }
-
-    # Handle both dict and string formats for primary
-    if isinstance(primary, dict):
-        result["model_id"] = primary.get("model_id", "us.anthropic.claude-opus-4-6-v1")
-        result["adaptive_thinking"] = primary.get("adaptive_thinking", False)
-        result["effort"] = primary.get("effort", "high")
-        result["extended_thinking"] = primary.get("extended_thinking", False)
-        result["budget_tokens"] = primary.get("budget_tokens")
-    else:
-        result["model_id"] = primary or "us.anthropic.claude-opus-4-6-v1"
-        result["adaptive_thinking"] = False
-        result["extended_thinking"] = False
-        result["effort"] = "high"
-        result["budget_tokens"] = None
-
-    return result
+    selection = parse_model_selection(config)
+    selection["max_tokens"] = max_tokens_from(config, default=12000)
+    return selection
 
 
 def _fetch_s3_content(s3: Any, s3_uri: str) -> str:
