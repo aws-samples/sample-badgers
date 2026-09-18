@@ -91,7 +91,7 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
             ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
             │   Lambda    │    │   Lambda    │    │   Lambda    │
             │ Specialist  │    │ Specialist  │    │ Specialist  │
-            │ (26 tools)  │    │             │    │             │
+            │ (27 tools)  │    │             │    │             │
             └─────────────┘    └─────────────┘    └─────────────┘
                    │                  │                  │
                    └──────────────────┼──────────────────┘
@@ -191,7 +191,7 @@ The eight steps:
 | 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                                                                             |
 | 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC                                                              |
 | 3   | Upload Config      | prompts, manifests and schemas to the config bucket                                                                                  |
-| 4   | Specialist Lambdas | container images, then the Lambda stack (12 of 26 specialists enabled by default; `deployment/deployment_config.json` selects which) |
+| 4   | Specialist Lambdas | container images, then the Lambda stack (12 of 27 specialists enabled by default; `deployment/deployment_config.json` selects which) |
 | 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                                                                                       |
 | 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime                                                                          |
 | 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image                                                                        |

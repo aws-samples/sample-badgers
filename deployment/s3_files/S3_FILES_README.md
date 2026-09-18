@@ -116,23 +116,24 @@ The wrapper uses placeholder injection:
 
 JSON configuration files defining each specialist tool's metadata, model selection, prompt files, and runtime settings.
 
-| Manifest                          | Specialist Purpose                           |
-| --------------------------------- | -------------------------------------------- |
-| 📄 `full_text_specialist.json`     | General text extraction with reading order   |
-| 📊 `table_specialist.json`         | Structured table data extraction             |
-| 📈 `charts_specialist.json`        | Chart and graph data extraction              |
-| 🔀 `diagram_specialist.json`       | Flowchart and diagram interpretation         |
-| ✍️ `handwriting_specialist.json`   | Handwritten text OCR                         |
-| 🏥 `decision_tree_specialist.json` | Clinical decision trees and medical content  |
-| 💻 `code_block_specialist.json`    | Source code extraction                       |
-| 📐 `layout_specialist.json`        | Page layout structure analysis               |
-| 🧩 `elements_specialist.json`      | Document element identification              |
-| 🏷️ `metadata_*_specialist.json`    | MODS/MADS/Generic metadata extraction        |
-| 🗺️ `war_map_specialist.json`       | Historical military map analysis             |
-| 🔬 `scientific_specialist.json`    | Scientific notation and formulas             |
-| 🏷️ `classify_pdf_content.json`     | Page content classification                  |
-| 🖼️ `pdf_processor.json`            | PDF-to-image conversion orchestration        |
-| 🔗 `correlation_specialist.json`   | Multi-specialist result correlation per page |
+| Manifest                             | Specialist Purpose                            |
+| ------------------------------------ | --------------------------------------------- |
+| 📄 `full_text_specialist.json`        | General text extraction with reading order    |
+| 📊 `table_specialist.json`            | Structured table data extraction              |
+| 📈 `charts_specialist.json`           | Chart and graph data extraction               |
+| 🔀 `diagram_specialist.json`          | Flowchart and diagram interpretation          |
+| ✍️ `handwriting_specialist.json`      | Handwritten text OCR                          |
+| 🔢 `handwriting_math_specialist.json` | Handwritten mathematical notation and working |
+| 🏥 `decision_tree_specialist.json`    | Clinical decision trees and medical content   |
+| 💻 `code_block_specialist.json`       | Source code extraction                        |
+| 📐 `layout_specialist.json`           | Page layout structure analysis                |
+| 🧩 `elements_specialist.json`         | Document element identification               |
+| 🏷️ `metadata_*_specialist.json`       | MODS/MADS/Generic metadata extraction         |
+| 🗺️ `war_map_specialist.json`          | Historical military map analysis              |
+| 🔬 `scientific_specialist.json`       | Scientific notation and formulas              |
+| 🏷️ `classify_pdf_content.json`        | Page content classification                   |
+| 🖼️ `pdf_processor.json`               | PDF-to-image conversion orchestration         |
+| 🔗 `correlation_specialist.json`      | Multi-specialist result correlation per page  |
 
 Each manifest contains:
 - `tool`: MCP tool definition (name, description, inputSchema including `audit_mode` boolean)
@@ -182,7 +183,7 @@ Used by the MCP server for request validation and by clients for understanding t
 
 ### Job tracking parameters
 
-All 26 schemas declare `job_id` and `doc_id` alongside `session_id`:
+All 27 schemas declare `job_id` and `doc_id` alongside `session_id`:
 
 ```json
 "job_id": {
