@@ -1,10 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [5.0.0] - 2026-09-16
 
-Everything on top of `[4.0.0]`, targeting **5.0.0**: 15 commits `f6ad01e` through `f352f2e`,
-plus the uncommitted model migration described first below. `pyproject.toml` reads `5.0.0`;
-nothing here has been tagged or released yet.
+Everything since `[4.0.0]` (2026-08-07). `pyproject.toml` reads `5.0.0`. This is the first
+tagged release of the repository; earlier versions exist only as CHANGELOG entries.
 
 > [!WARNING]
 > **5.0 is a fresh-install release. There is no upgrade path from 4.x.**
@@ -587,9 +586,12 @@ the UI env file, or reading per-model profile environment variables; all are mar
   deliveries written by `delivery.logs.amazonaws.com`, not by the role. If a Gateway code path
   does turn out to use the role for X-Ray, traces stop arriving silently; confirm a trace
   appears in X-Ray Transaction Search after the first chat message on a fresh deploy.
-- **`BADGERS-Vpc` has no measured cdk-nag state.** `vpc_stack.py`'s `max_azs=2` resolves
+- ~~**`BADGERS-Vpc` has no measured cdk-nag state.** `vpc_stack.py`'s `max_azs=2` resolves
   availability zones through a context lookup, which fails without live credentials, so
-  cdk-nag never evaluates the stack. Every other stack reports 0 findings.
+  cdk-nag never evaluates the stack.~~ **Resolved** — synthesized with live credentials on
+  2026-09-16: 8 rule evaluations, 7 compliant, 1 suppressed (`AwsSolutions-EC23` on the
+  endpoint security group, whose ingress rule uses the VPC `CidrBlock` intrinsic the rule
+  cannot evaluate; the reason is on the resource). All 14 stacks now report 0 findings.
 - On resume, `step_runtime`'s guard tests only `runtime_image_pushed`, so a deployment
   that pushed the runtime image but never deployed the runtime is skipped rather than
   re-entered. The previous resume table checked both keys.
