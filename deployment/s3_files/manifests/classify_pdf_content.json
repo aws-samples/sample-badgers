@@ -36,8 +36,6 @@
             "classify_pdf_content_gestalt.xml",
             "classification_job_role.xml",
             "classification_context.xml",
-            "classification_tools.xml",
-            "classification_tool_rules.xml",
             "classification_rules.xml",
             "classification_format.xml",
             "classification_tasks.xml"
