@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  BADGERS Content Tree Schema v2.0
+  =================================
+  Formal schema for the correlation specialist's unified_document output.
+  The content_tree structure uses PDF/UA (ISO 14289-1) tag names and mirrors
+  the nesting model of a PDF structure tree.
+
+  This is the primary interoperability schema for BADGERS — it defines the
+  document spine that downstream consumers (remediation, export, academic
+  mapping) operate on.
+
+  Namespace:  https://github.com/aws-samples/sample-badgers/schemas/content-tree
+  Version:    2.0 (September 2026, BADGERS v5.0)
+  License:    Apache-2.0
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="https://github.com/aws-samples/sample-badgers/schemas/content-tree"
+           xmlns:bct="https://github.com/aws-samples/sample-badgers/schemas/content-tree"
+           elementFormDefault="qualified">
+
+    <!-- ================================================================
+         ROOT: unified_document
+         ================================================================ -->
+    <xs:element name="unified_document">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="metadata" type="bct:MetadataType"/>
+                <xs:element name="content_tree" type="bct:ContentTreeType"/>
+                <xs:element name="cross_reference_index" type="bct:CrossReferenceIndexType" minOccurs="0"/>
+                <xs:element name="raw_outputs" type="bct:RawOutputsType" minOccurs="0"/>
+                <xs:element name="summary" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+            <xs:attribute name="session_id" type="xs:string" use="required"/>
+            <xs:attribute name="page" type="xs:positiveInteger" use="required"/>
+            <xs:attribute name="schema_version" type="xs:string" use="required"/>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- ================================================================
+         METADATA
+         ================================================================ -->
+    <xs:complexType name="MetadataType">
+        <xs:sequence>
+            <xs:element name="source_image" type="xs:string"/>
+            <xs:element name="correlation_timestamp" type="xs:string"/>
+            <xs:element name="specialists_executed" type="bct:SpecialistsExecutedType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="SpecialistsExecutedType">
+        <xs:sequence>
+            <xs:element name="specialist" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="name" type="xs:string" use="required"/>
+                    <xs:attribute name="s3_uri" type="xs:string" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ================================================================
+         CONTENT TREE — the spine
+         ================================================================ -->
+    <xs:complexType name="ContentTreeType">
+        <xs:sequence>
+            <xs:element name="sect" type="bct:SectType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Sect: structural grouping (mirrors PDF/UA Sect) -->
+    <xs:complexType name="SectType">
+        <xs:sequence>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="sect" type="bct:SectType"/>
+                <xs:element name="element" type="bct:ElementType"/>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+        <xs:attribute name="tag" type="xs:string" use="optional">
+            <xs:annotation>
+                <xs:documentation>
+                    Optional tag override for non-Sect groupings (e.g., "BlockQuote").
+                    Defaults to "Sect" if omitted.
+                </xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+
+    <!-- Element: a content node in the tree -->
+    <xs:complexType name="ElementType">
+        <xs:sequence>
+            <xs:element name="text" type="xs:string" minOccurs="0"/>
+            <xs:element name="alt_text" type="xs:string" minOccurs="0"/>
+            <xs:element name="caption" type="xs:string" minOccurs="0"/>
+            <xs:element name="inline" type="bct:InlineType" minOccurs="0"/>
+            <xs:element name="children" type="bct:ChildrenType" minOccurs="0"/>
+            <xs:element name="enrichments" type="bct:EnrichmentsType" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+        <xs:attribute name="tag" type="bct:PdfUaTagEnum" use="required"/>
+        <xs:attribute name="order" type="xs:nonNegativeInteger" use="optional"/>
+        <xs:attribute name="page" type="xs:positiveInteger" use="optional"/>
+        <xs:attribute name="placement" type="bct:PlacementEnum" use="optional"/>
+        <xs:attribute name="scope" type="bct:ScopeEnum" use="optional">
+            <xs:annotation>
+                <xs:documentation>Required for TH elements. "Column" or "Row".</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="ref" type="xs:string" use="optional">
+            <xs:annotation>
+                <xs:documentation>
+                    Cross-reference to another element ID.
+                    Used by Reference (→ Note), Caption (→ Figure/Table).
+                </xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="parent_ref" type="xs:string" use="optional"/>
+        <xs:attribute name="lang" type="xs:string" use="optional"/>
+    </xs:complexType>
+
+    <!-- Inline: elements nested inside a block-level parent -->
+    <xs:complexType name="InlineType">
+        <xs:sequence>
+            <xs:element name="element" type="bct:ElementType" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Children: structural sub-elements (tables, lists) -->
+    <xs:complexType name="ChildrenType">
+        <xs:sequence>
+            <xs:element name="element" type="bct:ElementType" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ================================================================
+         ENRICHMENTS — specialist-contributed annotations
+         ================================================================ -->
+    <xs:complexType name="EnrichmentsType">
+        <xs:sequence>
+            <xs:element name="chart" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType mixed="true">
+                    <xs:sequence>
+                        <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                    <xs:attribute name="ref" type="xs:string"/>
+                    <xs:attribute name="type" type="xs:string"/>
+                    <xs:attribute name="category" type="xs:string"/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="table" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType mixed="true">
+                    <xs:sequence>
+                        <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                    <xs:attribute name="ref" type="xs:string"/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="diagram" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType mixed="true">
+                    <xs:sequence>
+                        <xs:any processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                    <xs:attribute name="ref" type="xs:string"/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="cross_reference" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="relationship" type="xs:string" minOccurs="0"/>
+                        <xs:element name="evidence" type="xs:string" minOccurs="0"/>
+                    </xs:sequence>
+                    <xs:attribute name="target" type="xs:string"/>
+                    <xs:attribute name="type" type="xs:string"/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="keyword_topic" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="keyword" type="xs:string" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="grounded_to_text" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="ref" maxOccurs="unbounded">
+                            <xs:complexType>
+                                <xs:sequence>
+                                    <xs:element name="evidence" type="xs:string" minOccurs="0"/>
+                                </xs:sequence>
+                                <xs:attribute name="element" type="xs:string"/>
+                                <xs:attribute name="relationship" type="xs:string"/>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ================================================================
+         CROSS-REFERENCE INDEX (document-level)
+         ================================================================ -->
+    <xs:complexType name="CrossReferenceIndexType">
+        <xs:sequence>
+            <xs:element name="by_chart" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="chart" maxOccurs="unbounded">
+                            <xs:complexType>
+                                <xs:attribute name="ref" type="xs:string"/>
+                                <xs:attribute name="grounded_to" type="xs:string"/>
+                                <xs:attribute name="referenced_by" type="xs:string"/>
+                                <xs:attribute name="illustrates" type="xs:string"/>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="by_table" minOccurs="0">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="table" maxOccurs="unbounded">
+                            <xs:complexType>
+                                <xs:attribute name="ref" type="xs:string"/>
+                                <xs:attribute name="grounded_to" type="xs:string"/>
+                                <xs:attribute name="referenced_by" type="xs:string"/>
+                            </xs:complexType>
+                        </xs:element>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ================================================================
+         RAW OUTPUTS — references to per-specialist results
+         ================================================================ -->
+    <xs:complexType name="RawOutputsType">
+        <xs:sequence>
+            <xs:element name="output" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="specialist" type="xs:string" use="required"/>
+                    <xs:attribute name="s3_uri" type="xs:string" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- ================================================================
+         ENUMERATIONS
+         ================================================================ -->
+
+    <!-- PDF/UA structure tags used in the content tree -->
+    <xs:simpleType name="PdfUaTagEnum">
+        <xs:annotation>
+            <xs:documentation>
+                PDF/UA (ISO 14289-1) structure element tags supported by BADGERS.
+                Organized by category for readability.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <!-- Structural grouping -->
+            <xs:enumeration value="Document"/>
+            <xs:enumeration value="Sect"/>
+
+            <!-- Headings -->
+            <xs:enumeration value="H1"/>
+            <xs:enumeration value="H2"/>
+            <xs:enumeration value="H3"/>
+            <xs:enumeration value="H4"/>
+            <xs:enumeration value="H5"/>
+            <xs:enumeration value="H6"/>
+
+            <!-- Paragraphs and text -->
+            <xs:enumeration value="P"/>
+            <xs:enumeration value="Span"/>
+            <xs:enumeration value="Quote"/>
+            <xs:enumeration value="BlockQuote"/>
+
+            <!-- Lists -->
+            <xs:enumeration value="L"/>
+            <xs:enumeration value="LI"/>
+            <xs:enumeration value="Lbl"/>
+            <xs:enumeration value="LBody"/>
+
+            <!-- Tables -->
+            <xs:enumeration value="Table"/>
+            <xs:enumeration value="THead"/>
+            <xs:enumeration value="TBody"/>
+            <xs:enumeration value="TFoot"/>
+            <xs:enumeration value="TR"/>
+            <xs:enumeration value="TH"/>
+            <xs:enumeration value="TD"/>
+
+            <!-- Figures and media -->
+            <xs:enumeration value="Figure"/>
+            <xs:enumeration value="Caption"/>
+            <xs:enumeration value="Formula"/>
+            <xs:enumeration value="Code"/>
+
+            <!-- Links and references -->
+            <xs:enumeration value="Link"/>
+            <xs:enumeration value="Reference"/>
+            <xs:enumeration value="Note"/>
+            <xs:enumeration value="BibEntry"/>
+
+            <!-- Navigation -->
+            <xs:enumeration value="TOC"/>
+            <xs:enumeration value="TOCI"/>
+
+            <!-- Non-content -->
+            <xs:enumeration value="Artifact"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="PlacementEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Inline"/>
+            <xs:enumeration value="Block"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="ScopeEnum">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Column"/>
+            <xs:enumeration value="Row"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

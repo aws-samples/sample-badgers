@@ -2,7 +2,7 @@
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🗺️ **Navigation:**</sub><br>
-<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Schema](schemas/VOCABULARY.md)</sub>
 
 ---
 
@@ -126,6 +126,19 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 | 🏗️ IaC              | AWS CDK (Python)                                                        |
 | 📈 Observability    | CloudWatch Logs, X-Ray Transaction Search                               |
 | 📊 Cost Tracking    | Bedrock Application Inference Profiles                                  |
+
+## 📐 Schema & Vocabulary
+
+BADGERS defines a formal element vocabulary — 14 document element types with sub-types — used across all structural analysis specialists. The vocabulary is published in machine-readable formats for external consumption and interoperability:
+
+| File | Format | Purpose |
+|------|--------|---------|
+| [`badgers-content-tree.xsd`](schemas/badgers-content-tree.xsd) | XML Schema | **Primary interop schema** — PDF/UA content tree (the document spine) |
+| [`badgers-elements.xsd`](schemas/badgers-elements.xsd) | XML Schema | Validate specialist XML output |
+| [`badgers-elements.jsonld`](schemas/badgers-elements.jsonld) | JSON-LD Context | Linked-data interop — maps types to [Schema.org](https://schema.org/) and [Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) |
+| [`MAPPING.md`](schemas/MAPPING.md) | Mapping Reference | Rosetta stone — BADGERS ↔ JATS, ALTO, Dublin Core, PREMIS |
+
+See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions, sub-types, citation styles, and usage examples.
 
 ## 🔬 Specialists
 

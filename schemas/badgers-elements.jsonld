@@ -1,0 +1,77 @@
+{
+  "@context": {
+    "badgers": "https://github.com/aws-samples/sample-badgers/schemas/elements#",
+    "schema": "https://schema.org/",
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "dcterms": "http://purl.org/dc/terms/",
+
+    "Element": "badgers:Element",
+    "order": "badgers:order",
+    "type": "badgers:elementType",
+    "sub_type": "badgers:elementSubType",
+    "hierarchical_level": "badgers:hierarchicalLevel",
+    "content": "badgers:content",
+    "style": "badgers:citationStyle",
+    "location": "badgers:location",
+    "page": "badgers:page",
+    "position": "badgers:position",
+    "context": "badgers:context",
+
+    "document_title": {
+      "@id": "badgers:document_title",
+      "schema:equivalentProperty": "schema:name"
+    },
+    "section": {
+      "@id": "badgers:section",
+      "schema:equivalentProperty": "schema:hasPart"
+    },
+    "heading": {
+      "@id": "badgers:heading",
+      "schema:equivalentProperty": "schema:headline"
+    },
+    "paragraph": {
+      "@id": "badgers:paragraph",
+      "schema:equivalentProperty": "schema:text"
+    },
+    "citation": {
+      "@id": "badgers:citation",
+      "schema:equivalentProperty": "schema:citation"
+    },
+    "reference": {
+      "@id": "badgers:reference",
+      "dcterms:equivalentProperty": "dcterms:references"
+    },
+    "caption": {
+      "@id": "badgers:caption",
+      "schema:equivalentProperty": "schema:caption"
+    },
+    "quote": {
+      "@id": "badgers:quote",
+      "schema:equivalentProperty": "schema:citation"
+    },
+    "equation": {
+      "@id": "badgers:equation",
+      "schema:equivalentProperty": "schema:mathExpression"
+    },
+    "list": {
+      "@id": "badgers:list",
+      "schema:equivalentProperty": "schema:itemListElement"
+    },
+    "footnote": {
+      "@id": "badgers:footnote",
+      "dcterms:equivalentProperty": "dcterms:description"
+    },
+    "table_of_contents": {
+      "@id": "badgers:table_of_contents",
+      "dcterms:equivalentProperty": "dcterms:tableOfContents"
+    },
+    "abstract": {
+      "@id": "badgers:abstract",
+      "dcterms:equivalentProperty": "dcterms:abstract"
+    },
+    "keyword": {
+      "@id": "badgers:keyword",
+      "schema:equivalentProperty": "schema:keywords"
+    }
+  }
+}
