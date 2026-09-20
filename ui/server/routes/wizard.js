@@ -144,9 +144,14 @@ function sanitizeName(displayName) {
     let base = String(displayName || '')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
+        // The collapse above guarantees no '__' run, so leading/trailing
+        // underscores are at most one char. Strip a single one at each end
+        // (no '+' quantifier) to avoid a polynomial-backtracking regex on
+        // attacker-controlled input (ReDoS).
+        .replace(/^_/, '')
+        .replace(/_$/, '');
     if (!base) return '';
-    while (base.endsWith('_specialist')) base = base.slice(0, -'_specialist'.length).replace(/_+$/, '');
+    while (base.endsWith('_specialist')) base = base.slice(0, -'_specialist'.length).replace(/_$/, '');
     return base ? `${base}_specialist` : '';
 }
 
