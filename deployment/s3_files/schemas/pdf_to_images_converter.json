@@ -1,13 +1,13 @@
 [
   {
     "name": "pdf_to_images_converter",
-    "description": "Convert PDF documents to optimized images for AI analysis. Returns S3 paths to pre-encoded base64 image files (one per page) that can be passed directly to specialist tools via image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
+    "description": "Convert a source document (a PDF, or a single uploaded image: PNG, JPEG, TIFF, WebP, or GIF) into optimized page images for AI analysis. A PDF is rasterized one image per page; an image is already a single page and is only normalized (resized and re-encoded), never rasterized. Returns S3 paths to pre-encoded base64 image files that can be passed directly to specialist tools via the image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "pdf_path": {
+        "document_path": {
           "type": "string",
-          "description": "S3 URL (s3://bucket/key) or absolute file path to the PDF document to process."
+          "description": "S3 URL (s3://bucket/key) or absolute file path to the source document to process. May be a PDF or a single image (PNG, JPEG, TIFF, WebP, GIF)."
         },
         "max_image_size_mb": {
           "type": "number",
@@ -15,7 +15,7 @@
         },
         "dpi": {
           "type": "integer",
-          "description": "Resolution in dots per inch for PDF to image conversion. Default: 128"
+          "description": "Resolution in dots per inch for PDF-to-image rasterization. Ignored for image inputs. Default: 128"
         },
         "aws_profile": {
           "type": "string",
@@ -31,7 +31,7 @@
         }
       },
       "required": [
-        "pdf_path"
+        "document_path"
       ]
     },
     "outputSchema": {

@@ -83,6 +83,16 @@ def lambda_handler(event, context):
                 job_id, subtask, "Missing required parameter: pdf_path"
             )
             return _error_response("Missing required parameter: pdf_path")
+        # Remediation tags an existing PDF's structure tree; there is no source
+        # PDF to remediate for a directly-uploaded image. Reject it with a clear,
+        # actionable message rather than failing deep inside pikepdf/PyMuPDF.
+        if not pdf_path.lower().endswith(".pdf"):
+            message = (
+                "PDF remediation was unable to process this input because it is "
+                "an image, not a PDF. Please provide a PDF document."
+            )
+            job_state.mark_failed(job_id, subtask, message)
+            return _error_response(message)
         if not correlation_uri:
             job_state.mark_failed(
                 job_id, subtask, "Missing required parameter: correlation_uri"
