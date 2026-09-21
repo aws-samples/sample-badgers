@@ -92,8 +92,14 @@ export async function listModels(ENV = process.env) {
         readRegistry(s3Client, ENV.S3_CONFIG_BUCKET || ''),
     ]);
 
+    // A model is offered when it is active AND deployed. "Deployed" means it has an
+    // application inference profile in the SSM map — except mantle models, which have no
+    // profile by design (they attribute cost through the Bedrock default project), so their
+    // presence in the active registry is sufficient.
     const models = Object.entries(registry)
-        .filter(([modelId, spec]) => spec.status === 'active' && modelId in profiles)
+        .filter(([modelId, spec]) =>
+            spec.status === 'active' &&
+            (modelId in profiles || spec.transport === 'mantle'))
         .map(([modelId, spec]) => ({
             model_id: modelId,
             display_name: spec.display_name,
