@@ -1,5 +1,44 @@
 # Changelog
 
+## [5.0.1] - 2026-09-21
+
+Since `[5.0.0]`. Three vision-capable models added, and a second inference transport
+alongside Converse. `pyproject.toml` reads `5.0.1`.
+
+### Added
+
+- **Three vision models (eleven active total).** Kimi K3 (`us.moonshotai.kimi-k3`,
+  `$3.30`/`$16.50`) and Pixtral Large (`us.mistral.pixtral-large-2502-v1:0`, `$2.00`/`$6.00`)
+  join on the existing Converse path — registry entries plus their providers (`moonshotai`,
+  `mistral`) added to `VALID_PROVIDERS` and families to `get_model_family`; profiles, IAM,
+  and the wizard dropdown derive automatically with no other code change. Gemma 4 31B
+  (`google.gemma-4-31b`, `$0.14`/`$0.40`) joins on the new **mantle** transport below.
+
+- **A second transport: `mantle`.** Gemma 4 31B is served only on the OpenAI-compatible
+  `bedrock-mantle` endpoint, not Converse. `bedrock_client.py` gains a transport dispatch in
+  `_invoke_single_model` and an `_invoke_mantle` path: an OpenAI Chat Completions request
+  (`/openai/v1/chat/completions`) signed with SigV4 under the `bedrock-mantle` service and
+  POSTed over HTTP, its response normalized to the same envelope Converse returns.
+  `VALID_TRANSPORTS` gains `mantle`; `get_transport()` resolves it by model ID because the
+  registry is not shipped to the Lambda layer.
+
+- **`cross_region` registry field.** Marks an In-Region-only model whose key is the bare
+  foundation-model ID and whose application profile wraps the foundation model directly
+  rather than a `us.*` system profile. Present and validated, but currently unused — no such
+  model is registered.
+
+### Changed
+
+- **Mantle models have no application inference profile.** They are excluded from profile
+  creation, the SSM `model-profiles` map, and the two inference-profile IAM statements, and
+  are instead granted the foundation model plus `bedrock:InvokeModel` on `project/default`
+  (the OpenAI default-project grant now also covers mantle). Cost is attributed to the
+  Bedrock **default project**, not a per-model profile.
+
+- **The wizard offers mantle models without a profile.** `GET /api/models` now includes a
+  model when it is `active` and either has a profile in the SSM map or uses the `mantle`
+  transport.
+
 ## [5.0.0] - 2026-09-16
 
 Everything since `[4.0.0]` (2026-08-07). `pyproject.toml` reads `5.0.0`. This is the first

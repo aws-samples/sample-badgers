@@ -6,7 +6,7 @@
 
 ---
 
-# 🦡 BADGERS v5.0 as of September 2026
+# 🦡 BADGERS v5.0.1 as of September 2026
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
@@ -112,31 +112,31 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 
 ## 🛠️ Tech Stack
 
-| Component          | Technology                                                              |
-| ------------------ | ----------------------------------------------------------------------- |
-| 🤖 Agent Framework  | [Strands Agents](https://github.com/strands-agents/strands-agents)      |
-| 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                        |
-| 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                         |
-| 🧠 Foundation Model | Claude Opus 4.6 for the agent; eight models for specialists (see below) |
-| ⚡ Compute          | AWS Lambda (modular specialist functions, including container-based)    |
-| 📦 Storage          | Amazon S3 (configs, prompts, outputs)                                   |
-| 📋 Job Tracking     | Amazon DynamoDB (document → job → subtask state)                        |
-| 🖥️ UI Hosting       | Amazon ECS Express Gateway service (in a VPC)                           |
-| 🔐 Auth             | Amazon Cognito (OIDC + PKCE for the UI, OAuth 2.0 M2M for the Gateway)  |
-| 🏗️ IaC              | AWS CDK (Python)                                                        |
-| 📈 Observability    | CloudWatch Logs, X-Ray Transaction Search                               |
-| 📊 Cost Tracking    | Bedrock Application Inference Profiles                                  |
+| Component          | Technology                                                               |
+| ------------------ | ------------------------------------------------------------------------ |
+| 🤖 Agent Framework  | [Strands Agents](https://github.com/strands-agents/strands-agents)       |
+| 🏠 Agent Hosting    | Amazon Bedrock AgentCore Runtime                                         |
+| 🚪 Tool Gateway     | Amazon Bedrock AgentCore Gateway (MCP Protocol)                          |
+| 🧠 Foundation Model | Claude Opus 4.6 for the agent; eleven models for specialists (see below) |
+| ⚡ Compute          | AWS Lambda (modular specialist functions, including container-based)     |
+| 📦 Storage          | Amazon S3 (configs, prompts, outputs)                                    |
+| 📋 Job Tracking     | Amazon DynamoDB (document → job → subtask state)                         |
+| 🖥️ UI Hosting       | Amazon ECS Express Gateway service (in a VPC)                            |
+| 🔐 Auth             | Amazon Cognito (OIDC + PKCE for the UI, OAuth 2.0 M2M for the Gateway)   |
+| 🏗️ IaC              | AWS CDK (Python)                                                         |
+| 📈 Observability    | CloudWatch Logs, X-Ray Transaction Search                                |
+| 📊 Cost Tracking    | Bedrock Application Inference Profiles                                   |
 
 ## 📐 Schema & Vocabulary
 
 BADGERS defines a formal element vocabulary — 14 document element types with sub-types — used across all structural analysis specialists. The vocabulary is published in machine-readable formats for external consumption and interoperability:
 
-| File | Format | Purpose |
-|------|--------|---------|
-| [`badgers-content-tree.xsd`](schemas/badgers-content-tree.xsd) | XML Schema | **Primary interop schema** — PDF/UA content tree (the document spine) |
-| [`badgers-elements.xsd`](schemas/badgers-elements.xsd) | XML Schema | Validate specialist XML output |
-| [`badgers-elements.jsonld`](schemas/badgers-elements.jsonld) | JSON-LD Context | Linked-data interop — maps types to [Schema.org](https://schema.org/) and [Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) |
-| [`MAPPING.md`](schemas/MAPPING.md) | Mapping Reference | Rosetta stone — BADGERS ↔ JATS, ALTO, Dublin Core, PREMIS |
+| File                                                           | Format            | Purpose                                                                                                                                                    |
+| -------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`badgers-content-tree.xsd`](schemas/badgers-content-tree.xsd) | XML Schema        | **Primary interop schema** — PDF/UA content tree (the document spine)                                                                                      |
+| [`badgers-elements.xsd`](schemas/badgers-elements.xsd)         | XML Schema        | Validate specialist XML output                                                                                                                             |
+| [`badgers-elements.jsonld`](schemas/badgers-elements.jsonld)   | JSON-LD Context   | Linked-data interop — maps types to [Schema.org](https://schema.org/) and [Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) |
+| [`MAPPING.md`](schemas/MAPPING.md)                             | Mapping Reference | Rosetta stone — BADGERS ↔ JATS, ALTO, Dublin Core, PREMIS                                                                                                  |
 
 See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions, sub-types, citation styles, and usage examples.
 
@@ -469,7 +469,7 @@ Four metrics are combined into a complexity score: text pixel ratio, grayscale e
 
 ### 📊 Inference Profiles for Cost Tracking
 
-BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring. Every model in the registry gets one, and specialists resolve a model ID to its profile ARN at runtime:
+BADGERS uses Application Inference Profiles to enable cost allocation and usage monitoring. Every Converse model in the registry gets one, and specialists resolve a model ID to its profile ARN at runtime. (Mantle models such as Gemma 4 31B are the exception: they have no inference profile and attribute cost to the Bedrock default project — see the note below.)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -497,10 +497,10 @@ BADGERS uses Application Inference Profiles to enable cost allocation and usage 
 
 There are **no per-model `*_PROFILE_ARN` environment variables.** Adding or retiring a model is one registry edit plus a deploy — no stack, Lambda, or UI file lists models by hand.
 
-The model list the UI offers comes from `GET /api/models`, which joins the SSM parameter against the registry, so the dropdown cannot offer a model this deployment has no profile for.
+The model list the UI offers comes from `GET /api/models`, which joins the SSM parameter against the registry, so the dropdown cannot offer a Converse model this deployment has no profile for. Mantle models (Gemma 4 31B) have no profile by design, so they are offered on the strength of being `active` in the registry.
 
 > [!IMPORTANT]
-> Model inference does **not** stay in your deployment Region. All eight models are invoked through US geo cross-Region inference profiles (`us.*`), so Bedrock routes each request to a Region within the US geography. See [Inference Profiles and Regions](deployment/DEPLOYMENT_README.md#-inference-profiles-and-regions).
+> Model inference does **not** stay in your deployment Region. The ten Converse models are invoked through US geo cross-Region inference profiles (`us.*`), so Bedrock routes each request to a Region within the US geography. Gemma 4 31B uses the OpenAI-compatible `bedrock-mantle` endpoint instead (no inference profile; cost attributed to the Bedrock default project). See [Inference Profiles and Regions](deployment/DEPLOYMENT_README.md#-inference-profiles-and-regions).
 
 ### ➕ Adding a New Specialist
 
@@ -584,6 +584,9 @@ Customers are responsible for making their own independent assessment of the inf
 - [Claude Opus 5 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-opus-5.html) - Anthropic's newest Opus, same price as 4.6; adaptive thinking on by default
 - [OpenAI models in Amazon Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-openai-gpt-56-terra.html) - GPT-5.6 Terra; the GPT models are Converse-only on `bedrock-runtime` and need `bedrock:InvokeModel` on `project/default`
 - [Amazon Nova 2 Lite model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html) - The cheapest fallback in the chain
+- [Kimi K3 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-moonshot-ai-kimi-k3.html) - Vision-capable, Converse on `bedrock-runtime`
+- [Pixtral Large model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-mistral-ai-pixtral-large.html) - Vision-capable, Converse on `bedrock-runtime`
+- [Gemma 4 31B model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-google-gemma-4-31b.html) - Vision-capable, `bedrock-mantle` only (OpenAI-compatible; no inference profile)
 - [Using Amazon Nova in AI Agents](https://docs.aws.amazon.com/nova/latest/userguide/agents-use-nova.html) - Nova as foundation model for agents
 - [Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html) - How `us.*` profiles route, and the IAM grants they require
 
