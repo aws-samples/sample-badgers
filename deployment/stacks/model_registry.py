@@ -65,6 +65,9 @@ def model_profiles_param_name(deployment_id: str) -> str:
     return f"/badgers-{deployment_id}/model-profiles"
 
 
+_GEO_PREFIXES = ("us.", "eu.", "jp.", "au.", "in.", "global.")
+
+
 def foundation_model_id(geo_model_id: str) -> str:
     """Strip the geo prefix to get the base foundation model ID.
 
@@ -72,12 +75,29 @@ def foundation_model_id(geo_model_id: str) -> str:
 
     Used for ``foundation-model/*`` ARNs. AWS requires the underlying foundation model to
     be granted alongside the inference profile, even for models that offer no in-Region
-    inference at all.
+    inference at all. A key that carries no geo prefix (an In-Region-only model, see
+    ``is_cross_region``) is already a bare foundation-model ID and is returned unchanged.
     """
-    for prefix in ("us.", "eu.", "jp.", "au.", "in.", "global."):
+    for prefix in _GEO_PREFIXES:
         if geo_model_id.startswith(prefix):
             return geo_model_id[len(prefix) :]
     return geo_model_id
+
+
+def is_cross_region(spec: dict[str, Any]) -> bool:
+    """Whether the model is reached through a cross-Region system inference profile.
+
+    ``True`` (the default, and every model until an In-Region-only entry is added): the
+    registry key is a ``us.`` geo ID and the application profile wraps the system-defined
+    cross-Region profile of the same name.
+
+    ``False``: the model offers no cross-Region inference (a model card listing
+    ``Geo: Not supported`` / ``Global: Not supported``), so there is no ``us.*`` system
+    profile to wrap. The registry key is the bare foundation-model ID, the application
+    profile wraps the foundation model directly in the deploy Region, and the system-profile
+    IAM grant is skipped because no such profile exists.
+    """
+    return bool(spec.get("cross_region", True))
 
 
 def profile_slug(geo_model_id: str) -> str:
@@ -123,11 +143,29 @@ def _validate(models: dict[str, Any], source: Path) -> None:
         if not isinstance(spec, dict):
             raise RegistryError(f"{where}: entry must be an object")
 
-        if not model_id.startswith("us."):
-            # D11 fixes BADGERS on the US geo. A bare or non-`us.` ID would silently
-            # bypass cross-Region routing, and none of the target models support
-            # in-Region inference on bedrock-runtime at all.
-            raise RegistryError(f"{where}: must start with 'us.' (US geo only)")
+        if not isinstance(spec.get("cross_region", True), bool):
+            raise RegistryError(f"{where}: 'cross_region' must be a boolean if present")
+
+        if is_cross_region(spec):
+            # The default. The key names a `us.` geo system profile that the application
+            # profile wraps; a bare or non-`us.` ID would silently bypass cross-Region
+            # routing.
+            if not model_id.startswith("us."):
+                raise RegistryError(
+                    f"{where}: must start with 'us.' (US geo). For a model with no "
+                    f'cross-Region inference, set "cross_region": false and use the '
+                    f"bare foundation-model ID"
+                )
+        else:
+            # In-Region only. The key must be the bare foundation-model ID, invoked directly
+            # and wrapped by an application profile over the foundation model — never
+            # geo-prefixed, or the profile would point at a system profile that does not
+            # exist.
+            if model_id.startswith(_GEO_PREFIXES):
+                raise RegistryError(
+                    f"{where}: 'cross_region' is false, so the key must be the bare "
+                    f"foundation-model ID, not geo-prefixed"
+                )
 
         for field in ("display_name", "provider", "transport", "status"):
             if not spec.get(field):

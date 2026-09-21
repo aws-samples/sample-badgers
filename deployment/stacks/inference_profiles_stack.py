@@ -41,6 +41,7 @@ from .model_registry import (
     disabled_models,
     foundation_model_id,
     has_provider,
+    is_cross_region,
     load_registry,
     model_profiles_param_name,
     output_id_for,
@@ -106,8 +107,16 @@ class InferenceProfilesStack(Stack):
                 inference_profile_name=profile_name_for(model_id, deployment_id),
                 model_source=CfnApplicationInferenceProfile.InferenceProfileModelSourceProperty(
                     copy_from=(
+                        # Default: wrap the `us.*` cross-Region system-defined profile.
                         f"arn:aws:bedrock:{self.region}:{self.account}"
                         f":inference-profile/{model_id}"
+                        if is_cross_region(spec)
+                        # In-Region only: no system profile exists, so wrap the foundation
+                        # model directly. A foundation-model ARN has an empty account field.
+                        else (
+                            f"arn:aws:bedrock:{self.region}::"
+                            f"foundation-model/{foundation_model_id(model_id)}"
+                        )
                     )
                 ),
                 # description is validated against ^([0-9a-zA-Z:.][ _-]?)+$ — parentheses
@@ -228,20 +237,27 @@ class InferenceProfilesStack(Stack):
             )
         )
 
-        # 2. The underlying cross-Region system-defined profiles.
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="InvokeSystemInferenceProfiles",
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                ],
-                resources=[
-                    f"arn:aws:bedrock:*:{self.account}:inference-profile/{model_id}"
-                    for model_id in selected
-                ],
+        # 2. The underlying cross-Region system-defined profiles. Only cross-Region models
+        #    have one — an In-Region-only model (cross_region=false) has no `us.*` system
+        #    profile, so granting one would be a dangling permission. Its foundation model
+        #    is covered by statement 3.
+        system_profile_models = [
+            model_id for model_id, spec in selected.items() if is_cross_region(spec)
+        ]
+        if system_profile_models:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="InvokeSystemInferenceProfiles",
+                    actions=[
+                        "bedrock:InvokeModel",
+                        "bedrock:InvokeModelWithResponseStream",
+                    ],
+                    resources=[
+                        f"arn:aws:bedrock:*:{self.account}:inference-profile/{model_id}"
+                        for model_id in system_profile_models
+                    ],
+                )
             )
-        )
 
         # 3. The foundation models behind those profiles.
         role.add_to_policy(
@@ -294,7 +310,8 @@ class InferenceProfilesStack(Stack):
         return {
             "system_inference_profiles": [
                 f"Resource::arn:aws:bedrock:*:{account}:inference-profile/{model_id}"
-                for model_id in selected
+                for model_id, spec in selected.items()
+                if is_cross_region(spec)
                 for account in account_renderings(self.account)
             ],
             "foundation_models": [
