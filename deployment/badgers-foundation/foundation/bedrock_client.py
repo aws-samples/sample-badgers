@@ -136,7 +136,7 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude', 'nova', or 'openai'
+        'claude', 'nova', 'openai', or 'kimi'
 
     Raises:
         BedrockError: If model family cannot be determined
@@ -144,8 +144,8 @@ def get_model_family(model_id: str) -> str:
     Note:
         Under Converse the family no longer selects a request *shape* — Converse normalises
         that. It selects only which provider-specific fields go into
-        ``additionalModelRequestFields``, which is why 'openai' can be a family that adds
-        nothing at all.
+        ``additionalModelRequestFields``, which is why 'openai' — and, like it, 'kimi' — can
+        be families that add nothing at all.
     """
     model_lower = model_id.lower()
 
@@ -155,6 +155,8 @@ def get_model_family(model_id: str) -> str:
         return "nova"
     elif "openai" in model_lower or "gpt-" in model_lower:
         return "openai"
+    elif "moonshotai" in model_lower or "kimi" in model_lower:
+        return "kimi"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
 
@@ -645,10 +647,16 @@ class BedrockClient:
                 "reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}
             }
 
-        if model_family == "openai":
+        if model_family in ("openai", "kimi"):
+            # Neither exposes a reasoning parameter through Converse: the OpenAI and Kimi K3
+            # model cards document none for bedrock-runtime, and an unrecognised key in
+            # additionalModelRequestFields earns a ValidationException. Their registry
+            # entries set thinking=null, so this is only reached if a specialist config asks
+            # for thinking anyway; drop it.
             self.logger.info(
-                "Thinking requested for an OpenAI model; the model cards document no "
-                "reasoning parameter, so none is sent"
+                "Thinking requested for a %s model; its model card documents no Converse "
+                "reasoning parameter, so none is sent",
+                model_family,
             )
             return {}
 

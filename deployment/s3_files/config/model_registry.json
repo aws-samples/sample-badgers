@@ -93,6 +93,16 @@
       "thinking": null,
       "prompt_caching": false,
       "status": "active"
+    },
+    "us.moonshotai.kimi-k3": {
+      "display_name": "Kimi K3",
+      "provider": "moonshotai",
+      "transport": "converse",
+      "price_in": 3.3,
+      "price_out": 16.5,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
     }
   }
 }
