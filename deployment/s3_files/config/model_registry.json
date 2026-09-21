@@ -103,6 +103,16 @@
       "thinking": null,
       "prompt_caching": false,
       "status": "active"
+    },
+    "us.mistral.pixtral-large-2502-v1:0": {
+      "display_name": "Pixtral Large",
+      "provider": "mistral",
+      "transport": "converse",
+      "price_in": 2.0,
+      "price_out": 6.0,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
     }
   }
 }

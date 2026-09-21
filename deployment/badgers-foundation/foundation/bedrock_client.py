@@ -136,7 +136,7 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude', 'nova', 'openai', or 'kimi'
+        'claude', 'nova', 'openai', 'kimi', or 'mistral'
 
     Raises:
         BedrockError: If model family cannot be determined
@@ -144,8 +144,8 @@ def get_model_family(model_id: str) -> str:
     Note:
         Under Converse the family no longer selects a request *shape* — Converse normalises
         that. It selects only which provider-specific fields go into
-        ``additionalModelRequestFields``, which is why 'openai' — and, like it, 'kimi' — can
-        be families that add nothing at all.
+        ``additionalModelRequestFields``, which is why 'openai' — and, like it, 'kimi' and
+        'mistral' — can be families that add nothing at all.
     """
     model_lower = model_id.lower()
 
@@ -157,6 +157,8 @@ def get_model_family(model_id: str) -> str:
         return "openai"
     elif "moonshotai" in model_lower or "kimi" in model_lower:
         return "kimi"
+    elif "mistral" in model_lower or "pixtral" in model_lower:
+        return "mistral"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
 
@@ -647,12 +649,12 @@ class BedrockClient:
                 "reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}
             }
 
-        if model_family in ("openai", "kimi"):
-            # Neither exposes a reasoning parameter through Converse: the OpenAI and Kimi K3
-            # model cards document none for bedrock-runtime, and an unrecognised key in
-            # additionalModelRequestFields earns a ValidationException. Their registry
-            # entries set thinking=null, so this is only reached if a specialist config asks
-            # for thinking anyway; drop it.
+        if model_family in ("openai", "kimi", "mistral"):
+            # None of these expose a reasoning parameter through Converse: the OpenAI,
+            # Kimi K3, and Pixtral Large model cards document none for bedrock-runtime, and
+            # an unrecognised key in additionalModelRequestFields earns a
+            # ValidationException. Their registry entries set thinking=null, so this is
+            # only reached if a specialist config asks for thinking anyway; drop it.
             self.logger.info(
                 "Thinking requested for a %s model; its model card documents no Converse "
                 "reasoning parameter, so none is sent",
