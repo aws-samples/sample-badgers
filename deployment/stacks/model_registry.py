@@ -28,8 +28,8 @@ _DEFAULT_PATH = (
     / "model_registry.json"
 )
 
-VALID_PROVIDERS = {"anthropic", "amazon", "openai", "moonshotai", "mistral"}
-VALID_TRANSPORTS = {"converse", "invoke"}
+VALID_PROVIDERS = {"anthropic", "amazon", "openai", "moonshotai", "mistral", "google"}
+VALID_TRANSPORTS = {"converse", "invoke", "mantle"}
 VALID_THINKING = {None, "extended", "adaptive"}
 
 #: Three states, differing in what AWS resources they cause and whether the wizard offers
@@ -96,8 +96,26 @@ def is_cross_region(spec: dict[str, Any]) -> bool:
     profile to wrap. The registry key is the bare foundation-model ID, the application
     profile wraps the foundation model directly in the deploy Region, and the system-profile
     IAM grant is skipped because no such profile exists.
+
+    Not meaningful for mantle models (see ``is_mantle``), which have no inference profile of
+    any kind; the validator rejects ``cross_region`` on a mantle entry.
     """
     return bool(spec.get("cross_region", True))
+
+
+def is_mantle(spec: dict[str, Any]) -> bool:
+    """Whether the model is reached through the OpenAI-compatible ``bedrock-mantle`` endpoint
+    rather than Converse.
+
+    Mantle models (e.g. Gemma 4 31B, whose model card lists ``bedrock-mantle`` as the only
+    endpoint) have no application inference profile: profiles wrap Converse/InvokeModel
+    routing, which mantle does not use. Their cost is attributed through Amazon Bedrock
+    Projects — the account default project unless a project ID is passed — not a profile.
+    So they are excluded from profile creation, the SSM profile map, and the two
+    inference-profile IAM statements; they are granted the foundation model and the default
+    project instead, and invoked over HTTP (SigV4) by the foundation layer.
+    """
+    return spec.get("transport") == "mantle"
 
 
 def profile_slug(geo_model_id: str) -> str:
@@ -143,10 +161,24 @@ def _validate(models: dict[str, Any], source: Path) -> None:
         if not isinstance(spec, dict):
             raise RegistryError(f"{where}: entry must be an object")
 
-        if not isinstance(spec.get("cross_region", True), bool):
+        if spec.get("transport") == "mantle":
+            # Mantle (OpenAI-compatible) models have no inference profile and no
+            # cross-Region concept. The key is the bare model ID exactly as the model card
+            # lists it for the bedrock-mantle endpoint (e.g. `google.gemma-4-31b`).
+            if "cross_region" in spec:
+                raise RegistryError(
+                    f"{where}: 'cross_region' is meaningless for a mantle model — mantle "
+                    f"has no inference profile to route"
+                )
+            if model_id.startswith(_GEO_PREFIXES):
+                raise RegistryError(
+                    f"{where}: a mantle model key must be the bare model ID, not "
+                    f"geo-prefixed"
+                )
+        elif not isinstance(spec.get("cross_region", True), bool):
             raise RegistryError(f"{where}: 'cross_region' must be a boolean if present")
 
-        if is_cross_region(spec):
+        elif is_cross_region(spec):
             # The default. The key names a `us.` geo system profile that the application
             # profile wraps; a bare or non-`us.` ID would silently bypass cross-Region
             # routing.
