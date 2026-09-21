@@ -192,7 +192,7 @@ deploy_specialist() {
     echo ""
 
     # Step 1: Sync S3 files
-    log_info "Step 1/3: Syncing S3 files (prompts, manifest, schema)..."
+    log_info "Step 1/4: Syncing S3 files (prompts, manifest, schema)..."
     CONFIG_BUCKET=$(aws cloudformation describe-stacks \
         --stack-name "$(_sn S3)" \
         --query "Stacks[0].Outputs[?OutputKey=='ConfigBucketName'].OutputValue" \
@@ -214,7 +214,7 @@ deploy_specialist() {
     log_success "S3 files uploaded to s3://$CONFIG_BUCKET"
 
     # Step 2: Deploy Lambda stack
-    log_info "Step 2/3: Deploying Lambda stack (creates function if new)..."
+    log_info "Step 2/4: Deploying Lambda stack (creates function if new)..."
     if [ -f "$SCRIPT_DIR/.venv/bin/activate" ]; then
         source "$SCRIPT_DIR/.venv/bin/activate"
     fi
@@ -223,10 +223,17 @@ deploy_specialist() {
     log_success "Lambda stack deployed"
 
     # Step 3: Deploy Gateway stack
-    log_info "Step 3/3: Deploying Gateway stack (wires target)..."
+    log_info "Step 3/4: Deploying Gateway stack (wires target)..."
     $_CDK_CMD deploy "$(_sn Gateway)" $_CDK_CONTEXT --require-approval never --exclusively \
         || handle_error "Deploy Gateway stack"
     log_success "Gateway stack deployed"
+
+    # Step 4: Reconcile gateway target. The Gateway caches the tool schema at
+    # registration; a schema-only S3 change produces no CFN diff, so the deploy above
+    # cannot re-read it. This forces a re-read iff the S3 schema is newer than the
+    # live target (no-op otherwise).
+    log_info "Step 4/4: Reconciling gateway target (re-read schema if newer)..."
+    reconcile_gateway_target "$name"
 
     echo ""
     echo -e "${GREEN}=========================================="
@@ -259,6 +266,7 @@ echo -e "  This will:"
 echo -e "    1. Upload S3 files (prompts, manifest, schema)"
 echo -e "    2. Deploy ${BOLD}$(_sn Lambda)${NC} stack"
 echo -e "    3. Deploy ${BOLD}$(_sn Gateway)${NC} stack"
+echo -e "    4. Reconcile the gateway target (re-read schema if changed)"
 echo ""
 read -p "  Proceed? (Y/n): " -n 1 -r
 echo ""

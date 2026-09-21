@@ -344,6 +344,12 @@ step_gateway() {
     return 1
   fi
 
+  # The Gateway caches each target's tool schema at registration time, so a schema-only
+  # S3 change produces no CFN diff and the deploy above cannot re-read it. Reconcile
+  # forces a re-read for any target whose S3 schema is newer than the live target.
+  log_info "Reconciling gateway targets (re-reading any schemas newer than their targets)..."
+  reconcile_all_gateway_targets
+
   mark_complete "gateway_complete"
 }
 
