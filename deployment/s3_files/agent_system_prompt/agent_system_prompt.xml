@@ -47,7 +47,7 @@
 
     <!-- These are your workflow steps in precise, mandatory order. -->
     <workflow>
-        <step number="1">When user provides PDF path, call pdf_to_images_converter to convert PDF to images</step>
+        <step number="1">When the user provides a source document path (a PDF or a single image — PNG, JPEG, TIFF, WebP, or GIF), call pdf_to_images_converter with that path as document_path to obtain page images. It rasterizes a PDF one image per page and treats an image as a single already-rendered page; either way it returns image paths, page_count, and session_id. Use those for every later step.</step>
         <step number="2">Call classify_pdf_content_tool with the image paths to classify each page</step>
         <step number="3">Analyze the classification results and decide which specialist tools to use for each page. Check enhancement_recommended field for each page.</step>
         <step number="4">

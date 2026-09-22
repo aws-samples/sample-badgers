@@ -233,6 +233,54 @@ _sync_config_category() {
 # ══════════════════════════════════════════════════════════════════════════
 # STEP 4: Specialist Lambdas
 # ══════════════════════════════════════════════════════════════════════════
+# Returns the first foundation-layer source file whose mtime is newer than
+# layer.zip, or non-zero if none is. Keep this source set in sync with
+# stacks/lambda_stack.py::_assert_layer_not_stale, which is the authoritative
+# check at synth — this is the friendly pre-check so step 4 can offer to rebuild
+# instead of failing halfway through with a CDK traceback.
+_foundation_layer_newer_file() {
+  local layer="$1" src="$2" lambdas_dir="$3" f
+  if [ -f "${lambdas_dir}/requirements.txt" ] && [ "${lambdas_dir}/requirements.txt" -nt "$layer" ]; then
+    echo "${lambdas_dir}/requirements.txt"; return 0
+  fi
+  f=$(find "${src}/foundation" -type f -name '*.py' -newer "$layer" -print 2>/dev/null | head -n1)
+  [ -n "$f" ] && { echo "$f"; return 0; }
+  f=$(find "${src}/foundation/core_system_prompts" -type f -newer "$layer" -print 2>/dev/null | head -n1)
+  [ -n "$f" ] && { echo "$f"; return 0; }
+  if [ -f "${src}/config/config.py" ] && [ "${src}/config/config.py" -nt "$layer" ]; then
+    echo "${src}/config/config.py"; return 0
+  fi
+  return 1
+}
+
+# Prompts to rebuild the foundation layer when it is missing or older than its
+# sources, so a stale layer never reaches the container build or the CDK deploy.
+# Honours BADGERS_ALLOW_STALE_LAYER=1 (same override the synth guard respects)
+# and BADGERS_ASSUME_YES=1 (auto-rebuild, for non-interactive runs).
+_ensure_foundation_layer_fresh() {
+  [ "${BADGERS_ALLOW_STALE_LAYER:-}" = "1" ] && return 0
+  local layer="${DEPLOYMENT_DIR}/lambdas/layer.zip"
+  local src="${DEPLOYMENT_DIR}/badgers-foundation"
+  local newer
+  if [ ! -f "$layer" ]; then
+    log_warn "Foundation layer not built yet (lambdas/layer.zip is missing)."
+  else
+    newer=$(_foundation_layer_newer_file "$layer" "$src" "${DEPLOYMENT_DIR}/lambdas") || return 0
+    log_warn "Foundation layer is stale — ${newer#"${DEPLOYMENT_DIR}"/} is newer than lambdas/layer.zip."
+    log_warn "Deploying without rebuilding would ship the previous layer and its Lambdas would run stale code."
+  fi
+  if _confirm "  Rebuild the foundation layer now? (y/n): "; then
+    log_info "Rebuilding foundation layer..."
+    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_foundation_layer.sh) \
+      || { log_error "Foundation layer build failed."; return 1; }
+    log_success "Foundation layer rebuilt."
+  else
+    log_error "Foundation layer is stale. Rebuild it (menu option 1, or"
+    log_error "cd deployment/lambdas && ./build_foundation_layer.sh) then re-run step 4."
+    return 1
+  fi
+}
+
 step_specialists() {
   log_step "Step 4: Specialist Lambdas"
 
@@ -241,6 +289,11 @@ step_specialists() {
     log_warn "Already complete. Re-running will update if changes are detected."
     _confirm || return 0
   fi
+
+  # The container Lambda build copies foundation/ out of the layer build dir, and
+  # the Lambda stack ships layer.zip as-is, so both need a current layer. Catch a
+  # stale one here and offer to rebuild rather than failing inside CDK synth.
+  _ensure_foundation_layer_fresh || return 1
 
   ecr_login
 
@@ -290,6 +343,12 @@ step_gateway() {
     log_error "Could not read GatewayUrl from $(_sn Gateway) outputs"
     return 1
   fi
+
+  # The Gateway caches each target's tool schema at registration time, so a schema-only
+  # S3 change produces no CFN diff and the deploy above cannot re-read it. Reconcile
+  # forces a re-read for any target whose S3 schema is newer than the live target.
+  log_info "Reconciling gateway targets (re-reading any schemas newer than their targets)..."
+  reconcile_all_gateway_targets
 
   mark_complete "gateway_complete"
 }

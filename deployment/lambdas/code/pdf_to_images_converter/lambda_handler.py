@@ -62,38 +62,47 @@ def lambda_handler(event, context):
         # session id is available to job tracking and to every log line below.
         session_id = body.get("session_id") or uuid.uuid4().hex[:12]
 
-        pdf_path = body.get("pdf_path")
-        if not pdf_path:
+        document_path = body.get("document_path")
+        if not document_path:
             raise ValidationError(
-                message="Missing required parameter: pdf_path",
+                message="Missing required parameter: document_path",
                 details={"provided_keys": list(body.keys())},
             )
 
         # Job tracking (doc_id -> job_id -> subtask_id). All of these no-op when
         # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
-        # This converter fans one PDF out into many page images, so its subtask
-        # is keyed off the source PDF rather than a page.
+        # This converter fans one source document out into page images, so its
+        # subtask is keyed off the source document rather than a page.
         specialist_name = os.environ.get("SPECIALIST_NAME", "pdf_to_images_converter")
         job_id = body.get("job_id") or ""
         doc_id = body.get("doc_id") or ""
-        subtask = job_state.subtask_id(specialist_name, pdf_path)
+        subtask = job_state.subtask_id(specialist_name, document_path)
         job_state.mark_running(
             job_id,
             subtask,
             doc_id=doc_id,
             specialist=specialist_name,
-            image_id=job_state.image_identifier(pdf_path),
+            image_id=job_state.image_identifier(document_path),
             session_id=session_id,
         )
 
         max_image_size_mb = body.get("max_image_size_mb", 4.0)
         dpi = body.get("dpi", 128)
 
-        # Get PDF data
-        pdf_data = _get_pdf_data(pdf_path)
+        # Fetch the source bytes, then route on content. A PDF is rasterized
+        # page-by-page via poppler; an already-image upload is a single page and
+        # only needs normalization (RGB, downscale, JPEG-compress) — pdf2image
+        # never runs on it. Both branches emit the same page_NNN.b64 artifacts,
+        # so everything downstream (classify, specialists, correlator, report)
+        # is identical regardless of source type.
+        document_data = _get_document_data(document_path)
 
-        # Convert PDF to base64 images
-        base64_images = _convert_pdf_to_images(pdf_data, dpi, max_image_size_mb)
+        if b"%PDF-" in document_data[:1024]:
+            base64_images = _convert_pdf_to_images(
+                document_data, dpi, max_image_size_mb
+            )
+        else:
+            base64_images = [_convert_image_to_base64(document_data, max_image_size_mb)]
 
         # Store base64 in S3 temp location. _store_images_to_s3 raises when
         # OUTPUT_BUCKET is unset, so a missing artifact destination already
@@ -107,7 +116,7 @@ def lambda_handler(event, context):
         job_state.mark_complete(job_id, subtask, s3_paths[0] if s3_paths else "")
 
         logger.info(
-            "Converted PDF to %d images, stored in S3 temp/ (session: %s)",
+            "Converted source document to %d page image(s), stored in S3 temp/ (session: %s)",
             len(s3_paths),
             session_id,
         )
@@ -160,19 +169,19 @@ def _decrypt_pdf_if_needed(pdf_data: bytes) -> bytes:
         return decrypted
 
 
-def _get_pdf_data(pdf_path: str) -> bytes:
-    """Get PDF data from S3 or local path."""
-    if pdf_path.startswith("s3://"):
+def _get_document_data(document_path: str) -> bytes:
+    """Get source document bytes (PDF or image) from S3 or a local path."""
+    if document_path.startswith("s3://"):
         import boto3
 
         try:
             s3 = boto3.client("s3")
-            parts = pdf_path.replace("s3://", "").split("/", 1)
+            parts = document_path.replace("s3://", "").split("/", 1)
             if len(parts) != 2:
                 raise ValidationError(
                     message="Invalid S3 path format.",
                     details={
-                        "pdf_path": pdf_path,
+                        "document_path": document_path,
                         "expected_format": "s3://bucket/key",
                     },
                 )
@@ -183,20 +192,74 @@ def _get_pdf_data(pdf_path: str) -> bytes:
             raise
         except Exception as e:
             raise ResourceNotFoundError(
-                message=f"Failed to download PDF from S3: {str(e)}",
-                details={"pdf_path": pdf_path},
+                message=f"Failed to download document from S3: {str(e)}",
+                details={"document_path": document_path},
             )
 
     # Local file
-    file_path = Path(pdf_path)
+    file_path = Path(document_path)
     if not file_path.exists():
         raise ResourceNotFoundError(
-            message="PDF file not found.",
-            details={"pdf_path": pdf_path},
+            message="Document file not found.",
+            details={"document_path": document_path},
         )
 
     with open(file_path, "rb") as f:
         return f.read()
+
+
+def _convert_image_to_base64(image_data: bytes, max_size_mb: float) -> str:
+    """Normalize a single uploaded image into one base64-encoded JPEG page.
+
+    Mirrors the per-page handling in _convert_pdf_to_images (RGB conversion +
+    quality step-down) and adds a max-dimension downscale, since an uploaded
+    image can be far larger than a rasterized PDF page. No pdf2image/poppler is
+    involved. Only the first frame of a multi-frame image (animated GIF,
+    multi-page TIFF) is used.
+    """
+    from PIL import Image
+    import io
+
+    max_dimension = 2048
+    max_size_bytes = int(max_size_mb * 1024 * 1024)
+
+    try:
+        img = Image.open(io.BytesIO(image_data))
+        img.load()  # force-decode the first frame so a corrupt file fails here
+    except Exception as e:
+        raise ValidationError(
+            message="Unsupported or corrupt image file.",
+            details={"error": str(e)},
+        )
+
+    # Flatten transparency onto white rather than letting convert("RGB") turn it
+    # black — otherwise a transparent PNG renders as a black page.
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[-1])
+        img = background
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    if max(img.size) > max_dimension:
+        img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+
+    quality = 85
+    while quality > 20:
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=quality, optimize=True)
+        size = buffer.tell()
+
+        if size <= max_size_bytes:
+            break
+
+        quality -= 10
+
+    buffer.seek(0)
+    b64_str = base64.b64encode(buffer.read()).decode("utf-8")
+    logger.info("Normalized uploaded image: quality=%d, size=%d bytes", quality, size)
+    return b64_str
 
 
 def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> list[str]:

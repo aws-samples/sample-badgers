@@ -295,17 +295,27 @@ job_state.get_record(job_id, subtask)
 
 ---
 
-## 🔧 Utility Lambda: PDF Converter
+## 🔧 Utility Lambda: Document-to-Images Converter
 
-The PDF converter transforms PDFs into analyzable images:
+The converter turns a source document into analyzable page images. It routes on the
+content of the fetched bytes (`document_path`, formerly `pdf_path`): a PDF is rasterized
+with pdf2image + Poppler; an already-uploaded image (PNG/JPEG/TIFF/WebP/GIF) skips
+Poppler entirely and is normalized into a single page. Either way it emits the same
+`page_NNN.b64` artifacts in the output bucket, so everything downstream is identical
+regardless of source type.
 
 ```python
 def lambda_handler(event, context):
-    # 1️⃣ Get PDF from S3 or local path
-    pdf_data = _get_pdf_data(pdf_path)
+    # 1️⃣ Get source bytes from S3 or local path
+    document_data = _get_document_data(document_path)
 
-    # 2️⃣ Convert to images using pdf2image + Poppler
-    base64_images = _convert_pdf_to_images(pdf_data, dpi, max_size_mb)
+    # 2️⃣ Route on content
+    if b"%PDF-" in document_data[:1024]:
+        # PDF → one image per page via pdf2image + Poppler
+        base64_images = _convert_pdf_to_images(document_data, dpi, max_size_mb)
+    else:
+        # Image → first frame only, normalized (RGB, downscale, JPEG), no Poppler
+        base64_images = [_convert_image_to_base64(document_data, max_size_mb)]
 
     # 3️⃣ Store as .b64 files in S3 temp location
     s3_paths = _store_images_to_s3(base64_images, session_id)
@@ -313,6 +323,10 @@ def lambda_handler(event, context):
     # 4️⃣ Return S3 paths for downstream specialists
     return {"images": s3_paths, "page_count": len(s3_paths)}
 ```
+
+Multi-frame inputs (animated GIF, multi-page TIFF) use only the first frame. Image
+uploads are capped at 20 MB by the UI server, since the raw bytes are validated by the
+foundation `ImageProcessor` (20 MB limit) rather than pre-compressed like PDF pages.
 
 ### Image Compression
 

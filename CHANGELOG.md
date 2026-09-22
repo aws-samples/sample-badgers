@@ -2,8 +2,8 @@
 
 ## [5.0.1] - 2026-09-21
 
-Since `[5.0.0]`. Three vision-capable models added, and a second inference transport
-alongside Converse. `pyproject.toml` reads `5.0.1`.
+Since `[5.0.0]`. Three vision-capable models added, a second inference transport alongside
+Converse, and direct image upload. `pyproject.toml` reads `5.0.1`.
 
 ### Added
 
@@ -27,6 +27,16 @@ alongside Converse. `pyproject.toml` reads `5.0.1`.
   rather than a `us.*` system profile. Present and validated, but currently unused — no such
   model is registered.
 
+- **Direct image upload.** A document can now be a single image (PNG, JPEG, TIFF, WebP, or
+  GIF), not only a PDF. The image is uploaded to the source bucket like a PDF and runs the
+  same pipeline — classification, enhancement, specialists, correlation, report — with no
+  PDF-specific steps. `pdf_to_images_converter` routes on the fetched bytes: `%PDF-`
+  rasterizes via Poppler as before; anything else is opened with Pillow and normalized
+  (first frame only, RGB, transparency flattened onto white, downscaled to 2048px,
+  JPEG-compressed to the size cap) into a single `page_001.b64`. It emits the same artifact
+  in the output bucket, so classify/specialists/correlator/report are unchanged and Poppler
+  never runs on an image.
+
 ### Changed
 
 - **Mantle models have no application inference profile.** They are excluded from profile
@@ -38,6 +48,24 @@ alongside Converse. `pyproject.toml` reads `5.0.1`.
 - **The wizard offers mantle models without a profile.** `GET /api/models` now includes a
   model when it is `active` and either has a profile in the SSM map or uses the `mantle`
   transport.
+
+- **Upload gates accept images.** Both the browser (`Chat.jsx`) and the server
+  (`/api/upload`) now accept a PDF or an image. The server sniffs magic bytes rather than
+  trusting the declared MIME type, and caps image uploads at 20 MB — PDFs keep the 50 MB
+  limit — because image bytes are validated un-compressed by the foundation `ImageProcessor`
+  (20 MB limit), whereas PDF pages are pre-compressed.
+- **`pdf_to_images_converter` parameter renamed** `pdf_path` → `document_path` (schema and
+  handler), reflecting that it now accepts a PDF or an image.
+- **`remediation_specialist` rejects image inputs.** It tags an existing PDF's structure
+  tree, so there is nothing to remediate for an image. It now fails fast with a clear
+  message asking for a PDF, and its tool description tells the agent not to call it for image
+  sources.
+- **`deploy.sh` step 4 prompts to rebuild a stale foundation layer.** Before the container
+  build and the Lambda deploy it checks `lambdas/layer.zip` against its sources and offers to
+  run `build_foundation_layer.sh`, instead of letting the synth-time staleness guard surface
+  as a CDK traceback. Honours `BADGERS_ALLOW_STALE_LAYER=1` (skip) and `BADGERS_ASSUME_YES=1`
+  (auto-rebuild). Step 6 is unaffected — the Runtime image copies `foundation` source and
+  installs its own requirements, so it never ships the pre-built layer.
 
 ## [5.0.0] - 2026-09-16
 
