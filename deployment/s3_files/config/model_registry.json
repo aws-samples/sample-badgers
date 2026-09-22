@@ -114,6 +114,17 @@
       "prompt_caching": false,
       "status": "active"
     },
+    "qwen.qwen3-vl-235b-a22b": {
+      "display_name": "Qwen3 VL 235B",
+      "provider": "qwen",
+      "transport": "converse",
+      "cross_region": false,
+      "price_in": 0.53,
+      "price_out": 2.66,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
+    },
     "google.gemma-4-31b": {
       "display_name": "Gemma 4 31B",
       "provider": "google",

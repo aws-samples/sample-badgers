@@ -138,7 +138,7 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude', 'nova', 'openai', 'kimi', 'mistral', or 'gemma'
+        'claude', 'nova', 'openai', 'kimi', 'mistral', 'gemma', or 'qwen'
 
     Raises:
         BedrockError: If model family cannot be determined
@@ -147,7 +147,7 @@ def get_model_family(model_id: str) -> str:
         Under Converse the family no longer selects a request *shape* — Converse normalises
         that. It selects only which provider-specific fields go into
         ``additionalModelRequestFields``, which is why 'openai' — and, like it, 'kimi',
-        'mistral', and 'gemma' — can be families that add nothing at all.
+        'mistral', 'gemma', and 'qwen' — can be families that add nothing at all.
     """
     model_lower = model_id.lower()
 
@@ -163,6 +163,8 @@ def get_model_family(model_id: str) -> str:
         return "mistral"
     elif "gemma" in model_lower or model_lower.startswith("google."):
         return "gemma"
+    elif "qwen" in model_lower:
+        return "qwen"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
 
@@ -923,7 +925,7 @@ class BedrockClient:
                 "reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}
             }
 
-        if model_family in ("openai", "kimi", "mistral", "gemma"):
+        if model_family in ("openai", "kimi", "mistral", "gemma", "qwen"):
             # None of these expose a reasoning parameter through Converse. (Gemma is a mantle
             # model and never reaches the Converse thinking path at all, but is listed for
             # completeness.) An unrecognised key in additionalModelRequestFields earns a
@@ -1208,6 +1210,10 @@ class BedrockClient:
             # in-Region inference on bedrock-runtime.
             "us.openai.gpt-",
             "global.openai.gpt-",
+            # Qwen. In-Region only (no geo/global inference profile), reached through
+            # Converse by its bare foundation-model ID, wrapped by an application inference
+            # profile over the foundation model.
+            "qwen.",
             # Other supported models
             "amazon.titan-",
             "ai21.j2-",
