@@ -539,9 +539,11 @@ Profiles are named `badgers-{model}-{deployment_id}` — for example `badgers-cl
 
 **Model inference does not stay in your deployment Region.** This surprises people, so it is worth being explicit.
 
-Every model BADGERS ships is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
+Every **Converse** model BADGERS ships is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`, `us.moonshotai.…`, `us.mistral.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
 
-For the three models whose cards publish a destination table (Sonnet 4.6, Opus 4.6, Nova 2 Lite), a source Region of `us-west-2` routes to `us-east-1`, `us-east-2`, or `us-west-2`. The other five document a `us.*` profile without publishing a destination list.
+For the models whose cards publish a destination table (Sonnet 4.6, Opus 4.6, Nova 2 Lite, Pixtral Large), a source Region of `us-west-2` routes to `us-east-1`, `us-east-2`, or `us-west-2`. The rest document a `us.*` profile without publishing a destination list.
+
+**Gemma 4 31B is the exception.** It is served only on the OpenAI-compatible `bedrock-mantle` endpoint (`https://bedrock-mantle.{region}.api.aws/openai/v1`), not Converse, and has no inference profile. The foundation layer signs an OpenAI Chat Completions request with SigV4 (service `bedrock-mantle`) and cost is attributed to the Bedrock **default project** rather than a `us.*` profile. Its regional behavior follows the mantle endpoint, not a `us.*` cross-Region profile.
 
 Two consequences:
 
@@ -550,7 +552,7 @@ Two consequences:
 
 ### Why this is not In-Region inference
 
-In-Region inference would keep everything in one Region, and BADGERS does not use it because it is not available: all eight models report In-Region as **not-supported** on the `bedrock-runtime` endpoint in every US Region. Geo (`us.*`) is the most Region-restrictive option the model set actually offers. Global (`global.*`) is the same mechanism over every commercial Region worldwide.
+In-Region inference would keep everything in one Region, and BADGERS does not use it because it is not available: all ten Converse models report In-Region as **not-supported** on the `bedrock-runtime` endpoint in every US Region. Geo (`us.*`) is the most Region-restrictive option the model set actually offers. Global (`global.*`) is the same mechanism over every commercial Region worldwide.
 
 If you have hard data-residency requirements, this model set cannot meet them on `bedrock-runtime`.
 
@@ -561,8 +563,8 @@ Geo cross-Region inference requires `bedrock:InvokeModel` on the foundation mode
 `iam_stack.py` wildcards it: `arn:aws:bedrock:*::foundation-model/{model}`. The model ID stays pinned exactly, and no action or account is wildcarded. This trips `AwsSolutions-IAM5`, which is suppressed with the reasoning recorded inline. The short version:
 
 - The destination set depends on both the model and the operator-chosen source Region, so it is not knowable when the code is written.
-- Only 3 of 8 model cards publish a destination-Region table, so a hardcoded list would cover less than half the set.
-- `bedrock:GetInferenceProfile` returns the Region-qualified foundation model ARNs in `models[].modelArn` for all eight, but that is a deploy-time API call and would require a CDK custom resource.
+- Only 4 of the 10 Converse model cards publish a destination-Region table, so a hardcoded list would cover less than half the set. (Gemma 4 31B is mantle-only and has no `us.*` profile, so it is not part of this reasoning.)
+- `bedrock:GetInferenceProfile` returns the Region-qualified foundation model ARNs in `models[].modelArn` for each, but that is a deploy-time API call and would require a CDK custom resource.
 
 ### If your organization restricts Regions
 

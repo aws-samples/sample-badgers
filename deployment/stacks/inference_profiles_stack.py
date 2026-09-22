@@ -41,6 +41,8 @@ from .model_registry import (
     disabled_models,
     foundation_model_id,
     has_provider,
+    is_cross_region,
+    is_mantle,
     load_registry,
     model_profiles_param_name,
     output_id_for,
@@ -100,14 +102,32 @@ class InferenceProfilesStack(Stack):
         self._profiles: dict[str, CfnApplicationInferenceProfile] = {}
 
         for model_id, spec in self.models.items():
+            if is_mantle(spec):
+                # Mantle (OpenAI-compatible) models have no application inference profile —
+                # profiles wrap Converse/InvokeModel routing, which mantle does not use.
+                # They are absent from the SSM map (built from self._profiles below); the
+                # foundation layer resolves their transport by model ID and invokes them
+                # over HTTP. Cost is attributed via the Bedrock default project (see the
+                # project/default grant in grant_invoke_to_role), not a profile.
+                print(f"  Mantle model (no profile, no SSM entry): {model_id}")
+                continue
+
             profile = CfnApplicationInferenceProfile(
                 self,
                 construct_id_for(model_id),
                 inference_profile_name=profile_name_for(model_id, deployment_id),
                 model_source=CfnApplicationInferenceProfile.InferenceProfileModelSourceProperty(
                     copy_from=(
+                        # Default: wrap the `us.*` cross-Region system-defined profile.
                         f"arn:aws:bedrock:{self.region}:{self.account}"
                         f":inference-profile/{model_id}"
+                        if is_cross_region(spec)
+                        # In-Region only: no system profile exists, so wrap the foundation
+                        # model directly. A foundation-model ARN has an empty account field.
+                        else (
+                            f"arn:aws:bedrock:{self.region}::"
+                            f"foundation-model/{foundation_model_id(model_id)}"
+                        )
                     )
                 ),
                 # description is validated against ^([0-9a-zA-Z:.][ _-]?)+$ — parentheses
@@ -213,35 +233,50 @@ class InferenceProfilesStack(Stack):
 
         selected = self._select(models)
 
-        # 1. The application inference profiles created by this stack.
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="InvokeApplicationInferenceProfiles",
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                ],
-                resources=[
-                    self._profiles[model_id].attr_inference_profile_arn
-                    for model_id in selected
-                ],
+        # 1. The application inference profiles created by this stack. Mantle models have
+        #    none (they are not in self._profiles), so they are excluded here and covered by
+        #    the foundation-model and default-project statements below.
+        profile_models = [
+            model_id for model_id, spec in selected.items() if not is_mantle(spec)
+        ]
+        if profile_models:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="InvokeApplicationInferenceProfiles",
+                    actions=[
+                        "bedrock:InvokeModel",
+                        "bedrock:InvokeModelWithResponseStream",
+                    ],
+                    resources=[
+                        self._profiles[model_id].attr_inference_profile_arn
+                        for model_id in profile_models
+                    ],
+                )
             )
-        )
 
-        # 2. The underlying cross-Region system-defined profiles.
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="InvokeSystemInferenceProfiles",
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                ],
-                resources=[
-                    f"arn:aws:bedrock:*:{self.account}:inference-profile/{model_id}"
-                    for model_id in selected
-                ],
+        # 2. The underlying cross-Region system-defined profiles. Only cross-Region models
+        #    have one — an In-Region-only model (cross_region=false) has no `us.*` system
+        #    profile, so granting one would be a dangling permission. Its foundation model
+        #    is covered by statement 3.
+        system_profile_models = [
+            model_id
+            for model_id, spec in selected.items()
+            if is_cross_region(spec) and not is_mantle(spec)
+        ]
+        if system_profile_models:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="InvokeSystemInferenceProfiles",
+                    actions=[
+                        "bedrock:InvokeModel",
+                        "bedrock:InvokeModelWithResponseStream",
+                    ],
+                    resources=[
+                        f"arn:aws:bedrock:*:{self.account}:inference-profile/{model_id}"
+                        for model_id in system_profile_models
+                    ],
+                )
             )
-        )
 
         # 3. The foundation models behind those profiles.
         role.add_to_policy(
@@ -263,8 +298,14 @@ class InferenceProfilesStack(Stack):
         #    profile grant — and `_should_fallback` refuses to retry AccessDenied, so a GPT
         #    primary would not fall back to a Claude secondary. It would simply fail.
         #    Source: the GPT-5.6 Terra model card, Programmatic Access.
-        #    This is one account-wide ARN, not per-model, so it sits outside the loops.
-        if has_provider(selected, "openai"):
+        #    Mantle models (e.g. Gemma) ride the same OpenAI-compatible stack and attribute
+        #    cost through the Bedrock default project (no project ID is passed), so they need
+        #    this grant too. This is one account-wide ARN, not per-model, so it sits outside
+        #    the loops.
+        needs_default_project = has_provider(selected, "openai") or any(
+            is_mantle(spec) for spec in selected.values()
+        )
+        if needs_default_project:
             role.add_to_policy(
                 iam.PolicyStatement(
                     sid="InvokeDefaultProject",
@@ -294,7 +335,8 @@ class InferenceProfilesStack(Stack):
         return {
             "system_inference_profiles": [
                 f"Resource::arn:aws:bedrock:*:{account}:inference-profile/{model_id}"
-                for model_id in selected
+                for model_id, spec in selected.items()
+                if is_cross_region(spec) and not is_mantle(spec)
                 for account in account_renderings(self.account)
             ],
             "foundation_models": [

@@ -10,6 +10,8 @@ import json
 import logging
 import os
 import time
+import urllib.error
+import urllib.request
 from typing import Dict, Any, Optional, Callable
 from functools import lru_cache
 import boto3
@@ -136,7 +138,7 @@ def get_model_family(model_id: str) -> str:
         model_id: The Bedrock model ID
 
     Returns:
-        'claude', 'nova', or 'openai'
+        'claude', 'nova', 'openai', 'kimi', 'mistral', or 'gemma'
 
     Raises:
         BedrockError: If model family cannot be determined
@@ -144,8 +146,8 @@ def get_model_family(model_id: str) -> str:
     Note:
         Under Converse the family no longer selects a request *shape* — Converse normalises
         that. It selects only which provider-specific fields go into
-        ``additionalModelRequestFields``, which is why 'openai' can be a family that adds
-        nothing at all.
+        ``additionalModelRequestFields``, which is why 'openai' — and, like it, 'kimi',
+        'mistral', and 'gemma' — can be families that add nothing at all.
     """
     model_lower = model_id.lower()
 
@@ -155,8 +157,29 @@ def get_model_family(model_id: str) -> str:
         return "nova"
     elif "openai" in model_lower or "gpt-" in model_lower:
         return "openai"
+    elif "moonshotai" in model_lower or "kimi" in model_lower:
+        return "kimi"
+    elif "mistral" in model_lower or "pixtral" in model_lower:
+        return "mistral"
+    elif "gemma" in model_lower or model_lower.startswith("google."):
+        return "gemma"
     else:
         raise BedrockError(f"Unknown model family for model ID: {model_id}")
+
+
+def get_transport(model_id: str) -> str:
+    """Which wire transport a model uses: 'converse' or 'mantle'.
+
+    Mirrors the registry ``transport`` field, hardcoded here for the same reason
+    ``get_model_family`` and ``thinking_default_on`` are: the registry is read by CDK at
+    synth and by the UI at request time, but is not shipped in the Lambda layer. Add a model
+    here when its model card lists ``bedrock-mantle`` as its only endpoint (Gemma 4 31B);
+    everything else uses Converse on bedrock-runtime.
+    """
+    model_lower = model_id.lower()
+    if "gemma" in model_lower or model_lower.startswith("google."):
+        return "mantle"
+    return "converse"
 
 
 def thinking_default_on(model_id: str) -> bool:
@@ -423,6 +446,12 @@ class BedrockClient:
         try:
             model_family = get_model_family(model_id)
 
+            # Mantle (OpenAI-compatible) models are not Converse and have no inference
+            # profile — they are invoked over HTTP with SigV4. Dispatch before any of the
+            # Converse/profile machinery below.
+            if get_transport(model_id) == "mantle":
+                return self._invoke_mantle(client, model_id, payload)
+
             # Check for inference profile ARN - use it instead of model_id for cost tracking
             invoke_model_id = model_id
             profile_arn = get_inference_profile_arn(model_id)
@@ -482,6 +511,255 @@ class BedrockClient:
             raise
         except Exception as e:
             raise BedrockError(f"Model invocation failed: {e}") from e
+
+    # ── Mantle (OpenAI-compatible bedrock-mantle) transport ────────────────────────────
+    # Used for models whose model card lists bedrock-mantle as the only endpoint (Gemma 4
+    # 31B). Mantle speaks the OpenAI Chat Completions API, not Converse, and has no inference
+    # profile; cost is attributed to the Bedrock default project (no project ID is passed).
+    # The request is signed with SigV4 under the `bedrock-mantle` service and POSTed over
+    # HTTP, since boto3's bedrock-runtime client cannot reach this endpoint.
+    _MANTLE_SIGV4_SERVICE = "bedrock-mantle"
+    # Gemma 4 31B request-body cap (model card: 3.5 MB including images).
+    _MANTLE_MAX_PAYLOAD_BYTES = int(3.5 * 1024 * 1024)
+
+    # Anthropic media types -> data-URL MIME for OpenAI image_url parts.
+    _MANTLE_IMAGE_MIME = {
+        "image/jpeg": "image/jpeg",
+        "image/jpg": "image/jpeg",
+        "image/png": "image/png",
+        "image/gif": "image/gif",
+        "image/webp": "image/webp",
+    }
+
+    def _mantle_chat_completions_url(self, region: str) -> str:
+        """Gemma is served under ``/openai/v1`` (its model card), and the mantle SigV4
+        signing service is ``bedrock-mantle`` (OpenAI SDK Bedrock provider docs)."""
+        return f"https://bedrock-mantle.{region}.api.aws/openai/v1/chat/completions"
+
+    def _to_openai_content(self, content: Any) -> Any:
+        """Convert the internal Anthropic-shaped message content into OpenAI Chat
+        Completions content.
+
+        A bare string stays a string. A list becomes OpenAI content parts:
+            {"type": "text", "text": t}
+            {"type": "image", "source": {"media_type": m, "data": b64}}
+                -> {"type": "image_url", "image_url": {"url": "data:m;base64,b64"}}
+
+        Unlike the Converse path, OpenAI wants the base64 **string** inside a data URL, so
+        the image data is kept encoded rather than decoded to raw bytes.
+        """
+        if isinstance(content, str):
+            return content
+
+        if not isinstance(content, list):
+            raise BedrockError(
+                f"Message content must be a string or a list, got {type(content).__name__}"
+            )
+
+        parts = []
+        for index, item in enumerate(content):
+            if isinstance(item, str):
+                parts.append({"type": "text", "text": item})
+                continue
+            if not isinstance(item, dict):
+                raise BedrockError(
+                    f"Content block {index} must be a string or an object, "
+                    f"got {type(item).__name__}"
+                )
+
+            block_type = item.get("type")
+            if block_type == "text" or ("text" in item and "type" not in item):
+                parts.append({"type": "text", "text": item.get("text", "")})
+
+            elif block_type == "image":
+                source = item.get("source", {}) or {}
+                media_type = source.get("media_type", "image/png")
+                mime = self._MANTLE_IMAGE_MIME.get(media_type)
+                if mime is None:
+                    raise BedrockError(
+                        f"Content block {index}: unsupported image media type "
+                        f"{media_type!r}. Supported: {sorted(self._MANTLE_IMAGE_MIME)}"
+                    )
+                data = source.get("data", "")
+                if isinstance(data, bytes):
+                    b64 = base64.b64encode(data).decode("ascii")
+                else:
+                    try:
+                        base64.b64decode(data, validate=True)
+                    except (binascii.Error, ValueError) as exc:
+                        raise BedrockError(
+                            f"Content block {index}: image data is not valid base64 — {exc}"
+                        ) from exc
+                    b64 = data
+                if not b64:
+                    raise BedrockError(f"Content block {index}: image data is empty")
+                parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{b64}"},
+                    }
+                )
+            else:
+                raise BedrockError(
+                    f"Content block {index}: unsupported block type {block_type!r}"
+                )
+
+        if not parts:
+            raise BedrockError("Message content produced no OpenAI content parts")
+        return parts
+
+    def _build_mantle_request(
+        self, payload: Dict[str, Any], model_id: str
+    ) -> Dict[str, Any]:
+        """Turn the internal Anthropic-shaped payload into an OpenAI Chat Completions body."""
+        messages = []
+        system_prompt = payload.get("system")
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+
+        for index, message in enumerate(payload.get("messages") or []):
+            role = message.get("role")
+            if role not in ("user", "assistant"):
+                raise BedrockError(f"Message {index} has invalid role: {role!r}")
+            messages.append(
+                {
+                    "role": role,
+                    "content": self._to_openai_content(message.get("content")),
+                }
+            )
+
+        if not messages:
+            raise BedrockError("Mantle request requires at least one message")
+
+        body: Dict[str, Any] = {"model": model_id, "messages": messages}
+        max_tokens = payload.get("max_tokens")
+        if max_tokens:
+            body["max_tokens"] = max_tokens
+        temperature = payload.get("temperature")
+        if temperature is not None:
+            body["temperature"] = temperature
+        return body
+
+    def _invoke_mantle(
+        self, client, model_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Invoke a mantle model via the OpenAI Chat Completions API and return the same
+        normalized envelope the Converse path returns."""
+        region = (
+            getattr(getattr(client, "meta", None), "region_name", None)
+            or self.aws_region
+            or "us-west-2"
+        )
+        url = self._mantle_chat_completions_url(region)
+        body = self._build_mantle_request(payload, model_id)
+        raw = json.dumps(body).encode("utf-8")
+        if len(raw) > self._MANTLE_MAX_PAYLOAD_BYTES:
+            raise BedrockError(
+                f"Mantle request body is {len(raw)} bytes, over the "
+                f"{self._MANTLE_MAX_PAYLOAD_BYTES}-byte limit for {model_id}"
+            )
+
+        self.logger.info(
+            "Invoking mantle model: %s at %s (%d bytes)", model_id, url, len(raw)
+        )
+        time.sleep(self.throttle_delay)
+        response_json = self._post_signed_mantle(url, raw, region, model_id)
+        normalized = self._normalize_mantle_response(response_json, model_id)
+        self.logger.info("Mantle invocation successful")
+        return normalized
+
+    def _post_signed_mantle(
+        self, url: str, raw: bytes, region: str, model_id: str
+    ) -> Dict[str, Any]:
+        """SigV4-sign (service ``bedrock-mantle``) and POST the request, mapping HTTP and
+        network failures onto the error vocabulary ``_should_fallback`` understands so a
+        mantle primary can fall back to a Converse secondary on transient errors — but not
+        on 4xx, which indicate configuration problems."""
+        from botocore.auth import SigV4Auth
+        from botocore.awsrequest import AWSRequest
+
+        credentials = boto3.Session().get_credentials()
+        if credentials is None:
+            raise BedrockError(
+                "No AWS credentials available to sign the mantle request"
+            )
+
+        aws_req = AWSRequest(
+            method="POST",
+            url=url,
+            data=raw,
+            headers={"Content-Type": "application/json"},
+        )
+        SigV4Auth(credentials, self._MANTLE_SIGV4_SERVICE, region).add_auth(aws_req)
+
+        req = urllib.request.Request(url, data=raw, method="POST")
+        for header, value in aws_req.headers.items():
+            req.add_header(header, value)
+
+        timeout = int(os.environ.get("BEDROCK_READ_TIMEOUT", "900"))
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:500]
+            if e.code == 429:
+                raise BedrockError(
+                    f"ThrottlingException from mantle ({model_id}): {detail}"
+                ) from e
+            if e.code == 404:
+                raise BedrockError(
+                    f"ResourceNotFoundException from mantle ({model_id}): {detail}"
+                ) from e
+            if e.code >= 500:
+                raise BedrockError(
+                    f"ServiceUnavailable from mantle ({model_id}, HTTP {e.code}): {detail}"
+                ) from e
+            # 4xx (400/403/…): configuration or access error — must not fall back.
+            raise BedrockError(
+                f"Mantle request failed for {model_id} (HTTP {e.code}): {detail}"
+            ) from e
+        except urllib.error.URLError as e:
+            # Network-level failure — treat as transient so the chain can fall back.
+            raise BedrockError(
+                f"ServiceUnavailable reaching mantle ({model_id}): {e.reason}"
+            ) from e
+
+    def _normalize_mantle_response(
+        self, response: Dict[str, Any], model_id: str
+    ) -> Dict[str, Any]:
+        """Normalize an OpenAI Chat Completions response to the internal envelope callers
+        expect: ``{"content": [{"type": "text", "text": ...}], ...}`` with Converse-shaped
+        ``usage`` (``inputTokens``/``outputTokens``) that the specialists read."""
+        try:
+            choice = response["choices"][0]
+            text = choice["message"].get("content")
+        except (KeyError, IndexError, TypeError) as exc:
+            raise BedrockError(
+                f"Invalid mantle response structure ({model_id}): {exc}"
+            ) from exc
+
+        if not text:
+            raise BedrockError(
+                f"Mantle returned no text content ({model_id}); "
+                f"finish_reason={choice.get('finish_reason')!r}"
+            )
+
+        result: Dict[str, Any] = {"content": [{"type": "text", "text": text}]}
+
+        finish_reason = choice.get("finish_reason")
+        if finish_reason:
+            result["stopReason"] = finish_reason
+
+        usage = response.get("usage") or {}
+        if usage:
+            # OpenAI usage -> the Converse-shaped keys specialist_foundation reads.
+            result["usage"] = {
+                "inputTokens": usage.get("prompt_tokens", 0),
+                "outputTokens": usage.get("completion_tokens", 0),
+                "totalTokens": usage.get("total_tokens", 0),
+            }
+
+        return result
 
     # Anthropic media types -> Converse image formats. Converse names the format
     # separately from the bytes, where the Anthropic body carried a MIME type.
@@ -645,10 +923,16 @@ class BedrockClient:
                 "reasoningConfig": {"type": "enabled", "maxReasoningEffort": effort}
             }
 
-        if model_family == "openai":
+        if model_family in ("openai", "kimi", "mistral", "gemma"):
+            # None of these expose a reasoning parameter through Converse. (Gemma is a mantle
+            # model and never reaches the Converse thinking path at all, but is listed for
+            # completeness.) An unrecognised key in additionalModelRequestFields earns a
+            # ValidationException. Their registry entries set thinking=null, so this is only
+            # reached if a specialist config asks for thinking anyway; drop it.
             self.logger.info(
-                "Thinking requested for an OpenAI model; the model cards document no "
-                "reasoning parameter, so none is sent"
+                "Thinking requested for a %s model; its model card documents no Converse "
+                "reasoning parameter, so none is sent",
+                model_family,
             )
             return {}
 
