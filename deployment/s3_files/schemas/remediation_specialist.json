@@ -1,13 +1,13 @@
 [
   {
     "name": "analyze_remediation_tool",
-    "description": "PDF accessibility remediation tool that processes entire PDF documents to apply PDF/UA tags and build a structure tree for Section 508 compliance. Uses correlation XML for guided element resolution and content stream tagging.",
+    "description": "PDF accessibility remediation tool that processes entire PDF documents to apply PDF/UA tags and build a structure tree for Section 508 compliance. Uses correlation XML for guided element resolution and content stream tagging. Only PDF source documents are supported: do NOT call this tool when the source document is an image (PNG, JPEG, TIFF, WebP, GIF) — it will reject the request.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "pdf_path": {
           "type": "string",
-          "description": "S3 URI to the PDF document to remediate"
+          "description": "S3 URI to the PDF document to remediate. Must be a PDF; image inputs are not supported and will be rejected."
         },
         "session_id": {
           "type": "string",

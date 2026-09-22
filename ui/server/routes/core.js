@@ -227,9 +227,26 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     app.post('/api/upload', upload.single('file'), async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
         if (!UPLOAD_BUCKET) return res.status(500).json({ error: 'S3_UPLOAD_BUCKET not configured' });
-        const isPdfMime = req.file.mimetype === 'application/pdf';
-        const isPdfMagic = req.file.buffer.length >= 5 && req.file.buffer.slice(0, 5).toString() === '%PDF-';
-        if (!isPdfMime || !isPdfMagic) return res.status(400).json({ error: 'Only PDF files are accepted' });
+        // Accept a PDF or a single image. Sniff the magic bytes rather than
+        // trusting the client-declared MIME type; the extension is not evidence.
+        // A PDF is rasterized into page images downstream; an image is already
+        // a page and skips that step (the agent routes on the S3 key's extension).
+        const buf = req.file.buffer;
+        const hex = (n) => buf.slice(0, n).toString('hex');
+        const ascii = (a, b) => buf.slice(a, b).toString('latin1');
+        const isPdf = buf.length >= 5 && ascii(0, 5) === '%PDF-';
+        const isPng = buf.length >= 8 && hex(8) === '89504e470d0a1a0a';
+        const isJpeg = buf.length >= 3 && hex(3) === 'ffd8ff';
+        const isGif = buf.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a');
+        const isWebp = buf.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
+        const isTiff = buf.length >= 4 && (hex(4) === '49492a00' || hex(4) === '4d4d002a');
+        const isImage = isPng || isJpeg || isGif || isWebp || isTiff;
+        if (!isPdf && !isImage) return res.status(400).json({ error: 'Only PDF or image files (PNG, JPEG, TIFF, WebP, GIF) are accepted' });
+        // Images are sent to the vision models without the PDF flow's per-page
+        // recompression, so the raw bytes hit the foundation ImageProcessor's
+        // 20MB validation cap. Reject early with a clear message instead of
+        // failing mid-pipeline. PDFs keep the 50MB multer limit.
+        if (isImage && req.file.size > 20 * 1024 * 1024) return res.status(400).json({ error: 'Image files must be 20MB or smaller' });
 
         const filename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
         // doc_id is the top level of the job-tracking hierarchy
