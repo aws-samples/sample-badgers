@@ -93,6 +93,36 @@
       "thinking": null,
       "prompt_caching": false,
       "status": "active"
+    },
+    "us.moonshotai.kimi-k3": {
+      "display_name": "Kimi K3",
+      "provider": "moonshotai",
+      "transport": "converse",
+      "price_in": 3.3,
+      "price_out": 16.5,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
+    },
+    "us.mistral.pixtral-large-2502-v1:0": {
+      "display_name": "Pixtral Large",
+      "provider": "mistral",
+      "transport": "converse",
+      "price_in": 2.0,
+      "price_out": 6.0,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
+    },
+    "google.gemma-4-31b": {
+      "display_name": "Gemma 4 31B",
+      "provider": "google",
+      "transport": "mantle",
+      "price_in": 0.14,
+      "price_out": 0.4,
+      "thinking": null,
+      "prompt_caching": false,
+      "status": "active"
     }
   }
 }
