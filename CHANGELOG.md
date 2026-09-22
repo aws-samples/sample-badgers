@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Qwen3 VL 235B (`qwen.qwen3-vl-235b-a22b`, `$0.53`/`$2.66`) — the first In-Region-only
+  model.** A vision-capable model reached over **Converse** on `bedrock-runtime`, but with no
+  `us.*`/`global.*` cross-Region inference profile: its model card lists Geo and Global as
+  *Not supported*. It is therefore the first model to exercise the `cross_region` field that
+  `5.0.1` added but left unused. The registry key is the bare foundation-model ID
+  `qwen.qwen3-vl-235b-a22b` with `"cross_region": false`, and its application inference
+  profile wraps the foundation model directly in the deploy Region rather than a `us.*`
+  system profile, so **cost attribution is preserved**. Provider `qwen` is added to
+  `VALID_PROVIDERS`, a `qwen` branch to `get_model_family`, and the family joins the
+  drop-thinking set in `_thinking_fields` (the card documents no reasoning parameter);
+  profiles, the SSM map, IAM grants, and the wizard dropdown derive automatically.
+  `grant_invoke_to_role` omits the system-profile statement for it (none exists) and covers
+  it through the foundation-model grant. In-Region only — `us-west-2` is supported. Verified
+  live over Converse for both text and image input; the application-profile-over-foundation-model
+  wrapper is synth-verified and takes effect on deploy.
+
 ## [5.0.1] - 2026-09-21
 
 Since `[5.0.0]`. Three vision-capable models added, a second inference transport alongside
