@@ -1,0 +1,90 @@
+[
+  {
+    "name": "inspect_region_tool",
+    "description": "Gives a vision model a close look at specific regions of a page image when a specialist is uncertain. Call AFTER specialists and BEFORE correlation, only for regions a specialist flagged: a <miss>MISS</miss>, a human_review_flag in audit_mode, or an explicit alternate reading (e.g. '18 or 16'). Crops each region from the page image with context padding, resizes it to the vision model's working size, optionally overlays page-coordinate ticks for row alignment, and returns a blind re-reading of each region with a confidence score. Crops add no pixels beyond the source image: every result reports source pixel size and scale factor, and readings from heavily enlarged small regions are capped at medium confidence. Returns an S3 URI of the inspection results to pass to correlate_page_results_tool in specialist_uris.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) of the SAME page image the flagging specialist read (the enhanced URI if enhancement was applied). Use this OR image_data."
+        },
+        "image_data": {
+          "type": "string",
+          "description": "Base64-encoded image bytes. Use this OR image_path, not both."
+        },
+        "regions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "description": "The regions to re-read, one per flag raised on this page.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "region_id": {
+                "type": "string",
+                "description": "Stable ID, ideally the flagged element or cell ID (e.g. elem_003_td_5_2)."
+              },
+              "x1": { "type": "number", "minimum": 0, "maximum": 1 },
+              "y1": { "type": "number", "minimum": 0, "maximum": 1 },
+              "x2": { "type": "number", "minimum": 0, "maximum": 1 },
+              "y2": { "type": "number", "minimum": 0, "maximum": 1 },
+              "task": {
+                "type": "string",
+                "enum": ["transcribe", "assign_rows"],
+                "description": "transcribe: read the characters in the region. assign_rows: report the page y-coordinate of each mark so it can be matched to table rows (enables the page-coordinate tick overlay)."
+              },
+              "flagged_by": {
+                "type": "string",
+                "description": "Specialist that raised the flag. Recorded on the result; NOT shown to the reading model."
+              },
+              "concern": {
+                "type": "string",
+                "description": "The specialist's uncertainty, e.g. 'could be 18 or 16'. Withheld from the blind read; used only when comparing the reading to the specialist's candidates."
+              }
+            },
+            "required": ["region_id", "x1", "y1", "x2", "y2", "task"]
+          }
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID for organizing outputs in S3."
+        },
+        "audit_mode": {
+          "type": "boolean",
+          "description": "Pass through when audit_mode is enabled."
+        },
+        "page_number": {
+          "type": "string",
+          "description": "Optional page number this inspection covers. If omitted it is derived from the image filename."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the analysis run this invocation belongs to. Pass through the job_id supplied in the orchestrator context. Omit only when no analysis run is active."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document being analysed. Pass through the doc_id supplied in the orchestrator context."
+        }
+      },
+      "required": ["regions", "session_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON document with one entry per region: source pixel box/size, output size, scale factor, detail class, crop_uri, the blind reading with per-character confidence, the matched candidate, the final confidence, and whether it was capped. Pass the returned S3 URI to correlate_page_results_tool in specialist_uris."
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the inspection completed successfully"
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID echoed back"
+        }
+      }
+    }
+  }
+]

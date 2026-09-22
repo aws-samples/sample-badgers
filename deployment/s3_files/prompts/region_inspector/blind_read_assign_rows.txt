@@ -1,0 +1,1 @@
+This region has red ticks along its left edge, each labelled with a page y-coordinate. For every mark you see, report its text and the tick value level with the mark's baseline in the marks array. Still transcribe any characters in the region.

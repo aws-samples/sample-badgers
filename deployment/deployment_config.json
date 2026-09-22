@@ -104,6 +104,10 @@
             "enabled": true,
             "category": "Post-Processing"
         },
+        "region_inspector": {
+            "enabled": true,
+            "category": "Post-Processing"
+        },
         "remediation_specialist": {
             "enabled": true,
             "category": "Post-Processing"
