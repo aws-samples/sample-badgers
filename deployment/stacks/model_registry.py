@@ -28,7 +28,15 @@ _DEFAULT_PATH = (
     / "model_registry.json"
 )
 
-VALID_PROVIDERS = {"anthropic", "amazon", "openai", "moonshotai", "mistral", "google"}
+VALID_PROVIDERS = {
+    "anthropic",
+    "amazon",
+    "openai",
+    "moonshotai",
+    "mistral",
+    "google",
+    "qwen",
+}
 VALID_TRANSPORTS = {"converse", "invoke", "mantle"}
 VALID_THINKING = {None, "extended", "adaptive"}
 

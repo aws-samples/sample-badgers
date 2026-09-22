@@ -586,6 +586,7 @@ Customers are responsible for making their own independent assessment of the inf
 - [Amazon Nova 2 Lite model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-amazon-nova-2-lite.html) - The cheapest fallback in the chain
 - [Kimi K3 model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-moonshot-ai-kimi-k3.html) - Vision-capable, Converse on `bedrock-runtime`
 - [Pixtral Large model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-mistral-ai-pixtral-large.html) - Vision-capable, Converse on `bedrock-runtime`
+- [Qwen3 VL 235B model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-qwen-qwen3-vl-235b-a22b.html) - Vision-capable, Converse on `bedrock-runtime`; In-Region only (no `us.*`/`global.*` profile, so its application profile wraps the foundation model directly)
 - [Gemma 4 31B model card](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-google-gemma-4-31b.html) - Vision-capable, `bedrock-mantle` only (OpenAI-compatible; no inference profile)
 - [Using Amazon Nova in AI Agents](https://docs.aws.amazon.com/nova/latest/userguide/agents-use-nova.html) - Nova as foundation model for agents
 - [Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html) - How `us.*` profiles route, and the IAM grants they require

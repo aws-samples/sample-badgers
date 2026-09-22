@@ -539,11 +539,13 @@ Profiles are named `badgers-{model}-{deployment_id}` — for example `badgers-cl
 
 **Model inference does not stay in your deployment Region.** This surprises people, so it is worth being explicit.
 
-Every **Converse** model BADGERS ships is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`, `us.moonshotai.…`, `us.mistral.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
+Every **Converse** model BADGERS ships **except Qwen3 VL 235B** is invoked through a **US geo cross-Region inference profile** (`us.anthropic.…`, `us.amazon.…`, `us.openai.…`, `us.moonshotai.…`, `us.mistral.…`). Geo cross-Region inference means Bedrock picks a destination Region *within the US geography* to process each request. Your deployment Region is the **source** Region; it is not necessarily where the tokens are processed.
 
 For the models whose cards publish a destination table (Sonnet 4.6, Opus 4.6, Nova 2 Lite, Pixtral Large), a source Region of `us-west-2` routes to `us-east-1`, `us-east-2`, or `us-west-2`. The rest document a `us.*` profile without publishing a destination list.
 
-**Gemma 4 31B is the exception.** It is served only on the OpenAI-compatible `bedrock-mantle` endpoint (`https://bedrock-mantle.{region}.api.aws/openai/v1`), not Converse, and has no inference profile. The foundation layer signs an OpenAI Chat Completions request with SigV4 (service `bedrock-mantle`) and cost is attributed to the Bedrock **default project** rather than a `us.*` profile. Its regional behavior follows the mantle endpoint, not a `us.*` cross-Region profile.
+**Gemma 4 31B is one exception.** It is served only on the OpenAI-compatible `bedrock-mantle` endpoint (`https://bedrock-mantle.{region}.api.aws/openai/v1`), not Converse, and has no inference profile. The foundation layer signs an OpenAI Chat Completions request with SigV4 (service `bedrock-mantle`) and cost is attributed to the Bedrock **default project** rather than a `us.*` profile. Its regional behavior follows the mantle endpoint, not a `us.*` cross-Region profile.
+
+**Qwen3 VL 235B is the other exception.** It uses Converse like the rest, but its model card lists Geo and Global cross-Region inference as *Not supported*, so there is no `us.*` system profile to wrap. Its registry key is the bare foundation-model ID (`qwen.qwen3-vl-235b-a22b`, `"cross_region": false`) and its application inference profile wraps the foundation model **directly in the deploy Region**, so cost attribution still works — but inference stays **In-Region** rather than routing across the US geography. It is available only where the model card lists In-Region support; `us-west-2` is one such Region.
 
 Two consequences:
 

@@ -147,7 +147,7 @@ AgentCore Memory for session state:
 ### Inference Profiles (`inference_profiles_stack.py`)
 Application Inference Profiles for cost tracking and usage monitoring:
 - One profile per model in `s3_files/config/model_registry.json`, created in a loop over the registry rather than hand-written — currently **8**
-- Each wraps that model's **US geo cross-Region** system-defined profile (`us.*`), not the global one (`global.*`). Both route across Regions; `us.*` bounds routing to the US geography
+- Each wraps that model's **US geo cross-Region** system-defined profile (`us.*`), not the global one (`global.*`). Both route across Regions; `us.*` bounds routing to the US geography — **except an In-Region-only model** (`cross_region: false`, e.g. Qwen3 VL 235B), whose profile wraps the **foundation model directly** in the deploy Region because it has no `us.*` system profile
 - Naming convention: `badgers-{model}-{deployment_id}`
 - Writes `/badgers-{deployment_id}/model-profiles` in the same loop — the model ID → profile ARN map every consumer reads
 - `grant_invoke_to_role` generates all three Bedrock statements from the same iteration, plus `project/default` when any OpenAI model is provisioned
