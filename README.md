@@ -131,45 +131,45 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 
 BADGERS defines a formal element vocabulary — 14 document element types with sub-types — used across all structural analysis specialists. The vocabulary is published in machine-readable formats for external consumption and interoperability:
 
-| File | Format | Purpose |
-|------|--------|---------|
-| [`badgers-content-tree.xsd`](schemas/badgers-content-tree.xsd) | XML Schema | **Primary interop schema** — PDF/UA content tree (the document spine) |
-| [`badgers-elements.xsd`](schemas/badgers-elements.xsd) | XML Schema | Validate specialist XML output |
-| [`badgers-elements.jsonld`](schemas/badgers-elements.jsonld) | JSON-LD Context | Linked-data interop — maps types to [Schema.org](https://schema.org/) and [Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) |
-| [`MAPPING.md`](schemas/MAPPING.md) | Mapping Reference | Rosetta stone — BADGERS ↔ JATS, ALTO, Dublin Core, PREMIS |
+| File                                                           | Format            | Purpose                                                                                                                                                    |
+| -------------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`badgers-content-tree.xsd`](schemas/badgers-content-tree.xsd) | XML Schema        | **Primary interop schema** — PDF/UA content tree (the document spine)                                                                                      |
+| [`badgers-elements.xsd`](schemas/badgers-elements.xsd)         | XML Schema        | Validate specialist XML output                                                                                                                             |
+| [`badgers-elements.jsonld`](schemas/badgers-elements.jsonld)   | JSON-LD Context   | Linked-data interop — maps types to [Schema.org](https://schema.org/) and [Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) |
+| [`MAPPING.md`](schemas/MAPPING.md)                             | Mapping Reference | Rosetta stone — BADGERS ↔ JATS, ALTO, Dublin Core, PREMIS                                                                                                  |
 
 See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions, sub-types, citation styles, and usage examples.
 
 ## 🔬 Specialists
 
-| Specialist                             | Purpose                                                                                    |
-| -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 📸 `pdf_to_images_converter`            | Convert PDF pages to images                                                                |
-| 🏷️ `classify_pdf_content`               | Classify document content type                                                             |
-| 📝 `full_text_specialist`               | Extract all text content                                                                   |
-| 📊 `table_specialist`                   | Extract and structure tables                                                               |
-| 📈 `charts_specialist`                  | Analyze charts and graphs                                                                  |
-| 🔀 `diagram_specialist`                 | Process diagrams and flowcharts                                                            |
-| 📐 `layout_specialist`                  | Document structure analysis                                                                |
-| 🏥 `decision_tree_specialist`           | Medical/clinical document analysis                                                         |
-| 🔬 `scientific_specialist`              | Scientific paper analysis                                                                  |
-| ✍️ `handwriting_specialist`             | Handwritten text recognition                                                               |
-| 🔢 `handwriting_math_specialist`        | Handwritten mathematical notation recognition                                              |
-| 💻 `code_block_specialist`              | Extract code snippets                                                                      |
-| 🗂️ `metadata_generic_specialist`        | Generic metadata extraction                                                                |
-| 🗂️ `metadata_mads_specialist`           | MADS metadata format extraction                                                            |
-| 🗂️ `metadata_mods_specialist`           | MODS metadata format extraction                                                            |
-| 🔑 `keyword_topic_specialist`           | Extract keywords and topics                                                                |
-| 🔧 `remediation_specialist`             | PDF accessibility remediation (container, content stream tagging + structure tree builder) |
-| 📄 `page_specialist`                    | Single page content analysis                                                               |
-| 🧱 `elements_specialist`                | Document element detection                                                                 |
-| 🧱 `robust_elements_specialist`         | Enhanced element detection with fallbacks                                                  |
-| 👁️ `general_visual_analysis_specialist` | General-purpose visual content analysis                                                    |
-| ✏️ `editorial_specialist`               | Editorial content and markup analysis                                                      |
-| 🗺️ `war_map_specialist`                 | Historical war map analysis                                                                |
-| 🎓 `edu_transcript_specialist`          | Educational transcript analysis                                                            |
-| 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                |
-| 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                        |
+| Specialist                             | Purpose                                                                                     |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
+| 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
+| 📝 `full_text_specialist`               | Extract all text content                                                                    |
+| 📊 `table_specialist`                   | Extract and structure tables                                                                |
+| 📈 `charts_specialist`                  | Analyze charts and graphs                                                                   |
+| 🔀 `diagram_specialist`                 | Process diagrams and flowcharts                                                             |
+| 📐 `layout_specialist`                  | Document structure analysis                                                                 |
+| 🏥 `decision_tree_specialist`           | Medical/clinical document analysis                                                          |
+| 🔬 `scientific_specialist`              | Scientific paper analysis                                                                   |
+| ✍️ `handwriting_specialist`             | Handwritten text recognition                                                                |
+| 🔢 `handwriting_math_specialist`        | Handwritten mathematical notation recognition                                               |
+| 💻 `code_block_specialist`              | Extract code snippets                                                                       |
+| 🗂️ `metadata_generic_specialist`        | Generic metadata extraction                                                                 |
+| 🗂️ `metadata_mads_specialist`           | MADS metadata format extraction                                                             |
+| 🗂️ `metadata_mods_specialist`           | MODS metadata format extraction                                                             |
+| 🔑 `keyword_topic_specialist`           | Extract keywords and topics                                                                 |
+| 🔧 `remediation_specialist`             | PDF accessibility remediation (container, content stream tagging + structure tree builder)  |
+| 📄 `page_specialist`                    | Single page content analysis                                                                |
+| 🧱 `elements_specialist`                | Document element detection                                                                  |
+| 🧱 `robust_elements_specialist`         | Enhanced element detection with fallbacks                                                   |
+| 👁️ `general_visual_analysis_specialist` | General-purpose visual content analysis                                                     |
+| ✏️ `editorial_specialist`               | Editorial content and markup analysis                                                       |
+| 🗺️ `war_map_specialist`                 | Historical war map analysis                                                                 |
+| 🎓 `edu_transcript_specialist`          | Educational transcript analysis                                                             |
+| 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                 |
+| 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                         |
 
 ## 🚀 Deployment
 

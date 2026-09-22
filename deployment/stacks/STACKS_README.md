@@ -73,7 +73,7 @@ callback URLs at the service endpoint once it exists.
 ### S3 (`s3_stack.py`)
 Creates 3 buckets:
 - **Config** — Manifests, prompts, schemas (versioned)
-- **Source** — PDF uploads (versioned)
+- **Source** — PDF and image uploads (versioned)
 - **Output** — Analysis results with 1-day TTL on `temp/` prefix
 
 ### Cognito (`cognito_stack.py`)

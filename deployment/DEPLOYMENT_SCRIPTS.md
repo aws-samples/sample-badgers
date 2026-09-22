@@ -57,18 +57,28 @@ Behaviour worth knowing:
   the template unchanged.
 - **The X-Ray decision is resolved before every `cdk deploy`**, not just in step 2 —
   `RuntimeWebSocket` depends on the XRay stack and `cdk deploy` includes dependencies.
+- **Step 4 checks the foundation layer before building.** `lambdas/layer.zip` is a build
+  artifact that nothing rebuilds automatically, so before the container build and the Lambda
+  deploy, step 4 compares it against its sources (`badgers-foundation/foundation`,
+  `config/config.py`, the core system prompts, and `lambdas/requirements.txt`). If it is
+  missing or stale it names the newer file and prompts to rebuild (running
+  `build_foundation_layer.sh`), and fails the step if you decline — replacing the raw CDK
+  traceback the synth guard would otherwise throw. `BADGERS_ALLOW_STALE_LAYER=1` skips the
+  prompt; `BADGERS_ASSUME_YES=1` rebuilds without asking. Step 6 (Runtime) needs no
+  equivalent: it copies `foundation` source into the image and installs its own
+  `runtime/requirements.txt`, so it never ships the pre-built layer.
 
 Environment variables:
 
-| Variable                                         | Effect                                                                                                                                                                                                                                                                              |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step. |
-| `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                           |
-| `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                              |
-| `BADGERS_ALLOW_STALE_LAYER`                      | `1` lets the Lambda stack synthesize while `lambdas/layer.zip` is older than its sources. Without it, synth refuses so a deploy cannot ship the previous layer. `deploy.sh` never needs it (step 1 rebuilds first); `destroy.sh` sets it itself, since a destroy ships nothing.     |
-| `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                            |
-| `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                  |
-| `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                              |
+| Variable                                         | Effect                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step.                                |
+| `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                                                          |
+| `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                                                             |
+| `BADGERS_ALLOW_STALE_LAYER`                      | `1` lets the Lambda stack synthesize while `lambdas/layer.zip` is older than its sources, and skips step 4's pre-deploy freshness prompt. Without it, step 4 offers to rebuild and synth refuses outright, so a deploy cannot ship the previous layer. `destroy.sh` sets it itself, since a destroy ships nothing. |
+| `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                                                           |
+| `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                                                 |
+| `IMAGE_TAG`, `RUNTIME_IMAGE_TAG`, `UI_IMAGE_TAG` | Image tags. Default `latest`, `websocket`, `frontend`.                                                                                                                                                                                                                                                             |
 
 ## destroy.sh (repo root)
 

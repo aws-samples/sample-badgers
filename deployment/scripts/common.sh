@@ -671,6 +671,187 @@ stack_status() {
     --output text 2>/dev/null || echo "DELETED"
 }
 
+# ── Gateway target reconciliation ────────────────────────────────────────────
+#
+# A Gateway Lambda target caches its tool schema at registration time: the schema is
+# fetched once from schemas/<name>.json in the config bucket and stored on the target.
+# Editing that S3 object changes NO CloudFormation property on the target — its only
+# schema-related property is the static S3 URI — so `cdk deploy Gateway` sees no diff
+# and the live target keeps serving the OLD schema. The agent then calls the tool with
+# the stale parameter names and the Lambda rejects the request.
+#
+# A Lambda *code/config* update needs no re-registration: the target holds the function
+# ARN, which is stable across deploys, and the Gateway invokes the live function. Only a
+# schema change (or a function recreation that changes the ARN) makes the target stale.
+#
+# reconcile_gateway_target forces the Gateway to re-read the schema by calling
+# UpdateGatewayTarget with the target's OWN current configuration — nothing changes but
+# the re-fetched schema. It does so only when stale:
+#   - the S3 schema object is newer than the target's updatedAt, OR
+#   - the target's cached lambdaArn no longer matches the live badgers_<name> function.
+# Otherwise it is a cheap no-op, so it is safe to run on every deploy.
+#
+# Usage: reconcile_gateway_target <specialist_name> [gateway_id] [config_bucket]
+# The optional args let the loop variant resolve the gateway id and bucket once.
+reconcile_gateway_target() {
+  local name="$1"
+  local gw="${2:-}"
+  local config_bucket="${3:-}"
+
+  [ -n "${gw}" ] || gw="$(stack_output "$(_sn Gateway)" GatewayId)"
+  [ -n "${config_bucket}" ] || config_bucket="$(stack_output "$(_sn S3)" ConfigBucketName)"
+  if [ -z "${gw}" ] || [ "${gw}" = "None" ]; then
+    log_warn "reconcile: no GatewayId output for $(_sn Gateway); skipping ${name}"
+    return 0
+  fi
+  if [ -z "${config_bucket}" ] || [ "${config_bucket}" = "None" ]; then
+    log_warn "reconcile: no ConfigBucketName output; skipping ${name}"
+    return 0
+  fi
+
+  # Target-name transform must match agentcore_gateway_stack.py::add_lambda_target:
+  # strip an analyze_ prefix and a _tool suffix, replace underscores with hyphens,
+  # cap at 50 chars.
+  local short="${name#analyze_}"; short="${short%_tool}"
+  local tname; tname="$(printf '%s' "${short}" | tr '_' '-' | cut -c1-50)"
+
+  local tid
+  tid="$(aws bedrock-agentcore-control list-gateway-targets \
+    --gateway-identifier "${gw}" --region "${AWS_REGION}" \
+    --query "items[?name=='${tname}'].targetId | [0]" --output text 2>/dev/null || echo "")"
+  if [ -z "${tid}" ] || [ "${tid}" = "None" ]; then
+    log_warn "reconcile: no target named '${tname}' on gateway ${gw}; skipping"
+    return 0
+  fi
+
+  local schema_mtime
+  schema_mtime="$(aws s3api head-object --bucket "${config_bucket}" --key "schemas/${name}.json" \
+    --region "${AWS_REGION}" --query LastModified --output text 2>/dev/null || echo "")"
+  if [ -z "${schema_mtime}" ]; then
+    log_warn "reconcile: schemas/${name}.json not found in ${config_bucket}; skipping ${tname}"
+    return 0
+  fi
+
+  local tgt_json
+  tgt_json="$(aws bedrock-agentcore-control get-gateway-target \
+    --gateway-identifier "${gw}" --target-id "${tid}" --region "${AWS_REGION}" \
+    --query '{u:updatedAt,name:name,cfg:targetConfiguration,creds:credentialProviderConfigurations}' \
+    --output json 2>/dev/null || echo "")"
+  if [ -z "${tgt_json}" ]; then
+    log_warn "reconcile: could not read target ${tname} (${tid}); skipping"
+    return 0
+  fi
+
+  # Live ARN for the recreation guard (function rename/recreate changes the ARN).
+  local live_arn
+  live_arn="$(aws lambda get-function-configuration --function-name "badgers_${name}" \
+    --region "${AWS_REGION}" --query FunctionArn --output text 2>/dev/null || echo "")"
+  [ "${live_arn}" = "None" ] && live_arn=""
+
+  local recon_tmp; recon_tmp="$(mktemp -d)"
+  local decision
+  decision="$(TGT_JSON="${tgt_json}" SCHEMA_MTIME="${schema_mtime}" LIVE_ARN="${live_arn}" \
+    RECON_TMP="${recon_tmp}" python3 -c '
+import json, os, sys
+from datetime import datetime, timezone
+
+def parse_ts(v):
+    if isinstance(v, (int, float)):
+        return datetime.fromtimestamp(v, tz=timezone.utc)
+    s = str(v).strip().replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return datetime.fromtimestamp(float(s), tz=timezone.utc)
+
+try:
+    tgt = json.loads(os.environ["TGT_JSON"])
+    schema_mtime = parse_ts(os.environ["SCHEMA_MTIME"])
+    updated = parse_ts(tgt["u"])
+except Exception as exc:
+    print("ERROR " + str(exc))
+    sys.exit(0)
+
+reasons = []
+if schema_mtime > updated:
+    reasons.append("schema newer than target")
+
+live_arn = os.environ.get("LIVE_ARN", "").strip()
+cached_arn = ""
+try:
+    cached_arn = tgt["cfg"]["mcp"]["lambda"]["lambdaArn"]
+except Exception:
+    pass
+if live_arn and cached_arn and live_arn != cached_arn:
+    reasons.append("lambda ARN changed")
+
+if not reasons:
+    print("CURRENT")
+    sys.exit(0)
+
+tmp = os.environ["RECON_TMP"]
+with open(os.path.join(tmp, "cfg.json"), "w") as fh:
+    json.dump(tgt["cfg"], fh)
+creds = tgt.get("creds") or [{"credentialProviderType": "GATEWAY_IAM_ROLE"}]
+with open(os.path.join(tmp, "creds.json"), "w") as fh:
+    json.dump(creds, fh)
+with open(os.path.join(tmp, "name.txt"), "w") as fh:
+    fh.write(tgt["name"])
+print("STALE " + "; ".join(reasons))
+')"
+
+  case "${decision}" in
+    CURRENT)
+      log_success "reconcile: target ${tname} already current"
+      ;;
+    STALE*)
+      log_info "reconcile: ${tname} stale (${decision#STALE }) — re-registering to force schema re-read..."
+      if aws bedrock-agentcore-control update-gateway-target \
+          --gateway-identifier "${gw}" --target-id "${tid}" --region "${AWS_REGION}" \
+          --name "$(cat "${recon_tmp}/name.txt")" \
+          --target-configuration "file://${recon_tmp}/cfg.json" \
+          --credential-provider-configurations "file://${recon_tmp}/creds.json" \
+          >/dev/null 2>&1; then
+        log_success "reconcile: ${tname} re-registered (schema re-read triggered)"
+      else
+        log_warn "reconcile: UpdateGatewayTarget failed for ${tname} — re-run or check target status/creds"
+      fi
+      ;;
+    ERROR*)
+      log_warn "reconcile: could not evaluate ${tname} (${decision#ERROR }); skipping"
+      ;;
+    *)
+      log_warn "reconcile: unexpected result for ${tname}; skipping"
+      ;;
+  esac
+  rm -rf "${recon_tmp}"
+}
+
+# Reconcile every specialist that has a schema file. Resolves the gateway id and config
+# bucket once, then reconciles each target. Used by a full deploy's Gateway step.
+reconcile_all_gateway_targets() {
+  local schema_dir="${DEPLOYMENT_DIR}/s3_files/schemas"
+  if [ ! -d "${schema_dir}" ]; then
+    log_warn "reconcile: ${schema_dir} not found; skipping target reconciliation"
+    return 0
+  fi
+
+  local gw config_bucket
+  gw="$(stack_output "$(_sn Gateway)" GatewayId)"
+  config_bucket="$(stack_output "$(_sn S3)" ConfigBucketName)"
+  if [ -z "${gw}" ] || [ "${gw}" = "None" ] || [ -z "${config_bucket}" ] || [ "${config_bucket}" = "None" ]; then
+    log_warn "reconcile: missing GatewayId or ConfigBucketName output; skipping target reconciliation"
+    return 0
+  fi
+
+  local f name
+  for f in "${schema_dir}"/*.json; do
+    [ -f "${f}" ] || continue
+    name="$(basename "${f}" .json)"
+    reconcile_gateway_target "${name}" "${gw}" "${config_bucket}"
+  done
+}
+
 # ── CDK ────────────────────────────────────────────────────────────────────
 ensure_cdk_deps() {
   if ! command -v uv &> /dev/null; then
