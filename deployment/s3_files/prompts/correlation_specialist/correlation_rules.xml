@@ -28,13 +28,7 @@ Updated for schema_version 2.0 — hierarchical content_tree.
          ============================================================ -->
     <rule priority="critical">
         <name>Sect nesting from headings</name>
-        <description>Headings define section boundaries. When you encounter a heading:
-            - H1: place directly in sect_root (typically the document title)
-            - H2: open a new sect (depth 1) inside sect_root. Close any previously open depth-1 sect.
-            - H3: open a new sect (depth 2) inside the current depth-1 sect. Close any previously open depth-2 sect.
-            - H4: open a new sect (depth 3) inside the current depth-2 sect. Close any previously open depth-3 sect.
-            The heading element itself is the FIRST child of its new sect.
-        </description>
+        <description>Headings define section boundaries. When you encounter a heading: - H1: place directly in sect_root (typically the document title) - H2: open a new sect (depth 1) inside sect_root. Close any previously open depth-1 sect. - H3: open a new sect (depth 2) inside the current depth-1 sect. Close any previously open depth-2 sect. - H4: open a new sect (depth 3) inside the current depth-2 sect. Close any previously open depth-3 sect. The heading element itself is the FIRST child of its new sect. </description>
     </rule>
 
     <rule priority="critical">
@@ -75,21 +69,12 @@ Updated for schema_version 2.0 — hierarchical content_tree.
          ============================================================ -->
     <rule priority="high">
         <name>Table substructure</name>
-        <description>When the table specialist provides structured table data, express it with proper PDF/UA nesting inside the Table element's children block:
-            Table → Caption (if present)
-            Table → THead → TR → TH (with scope="Column")
-            Table → TBody → TR → TH (with scope="Row" for row headers) + TD
-            Every TH MUST have a scope attribute: "Column" for column headers, "Row" for row headers.
-        </description>
+        <description>When the table specialist provides structured table data, express it with proper PDF/UA nesting inside the Table element's children block: Table → Caption (if present) Table → THead → TR → TH (with scope="Column") Table → TBody → TR → TH (with scope="Row" for row headers) + TD Every TH MUST have a scope attribute: "Column" for column headers, "Row" for row headers. </description>
     </rule>
 
     <rule priority="high">
         <name>List substructure</name>
-        <description>When a list is identified, express it with proper PDF/UA nesting:
-            L → LI → Lbl (bullet/number) + LBody (content)
-            LBody may contain P elements and nested L elements for sub-lists.
-            If the elements specialist identifies a list structure, use it. If only the full_text specialist identified it, still attempt to decompose into LI/Lbl/LBody.
-        </description>
+        <description>When a list is identified, express it with proper PDF/UA nesting: L → LI → Lbl (bullet/number) + LBody (content) LBody may contain P elements and nested L elements for sub-lists. If the elements specialist identifies a list structure, use it. If only the full_text specialist identified it, still attempt to decompose into LI/Lbl/LBody. </description>
     </rule>
 
     <!-- ============================================================
@@ -129,6 +114,14 @@ Updated for schema_version 2.0 — hierarchical content_tree.
     <rule priority="medium">
         <name>Artifact identification</name>
         <description>Page numbers, running headers, running footers, watermarks, and decorative elements should be tagged as Artifact. Place them inside sect_root. The downstream tagger will mark them in the content stream with BMC /Artifact (not BDC with MCID) and exclude them from the structure tree.</description>
+    </rule>
+
+    <!-- ============================================================
+         REGION INSPECTION RULES
+         ============================================================ -->
+    <rule priority="high">
+        <name>Region inspection results</name>
+        <description>When a region_inspector result is present for an element or cell: - If the inspection reading has confidence "high" AND capped is false, it MAY replace a MISS or select between alternate readings. Record the specialist's original value in a correlation_conflict block. - Otherwise, keep the specialist's value and record the inspection reading as an additional alternate with its confidence. - Never place inspection metadata (scale factor, source pixel size) inside a text tag; attach it in enrichments. </description>
     </rule>
 
     <!-- ============================================================

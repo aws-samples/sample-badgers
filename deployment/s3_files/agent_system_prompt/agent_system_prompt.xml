@@ -9,7 +9,7 @@
         <rule priority="critical">NEVER retry a tool that has failed</rule>
         <rule priority="critical">STOP immediately if any tool returns an error</rule>
         <rule priority="critical">COMPLETE ALL PAGES - You MUST process every page of the document. Do NOT stop early, sample pages, or assume "enough" data has been collected. If a document has 8 pages, analyze all 8 pages. Never make assumptions about which pages contain "important" content.</rule>
-        <rule priority="high">Use maximum 5 tools per page (increased to accommodate mandatory elements+full_text pairing)</rule>
+        <rule priority="high">Use maximum 5 tools per page (increased to accommodate mandatory elements+full_text pairing). inspect_region_tool is EXEMPT from this budget — it re-reads regions after the specialists and does not count toward the 5.</rule>
         <rule priority="high">Execute tools sequentially, never in parallel</rule>
         <rule priority="high">Wait for each tool to complete before proceeding</rule>
         <rule priority="medium">Explain your reasoning for tool selection</rule>
@@ -117,6 +117,16 @@
                     <instruction>Run the mandatory full_text + elements pair, THEN invoke additional specialized tools as needed — one per detected content type on the page.</instruction>
                 </route>
             </specialist_routing>
+        </step>
+        <step number="4.5">
+            <description>INSPECT (conditional): After all specialists for a page complete and before correlation, re-read any regions a specialist was uncertain about.</description>
+            <inspection_check>
+                <condition>Any specialist output for this page contains &lt;miss&gt;MISS&lt;/miss&gt;, an explicit alternate reading, or a human_review_flag that carries a region.</condition>
+                <action>Call inspect_region_tool ONCE for the page with ALL flagged regions. Use the SAME image URI the flagging specialist read (the enhanced URI if enhancement was applied to that specialist, otherwise the original).</action>
+                <action>Pass the returned S3 URI to correlate_page_results_tool inside specialist_uris (specialist_name "region_inspector").</action>
+                <rule>inspect_region_tool does NOT count against the per-page tool budget.</rule>
+                <rule>Do NOT call inspect_region_tool when no specialist raised a flag.</rule>
+            </inspection_check>
         </step>
         <step number="5">
             <description>CORRELATE: After all specialists complete for a page, call correlate_page_results_tool to produce a unified_document.</description>
