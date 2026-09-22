@@ -93,7 +93,7 @@ Browser (React/Vite)
     ├── /api/* ──→ Express server (port 7860), all behind requireAuth
     │                ├── Core routes (all roles)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
-    │                │   ├── PDF upload to S3 (mints doc_id)
+    │                │   ├── PDF or image upload to S3 (mints doc_id)
     │                │   ├── Job records (/api/jobs)
     │                │   ├── S3 file operations (manifests, prompts, schemas)
     │                │   ├── CloudWatch Logs Insights queries
@@ -256,7 +256,7 @@ ui/
 │   │   └── useUser.js             # User context (role, email) from ID token claims
 │   └── components/
 │       ├── Home.jsx               # Dashboard
-│       ├── Chat.jsx               # Agent chat interface, PDF upload, doc_id
+│       ├── Chat.jsx               # Agent chat interface, PDF/image upload, doc_id
 │       ├── CopyButton.jsx         # Shared copy-to-clipboard control
 │       ├── Reports.jsx            # Report index and Page Reader
 │       ├── SpecialistEditor.jsx   # Manifest/prompt editor
