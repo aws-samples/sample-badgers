@@ -13,11 +13,11 @@
             "category": "Document Processing"
         },
         "page_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Document Processing"
         },
         "layout_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Document Processing"
         },
         "charts_specialist": {
@@ -29,39 +29,39 @@
             "category": "Visual Content"
         },
         "general_visual_analysis_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Visual Content"
         },
         "war_map_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Visual Content"
         },
         "decision_tree_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Visual Content"
         },
         "editorial_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "edu_transcript_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "handwriting_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "handwriting_math_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "code_block_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "keyword_topic_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Text & Language"
         },
         "scientific_specialist": {
@@ -77,7 +77,7 @@
             "category": "Structured Data"
         },
         "robust_elements_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Structured Data"
         },
         "correlation_specialist": {
@@ -89,15 +89,15 @@
             "category": "Post-Processing"
         },
         "metadata_generic_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Metadata"
         },
         "metadata_mads_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Metadata"
         },
         "metadata_mods_specialist": {
-            "enabled": false,
+            "enabled": true,
             "category": "Metadata"
         },
         "image_enhancer": {

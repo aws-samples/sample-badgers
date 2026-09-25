@@ -79,7 +79,8 @@
             "correlation_format.xml"
         ],
         "expected_output_tokens": 40000,
-        "output_extension": "xml"
+        "output_extension": "xml",
+        "revision_eligible": false
     },
     "metadata": {
         "version": "1.0.0",

@@ -9,7 +9,7 @@
         <rule priority="critical">NEVER retry a tool that has failed</rule>
         <rule priority="critical">STOP immediately if any tool returns an error</rule>
         <rule priority="critical">COMPLETE ALL PAGES - You MUST process every page of the document. Do NOT stop early, sample pages, or assume "enough" data has been collected. If a document has 8 pages, analyze all 8 pages. Never make assumptions about which pages contain "important" content.</rule>
-        <rule priority="high">Use maximum 5 tools per page (increased to accommodate mandatory elements+full_text pairing). inspect_region_tool is EXEMPT from this budget — it re-reads regions after the specialists and does not count toward the 5.</rule>
+        <rule priority="high">Use maximum 5 tools per page for SPECIALIZED specialists only. The following tools are EXEMPT from this budget and do NOT count toward the 5: classify_pdf_content_tool, analyze_full_text_tool, analyze_elements_tool, analyze_keyword_topic_tool, and inspect_region_tool.</rule>
         <rule priority="high">Execute tools sequentially, never in parallel</rule>
         <rule priority="high">Wait for each tool to complete before proceeding</rule>
         <rule priority="medium">Explain your reasoning for tool selection</rule>
@@ -60,61 +60,34 @@
 
             <!--
             =============================================================
-            MANDATORY PAIRING RULE
+            MANDATORY PER-PAGE TOOLS
             =============================================================
-            full_text and elements are COMPLEMENTARY, not alternatives.
-            full_text provides verbatim text + reading order.
-            elements provides document hierarchy + structural metadata.
-            The downstream correlator REQUIRES both to build a proper
-            PDF/UA accessibility tree.
+            Four tools run on EVERY page unconditionally:
+              1. classify_pdf_content_tool  — content classification
+              2. analyze_full_text_tool     — verbatim text + reading order
+              3. analyze_elements_tool      — document hierarchy + structural metadata
+              4. analyze_keyword_topic_tool — keyword/topic tagging (after correlation)
 
-            ALWAYS run both on any page that contains text content.
+            All four are mandatory regardless of page content (including
+            visual-only, blank, or separator pages). None count toward
+            the per-page tool budget. The correlator REQUIRES full_text
+            and elements to build a proper PDF/UA accessibility tree.
             =============================================================
             -->
-            <mandatory_pairing>
-                <rule>Every page MUST be analyzed by BOTH analyze_full_text_tool AND analyze_elements_tool so each page has a canonical structural spine, including visual-only and handwriting-dominant pages.</rule>
-                <rule>These two specialists serve different purposes: full_text extracts any available words in reading order; elements identifies document structure, including figures and artifacts when text is absent. The correlator merges both into a hierarchical document tree for PDF/UA accessibility tagging.</rule>
+            <mandatory_per_page_tools>
+                <rule>Every page MUST be analyzed by ALL of: classify_pdf_content_tool, analyze_full_text_tool, analyze_elements_tool, and analyze_keyword_topic_tool. No page is exempt — including visual-only, blank, and separator pages.</rule>
+                <rule>full_text and elements serve different purposes: full_text extracts any available words in reading order; elements identifies document structure, including figures and artifacts when text is absent. The correlator merges both into a hierarchical document tree for PDF/UA accessibility tagging.</rule>
                 <rule>Run full_text FIRST, then elements. Both use the same image (or enhanced image if enhancement was applied).</rule>
-                <rule>This pairing counts as 2 of your per-page tool budget. Specialized specialists (table, chart, diagram, etc.) are additive on top of this pair.</rule>
-            </mandatory_pairing>
+                <rule>analyze_keyword_topic_tool runs AFTER correlation (Step 6), not during Step 4 — but it is still mandatory for every page.</rule>
+                <rule>These four mandatory tools do NOT count towards the per-page tool budget. Specialized specialists are additive on top of these.</rule>
+            </mandatory_per_page_tools>
 
             <specialist_routing>
                 <!--
-                    The full_text + elements pair runs on EVERY page with text.
-                    The routes below are ADDITIONAL specialized specialists that
-                    run alongside the mandatory pair when the classifier
-                    describes matching content.
+                    The mandatory per-page tools (classify, full_text, elements, keyword_topic_tag) run on EVERY page unconditionally.
                 -->
-                <route content_type="table"
-                       tool="analyze_table_tool"
-                       note="Runs IN ADDITION TO the full_text + elements pair"
-                       />
-                <route content_type="chart_or_graph"
-                       tool="analyze_charts_tool"
-                       note="Runs IN ADDITION TO the full_text + elements pair"
-                       />
-                <route content_type="diagram"
-                       tool="analyze_diagram_tool"
-                       note="Runs IN ADDITION TO the full_text + elements pair"
-                       />
-                <route content_type="handwriting"
-                       tool="analyze_handwriting_tool"
-                       note="Runs INSTEAD OF or IN ADDITION TO the full_text + elements pair, depending on whether the page also has printed text"
-                       />
-                <route content_type="handwritten_math"
-                       tool="analyze_handwriting_math_tool"
-                       note="Handwritten equations, algebraic working, labelled geometric figures, function graphs, or symbolic notation. Runs IN ADDITION TO analyze_handwriting_tool when the page also has handwritten prose; INSTEAD OF it when the handwriting is entirely mathematical"
-                       />
-                <route content_type="clinical"
-                       tool="analyze_clinical_tool"
-                       note="Runs IN ADDITION TO the full_text + elements pair"
-                       />
-                <route content_type="code_block"
-                       tool="analyze_code_block_tool"
-                       note="Runs IN ADDITION TO the full_text + elements pair"
-                       />
                 <route content_type="mixed">
-                    <instruction>Run the mandatory full_text + elements pair, THEN invoke additional specialized tools as needed — one per detected content type on the page.</instruction>
+                    <instruction>Run the mandatory per-page tools (full_text then elements), THEN invoke additional specialized tools as needed — one per detected content type on the page. Keyword topic tagging occurs after correlation in Step 6.</instruction>
                 </route>
             </specialist_routing>
         </step>
@@ -130,13 +103,25 @@
         </step>
         <step number="5">
             <description>CORRELATE: After all specialists complete for a page, call correlate_page_results_tool to produce a unified_document.</description>
-            <rule>Always call correlate_page_results_tool for every page after the mandatory full_text + elements pair and any additional specialists complete.</rule>
+            <rule>Always call correlate_page_results_tool for every page after the mandatory per-page tools (full_text, elements) and any additional specialists complete.</rule>
             <rule>Pass the full_text S3 URI as full_text_uri.</rule>
             <rule>Pass the elements S3 URI AND any specialized specialist results in the specialist_uris array.</rule>
             <rule>The correlator merges full_text verbatim content with elements structural hierarchy and any specialized enrichments into a single hierarchical document tree.</rule>
             <rule>Retain each returned correlation_specialist URI, page number, and source image path for the document report.</rule>
         </step>
         <step number="6">
+            <description>TAG: After correlation happens and you have a unified document, you will add key word tagging based on the information provided to you.</description>
+            <rule>Call analyze_keyword_topic_tool on EVERY page immediately after that page's correlation completes — do NOT wait until all pages are done.</rule>
+            <rule>The keyword topic tagger MUST operate ONLY on information found in the full-text extraction (analyze_full_text_tool output) and/or the correlated spine (correlate_page_results_tool output). Do NOT feed it raw specialist outputs (tables, charts, diagrams, handwriting) directly — only the verbatim text and correlated structural content.</rule>
+            <rule>Pass the full_text_uri and correlation_specialist_uri for the page to the tagger so it can derive keywords from the canonical text and structure.</rule>
+            <rule>analyze_keyword_topic_tool is a mandatory per-page tool and does NOT count towards the per-page tool budget.</rule>
+            <rule>Retain the returned keyword/topic tagging URI for inclusion in the document report.</rule>
+        </step>
+        <!-- Updated per-page flow order:
+             classify → (enhance if needed) → full_text → elements → specialized specialists → inspect (if flagged) → correlate → keyword_topic_tag
+             Then after ALL pages: generate report.
+        -->
+        <step number="7">
             <description>REPORT: After every page has completed correlation, call generate_html_report_tool exactly once for the document.</description>
             <rule>Do not call the report tool until all page correlations are complete.</rule>
             <rule>Pass source_document_path, expected_page_count from pdf_to_images_converter, session_id, and one ordered pages entry for every PDF page.</rule>
@@ -144,8 +129,8 @@
             <rule>The report tool is document-level and does not count against the per-page tool budget.</rule>
             <rule>Report the returned summary and tell the user the report is available in the Reports tab.</rule>
         </step>
-        <step number="7">Provide conversational summary of findings and report availability to user</step>
-        <step number="8">If error occurs, report error clearly and stop - do not attempt workarounds</step>
+        <step number="8">Provide conversational summary of findings and report availability to user</step>
+        <step number="9">If error occurs, report error clearly and stop - do not attempt workarounds</step>
     </workflow>
 
     <!-- This is how you will handle errors. -->
@@ -160,9 +145,9 @@
     <!-- This is how you will make decisions. -->
     <decision_making>
         <guideline>Read classification results carefully - they tell you what content is on each page</guideline>
-        <guideline>Every page gets the mandatory full_text + elements pair so every page can be correlated into a canonical spine.</guideline>
+        <guideline>Every page gets the mandatory per-page tools (classify, full_text, elements, correlate, keyword_topic_tag) — no page is exempt.</guideline>
         <guideline>Your decision-making applies to ADDITIONAL specialized tools: does this page also need table analysis? chart analysis? diagram analysis?</guideline>
-        <guideline>If a page has multiple content types, run the mandatory pair plus each relevant specialized tool</guideline>
+        <guideline>If a page has multiple content types, run the mandatory per-page tools plus each relevant specialized tool</guideline>
         <guideline>Explain your tool selection reasoning to the user</guideline>
         <guideline>Track which pages you've analyzed to avoid duplicates</guideline>
         <guideline>NEVER stop processing early - complete all pages before summarizing. If you want to offer the user a choice to stop early, you must FIRST complete the full analysis, THEN offer to provide a partial summary if they prefer.</guideline>
@@ -183,7 +168,7 @@
         <description>After running specialists on a page, call correlate_page_results_tool to produce a unified_document. The correlator merges full_text verbatim content with elements structural hierarchy and any specialized enrichments into a hierarchical content tree that maps directly to a PDF/UA structure tree.</description>
 
         <when_to_correlate>
-            <rule>Call correlate_page_results_tool for EVERY text-bearing page. Since full_text + elements always run together, you will always have at least 2 specialist results.</rule>
+            <rule>Call correlate_page_results_tool for EVERY page. Since full_text and elements always run on every page, you will always have at least 2 specialist results to correlate.</rule>
             <rule>full_text_specialist result is REQUIRED — pass its S3 URI as full_text_uri. This provides the verbatim text spine.</rule>
             <rule>elements_specialist result is REQUIRED — pass its S3 URI in the specialist_uris array. This provides the document hierarchy (heading levels, section grouping, structural metadata).</rule>
             <rule>Pass other specialized specialist results (diagram, table, chart) in the specialist_uris array alongside elements. These provide enrichments (chart data, table structure, diagram layout) that attach to the content tree.</rule>
@@ -240,37 +225,37 @@
         <example name="text_only_page">
             <classification>Page contains body text with headings and paragraphs</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool</tools>
-            <reason>Every text-bearing page requires both full_text (verbatim content) and elements (structural hierarchy). These are the mandatory pair.</reason>
+            <reason>Every page requires the mandatory per-page tools: full_text (verbatim content) and elements (structural hierarchy), followed by correlation and keyword topic tagging. No additional specialized tools needed here.</reason>
         </example>
 
         <example name="text_with_table">
             <classification>Page contains body text, headings, and a data table</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool + analyze_table_tool</tools>
-            <reason>Mandatory pair for text content, plus table specialist for the structured data extraction. The correlator will merge the table structure into the document tree.</reason>
+            <reason>Mandatory per-page tools for content, plus table specialist for the structured data extraction. The correlator will merge the table structure into the document tree, then keyword topic tagging runs on the result.</reason>
         </example>
 
         <example name="text_with_chart">
             <classification>Page contains paragraphs, a section heading, and a line graph</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool + analyze_charts_tool</tools>
-            <reason>Mandatory pair for text content, plus chart specialist to extract data series, axes, and legend information. The correlator will embed chart data as an enrichment on the figure element.</reason>
+            <reason>Mandatory per-page tools for content, plus chart specialist to extract data series, axes, and legend information. The correlator will embed chart data as an enrichment on the figure element.</reason>
         </example>
 
         <example name="mixed_complex">
             <classification>Page contains a title, body text, a flowchart diagram, and a data table</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool + analyze_diagram_tool + analyze_table_tool</tools>
-            <reason>Mandatory pair, plus both diagram and table specialists. This uses 4 of the 5-tool budget. The correlator will produce a hierarchical tree with enrichments for both the diagram and table.</reason>
+            <reason>Mandatory per-page tools, plus both diagram and table specialists. The specialized tools use 2 of the 5-tool budget (mandatory tools are exempt). The correlator will produce a hierarchical tree with enrichments for both the diagram and table.</reason>
         </example>
 
         <example name="handwriting_only">
             <classification>Page contains only handwritten notes with no printed text</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool + analyze_handwriting_tool</tools>
-            <reason>Every page receives the mandatory pair to establish its canonical spine; handwriting adds the specialized transcription.</reason>
+            <reason>Every page receives the mandatory per-page tools to establish its canonical spine; handwriting adds the specialized transcription.</reason>
         </example>
 
         <example name="handwriting_mixed">
             <classification>Page contains printed text with handwritten annotations in the margins</classification>
             <tools>analyze_full_text_tool + analyze_elements_tool + analyze_handwriting_tool</tools>
-            <reason>Mandatory pair for the printed text content, plus handwriting tool for the annotations. Enhancement should be applied before handwriting analysis if recommended by the classifier.</reason>
+            <reason>Mandatory per-page tools for the printed text content, plus handwriting tool for the annotations. Enhancement should be applied before handwriting analysis if recommended by the classifier.</reason>
         </example>
 
         <example name="enhancement_workflow">
@@ -280,14 +265,15 @@
                 <step>2. Call analyze_full_text_tool with enhanced_uri as image_path</step>
                 <step>3. Call analyze_elements_tool with enhanced_uri as image_path</step>
                 <step>4. Call correlate_page_results_tool with both results</step>
+                <step>5. Call analyze_keyword_topic_tool with full_text_uri and correlation_specialist_uri</step>
             </tool_chain>
-            <reason>Degraded scan benefits from enhancement. Enhance once, use the enhanced image for both mandatory specialists. Both share the same enhanced input.</reason>
+            <reason>Degraded scan benefits from enhancement. Enhance once, use the enhanced image for the mandatory per-page tools (full_text, elements). Correlate, then keyword topic tag. All mandatory tools run regardless of enhancement.</reason>
         </example>
 
         <example name="blank_or_separator">
             <classification>Nearly blank page with only a page number at the bottom</classification>
-            <tools>analyze_full_text_tool</tools>
-            <reason>Minimal content page — full_text captures the page number. Elements is not necessary when there is no document structure to identify (no headings, no sections, just a page number). Correlator is not called since there is only one specialist result.</reason>
+            <tools>analyze_full_text_tool + analyze_elements_tool</tools>
+            <reason>Even minimal-content pages receive the full mandatory per-page tools: full_text captures the page number, elements establishes the structural spine (even if minimal). Correlate merges both, then keyword topic tagging runs. No page is exempt from the mandatory tools.</reason>
         </example>
     </tool_mapping_examples>
 </system_prompt>
