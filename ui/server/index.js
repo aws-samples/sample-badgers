@@ -107,7 +107,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
     const start = Date.now();
     res.on('finish', () => {
-        console.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+        console.log(`${new Date().toISOString()} ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
     });
     next();
 });

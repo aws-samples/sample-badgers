@@ -474,6 +474,12 @@ class AgentCoreRuntimeWebSocketStack(Stack):
 
         runtime.node.add_dependency(self.agent_role)
 
+        # CloudFormation supports PlatformVersion V2 but CfnRuntime has no typed
+        # property for it yet, so it is set through the L1 escape hatch. Without
+        # this, the property is unmanaged: a version set out of band via
+        # UpdateAgentRuntime is invisible to CDK and can be reverted on deploy.
+        runtime.add_property_override("PlatformVersion", "V2")
+
         # Log delivery via the L1 chain rather than CfnRuntimeLogsMixin. The mixin
         # creates its own resource policy per stack, so using it here would add a
         # second policy alongside the deployment-wide one the Gateway stack owns and

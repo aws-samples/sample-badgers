@@ -16,11 +16,13 @@ import json
 import logging
 import os
 import sys
+import threading
+import time
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, AsyncIterator, Iterator, Optional
 
@@ -109,6 +111,65 @@ def processing_context(session_id: str) -> Iterator[None]:
 
 
 # =============================================================================
+# WARM STATE
+# =============================================================================
+#
+# One AgentCore runtime session is one microVM, and every WebSocket the UI server
+# opens with the same session id lands on it. Module-level state therefore lives
+# for the whole chat session even though the UI server opens a fresh socket per
+# turn. The UI sends a {"warmup": true} frame when the chat mounts so this state is
+# filled before the first prompt; each turn then reuses it instead of rebuilding
+# the token, Gateway connection, tool list and model.
+#
+# What is deliberately NOT cached:
+# - The system prompt and model config are re-validated every turn with an ETag
+#   conditional GET, so editing them in the config bucket still takes effect on
+#   the next message with no redeploy.
+# - The Agent and its memory session manager are built per turn. The session
+#   manager reloads and sanitizes history on construction, which is what repairs
+#   a turn the browser abandoned mid-tool-call.
+
+# Refresh the Cognito token this long before it expires, so a turn that starts
+# just inside the window cannot outlive it.
+_TOKEN_REFRESH_MARGIN_S = 300
+
+
+@dataclass
+class _WarmState:
+    """Per-session (per-microVM) cache of everything a turn needs before the model."""
+
+    credentials: Optional[dict[str, str]] = None
+    access_token: str = ""
+    token_expires_at: float = 0.0
+    s3_client: Any = None
+    # key -> (etag, body)
+    s3_cache: dict[str, tuple[str, str]] = field(default_factory=dict)
+    mcp_client: Any = None
+    # The token the live MCP client was opened with; a new token means a new client.
+    mcp_token: str = ""
+    tools: list[Any] = field(default_factory=list)
+    model: Any = None
+    model_key: str = ""
+
+
+@dataclass(frozen=True)
+class WarmSnapshot:
+    """What one turn reads out of the warm state."""
+
+    system_prompt: str
+    model_config: dict[str, Any]
+    model: Any
+    tools: list[Any]
+
+
+_warm = _WarmState()
+# The warmup frame and the first prompt arrive on separate sockets and can overlap
+# if the user sends quickly. Serializing here makes the prompt wait for the warmup
+# it raced instead of starting a second, duplicate initialization.
+_warm_lock = threading.Lock()
+
+
+# =============================================================================
 # AUTHENTICATION HELPERS
 # =============================================================================
 
@@ -129,23 +190,42 @@ def get_cognito_credentials() -> dict[str, str]:
 
 
 def get_cognito_token() -> str:
-    """Get OAuth token from Cognito for Gateway authentication."""
+    """Get OAuth token from Cognito for Gateway authentication.
+
+    Returns the cached token until it is within _TOKEN_REFRESH_MARGIN_S of expiry.
+    The client secret is cached too; a rejected token request re-reads it once in
+    case it was rotated since.
+    """
     import httpx
 
-    credentials = get_cognito_credentials()
-    response = httpx.post(
-        credentials["token_endpoint"],
-        data={
-            "grant_type": "client_credentials",
-            "client_id": credentials["client_id"],
-            "client_secret": credentials["client_secret"],
-        },
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        timeout=30.0,
-    )
-    if response.status_code != 200:
-        raise ValueError(f"Failed to get Cognito token: {response.status_code}")
-    return response.json()["access_token"]
+    now = time.time()
+    if _warm.access_token and now < _warm.token_expires_at - _TOKEN_REFRESH_MARGIN_S:
+        return _warm.access_token
+
+    status_code = 0
+    for _attempt in range(2):
+        if _warm.credentials is None:
+            _warm.credentials = get_cognito_credentials()
+        credentials = _warm.credentials
+        response = httpx.post(
+            credentials["token_endpoint"],
+            data={
+                "grant_type": "client_credentials",
+                "client_id": credentials["client_id"],
+                "client_secret": credentials["client_secret"],
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=30.0,
+        )
+        status_code = response.status_code
+        if status_code == 200:
+            body = response.json()
+            _warm.access_token = body["access_token"]
+            _warm.token_expires_at = now + float(body.get("expires_in", 3600))
+            return _warm.access_token
+        _warm.credentials = None
+
+    raise ValueError(f"Failed to get Cognito token: {status_code}")
 
 
 # =============================================================================
@@ -160,6 +240,66 @@ def create_mcp_transport(gateway_url: str, access_token: str) -> Any:
     return streamablehttp_client(
         gateway_url, headers={"Authorization": f"Bearer {access_token}"}
     )
+
+
+def _mcp_client_alive(client: Any) -> bool:
+    """Whether the MCP client's background session is still running.
+
+    Strands exposes this only privately. If a future release drops it, assume
+    alive; a dead session then surfaces as tool errors and is rebuilt when the
+    token next rotates.
+    """
+    check = getattr(client, "_is_session_active", None)
+    return bool(check()) if callable(check) else True
+
+
+def _ensure_mcp_tools(gateway_url: str, access_token: str) -> list[Any]:
+    """Return the Gateway tool list, keeping one MCP session open across turns.
+
+    The session is rebuilt when the token changes (the token is baked into the
+    transport's headers) or when its background thread has died. The tool list is
+    fetched once per session, so a Gateway target added mid-session appears on the
+    next token rotation or in a new chat session.
+    """
+    from strands.tools.mcp.mcp_client import MCPClient
+
+    client = _warm.mcp_client
+    if (
+        client is not None
+        and _warm.mcp_token == access_token
+        and _mcp_client_alive(client)
+    ):
+        return _warm.tools
+
+    if client is not None:
+        try:
+            client.stop(None, None, None)
+        except Exception as e:  # a dead session can fail to stop cleanly
+            log(f"Ignoring error stopping stale MCP client: {e}", level="warning")
+        _warm.mcp_client = None
+        _warm.tools = []
+
+    client = MCPClient(lambda: create_mcp_transport(gateway_url, access_token))
+    client.start()
+    try:
+        tools: list[Any] = []
+        pagination_token = None
+        while True:
+            result = client.list_tools_sync(pagination_token=pagination_token)
+            tools.extend(result)
+            if hasattr(result, "pagination_token") and result.pagination_token:
+                pagination_token = result.pagination_token
+            else:
+                break
+    except Exception:
+        client.stop(None, None, None)
+        raise
+
+    _warm.mcp_client = client
+    _warm.mcp_token = access_token
+    _warm.tools = tools
+    log(f"Opened MCP session and fetched {len(tools)} tools")
+    return tools
 
 
 # =============================================================================
@@ -441,12 +581,78 @@ class JobTrackingHook:
             tool_input["user_name"] = self.user_name
 
 
+def _s3_read_text(bucket: str, key: str) -> str:
+    """Read an S3 object, revalidating a cached copy by ETag.
+
+    An unchanged object costs one 304 round trip instead of a download, while an
+    edit is still picked up on the very next call.
+    """
+    import boto3
+    from botocore.exceptions import ClientError
+
+    if _warm.s3_client is None:
+        _warm.s3_client = boto3.client(
+            "s3", region_name=os.environ.get("AWS_REGION", "us-west-2")
+        )
+
+    cached = _warm.s3_cache.get(key)
+    request: dict[str, Any] = {"Bucket": bucket, "Key": key}
+    if cached:
+        request["IfNoneMatch"] = cached[0]
+    try:
+        response = _warm.s3_client.get_object(**request)
+    except ClientError as e:
+        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if cached and status == 304:
+            return cached[1]
+        # Deleted or unreadable: drop the copy so a stale body is never served.
+        _warm.s3_cache.pop(key, None)
+        raise
+
+    text = str(response["Body"].read().decode("utf-8"))
+    _warm.s3_cache[key] = (str(response["ETag"]), text)
+    return text
+
+
+def _ensure_model(model_config: dict[str, Any]) -> Any:
+    """Return a BedrockModel for this config, rebuilding only when the config changes."""
+    from strands.models import BedrockModel
+
+    key = json.dumps(model_config, sort_keys=True, default=str)
+    if _warm.model is None or key != _warm.model_key:
+        _warm.model = BedrockModel(
+            model_id=model_config.get("model_id", DEFAULT_MODEL_CONFIG["model_id"]),
+            region_name=os.environ.get("AWS_REGION", "us-west-2"),
+            temperature=model_config.get("temperature", 1.0),
+            max_tokens=model_config.get("max_tokens", 8000),
+            additional_request_fields=_build_additional_request_fields(model_config),
+        )
+        _warm.model_key = key
+    return _warm.model
+
+
+def ensure_warm(gateway_url: str) -> WarmSnapshot:
+    """Bring the warm state up to date and return what a turn needs.
+
+    Blocking; call through asyncio.to_thread so the event loop (and the platform
+    health check it serves) is not stalled while the Gateway session opens.
+    """
+    with _warm_lock:
+        access_token = get_cognito_token()
+        tools = _ensure_mcp_tools(gateway_url, access_token)
+        system_prompt, model_config = load_config_from_s3()
+        model = _ensure_model(model_config)
+        return WarmSnapshot(
+            system_prompt=system_prompt,
+            model_config=model_config,
+            model=model,
+            tools=list(tools),
+        )
+
+
 def load_config_from_s3() -> tuple[str, dict[str, Any]]:
     """Load system prompt and model config from S3."""
-    import boto3
-
     try:
-        region = os.environ.get("AWS_REGION", "us-west-2")
         # Injected by the runtime stack. Previously read from the global SSM path
         # /badgers/config-bucket-name, which two deployments would fight over.
         bucket_name = os.environ.get("CONFIG_BUCKET_NAME", "")
@@ -455,19 +661,17 @@ def load_config_from_s3() -> tuple[str, dict[str, Any]]:
                 "CONFIG_BUCKET_NAME is not set; cannot locate the config bucket."
             )
 
-        s3 = boto3.client("s3", region_name=region)
-        response = s3.get_object(
-            Bucket=bucket_name, Key="agent_system_prompt/agent_system_prompt.xml"
+        system_prompt = _s3_read_text(
+            bucket_name, "agent_system_prompt/agent_system_prompt.xml"
         )
-        system_prompt = response["Body"].read().decode("utf-8")
 
         # Load operating environment config and inject into system prompt
         try:
-            response = s3.get_object(
-                Bucket=bucket_name,
-                Key="agent_config/agent_operating_environment_config.json",
+            env_config = json.loads(
+                _s3_read_text(
+                    bucket_name, "agent_config/agent_operating_environment_config.json"
+                )
             )
-            env_config = json.loads(response["Body"].read().decode("utf-8"))
             env_value = env_config.get("operating_environment", "")
             if env_value:
                 env_block = (
@@ -480,10 +684,11 @@ def load_config_from_s3() -> tuple[str, dict[str, Any]]:
 
         model_config = DEFAULT_MODEL_CONFIG.copy()
         try:
-            response = s3.get_object(
-                Bucket=bucket_name, Key="agent_config/agent_model_config.json"
+            model_config.update(
+                json.loads(
+                    _s3_read_text(bucket_name, "agent_config/agent_model_config.json")
+                )
             )
-            model_config.update(json.loads(response["Body"].read().decode("utf-8")))
         except Exception:
             # Optional config file - use defaults if not found
             logger.debug("agent_model_config.json not found, using defaults")
@@ -545,7 +750,6 @@ def sanitize_event_for_json(obj: Any, max_depth: int = 10) -> Any:
 
 async def stream_agent_events(
     gateway_url: str,
-    access_token: str,
     query: str,
     session_id: str,
     actor_id: str,
@@ -564,209 +768,185 @@ async def stream_agent_events(
     - {"type": "error", "message": "..."}
     """
     from strands import Agent
-    from strands.models import BedrockModel
-    from strands.tools.mcp.mcp_client import MCPClient
 
     log("Creating streaming agent...")
 
-    system_prompt, model_config = load_config_from_s3()
+    # Token, Gateway session, tool list and model come from the warm state; after
+    # a warmup frame this is a token check plus three ETag revalidations.
+    warm = await asyncio.to_thread(ensure_warm, gateway_url)
+    tools = warm.tools
 
     # Enhance system prompt with runtime session ID
-    enhanced_system_prompt = f"""{system_prompt}
+    enhanced_system_prompt = f"""{warm.system_prompt}
 
 RUNTIME SESSION ID: {runtime_session_id}
 Include session_id: "{runtime_session_id}" in ALL tool calls."""
 
-    model = BedrockModel(
-        model_id=model_config.get("model_id", DEFAULT_MODEL_CONFIG["model_id"]),
-        region_name=os.environ.get("AWS_REGION", "us-west-2"),
-        temperature=model_config.get("temperature", 1.0),
-        max_tokens=model_config.get("max_tokens", 8000),
-        additional_request_fields=_build_additional_request_fields(model_config),
-    )
+    log(f"Using {len(tools)} tools")
+    yield {"type": "status", "message": f"Loaded {len(tools)} tools from Gateway"}
 
-    mcp_client = MCPClient(lambda: create_mcp_transport(gateway_url, access_token))
-
-    with mcp_client:
-        # Fetch tools
-        tools = []
-        pagination_token = None
-        while True:
-            result = mcp_client.list_tools_sync(pagination_token=pagination_token)
-            tools.extend(result)
-            if hasattr(result, "pagination_token") and result.pagination_token:
-                pagination_token = result.pagination_token
-            else:
-                break
-
-        log(f"Fetched {len(tools)} tools")
-        yield {"type": "status", "message": f"Loaded {len(tools)} tools from Gateway"}
-
-        # Configure session manager
-        session_manager = None
-        memory_id = os.environ.get("AGENTCORE_MEMORY_ID")
-        if memory_id:
-            memory_config = AgentCoreMemoryConfig(
-                memory_id=memory_id,
-                session_id=session_id,
-                actor_id=actor_id,
-            )
-            inner_manager = AgentCoreMemorySessionManager(
-                agentcore_memory_config=memory_config,
-                region_name=os.environ.get("AWS_REGION", "us-west-2"),
-            )
-            session_manager = SanitizingSessionManager(inner_manager)
-
-        # Mints job_id on the first specialist tool call and stamps job_id/doc_id
-        # into the tool input for every specialist invocation in this turn.
-        job_hook = JobTrackingHook(
-            doc_id=doc_id,
+    # Configure session manager
+    session_manager = None
+    memory_id = os.environ.get("AGENTCORE_MEMORY_ID")
+    if memory_id:
+        memory_config = AgentCoreMemoryConfig(
+            memory_id=memory_id,
             session_id=session_id,
             actor_id=actor_id,
-            user_name=user_name,
         )
-
-        # Create agent
-        agent = Agent(
-            system_prompt=enhanced_system_prompt,
-            name="PDFAnalysisAgent",
-            tools=tools,
-            model=model,
-            session_manager=session_manager,
-            hooks=[job_hook],
-            callback_handler=None,  # We handle events ourselves
+        inner_manager = AgentCoreMemorySessionManager(
+            agentcore_memory_config=memory_config,
+            region_name=os.environ.get("AWS_REGION", "us-west-2"),
         )
+        session_manager = SanitizingSessionManager(inner_manager)
 
-        log(f"Streaming agent response for query: {query[:100]}...")
-        yield {"type": "status", "message": "Agent processing started"}
+    # Mints job_id on the first specialist tool call and stamps job_id/doc_id
+    # into the tool input for every specialist invocation in this turn.
+    job_hook = JobTrackingHook(
+        doc_id=doc_id,
+        session_id=session_id,
+        actor_id=actor_id,
+        user_name=user_name,
+    )
 
-        # Stream the agent response
-        final_response = ""
-        announced_job_id = ""
-        async for event in agent.stream_async(query):
-            # Surface the job id once it exists so the client can correlate this
-            # turn with its job record without polling for it.
-            if job_hook.job_id and job_hook.job_id != announced_job_id:
-                announced_job_id = job_hook.job_id
+    # Create agent
+    agent = Agent(
+        system_prompt=enhanced_system_prompt,
+        name="PDFAnalysisAgent",
+        tools=tools,
+        model=warm.model,
+        session_manager=session_manager,
+        hooks=[job_hook],
+        callback_handler=None,  # We handle events ourselves
+    )
+
+    log(f"Streaming agent response for query: {query[:100]}...")
+    yield {"type": "status", "message": "Agent processing started"}
+
+    # Stream the agent response
+    final_response = ""
+    announced_job_id = ""
+    async for event in agent.stream_async(query):
+        # Surface the job id once it exists so the client can correlate this
+        # turn with its job record without polling for it.
+        if job_hook.job_id and job_hook.job_id != announced_job_id:
+            announced_job_id = job_hook.job_id
+            yield {
+                "type": "job",
+                "job_id": job_hook.job_id,
+                "doc_id": doc_id,
+            }
+
+        # Convert event to serializable dict
+        if isinstance(event, dict):
+            event_data = event
+        elif hasattr(event, "__dict__"):
+            event_data = {
+                k: v
+                for k, v in event.__dict__.items()
+                if not k.startswith("_") and is_json_serializable(v)
+            }
+        else:
+            event_data = {"raw": str(event)}
+
+        # Handle Strands lifecycle events
+        if event_data.get("init_event_loop"):
+            yield {"init_event_loop": True}
+            continue
+        if event_data.get("start_event_loop"):
+            yield {"start_event_loop": True}
+            continue
+        if event_data.get("start"):
+            yield {"start": True}
+            continue
+        if event_data.get("complete"):
+            yield {"complete": True, "response": final_response}
+            continue
+        if event_data.get("force_stop"):
+            yield {
+                "force_stop": True,
+                "force_stop_reason": event_data.get("force_stop_reason", ""),
+            }
+            continue
+
+        # Handle result event - extract only serializable parts
+        if "result" in event_data:
+            result = event_data["result"]
+            if hasattr(result, "message"):
+                final_response = (
+                    str(result.message) if result.message else final_response
+                )
+            yield {"result": {"message": final_response}}
+            continue
+
+        # Handle text data
+        if "data" in event_data:
+            data = event_data["data"]
+            if isinstance(data, str):
+                final_response += data
+                yield {"data": data}
+            continue
+
+        # Handle message events
+        if "message" in event_data:
+            msg = event_data["message"]
+            if isinstance(msg, dict):
+                yield {"message": msg}
+            continue
+
+        # Handle tool events
+        if "current_tool_use" in event_data:
+            tool_use = event_data["current_tool_use"]
+            if isinstance(tool_use, dict):
                 yield {
-                    "type": "job",
-                    "job_id": job_hook.job_id,
-                    "doc_id": doc_id,
-                }
-
-            # Convert event to serializable dict
-            if isinstance(event, dict):
-                event_data = event
-            elif hasattr(event, "__dict__"):
-                event_data = {
-                    k: v
-                    for k, v in event.__dict__.items()
-                    if not k.startswith("_") and is_json_serializable(v)
-                }
-            else:
-                event_data = {"raw": str(event)}
-
-            # Handle Strands lifecycle events
-            if event_data.get("init_event_loop"):
-                yield {"init_event_loop": True}
-                continue
-            if event_data.get("start_event_loop"):
-                yield {"start_event_loop": True}
-                continue
-            if event_data.get("start"):
-                yield {"start": True}
-                continue
-            if event_data.get("complete"):
-                yield {"complete": True, "response": final_response}
-                continue
-            if event_data.get("force_stop"):
-                yield {
-                    "force_stop": True,
-                    "force_stop_reason": event_data.get("force_stop_reason", ""),
-                }
-                continue
-
-            # Handle result event - extract only serializable parts
-            if "result" in event_data:
-                result = event_data["result"]
-                if hasattr(result, "message"):
-                    final_response = (
-                        str(result.message) if result.message else final_response
-                    )
-                yield {"result": {"message": final_response}}
-                continue
-
-            # Handle text data
-            if "data" in event_data:
-                data = event_data["data"]
-                if isinstance(data, str):
-                    final_response += data
-                    yield {"data": data}
-                continue
-
-            # Handle message events
-            if "message" in event_data:
-                msg = event_data["message"]
-                if isinstance(msg, dict):
-                    yield {"message": msg}
-                continue
-
-            # Handle tool events
-            if "current_tool_use" in event_data:
-                tool_use = event_data["current_tool_use"]
-                if isinstance(tool_use, dict):
-                    yield {
-                        "current_tool_use": {
-                            "name": tool_use.get("name"),
-                            "toolUseId": tool_use.get("toolUseId"),
-                            "input": tool_use.get("input", {}),
-                        }
+                    "current_tool_use": {
+                        "name": tool_use.get("name"),
+                        "toolUseId": tool_use.get("toolUseId"),
+                        "input": tool_use.get("input", {}),
                     }
-                continue
-
-            # Handle reasoning events
-            if event_data.get("reasoning") or "reasoningText" in event_data:
-                yield {
-                    "reasoning": True,
-                    "reasoningText": event_data.get("reasoningText", {}),
                 }
-                continue
+            continue
 
-            # Handle raw model events (nested in "event" key)
-            if "event" in event_data:
-                raw_event = event_data["event"]
-                if isinstance(raw_event, dict):
-                    # Only pass through serializable model events
-                    yield {"event": sanitize_event_for_json(raw_event)}
-                continue
+        # Handle reasoning events
+        if event_data.get("reasoning") or "reasoningText" in event_data:
+            yield {
+                "reasoning": True,
+                "reasoningText": event_data.get("reasoningText", {}),
+            }
+            continue
 
-            # Legacy event types
-            if (
-                "reasoningContent" in event_data
-                or "thinking" in str(event_data).lower()
-            ):
-                yield {"type": "thinking", "data": sanitize_event_for_json(event_data)}
-            elif "toolUse" in event_data:
-                tool_use = event_data.get("toolUse", {})
-                yield {
-                    "type": "tool_use",
-                    "name": tool_use.get("name", "unknown"),
-                    "toolUseId": tool_use.get("toolUseId"),
-                    "input": tool_use.get("input", {}),
-                }
-            elif "toolResult" in event_data:
-                tool_result = event_data.get("toolResult", {})
-                yield {
-                    "type": "tool_result",
-                    "toolUseId": tool_result.get("toolUseId"),
-                    "content": tool_result.get("content", []),
-                }
-            elif "text" in event_data:
-                text = event_data.get("text", "")
-                final_response += text
-                yield {"type": "text", "text": text}
+        # Handle raw model events (nested in "event" key)
+        if "event" in event_data:
+            raw_event = event_data["event"]
+            if isinstance(raw_event, dict):
+                # Only pass through serializable model events
+                yield {"event": sanitize_event_for_json(raw_event)}
+            continue
 
-        yield {"type": "complete", "response": final_response}
+        # Legacy event types
+        if "reasoningContent" in event_data or "thinking" in str(event_data).lower():
+            yield {"type": "thinking", "data": sanitize_event_for_json(event_data)}
+        elif "toolUse" in event_data:
+            tool_use = event_data.get("toolUse", {})
+            yield {
+                "type": "tool_use",
+                "name": tool_use.get("name", "unknown"),
+                "toolUseId": tool_use.get("toolUseId"),
+                "input": tool_use.get("input", {}),
+            }
+        elif "toolResult" in event_data:
+            tool_result = event_data.get("toolResult", {})
+            yield {
+                "type": "tool_result",
+                "toolUseId": tool_result.get("toolUseId"),
+                "content": tool_result.get("content", []),
+            }
+        elif "text" in event_data:
+            text = event_data.get("text", "")
+            final_response += text
+            yield {"type": "text", "text": text}
+
+    yield {"type": "complete", "response": final_response}
 
 
 # =============================================================================
@@ -813,15 +993,11 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 yield {"type": "error", "message": "GATEWAY_URL not set"}
                 return
 
-            yield {"type": "status", "message": "Obtaining authentication token..."}
-            access_token = get_cognito_token()
-
             yield {"type": "status", "message": "Connecting to Gateway..."}
 
             # Stream events from agent
             async for event in stream_agent_events(
                 gateway_url=gateway_url,
-                access_token=access_token,
                 query=query,
                 session_id=session_id,
                 actor_id=actor_id,
@@ -863,6 +1039,30 @@ async def websocket_handler(websocket, context) -> None:
             data = await websocket.receive_json()
             log(f"Received WebSocket message: {json.dumps(data)[:200]}...")
 
+            # Sent by the UI server when the chat mounts, on the same runtime session
+            # id the prompts will use. It allocates this microVM and fills the warm
+            # state; it never reaches the model.
+            if data.get("warmup"):
+                started = time.monotonic()
+                try:
+                    gateway_url = os.environ.get("GATEWAY_URL")
+                    if not gateway_url:
+                        raise RuntimeError("GATEWAY_URL not set")
+                    warm = await asyncio.to_thread(ensure_warm, gateway_url)
+                    elapsed_ms = int((time.monotonic() - started) * 1000)
+                    log(f"Warmup complete: {len(warm.tools)} tools in {elapsed_ms}ms")
+                    await websocket.send_json(
+                        {
+                            "type": "warm",
+                            "tools": len(warm.tools),
+                            "elapsed_ms": elapsed_ms,
+                        }
+                    )
+                except Exception as e:
+                    log(f"Warmup failed: {e}", level="error")
+                    await websocket.send_json({"type": "warm_error", "message": str(e)})
+                continue
+
             # Extract request parameters
             query = data.get("prompt", "Hello!")
             session_id = data.get("session_id") or f"session_{uuid.uuid4().hex}"
@@ -884,21 +1084,12 @@ async def websocket_handler(websocket, context) -> None:
                         continue
 
                     await websocket.send_json(
-                        {
-                            "type": "status",
-                            "message": "Obtaining authentication token...",
-                        }
-                    )
-                    access_token = get_cognito_token()
-
-                    await websocket.send_json(
                         {"type": "status", "message": "Connecting to Gateway..."}
                     )
 
                     # Stream events from agent
                     async for event in stream_agent_events(
                         gateway_url=gateway_url,
-                        access_token=access_token,
                         query=query,
                         session_id=session_id,
                         actor_id=actor_id,

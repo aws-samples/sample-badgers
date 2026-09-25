@@ -54,6 +54,12 @@ def lambda_handler(event, context):
         # Parse input - AgentCore Gateway passes parameters directly in event
         body = json.loads(event["body"]) if "body" in event else event
 
+        # ── Revision mode: delegate to foundation revision handler ──
+        revision_result = try_revision(event, context)
+        if revision_result is not None:
+            return revision_result
+
+
         # Extract and log session_id from AgentCore Runtime
         session_id = body.get("session_id", "no_session")
         logger.info("Processing request for runtime session_id: %s", session_id)
@@ -252,6 +258,7 @@ def _initialize_specialist(
     from foundation.bedrock_client import BedrockClient
     from foundation.message_chain_builder import MessageChainBuilder
     from foundation.response_processor import ResponseProcessor
+from foundation.revision_handler import try_revision
 
     # Create specialist instance
     specialist = object.__new__(SpecialistFoundation)

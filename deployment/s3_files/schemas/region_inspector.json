@@ -17,7 +17,7 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 12,
-          "description": "The regions to re-read, one per flag raised on this page.",
+          "description": "The regions to re-read, one per flag raised on this page. Coordinates use a top-left origin. Supply all four coordinates either as normalized 0-1 values or as page pixels; do not mix coordinate spaces.",
           "items": {
             "type": "object",
             "properties": {
@@ -25,13 +25,32 @@
                 "type": "string",
                 "description": "Stable ID, ideally the flagged element or cell ID (e.g. elem_003_td_5_2)."
               },
-              "x1": { "type": "number", "minimum": 0, "maximum": 1 },
-              "y1": { "type": "number", "minimum": 0, "maximum": 1 },
-              "x2": { "type": "number", "minimum": 0, "maximum": 1 },
-              "y2": { "type": "number", "minimum": 0, "maximum": 1 },
+              "x1": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Left edge, in normalized 0-1 coordinates or page pixels."
+              },
+              "y1": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Top edge, in normalized 0-1 coordinates or page pixels."
+              },
+              "x2": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Right edge, in the same coordinate space as x1."
+              },
+              "y2": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Bottom edge, in the same coordinate space as y1."
+              },
               "task": {
                 "type": "string",
-                "enum": ["transcribe", "assign_rows"],
+                "enum": [
+                  "transcribe",
+                  "assign_rows"
+                ],
                 "description": "transcribe: read the characters in the region. assign_rows: report the page y-coordinate of each mark so it can be matched to table rows (enables the page-coordinate tick overlay)."
               },
               "flagged_by": {
@@ -43,7 +62,14 @@
                 "description": "The specialist's uncertainty, e.g. 'could be 18 or 16'. Withheld from the blind read; used only when comparing the reading to the specialist's candidates."
               }
             },
-            "required": ["region_id", "x1", "y1", "x2", "y2", "task"]
+            "required": [
+              "region_id",
+              "x1",
+              "y1",
+              "x2",
+              "y2",
+              "task"
+            ]
           }
         },
         "session_id": {
@@ -67,7 +93,10 @@
           "description": "Identifier of the source document being analysed. Pass through the doc_id supplied in the orchestrator context."
         }
       },
-      "required": ["regions", "session_id"]
+      "required": [
+        "regions",
+        "session_id"
+      ]
     },
     "outputSchema": {
       "type": "object",

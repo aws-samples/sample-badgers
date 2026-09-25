@@ -62,10 +62,24 @@ def test_padding_is_15_percent_each_side(page_bytes):
 
 
 def test_edge_region_is_clamped(page_bytes):
-    r = ri.inspect_regions(page_bytes, [ri.RegionRequest("e", 0.95, 0.95, 1.2, 1.1)])[0]
+    r = ri.inspect_regions(page_bytes, [ri.RegionRequest("e", 0.95, 0.95, 1.0, 1.0)])[0]
     assert r.source_px_box[2] == 1030 and r.source_px_box[3] == 558
     # property 2: source box lies within the page
     assert r.source_px_box[0] >= 0 and r.source_px_box[1] >= 0
+
+
+def test_page_pixel_coordinates_are_normalized_before_cropping():
+    page = Image.new("RGB", (1600, 1237), "white")
+    buf = io.BytesIO()
+    page.save(buf, format="JPEG")
+
+    r = ri.inspect_regions(
+        buf.getvalue(), [ri.RegionRequest("diag_center_jpg", 300, 300, 700, 700)]
+    )[0]
+
+    assert r.error is None
+    assert r.page_px_size == [1600, 1237]
+    assert r.source_px_box == [240, 240, 760, 760]
 
 
 # --- Delta 1: a bad region yields a per-region error instead of raising ---
