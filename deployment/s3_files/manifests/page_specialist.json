@@ -51,7 +51,8 @@
                 "us.amazon.nova-2-lite-v1:0"
             ]
         },
-        "output_extension": "xml"
+        "output_extension": "xml",
+        "revision_eligible": false
     },
     "metadata": {
         "version": "1.0.0",

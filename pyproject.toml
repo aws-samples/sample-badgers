@@ -22,7 +22,7 @@ dependencies = [
     # 2.263.0 is the version the stable aws_bedrockagentcore Gateway L2 and
     # Stack.add_stack_dependency were verified against. Both replaced deprecated
     # APIs, and the lock file pins this version.
-    "aws-cdk-lib>=2.263.0",
+    "aws-cdk-lib>=2.270.0",
     "constructs>=10.4.3",
     # Capped below 3.x: cdk-nag 3.x changed the Aspect API and fails at synth
     # with "aspectApplication.aspect.visit is not a function" against

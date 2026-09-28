@@ -32,7 +32,30 @@ _PAGE_NUMBER = re.compile(r"^[1-9][0-9]{0,5}$")
 _MAX_PAGES = 50
 _MAX_XML_BYTES = 5 * 1024 * 1024
 _MAX_IMAGE_OBJECT_BYTES = 8 * 1024 * 1024
+_MAX_INSPECTION_JSON_BYTES = 5 * 1024 * 1024
+_MAX_INSPECTIONS_PER_PAGE = 12
 _MAX_AGGREGATE_BYTES = 150 * 1024 * 1024
+_INSPECTION_FIELDS = (
+    "region_id",
+    "image_uri",
+    "flagged_by",
+    "task",
+    "page_px_size",
+    "source_px_box",
+    "source_px_size",
+    "output_px_size",
+    "scale_factor",
+    "detail",
+    "notes",
+    "reading",
+    "per_character",
+    "marks",
+    "concern",
+    "match",
+    "confidence",
+    "capped",
+    "error",
+)
 
 
 def lambda_handler(
@@ -110,6 +133,13 @@ def lambda_handler(
             if record.get("specialist") == "correlation_specialist"
             and record.get("status") == "COMPLETE"
         }
+        region_inspector_records = {
+            str(record.get("result_s3_key") or ""): record
+            for record in job_records
+            if record.get("specialist") == "region_inspector"
+            and record.get("status") == "COMPLETE"
+            and record.get("result_s3_key")
+        }
         normalized_pages = _validate_pages(pages)
         report_pages: list[dict[str, Any]] = []
         aggregate_bytes = 0
@@ -166,6 +196,7 @@ def lambda_handler(
             # report: the page simply carries no enhanced key and the reader falls
             # back to a single view.
             enhanced_image_key = ""
+            enhanced_image_data = ""
             enhanced_uri = _enhanced_source(job_records, image_uri)
             if enhanced_uri:
                 try:
@@ -182,6 +213,7 @@ def lambda_handler(
                     enhanced_image_key = (
                         f"{report_prefix}/pages/page-{page_token}-enhanced.jpg"
                     )
+                    enhanced_image_data = enhanced_base64
                     s3.put_object(
                         Bucket=output_bucket,
                         Key=enhanced_image_key,
@@ -197,6 +229,25 @@ def lambda_handler(
                         error,
                     )
                     enhanced_image_key = ""
+                    enhanced_image_data = ""
+
+            allowed_image_ids = {job_state.image_identifier(image_uri)}
+            if enhanced_uri:
+                allowed_image_ids.add(job_state.image_identifier(enhanced_uri))
+            inspections, aggregate_bytes = _copy_page_inspections(
+                s3,
+                page_number=page_number,
+                specialists=parsed["specialists"],
+                records_by_uri=region_inspector_records,
+                output_bucket=output_bucket,
+                report_prefix=report_prefix,
+                page_token=page_token,
+                session_id=session_id,
+                doc_id=doc_id,
+                allowed_image_ids=allowed_image_ids,
+                aggregate_bytes=aggregate_bytes,
+            )
+
             s3.put_object(
                 Bucket=output_bucket,
                 Key=spine_key,
@@ -221,10 +272,12 @@ def lambda_handler(
                     # "" when the page was never enhanced. Consumers must treat it
                     # as optional; older reports predate it entirely.
                     "enhanced_image_key": enhanced_image_key,
+                    "inspections": inspections,
                     "spine_key": spine_key,
                     "correlation_specialist_uri": correlation_uri,
                     "source_image_path": image_uri,
                     "image_data": image_base64,
+                    "enhanced_image_data": enhanced_image_data,
                     "xml": correlation_xml,
                 }
             )
@@ -376,6 +429,157 @@ def _get_text(s3: Any, uri: str, expected_bucket: str, *, max_bytes: int) -> str
     return body.decode("utf-8")
 
 
+def _get_png(s3: Any, uri: str, expected_bucket: str) -> tuple[str, bytes]:
+    bucket, key = _parse_s3_uri(uri)
+    if bucket != expected_bucket:
+        raise ValueError("Report inputs must come from the configured output bucket")
+    response = s3.get_object(Bucket=bucket, Key=key)
+    if int(response.get("ContentLength") or 0) > _MAX_IMAGE_OBJECT_BYTES:
+        raise ValueError(f"Report inspection crop exceeds 8 MiB: {uri}")
+    body = bytes(response["Body"].read(_MAX_IMAGE_OBJECT_BYTES + 1))
+    if len(body) > _MAX_IMAGE_OBJECT_BYTES:
+        raise ValueError(f"Report inspection crop exceeds 8 MiB: {uri}")
+    content_type = str(response.get("ContentType") or "")
+    if content_type and content_type not in {
+        "image/png",
+        "binary/octet-stream",
+        "application/octet-stream",
+    }:
+        raise ValueError(f"Unsupported inspection crop content type: {content_type}")
+    if body[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"Report inspection crop is not a valid PNG: {uri}")
+    return base64.b64encode(body).decode("ascii"), body
+
+
+def _region_inspector_uri(specialists: list[dict[str, str]]) -> str:
+    matches = [
+        str(item.get("s3_uri") or "").strip()
+        for item in specialists
+        if item.get("name") == "region_inspector"
+    ]
+    if len(matches) > 1:
+        raise ValueError(
+            "Correlation artifact contains multiple region_inspector results"
+        )
+    if matches and not matches[0]:
+        raise ValueError("Correlation artifact has no URI for region_inspector")
+    return matches[0] if matches else ""
+
+
+def _copy_page_inspections(
+    s3: Any,
+    *,
+    page_number: str,
+    specialists: list[dict[str, str]],
+    records_by_uri: dict[str, dict[str, Any]],
+    output_bucket: str,
+    report_prefix: str,
+    page_token: str,
+    session_id: str,
+    doc_id: str,
+    allowed_image_ids: set[str],
+    aggregate_bytes: int,
+) -> tuple[list[dict[str, Any]], int]:
+    inspector_uri = _region_inspector_uri(specialists)
+    if not inspector_uri:
+        return [], aggregate_bytes
+
+    record = records_by_uri.get(inspector_uri)
+    if not record:
+        raise ValueError(
+            f"Page {page_number} region inspection does not belong to this job"
+        )
+    if record.get("doc_id") != doc_id or record.get("session_id") != session_id:
+        raise ValueError(
+            f"Page {page_number} region inspection does not match the report job"
+        )
+    if record.get("image_identifier") not in allowed_image_ids:
+        raise ValueError(
+            f"Page {page_number} region inspection image does not match the report page"
+        )
+
+    raw = _get_text(
+        s3,
+        inspector_uri,
+        output_bucket,
+        max_bytes=_MAX_INSPECTION_JSON_BYTES,
+    )
+    aggregate_bytes += len(raw.encode("utf-8"))
+    if aggregate_bytes > _MAX_AGGREGATE_BYTES:
+        raise ValueError("report artifacts exceed the 150 MiB aggregate limit")
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid region inspection JSON: {inspector_uri}") from error
+    if not isinstance(document, dict):
+        raise ValueError("Region inspection result must be a JSON object")
+    if document.get("specialist") != "region_inspector":
+        raise ValueError("Region inspection result has the wrong specialist")
+    if str(document.get("session_id") or "") != session_id:
+        raise ValueError("Region inspection result has the wrong session")
+    if str(document.get("page") or "") != page_number:
+        raise ValueError("Region inspection result has the wrong page")
+
+    regions = document.get("regions")
+    if not isinstance(regions, list):
+        raise ValueError("Region inspection result must contain a regions array")
+    if len(regions) > _MAX_INSPECTIONS_PER_PAGE:
+        raise ValueError(
+            f"Region inspection result exceeds {_MAX_INSPECTIONS_PER_PAGE} regions"
+        )
+
+    inspections: list[dict[str, Any]] = []
+    region_ids: set[str] = set()
+    crop_prefix = f"{session_id}/region_inspector/crops/"
+    for index, region in enumerate(regions, start=1):
+        if not isinstance(region, dict):
+            raise ValueError("Region inspection entries must be objects")
+        region_id = str(region.get("region_id") or "").strip()
+        if not region_id or region_id in region_ids:
+            raise ValueError("Region inspection IDs must be non-empty and unique")
+        region_ids.add(region_id)
+        if (
+            job_state.image_identifier(str(region.get("image_uri") or ""))
+            not in allowed_image_ids
+        ):
+            raise ValueError(
+                f"Region inspection {region_id} image does not match the report page"
+            )
+
+        inspection = {field: region.get(field) for field in _INSPECTION_FIELDS}
+        inspection["crop_image_key"] = ""
+        inspection["crop_data"] = ""
+        crop_uri = str(region.get("crop_uri") or "").strip()
+        if region.get("error"):
+            inspections.append(inspection)
+            continue
+        if not crop_uri:
+            raise ValueError(f"Region inspection {region_id} is missing its crop")
+        crop_bucket, crop_source_key = _parse_s3_uri(crop_uri)
+        if crop_bucket != output_bucket or not crop_source_key.startswith(crop_prefix):
+            raise ValueError(f"Region inspection {region_id} has an invalid crop URI")
+        crop_data, crop_bytes = _get_png(s3, crop_uri, output_bucket)
+        aggregate_bytes += len(crop_data)
+        if aggregate_bytes > _MAX_AGGREGATE_BYTES:
+            raise ValueError("report artifacts exceed the 150 MiB aggregate limit")
+        crop_key = (
+            f"{report_prefix}/pages/page-{page_token}-inspection-"
+            f"{index:02d}-{_safe_id(region_id, 'region')}.png"
+        )
+        s3.put_object(
+            Bucket=output_bucket,
+            Key=crop_key,
+            Body=crop_bytes,
+            ContentType="image/png",
+            CacheControl="private, max-age=3600",
+        )
+        inspection["crop_image_key"] = crop_key
+        inspection["crop_data"] = crop_data
+        inspections.append(inspection)
+
+    return inspections, aggregate_bytes
+
+
 def _get_image(s3: Any, uri: str, expected_bucket: str) -> tuple[str, bytes]:
     bucket, key = _parse_s3_uri(uri)
     if bucket != expected_bucket:
@@ -521,10 +725,18 @@ def _manifest(
     manifest = {key: value for key, value in report.items() if key != "pages"}
     manifest["html_key"] = html_key
     manifest["manifest_key"] = manifest_key
-    manifest["pages"] = [
-        {key: value for key, value in page.items() if key not in {"image_data", "xml"}}
-        for page in report["pages"]
-    ]
+    manifest["pages"] = []
+    for report_page in report["pages"]:
+        page = {
+            key: value
+            for key, value in report_page.items()
+            if key not in {"image_data", "enhanced_image_data", "xml"}
+        }
+        page["inspections"] = [
+            {key: value for key, value in inspection.items() if key != "crop_data"}
+            for inspection in report_page.get("inspections", [])
+        ]
+        manifest["pages"].append(page)
     return manifest
 
 

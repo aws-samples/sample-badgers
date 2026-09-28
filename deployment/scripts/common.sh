@@ -112,7 +112,11 @@ log_info() { echo -e "${BLUE}[$(_ts)]${NC} $1"; }
 log_success() { echo -e "${GREEN}[$(_ts) ✓]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[$(_ts) !]${NC} $1"; }
 log_error() { echo -e "${RED}[$(_ts) ✗]${NC} $1"; }
-log_step() { echo -e "${CYAN}${BOLD}── [$(_ts)]${NC} ${BOLD}$1${NC}"; }
+# log_step records the step label so a later failure can report which step failed.
+# Entering a step clears any submenu selection carried over from a previous step.
+CURRENT_STEP_LABEL=""
+CURRENT_STEP_SUBMENU=""
+log_step() { CURRENT_STEP_LABEL="$1"; CURRENT_STEP_SUBMENU=""; echo -e "${CYAN}${BOLD}── [$(_ts)]${NC} ${BOLD}$1${NC}"; }
 
 # ── Windows VDI: strip carriage returns from tool output ─────────────────────
 # These scripts may be run from a Windows VDI under Git Bash. The native Windows
@@ -715,10 +719,16 @@ reconcile_gateway_target() {
   local short="${name#analyze_}"; short="${short%_tool}"
   local tname; tname="$(printf '%s' "${short}" | tr '_' '-' | cut -c1-50)"
 
+  # list-gateway-targets auto-paginates once the gateway has enough targets, and the
+  # AWS CLI applies --query PER PAGE: the page without this target yields "None", the
+  # page with it yields the id, and --output text concatenates them into a multi-line
+  # value (e.g. "None\n\nXAAKI79TGE"). Strip the per-page None/empty lines and keep the
+  # first real id so the guard below and get-gateway-target see a single clean value.
   local tid
   tid="$(aws bedrock-agentcore-control list-gateway-targets \
     --gateway-identifier "${gw}" --region "${AWS_REGION}" \
-    --query "items[?name=='${tname}'].targetId | [0]" --output text 2>/dev/null || echo "")"
+    --query "items[?name=='${tname}'].targetId | [0]" --output text 2>/dev/null \
+    | grep -vx 'None' | grep -vx '' | head -n1 || true)"
   if [ -z "${tid}" ] || [ "${tid}" = "None" ]; then
     log_warn "reconcile: no target named '${tname}' on gateway ${gw}; skipping"
     return 0

@@ -35,6 +35,7 @@
         "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
             "../shared/gestalt_perception_foundation.xml",
+            "../shared/uncertainty_flags.xml",
             "tables_gestalt.xml",
             "table_job_role.xml",
             "table_context.xml",
@@ -57,7 +58,8 @@
                 "us.amazon.nova-2-lite-v1:0"
             ]
         },
-        "output_extension": "xml"
+        "output_extension": "xml",
+        "revision_eligible": true
     },
     "metadata": {
         "version": "1.0.0",

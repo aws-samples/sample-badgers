@@ -80,7 +80,8 @@
         "max_examples": 0,
         "analysis_text": "document structure elements",
         "expected_output_tokens": 6000,
-        "output_extension": "json"
+        "output_extension": "json",
+        "revision_eligible": false
     },
     "metadata": {
         "version": "1.0.0",

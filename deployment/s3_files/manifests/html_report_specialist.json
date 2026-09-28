@@ -1,82 +1,83 @@
 {
-  "tool": {
-    "name": "generate_html_report_tool",
-    "description": "Generates one document-level HTML analysis and audit report after all page correlations complete.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "source_document_path": {
-          "type": "string"
-        },
-        "document_title": {
-          "type": "string"
-        },
-        "expected_page_count": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 50
-        },
-        "pages": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 50,
-          "items": {
+    "tool": {
+        "name": "generate_html_report_tool",
+        "description": "Generates one document-level HTML analysis and audit report after all page correlations complete.",
+        "inputSchema": {
             "type": "object",
             "properties": {
-              "page_number": {
-                "type": "string"
-              },
-              "correlation_specialist_uri": {
-                "type": "string"
-              },
-              "source_image_path": {
-                "type": "string"
-              }
+                "source_document_path": {
+                    "type": "string"
+                },
+                "document_title": {
+                    "type": "string"
+                },
+                "expected_page_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50
+                },
+                "pages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "page_number": {
+                                "type": "string"
+                            },
+                            "correlation_specialist_uri": {
+                                "type": "string"
+                            },
+                            "source_image_path": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "page_number",
+                            "correlation_specialist_uri",
+                            "source_image_path"
+                        ]
+                    }
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "job_id": {
+                    "type": "string"
+                },
+                "doc_id": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "user_name": {
+                    "type": "string"
+                }
             },
             "required": [
-              "page_number",
-              "correlation_specialist_uri",
-              "source_image_path"
+                "source_document_path",
+                "expected_page_count",
+                "pages",
+                "session_id"
             ]
-          }
-        },
-        "session_id": {
-          "type": "string"
-        },
-        "job_id": {
-          "type": "string"
-        },
-        "doc_id": {
-          "type": "string"
-        },
-        "user_id": {
-          "type": "string"
-        },
-        "user_name": {
-          "type": "string"
         }
-      },
-      "required": [
-        "source_document_path",
-        "expected_page_count",
-        "pages",
-        "session_id"
-      ]
+    },
+    "specialist": {
+        "name": "html_report_specialist",
+        "description": "Deterministically renders BADGERS page spines and audit records into a document-level HTML report",
+        "enhancement_eligible": false,
+        "prompt_files": [],
+        "output_extension": "html",
+        "revision_eligible": false
+    },
+    "metadata": {
+        "version": "1.0.0",
+        "dependencies": [
+            "boto3"
+        ],
+        "wizard_managed": false,
+        "specialist_type": "report"
     }
-  },
-  "specialist": {
-    "name": "html_report_specialist",
-    "description": "Deterministically renders BADGERS page spines and audit records into a document-level HTML report",
-    "enhancement_eligible": false,
-    "prompt_files": [],
-    "output_extension": "html"
-  },
-  "metadata": {
-    "version": "1.0.0",
-    "dependencies": [
-      "boto3"
-    ],
-    "wizard_managed": false,
-    "specialist_type": "report"
-  }
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   AssistantRuntimeProvider,
   useLocalRuntime,
@@ -72,13 +72,13 @@ function Reasoning({ text }) {
   return <p className="reasoning-text">{text}</p>
 }
 
-function ChainOfThought({ parts }) {
+function ChainOfThought({ parts, isRunning }) {
   const [open, setOpen] = useState(false)
   if (!parts.length) return null
   return (
     <div className="thinking-block">
       <button className="thinking-trigger" onClick={() => setOpen(o => !o)}>
-        <span>{open ? '▼' : '▶'} 🧠 Thinking</span>
+        <span>{open ? '▼' : '▶'} 🧠 {isRunning ? 'Thinking' : 'View thoughts'}</span>
       </button>
       {open && (
         <div className="thinking-content">
@@ -163,7 +163,7 @@ function AssistantMessage({ activity }) {
             return null
           }}
         </MessagePrimitive.Parts>
-        <ChainOfThought parts={reasoningParts} />
+        <ChainOfThought parts={reasoningParts} isRunning={isRunning} />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
           {/* Read at click time, not render time, so a copy during streaming
               takes whatever has arrived so far. */}
@@ -526,6 +526,25 @@ function ChatInner({ onNewSession }) {
 
   useEffect(() => { refreshTools() }, [refreshTools])
 
+  // Warm the agent session as soon as the chat exists, on the same session id the
+  // prompts will use, so the first message doesn't pay for microVM allocation,
+  // Gateway connect and tool listing. Always resolves: a failed warmup just means
+  // the first turn initializes the agent itself, as it did before.
+  const warmupRef = useRef(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    warmupRef.current = fetch('/api/chat/warmup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+      signal: controller.signal,
+    })
+      .then(r => r.json())
+      .then(d => { if (d.error) console.warn('Agent warmup failed:', d.error) })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [sessionId])
+
   const attachmentAdapter = useMemo(() => new S3AttachmentAdapter(), [])
 
   const adapter = useMemo(() => ({
@@ -538,6 +557,9 @@ function ChatInner({ onNewSession }) {
 
       setActivity('Connecting...')
       try {
+        // A message sent while the warmup is still running waits for it rather
+        // than racing it into a second cold initialization.
+        await warmupRef.current
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
