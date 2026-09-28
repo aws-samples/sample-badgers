@@ -32,6 +32,8 @@ export default function Reports() {
   // Empty unless the run enhanced this page. Drives whether the image pane offers
   // tabs at all rather than showing an empty "Enhanced" view.
   const [enhancedImageUrl, setEnhancedImageUrl] = useState('')
+  const [inspectionUrls, setInspectionUrls] = useState({})
+  const [selectedInspectionIndex, setSelectedInspectionIndex] = useState(null)
   const [imageTab, setImageTab] = useState('original')
   const [xml, setXml] = useState('')
   const [loading, setLoading] = useState(true)
@@ -63,6 +65,9 @@ export default function Reports() {
       setManifest(null)
       setLoadedReportId('')
       setImageUrl('')
+      setEnhancedImageUrl('')
+      setInspectionUrls({})
+      setSelectedInspectionIndex(null)
       setXml('')
       return
     }
@@ -70,6 +75,9 @@ export default function Reports() {
     setManifest(null)
     setLoadedReportId('')
     setImageUrl('')
+    setEnhancedImageUrl('')
+    setInspectionUrls({})
+    setSelectedInspectionIndex(null)
     setXml('')
     setLoading(true)
     setError('')
@@ -93,11 +101,15 @@ export default function Reports() {
     if (!reportId || !currentPage || loadedReportId !== reportId) {
       setImageUrl('')
       setEnhancedImageUrl('')
+      setInspectionUrls({})
+      setSelectedInspectionIndex(null)
       setXml('')
       return
     }
     setImageUrl('')
     setEnhancedImageUrl('')
+    setInspectionUrls({})
+    setSelectedInspectionIndex(null)
     setImageTab('original')
     setXml('')
     let cancelled = false
@@ -106,6 +118,13 @@ export default function Reports() {
     // Only requested when the manifest declares one, so an un-enhanced page (or a
     // report generated before enhanced copies were kept) costs no extra request.
     const hasEnhanced = Boolean(currentPage.enhanced_image_key)
+    const inspections = currentPage.inspections || []
+    const cropRequests = inspections.map((inspection, index) => {
+      if (!inspection.crop_image_key) return Promise.resolve(null)
+      return fetch(`${base}/inspections/${index}/image`)
+        .then(response => (response.ok ? response.blob() : null))
+        .catch(() => null)
+    })
     Promise.all([
       fetch(`${base}/image`).then(async response => {
         if (!response.ok) throw new Error('Could not load page image')
@@ -115,14 +134,15 @@ export default function Reports() {
         if (!response.ok) throw new Error('Could not load page spine')
         return response.text()
       }),
-      // Supplementary: resolves to null on failure so a missing enhanced copy
-      // cannot stop the page from rendering.
+      // Supplementary images resolve to null on failure so a missing enhanced
+      // image or crop cannot stop the page and its remaining evidence rendering.
       hasEnhanced
         ? fetch(`${base}/enhanced-image`)
             .then(response => (response.ok ? response.blob() : null))
             .catch(() => null)
         : Promise.resolve(null),
-    ]).then(([blob, pageXml, enhancedBlob]) => {
+      Promise.all(cropRequests),
+    ]).then(([blob, pageXml, enhancedBlob, cropBlobs]) => {
       if (cancelled) return
       const url = URL.createObjectURL(blob)
       objectUrls.push(url)
@@ -133,6 +153,14 @@ export default function Reports() {
         objectUrls.push(enhancedUrl)
         setEnhancedImageUrl(enhancedUrl)
       }
+      const nextInspectionUrls = {}
+      cropBlobs.forEach((cropBlob, index) => {
+        if (!cropBlob) return
+        const cropUrl = URL.createObjectURL(cropBlob)
+        objectUrls.push(cropUrl)
+        nextInspectionUrls[index] = cropUrl
+      })
+      setInspectionUrls(nextInspectionUrls)
     }).catch(e => { if (!cancelled) setError(e.message) })
     return () => {
       cancelled = true
@@ -213,6 +241,9 @@ export default function Reports() {
           setPageIndex={setPageIndex}
           imageUrl={imageUrl}
           enhancedImageUrl={enhancedImageUrl}
+          inspectionUrls={inspectionUrls}
+          selectedInspectionIndex={selectedInspectionIndex}
+          setSelectedInspectionIndex={setSelectedInspectionIndex}
           imageTab={imageTab}
           setImageTab={setImageTab}
           xml={xml}
@@ -265,31 +296,78 @@ function XmlPane({ xml }) {
   )
 }
 
-function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, enhancedImageUrl, imageTab, setImageTab, xml, spineTab, setSpineTab, pageSpecialists, onIndex }) {
-  const tabs = [['rendered', 'Rendered Spine'], ['xml', 'Raw XML'], ['results', 'Specialists'], ['audit', 'Audit']]
+function formatDimensions(value) {
+  return Array.isArray(value) && value.length === 2 ? `${value[0]}×${value[1]} px` : '—'
+}
+
+function InspectionCards({ inspections, inspectionUrls, selectedIndex, onSelect }) {
+  if (!inspections.length) return <p className="report-muted">No region inspections were recorded for this page.</p>
+  return <div className="report-inspection-grid">{inspections.map((inspection, index) => {
+    const cropUrl = inspectionUrls[index]
+    const selected = selectedIndex === index
+    return <button
+      type="button"
+      className={`report-inspection-card${selected ? ' selected' : ''}`}
+      key={`${inspection.region_id || 'region'}-${index}`}
+      onClick={() => cropUrl && onSelect(index)}
+      disabled={!cropUrl}
+    >
+      <div className="report-inspection-thumb">
+        {cropUrl ? <img src={cropUrl} alt={`Inspected crop ${inspection.region_id || index + 1}`} /> : <span>{inspection.error || 'Crop unavailable'}</span>}
+      </div>
+      <div className="report-inspection-body">
+        <div className="report-inspection-title"><b>{inspection.region_id || `Region ${index + 1}`}</b><em>{inspection.confidence || (inspection.error ? 'ERROR' : 'UNRATED')}{inspection.capped ? ' · CAPPED' : ''}</em></div>
+        {inspection.reading && <p><strong>Blind reading</strong>{inspection.reading}</p>}
+        {inspection.concern && <p><strong>Original concern</strong>{inspection.concern}</p>}
+        <dl>
+          <dt>Source</dt><dd>{formatDimensions(inspection.source_px_size)}</dd>
+          <dt>Output</dt><dd>{formatDimensions(inspection.output_px_size)}</dd>
+          <dt>Scale</dt><dd>{inspection.scale_factor == null ? '—' : `${inspection.scale_factor}×`} · {inspection.detail || '—'}</dd>
+          <dt>Flagged by</dt><dd>{inspection.flagged_by || '—'}</dd>
+        </dl>
+        {(inspection.notes || []).map((note, noteIndex) => <small key={noteIndex}>{note}</small>)}
+      </div>
+    </button>
+  })}</div>
+}
+
+function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, enhancedImageUrl, inspectionUrls, selectedInspectionIndex, setSelectedInspectionIndex, imageTab, setImageTab, xml, spineTab, setSpineTab, pageSpecialists, onIndex }) {
+  const inspections = page.inspections || []
+  const selectedInspection = selectedInspectionIndex == null ? null : inspections[selectedInspectionIndex]
+  const selectedInspectionUrl = selectedInspectionIndex == null ? '' : inspectionUrls[selectedInspectionIndex]
+  const tabs = [['rendered', 'Rendered Spine'], ['inspections', `Inspections (${inspections.length})`], ['xml', 'Raw XML'], ['results', 'Specialists'], ['audit', 'Audit']]
+  const selectInspection = index => {
+    setSelectedInspectionIndex(index)
+    setImageTab('inspection')
+  }
+  const imageTabs = [
+    ['original', 'Page'],
+    ...(enhancedImageUrl ? [['enhanced', 'Enhanced']] : []),
+    ...(selectedInspectionUrl ? [['inspection', 'Inspection']] : []),
+  ]
+
   return <>
     <div className="report-page-nav"><button onClick={onIndex}>⌂ Index</button><button disabled={pageIndex === 0} onClick={() => setPageIndex(pageIndex - 1)}>◀ Previous</button><b>Page {page.page_number} of {manifest.pages.length}</b><button disabled={pageIndex >= manifest.pages.length - 1} onClick={() => setPageIndex(pageIndex + 1)}>Next ▶</button></div>
     <div className="report-page-context">Spine: <code>{page.spine_key}</code> · {pageSpecialists.length} specialists · Keyboard ← → navigates pages</div>
     <div className="report-reader-grid">
       <div className="card report-image-pane">
-        <div className="report-pane-head">🖼 Page Image <span>durable report copy</span></div>
-        {/* Tabs only when there is a second image to switch to. The original is what
-            the correlation artifact names as its source; the enhanced copy is what
-            the image enhancer produced and what most specialists actually read. */}
-        {enhancedImageUrl && <div className="report-spine-tabs">
-          {[['original', 'Original'], ['enhanced', 'Enhanced']].map(([id, label]) =>
-            <button key={id} className={imageTab === id ? 'active' : ''} onClick={() => setImageTab(id)}>{label}</button>)}
+        <div className="report-pane-head">🖼 Analysis Image <span>{imageTab === 'inspection' && selectedInspection ? selectedInspection.region_id : 'durable report copy'}</span></div>
+        {imageTabs.length > 1 && <div className="report-spine-tabs">
+          {imageTabs.map(([id, label]) => <button key={id} className={imageTab === id ? 'active' : ''} onClick={() => setImageTab(id)}>{label}</button>)}
         </div>}
         <div className="report-image-canvas">
-          {imageTab === 'enhanced' && enhancedImageUrl
-            ? <img src={enhancedImageUrl} alt={`Enhanced page ${page.page_number}`} />
-            : imageUrl
-              ? <img src={imageUrl} alt={`Page ${page.page_number} as analysed`} />
-              : <span>Loading image...</span>}
+          {imageTab === 'inspection' && selectedInspectionUrl
+            ? <img src={selectedInspectionUrl} alt={`Inspected crop ${selectedInspection?.region_id || ''}`} />
+            : imageTab === 'enhanced' && enhancedImageUrl
+              ? <img src={enhancedImageUrl} alt={`Enhanced page ${page.page_number}`} />
+              : imageUrl
+                ? <img src={imageUrl} alt={`Page ${page.page_number} as analysed`} />
+                : <span>Loading image...</span>}
         </div>
       </div>
       <div className="card report-spine-pane"><div className="report-pane-head">🌳 Correlated Page Spine <span>schema v2.0</span></div><div className="report-spine-tabs">{tabs.map(([id, label]) => <button key={id} className={spineTab === id ? 'active' : ''} onClick={() => setSpineTab(id)}>{label}</button>)}</div>
         {spineTab === 'rendered' && <div className="report-spine-scroll"><div className="report-callout"><b>Page {page.page_number} synthesis</b><br />{page.summary}</div><div className="report-tree">{(page.elements || []).map((element, index) => <div className="report-tree-node" key={element.id || index} style={{ marginLeft: Math.min(element.depth || 0, 5) * 16 }}><span>{element.tag || 'P'}</span>{element.text}<small>{element.id}</small></div>)}</div></div>}
+        {spineTab === 'inspections' && <div className="report-spine-scroll"><InspectionCards inspections={inspections} inspectionUrls={inspectionUrls} selectedIndex={selectedInspectionIndex} onSelect={selectInspection} /></div>}
         {spineTab === 'xml' && <XmlPane xml={xml} />}
         {spineTab === 'results' && <div className="report-spine-scroll">{pageSpecialists.map((specialist, index) => <div className="report-result" key={`${specialist.name}-${index}`}><b>{specialist.name}</b><em>✓ COMPLETE</em><small>{specialist.s3_uri || 'Artifact retained'}</small></div>)}</div>}
         {spineTab === 'audit' && <div className="report-spine-scroll">{(page.audit || []).length ? page.audit.map((record, index) => <div className="report-result" key={`${record.specialist}-${index}`}><b>{record.specialist}</b><em className={record.status === 'FAILED' ? 'failed' : ''}>{record.status}</em><small>{formatDate(record.started_at)} → {formatDate(record.completed_at)} · {duration(record.started_at, record.completed_at)}</small></div>) : <p className="report-muted">No page timing records available.</p>}</div>}

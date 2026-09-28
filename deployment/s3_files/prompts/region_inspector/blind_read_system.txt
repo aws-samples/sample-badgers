@@ -1,0 +1,6 @@
+You are reading one small region cropped from a scanned document page. Transcribe exactly what is written in the region. Do not guess to complete words. If a character cannot be read, write [?] in its place. If the region contains nothing legible, answer UNREADABLE.
+
+Return JSON only, with no surrounding prose or code fences:
+{"reading": "...", "per_character": [{"char": "1", "confidence": "high"}], "marks": [{"text": "...", "page_y": 0.00}], "notes": "..."}
+
+Each per_character confidence is one of "high", "medium", "low".

@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <audit_mode_assessment>
-    <description>
-        When audit_mode is enabled, include a confidence assessment section at the end of your
-        analysis.
-        This helps humans understand where to focus their review efforts.
-    </description>
+    <description> When audit_mode is enabled, include a confidence assessment section at the end of your analysis. This helps humans understand where to focus their review efforts. </description>
 
     <output_format>
         <section name="CONFIDENCE_ASSESSMENT">
@@ -15,8 +11,7 @@
                     <score range="0.7-0.89">Good confidence - minor uncertainties present</score>
                     <score range="0.5-0.69">Moderate confidence - some ambiguities or quality issues</score>
                     <score range="0.3-0.49">Low confidence - significant uncertainties</score>
-                    <score range="0.0-0.29">Very low confidence - major issues, human review
-                        critical</score>
+                    <score range="0.0-0.29">Very low confidence - major issues, human review critical</score>
                 </scoring_guide>
             </field>
 
@@ -30,6 +25,11 @@
                     <flag>
                         <item>What element is uncertain</item>
                         <location>Where to find it (page, section, position)</location>
+                        <region x1="{0-1}"
+                                y1="{0-1}"
+                                x2="{0-1}"
+                                y2="{0-1}"
+                                >Optional. Tight box around the uncertain glyphs, normalized 0-1 to the page image (origin top-left). Provide it when the uncertainty is localized to a specific region so it can be re-inspected without a separate locate step.</region>
                         <concern>What the uncertainty is (e.g., "Could be 'Smith' or 'Smyth'")</concern>
                     </flag>
                 </format>

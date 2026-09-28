@@ -1,0 +1,54 @@
+<!--
+    SHARED: Localized uncertainty flags for targeted re-inspection ("zoom").
+    ============================================================================
+    Included via each reading/extraction specialist's prompt_files. Edit THIS
+    file to change the behaviour for every specialist that includes it.
+
+    Purpose: after image enhancement has done its best, a specialist may still
+    have a localized area it cannot resolve with confidence. Emitting a flag WITH
+    a bounding box lets the orchestrator call inspect_region_tool to re-read that
+    exact area at higher resolution and feed the result back into analysis.
+
+    The <region> box maps directly to inspect_region_tool's required inputs
+    (x1,y1,x2,y2 normalized 0-1, origin top-left). The orchestrator already
+    treats "a human_review_flag that carries a region" as the trigger to inspect.
+-->
+<uncertainty_flagging>
+    <description>
+        After completing your main analysis, review your own reading for any
+        localized area you could NOT resolve with confidence — a word, number,
+        glyph, table cell, or handwritten mark that stays unclear even after
+        image enhancement. For each such area, append a human_review_flag that
+        carries a bounding box. This is an ADDITIONAL section at the very end of
+        your response; it does not replace or alter your main output.
+    </description>
+    <rules>
+        <rule>Only flag areas that are genuinely unclear AND localized. Never flag content you read confidently, and never box the whole page.</rule>
+        <rule>If nothing is unclear, omit the block entirely. Do not emit an empty human_review_flags block.</rule>
+        <rule>Emit at most a few flags per page. Never more than 12.</rule>
+        <rule>Coordinates in &lt;region&gt; are normalized 0.0-1.0 relative to the page image, origin at top-left. Draw a TIGHT box around only the uncertain glyphs.</rule>
+        <rule>region_id must be stable and specific — ideally the flagged element or cell id (e.g. td_3_2); otherwise a short descriptive id.</rule>
+        <rule>task is "transcribe" to read the characters in the region, or "assign_rows" to report the page y-coordinate of marks for table-row alignment. Default to "transcribe".</rule>
+        <rule>concern states what is uncertain and any candidate readings, e.g. "digit unclear — could be 1,234 or 1,284".</rule>
+    </rules>
+    <format>
+        <human_review_flags>
+            <flag>
+                <region_id>{stable id}</region_id>
+                <region x1="{0-1}" y1="{0-1}" x2="{0-1}" y2="{0-1}"/>
+                <task>transcribe</task>
+                <concern>{what is uncertain}</concern>
+            </flag>
+        </human_review_flags>
+    </format>
+    <example>
+        <human_review_flags>
+            <flag>
+                <region_id>td_3_2</region_id>
+                <region x1="0.62" y1="0.41" x2="0.68" y2="0.44"/>
+                <task>transcribe</task>
+                <concern>digit unclear — could be 1,234 or 1,284</concern>
+            </flag>
+        </human_review_flags>
+    </example>
+</uncertainty_flagging>

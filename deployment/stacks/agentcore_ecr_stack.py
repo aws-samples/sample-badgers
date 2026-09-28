@@ -37,9 +37,16 @@ class AgentCoreECRStack(Stack):
             image_scan_on_push=True,
             lifecycle_rules=[
                 ecr.LifecycleRule(
-                    description="Keep last 10 images",
+                    description="Keep last 3 AgentCore runtime images",
+                    max_image_count=3,
+                    rule_priority=1,
+                    tag_prefix_list=["websocket-"],
+                ),
+                ecr.LifecycleRule(
+                    description="Keep last 10 other images",
                     max_image_count=10,
-                )
+                    rule_priority=2,
+                ),
             ],
         )
 

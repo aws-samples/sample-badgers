@@ -187,6 +187,7 @@ step_upload() {
     read -rp "  Choice [7]: " choice
     choice="${choice:-7}"
   fi
+  CURRENT_STEP_SUBMENU="${choice}"
 
   # Every arm must propagate failure. Arms 1-6 previously did not: a failed `aws s3 sync`
   # inside _sync_config_category fell through to log_success and mark_complete, so the
@@ -549,6 +550,7 @@ step_ui_deploy() {
     read -rp "  Choice [1]: " ecs_choice
     ecs_choice="${ecs_choice:-1}"
   fi
+  CURRENT_STEP_SUBMENU="${ecs_choice}"
 
   case "$ecs_choice" in
   1)
@@ -942,8 +944,21 @@ if [ $# -gt 0 ]; then
   # Deliberately not `dispatch "$1" || ...`: a command on the left of || runs with
   # errexit suppressed for its entire call tree, which previously let a failed
   # cdk_deploy fall through to mark_complete.
-  dispatch "$1"
-  exit $?
+  CURRENT_STEP_LABEL=""
+  CURRENT_STEP_SUBMENU=""
+  rc=0
+  dispatch "$1" || rc=$?
+  if [ "${rc}" -ne 0 ]; then
+    echo ""
+    # Mirror the interactive loop: name the step that actually failed (set by log_step,
+    # including the nested steps run by Full/Resume) rather than just exiting silently.
+    _where="${CURRENT_STEP_LABEL:-Step (option $1)}"
+    if [ -n "${CURRENT_STEP_SUBMENU}" ]; then
+      _where="${_where} — submenu ${CURRENT_STEP_SUBMENU}"
+    fi
+    log_error "${_where} failed (exit ${rc}). Nothing was marked complete."
+  fi
+  exit "${rc}"
 fi
 
 while true; do
@@ -954,10 +969,19 @@ while true; do
     # Capture dispatch's status directly. Reading $? inside an else branch reports the
     # status of the last command run in that branch, not of the failed step.
     rc=0
+    CURRENT_STEP_LABEL=""
+    CURRENT_STEP_SUBMENU=""
     dispatch "${choice}" || rc=$?
     if [ "${rc}" -ne 0 ]; then
       echo ""
-      log_error "Step failed (exit ${rc}). Nothing was marked complete."
+      # CURRENT_STEP_LABEL is set by log_step at the top of each step (including the
+      # nested steps run by Full/Resume), so this names the step that actually failed
+      # rather than the menu option chosen. Submenu selection is appended when present.
+      _where="${CURRENT_STEP_LABEL:-Step (option ${choice})}"
+      if [ -n "${CURRENT_STEP_SUBMENU}" ]; then
+        _where="${_where} — submenu ${CURRENT_STEP_SUBMENU}"
+      fi
+      log_error "${_where} failed (exit ${rc}). Nothing was marked complete."
     fi
   else
     log_error "Invalid option: ${choice}"

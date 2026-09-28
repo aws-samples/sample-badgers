@@ -159,6 +159,9 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             // only confined when present — pushing undefined would fail the manifest
             // outright on every older report.
             if (page.enhanced_image_key) declaredKeys.push(page.enhanced_image_key);
+            for (const inspection of page.inspections || []) {
+                if (inspection.crop_image_key) declaredKeys.push(inspection.crop_image_key);
+            }
         }
         if (declaredKeys.some(key => typeof key !== 'string' || !key.startsWith(prefix))) {
             throw Object.assign(new Error('Invalid report manifest'), { status: 500 });
@@ -268,14 +271,87 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         }
     });
 
+    // ── Chat warmup ──
+
+    // Called by the chat UI on mount, before the user types. Opening a socket with
+    // the chat's session id allocates that session's microVM, and the warmup frame
+    // has the agent fetch its token, open the Gateway session, list tools and build
+    // the model. Both persist in the microVM, so /api/chat — which opens its own
+    // socket on the same session id — finds them ready. Never reaches the model.
+    const WARMUP_TIMEOUT_MS = 60000;
+
+    app.post('/api/chat/warmup', async (req, res) => {
+        const { session_id } = req.body || {};
+        if (!session_id || !/^[a-zA-Z0-9_-]+$/.test(session_id)) return res.status(400).json({ error: 'Invalid session_id' });
+        if (!RUNTIME_ARN) return res.status(503).json({ error: 'AGENTCORE_RUNTIME_WEBSOCKET_ARN not configured' });
+
+        const started = Date.now();
+        let ws;
+        let settled = false;
+        const settle = (status, body) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+            if (!res.headersSent) res.status(status).json({ ...body, total_ms: Date.now() - started });
+        };
+        const timer = setTimeout(() => settle(504, { error: 'Warmup timed out' }), WARMUP_TIMEOUT_MS);
+
+        try {
+            ws = new WebSocket(await getPresignedWsUrl(session_id));
+        } catch (e) {
+            return settle(502, { error: e.message });
+        }
+        ws.on('open', () => {
+            // Settled while still connecting (timeout or client gone): close() is only
+            // safe once open, so it is done here rather than left dangling.
+            if (settled) { ws.close(); return; }
+            ws.send(JSON.stringify({ warmup: true, session_id }));
+        });
+        ws.on('message', (raw) => {
+            try {
+                const str = raw.toString();
+                const data = str.startsWith('data: ') ? JSON.parse(str.slice(6)) : JSON.parse(str);
+                if (data.type === 'warm') settle(200, { ok: true, tools: data.tools, agent_ms: data.elapsed_ms });
+                else if (data.type === 'warm_error') settle(502, { error: data.message || 'Warmup failed' });
+            } catch { /* parse error — skip */ }
+        });
+        ws.on('error', (e) => settle(502, { error: e.message }));
+        ws.on('close', () => settle(502, { error: 'Runtime closed the socket before warmup completed' }));
+        // The browser left (unmount, New Session) before the agent answered. The
+        // agent keeps warming regardless; only the socket is ours to close.
+        res.on('close', () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+        });
+    });
+
     // ── Chat (WebSocket to AgentCore Runtime, SSE to frontend) ──
 
     app.post('/api/chat', async (req, res) => {
-        const { message, session_id, audit_mode, dynamic_tokens, doc_id } = req.body;
+        const { message, session_id, audit_mode, dynamic_tokens, doc_id: requestDocId } = req.body;
         if (!session_id || !/^[a-zA-Z0-9_-]+$/.test(session_id)) return res.status(400).json({ error: 'Invalid session_id' });
         // doc_id is a server-minted UUID from /api/upload. Validate rather than
         // trust it: it reaches DynamoDB as a key attribute on the job record.
-        if (doc_id && !/^[a-zA-Z0-9-]{1,64}$/.test(doc_id)) return res.status(400).json({ error: 'Invalid doc_id' });
+        if (requestDocId && !/^[a-zA-Z0-9-]{1,64}$/.test(requestDocId)) return res.status(400).json({ error: 'Invalid doc_id' });
+        // Attachment content carries the exact upload URI into the user message.
+        // Recover its server-minted document ID when the attachment adapter did
+        // not copy docId into the chat request, and reject conflicting identities.
+        const uploadDocIds = [...String(message || '').matchAll(/s3:\/\/([^/\s]+)\/uploads\/([a-zA-Z0-9-]{1,64})\//g)]
+            .filter(match => match[1] === UPLOAD_BUCKET)
+            .map(match => match[2]);
+        const inferredDocIds = [...new Set(uploadDocIds)];
+        if (inferredDocIds.length > 1) return res.status(400).json({ error: 'Message references multiple uploaded documents' });
+        const inferredDocId = inferredDocIds[0] || '';
+        if (requestDocId && inferredDocId && requestDocId !== inferredDocId) {
+            return res.status(400).json({ error: 'doc_id does not match the uploaded document URI' });
+        }
+        const doc_id = requestDocId || inferredDocId;
+
+        const chatStarted = Date.now();
+        console.log(`${new Date().toISOString()} User chat send session=${session_id}`);
 
         mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -374,6 +450,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
                     else if (data.init_event_loop || data.start_event_loop) { send('status', 'Thinking...'); }
                     if (data.complete || data.force_stop || data.type === 'error' || (data.result != null)) {
                         if (data.type === 'error') send('error', data.message || 'Unknown error');
+                        if (!ended) console.log(`${new Date().toISOString()} Assistant final response session=${session_id} ${Date.now() - chatStarted}ms${data.type === 'error' ? ' (error)' : ''}`);
                         log(`[done] ${new Date().toISOString()}`);
                         finish(); ws.close();
                     }
@@ -487,6 +564,24 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
             if (!page) return res.status(404).json({ error: 'Page not found' });
             if (!page.enhanced_image_key) return res.status(404).json({ error: 'Page has no enhanced image' });
             await sendReportObject(res, page.enhanced_image_key, 'image/jpeg');
+        } catch (e) {
+            if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/reports/:reportId/pages/:pageNumber/inspections/:inspectionIndex/image', async (req, res) => {
+        try {
+            const { manifest } = await loadReportManifest(req, req.params.reportId);
+            const page = (manifest.pages || []).find(item => String(item.page_number) === req.params.pageNumber);
+            if (!page) return res.status(404).json({ error: 'Page not found' });
+            if (!/^(0|[1-9][0-9]*)$/.test(req.params.inspectionIndex)) {
+                return res.status(400).json({ error: 'Invalid inspection index' });
+            }
+            const inspection = (page.inspections || [])[Number(req.params.inspectionIndex)];
+            if (!inspection?.crop_image_key) {
+                return res.status(404).json({ error: 'Inspection crop not found' });
+            }
+            await sendReportObject(res, inspection.crop_image_key, 'image/png');
         } catch (e) {
             if (!res.headersSent) res.status(e.status || 500).json({ error: e.message });
         }

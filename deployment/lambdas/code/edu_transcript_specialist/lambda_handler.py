@@ -15,6 +15,7 @@ from foundation.lambda_error_handler import (
 )
 from foundation.s3_result_saver import save_result_to_s3
 from foundation import job_state
+from foundation.revision_handler import try_revision
 
 # Configure logging from environment variable
 logger = logging.getLogger()
@@ -50,7 +51,9 @@ def lambda_handler(event, context):
         if os.environ.get("AWS_EXECUTION_ENV") and config_bucket:
             config_source = "s3"
             logger.info(
-                "Using S3 config: bucket=%s, specialist=%s", config_bucket, specialist_name
+                "Using S3 config: bucket=%s, specialist=%s",
+                config_bucket,
+                specialist_name,
             )
         else:
             config_source = "local"
@@ -58,6 +61,11 @@ def lambda_handler(event, context):
 
         # Parse input - AgentCore Gateway passes parameters directly in event
         body = json.loads(event["body"]) if "body" in event else event
+
+        # ── Revision mode: delegate to foundation revision handler ──
+        revision_result = try_revision(event, context)
+        if revision_result is not None:
+            return revision_result
 
         # Extract and log session_id from AgentCore Runtime
         session_id = body.get("session_id", "no_session")
