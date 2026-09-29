@@ -163,6 +163,24 @@ that costs only time.
 
 See [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md) for every script and its flags.
 
+### Region inspection deployment
+
+The targeted region-inspection workflow spans the configuration bucket, specialist Lambdas,
+AgentCore Gateway, AgentCore Runtime prompts, and the report UI. For an existing deployment,
+run steps `3` through `8` in order:
+
+1. **Step 3** uploads the region-inspector manifest, schema, shared uncertainty prompt, and
+   correlation rules.
+2. **Step 4** deploys the `region_inspector` Lambda and the report-materialization changes.
+3. **Step 5** reconciles the `inspect_region_tool` Gateway target.
+4. **Step 6** deploys the runtime workflow that triggers inspection and passes its result to
+   correlation.
+5. **Steps 7 and 8** rebuild and deploy the UI so the Page Reader exposes inspection cards and
+   crop images.
+
+The workflow is conditional: specialists must first flag a localized uncertainty. A deployment
+can contain the tool without producing inspection artifacts for every report.
+
 ## 📦 CDK Stacks
 
 13 stacks deployed in dependency order, plus 1 optional. See

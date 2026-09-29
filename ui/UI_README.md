@@ -130,14 +130,15 @@ Job status is computed at read time rather than stored — see the endpoint comm
 The Reports tab reads the artifacts written by `html_report_specialist`. Every endpoint is
 authenticated and scoped to the caller.
 
-| Endpoint                                       | Returns                                    |
-| ---------------------------------------------- | ------------------------------------------ |
-| `GET /api/reports`                             | Every report the caller owns, newest first |
-| `GET /api/reports/:id/manifest`                | One report's manifest                      |
-| `GET /api/reports/:id/pages/:n/image`          | The durable analysis image for one page    |
-| `GET /api/reports/:id/pages/:n/enhanced-image` | The enhanced copy, when the run made one   |
-| `GET /api/reports/:id/pages/:n/xml`            | The correlated page spine for one page     |
-| `GET /api/reports/:id/download`                | The offline single-file HTML report        |
+| Endpoint                                             | Returns                                    |
+| ---------------------------------------------------- | ------------------------------------------ |
+| `GET /api/reports`                                   | Every report the caller owns, newest first |
+| `GET /api/reports/:id/manifest`                      | One report's manifest                      |
+| `GET /api/reports/:id/pages/:n/image`                | The durable analysis image for one page    |
+| `GET /api/reports/:id/pages/:n/enhanced-image`       | The enhanced copy, when the run made one   |
+| `GET /api/reports/:id/pages/:n/inspections/:i/image` | The durable PNG crop for inspection `i`    |
+| `GET /api/reports/:id/pages/:n/xml`                  | The correlated page spine for one page     |
+| `GET /api/reports/:id/download`                      | The offline single-file HTML report        |
 
 `enhanced-image` returns **404 rather than an error** when the page has no
 `enhanced_image_key`: a clean page is never enhanced, and reports generated before that
@@ -148,6 +149,23 @@ tabs only when a second image exists.
 The image the correlation artifact names as its source is the *original*, so before this
 existed a report showed the page as scanned while most specialists had read the enhanced
 copy. Persisting both is what makes that provenance visible rather than implied.
+
+### Page Reader inspections
+
+A page's **Inspections** tab is populated only when the agent called `inspect_region_tool` for
+that page. The call is conditional on a specialist flagging a localized uncertainty, such as a
+`MISS`, an alternate reading, or an audit-mode `human_review_flag` with a bounding box. The agent
+batches all flagged regions into one call, with a maximum of 12 regions per page.
+
+Each inspection card can show the retained crop and its blind reading, original concern,
+confidence, source and output dimensions, scale factor, detail class, and flagging specialist.
+Selecting a card switches the image pane to the durable crop. A region that failed inspection is
+retained as an error card without a crop. Pages without inspection results show an empty
+Inspections tab rather than making an additional image request.
+
+The report Lambda validates that inspection artifacts belong to the same session, document, page,
+and source image before copying their PNG crops into the report prefix. The UI therefore reads
+report-owned keys rather than the specialist's transient output location.
 
 The listing is a keyed DynamoDB query on the `owner-index` GSI, partitioned by the
 caller's `owner_sub` and filtered to job rows carrying a `report_id`. Ownership therefore
