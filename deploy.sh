@@ -437,7 +437,7 @@ step_ui_build() {
     bash "${DEPLOYMENT_DIR}/scripts/generate_ui_env.sh"
 
   log_info "Building React app..."
-  (cd "${REPO_ROOT}/ui" && npm install --silent && npm run build) \
+  (cd "${REPO_ROOT}/ui" && npm ci --silent && npm run build) \
     || { log_error "UI bundle build failed."; return 1; }
 
   # Ensure AMD64 cross-compilation works (QEMU on ARM hosts / Apple Silicon)
