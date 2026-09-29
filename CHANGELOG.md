@@ -20,6 +20,14 @@
   live over Converse for both text and image input; the application-profile-over-foundation-model
   wrapper is synth-verified and takes effect on deploy.
 
+- **Targeted region inspection.** The new `inspect_region_tool` gives the vision model a close,
+  blind reread of localized regions that a specialist could not resolve. Specialists can flag a
+  `MISS`, an alternate reading, or an audit-mode `human_review_flag` with a bounding box. The agent
+  batches up to 12 flagged regions per page, calls the inspector after the specialist pass and before
+  correlation, and passes its S3 artifact into correlation. Reports retain validated crop PNGs and
+  expose them in the Page Reader's **Inspections** tab with reading confidence, scale, dimensions,
+  and provenance. Pages without uncertainty flags are not inspected.
+
 ## [5.0.1] - 2026-09-21
 
 Since `[5.0.0]`. Three vision-capable models added, a second inference transport alongside

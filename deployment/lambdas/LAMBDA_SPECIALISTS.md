@@ -295,6 +295,54 @@ job_state.get_record(job_id, subtask)
 
 ---
 
+## 🔎 Region Inspection Specialist
+
+`region_inspector` is a code-based Gateway specialist exposed as `inspect_region_tool`. It is
+not a general page reader; the agent calls it only after other specialists report a localized
+uncertainty and before page correlation.
+
+### Trigger conditions
+
+A page is eligible when a specialist reports one of the following:
+
+- `<miss>MISS</miss>` for an unresolved value.
+- An explicit alternate reading, such as `18 or 16`.
+- An audit-mode `human_review_flag` containing a region bounding box.
+
+The agent makes one inspection call per page and batches all flagged regions in that call. The
+maximum is 12 regions per page. If no specialist raises a flag, the agent does not call the tool.
+
+### Input contract
+
+| Field                             | Description                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `image_path` or `image_data`      | The same page image read by the flagging specialist; use the enhanced image when that specialist used one. |
+| `regions`                         | One or more regions with `region_id`, `x1`, `y1`, `x2`, `y2`, and `task`.                                  |
+| `task`                            | `transcribe` reads characters; `assign_rows` reports page y-coordinates for table-row matching.            |
+| `flagged_by`                      | Specialist that raised the uncertainty; retained as provenance and withheld from the reading model.        |
+| `concern`                         | Original uncertainty or candidate readings; retained for comparison and withheld from the reading model.   |
+| `session_id`                      | Runtime session used to organize the result in S3.                                                         |
+| `page_number`, `job_id`, `doc_id` | Optional page and job identity passed through by the orchestrator.                                         |
+
+Coordinates must use one coordinate space per request: either normalized `0–1` values or page
+pixels. The four coordinates must not mix those spaces.
+
+### Result and report behavior
+
+The inspector crops each region with context padding, resizes it to the model input size, and
+performs a blind reread. Results include the source and output dimensions, scale factor, detail
+class, reading, confidence, candidate comparison, and whether confidence was capped because the
+source region was too small. A heavily enlarged crop cannot claim high confidence from invented
+pixels.
+
+The tool returns an S3 URI for the JSON inspection artifact. The agent passes that URI to
+`correlate_page_results_tool` as the `region_inspector` entry in `specialist_uris`. The report
+specialist validates the artifact's session, document, page, source image, unique region IDs, and
+crop location before copying each valid PNG under the report prefix. Failed regions remain visible
+as error cards without a crop.
+
+---
+
 ## 🔧 Utility Lambda: Document-to-Images Converter
 
 The converter turns a source document into analyzable page images. It routes on the

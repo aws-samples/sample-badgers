@@ -56,6 +56,19 @@ A single React + Express app is both the testing workbench and the deployment/op
 | ![Audit Trail](.github/assets/BADGERS-screenshot-report-page-reader-audit-trail.png)                                      | ![Report Tesla](.github/assets/BADGERS-screenshot-report-overview-tesla.png)                                          |
 | Specialist execution times, token usage, and model selections per page — useful for performance tuning and cost analysis. | The same report viewer on a different document type (textbook with diagrams), showing how analysis adapts to content. |
 
+### Targeted Region Inspection
+
+When a specialist cannot resolve a localized word, number, glyph, table cell, or handwritten mark,
+it can emit an uncertainty flag with a page-region bounding box. The agent then calls
+`inspect_region_tool` once for that page, after the specialist pass and before correlation. The tool
+re-reads all flagged regions from the same page image, returns blind readings with confidence and
+source/output dimensions, and supplies an artifact for correlation. Clean pages do not incur an
+inspection call.
+
+The report viewer exposes these artifacts in the page reader's **Inspections** tab. Each card shows
+the durable crop, blind reading, original concern, confidence, scale, source dimensions, and the
+specialist that raised the flag.
+
 ### Deployment CLI
 
 
