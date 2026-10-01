@@ -45,7 +45,7 @@ dependencies = [
     #    strands-agents, and bedrock-agentcore; urllib3 via botocore. Set in 4.0.0 so
     #    versions that dependabot flagged cannot regress when the lock is re-resolved.
     "pydantic>=2.13.4",
-    "urllib3>=2.7.0",
+    "urllib3>=2.8.0",
 ]
 
 [project.optional-dependencies]
