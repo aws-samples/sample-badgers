@@ -177,7 +177,11 @@ mountAdminRoutes(app, PROJECT_ROOT);
 mountWizardRoutes(app, PROJECT_ROOT);
 mountModelsRoutes(app);
 
-// ── Static serving ──
+// An explicit HOST override wins. Otherwise keep local development on IPv4
+// loopback while binding to all container interfaces in production so ECS can
+// route traffic to the process.
+const HOST = process.env.HOST ||
+    (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 const PORT = process.env.PORT || 7860;
 
 async function startServer() {
@@ -208,8 +212,8 @@ async function startServer() {
         app.use(vite.middlewares);
     }
 
-    app.listen(PORT, () => {
-        console.log(`\n🦡 BADGERS Unified UI on http://localhost:${PORT}\n`);
+    app.listen(PORT, HOST, () => {
+        console.log(`\n🦡 BADGERS Unified UI listening on ${HOST}:${PORT}\n`);
     });
 }
 
