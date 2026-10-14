@@ -94,6 +94,7 @@ Browser (React/Vite)
     │                ├── Core routes (all roles)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
     │                │   ├── DOCX, PDF, or image upload to S3 (mints doc_id)
+    │                │   ├── DOCX: native page plan → Textract OCR or Vision only when needed
     │                │   ├── Job records (/api/jobs)
     │                │   ├── S3 file operations (manifests, prompts, schemas)
     │                │   ├── CloudWatch Logs Insights queries
