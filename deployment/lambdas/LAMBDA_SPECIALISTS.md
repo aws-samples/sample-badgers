@@ -78,6 +78,21 @@ BADGERS uses four types of Lambda functions:
 | --------------- | -------- | -------------------------------------- |
 | `OUTPUT_BUCKET` | ✅        | S3 bucket for storing converted images |
 
+### DOCX and Textract OCR Routing
+
+`route_document_input_tool` is always the first tool for an uploaded document. A `.docx`
+is sent to `process_docx_tool`, which produces an ordered page plan. Pages marked
+`native_docx` already have a canonical BADGERS page spine and do not create an image or
+invoke a model. Pages marked `textract_ocr` have no useful native text and receive one
+`extract_textract_ocr_tool` pass on their already-rendered page image.
+
+Textract output must pass its deterministic quality gate (non-empty, sufficient readable
+text, mean line confidence of at least 75, and no symbol-dominated output) before it is
+stored as a canonical BADGERS content-tree page. A failed gate is a successful routing
+decision—not a Textract retry—and preserves the raw OCR artifact before routing the same
+page to BADGERS Vision. `hybrid` and `vision_ai` pages bypass Textract and use Vision
+directly.
+
 ---
 
 ## 🔬 Anatomy of a Vision Specialist

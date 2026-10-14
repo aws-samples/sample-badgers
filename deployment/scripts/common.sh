@@ -1579,7 +1579,12 @@ preflight_service_quotas() {
 # neither preflight in this section was ever called from anywhere.
 _BADGERS_MODEL_REGISTRY="${DEPLOYMENT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/s3_files/config/model_registry.json"
 
-# Emits "<geo_model_id> <foundation_model_id>" per active model.
+# Emits "<model_id> <foundation_model_id> <transport>" per active model.
+#
+# `mantle` models are deliberately included so callers can state that they
+# were considered, but they cannot be checked through inference profiles or
+# bedrock-runtime Converse: their OpenAI-compatible endpoint is a different
+# transport entirely.
 _badgers_active_models() {
   python3 -c "
 import json,sys
@@ -1591,33 +1596,37 @@ except Exception as e:
 for mid,spec in models.items():
     if spec.get('status')!='active': continue
     base=mid.split('.',1)[1] if mid.startswith(('us.','eu.','jp.','au.','in.')) else mid
-    print(mid, base)
+    print(mid, base, spec.get('transport', 'converse'))
 " "${_BADGERS_MODEL_REGISTRY}"
 }
 
 preflight_model_access() {
   log_info "Checking Bedrock model availability in ${AWS_REGION}..."
 
-  local missing=() model_id base_id rows
+  local missing=() model_id base_id transport rows
   rows="$(_badgers_active_models)" || {
     log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
     return 1
   }
 
-  # Every BADGERS model is invoked through a US geo cross-Region profile (us.*), and none
-  # of them supports In-Region inference on bedrock-runtime at all. So the question this
-  # preflight has to answer is not "is the base model in this Region's catalog" -- a
-  # CRIS-only model may or may not appear in ListFoundationModels for a Region it is not
-  # served in-Region from -- but "does the geo profile exist here", i.e. is this Region a
-  # valid source Region for it. GetInferenceProfile on the geo ID answers exactly that.
+  # Converse models usually use a US geo cross-Region profile (us.*). The
+  # question for those models is not "is the base model in this Region's
+  # catalog" -- a CRIS-only model may not appear there -- but "does the geo
+  # profile exist here", i.e. is this Region a valid source Region for it.
+  # GetInferenceProfile on the geo ID answers exactly that. Mantle models have
+  # no inference profile and are explicitly skipped below.
   #
   # The base-model catalog check is kept as a second chance, not a first: if the profile
   # lookup fails for a reason unrelated to availability (an IAM role without
   # bedrock:GetInferenceProfile, an old CLI), a model that the catalog does list still
   # passes. Model *access* -- subscription, entitlement -- is a separate question and is
   # what preflight_model_invocation answers with a real call.
-  while read -r model_id base_id; do
+  while read -r model_id base_id transport; do
     [ -z "${model_id}" ] && continue
+    if [ "${transport}" = "mantle" ]; then
+      echo "    ✓ ${model_id}  (mantle transport; no inference profile to check)"
+      continue
+    fi
 
     local profile_status="" catalog_status=""
     profile_status="$(aws bedrock get-inference-profile \
@@ -1651,8 +1660,8 @@ preflight_model_access() {
       log_error "    ${m}"
     done
     echo ""
-    log_error "Every BADGERS model is already invoked through a US geo cross-Region profile"
-    log_error "(us.*), so this is not fixed by switching profile type. Likely causes:"
+    log_error "The affected Converse models use inference profiles or direct Converse access."
+    log_error "Likely causes:"
     log_error "  1. ${AWS_REGION} is not a source Region for the US geo profile -- deploy from"
     log_error "     a US Region (us-east-1, us-east-2, us-west-1, us-west-2) or ca-*."
     log_error "  2. The deploying role lacks bedrock:GetInferenceProfile and"
@@ -1671,15 +1680,17 @@ preflight_model_access() {
 # Actually invokes each model with a minimal payload to confirm marketplace
 # subscriptions, inference profiles, and IAM permissions are all in place.
 #
-# Uses Converse, not InvokeModel. Two reasons: it is the transport BADGERS actually uses,
-# and no OpenAI model supports InvokeModel at all — so an Anthropic-shaped invoke_model
-# body could never smoke-test two thirds of the model set. It also avoids a trap in the
-# previous version, which passed raw JSON to `invoke-model --body`; under AWS CLI v2 that
-# fails base64 decoding, and the resulting error matched none of the greps below, so the
-# test reported success no matter what.
+# Uses Converse, not InvokeModel. Two reasons: it is the transport BADGERS uses
+# for every non-Mantle model, and no OpenAI model supports InvokeModel at all —
+# so an Anthropic-shaped invoke_model body could never smoke-test two thirds of
+# the model set. Mantle models are excluded because their OpenAI-compatible
+# endpoint is not a Converse endpoint. This also avoids a trap in the previous
+# version, which passed raw JSON to `invoke-model --body`; under AWS CLI v2 that
+# fails base64 decoding, and the resulting error matched none of the greps
+# below, so the test reported success no matter what.
 preflight_model_invocation() {
   log_info "Testing model invocations (this may take 10-20 seconds)..."
-  local failed=0 rows model_id _base
+  local failed=0 rows model_id _base transport
 
   rows="$(_badgers_active_models)" || {
     log_error "Could not read model registry: ${_BADGERS_MODEL_REGISTRY}"
@@ -1691,8 +1702,12 @@ preflight_model_invocation() {
   local messages='[{"role":"user","content":[{"text":"hi"}]}]'
   local inference_config='{"maxTokens":64}'
 
-  while read -r model_id _base; do
+  while read -r model_id _base transport; do
     [ -z "${model_id}" ] && continue
+    if [ "${transport}" = "mantle" ]; then
+      echo "    ✓ ${model_id}  (mantle transport; Converse preflight not applicable)"
+      continue
+    fi
     local response rc=0
     # `|| rc=$?` rather than a bare assignment: deploy.sh runs under `set -e`, and although
     # errexit is suspended inside a function invoked as `preflight || return 1`, a caller

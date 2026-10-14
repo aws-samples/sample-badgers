@@ -187,6 +187,27 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                 |
 | 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                         |
 
+### 📄 Page-Aware DOCX Intake
+
+Word documents use an extension-keyed intake path rather than the PDF/image converter:
+
+1. `document_intake_router` accepts `.docx` and rejects legacy `.doc`, macro-enabled
+   `.docm`, and the future-reserved `.pptx` / `.xlsx` formats.
+2. `docx_processor` safely reads WordprocessingML structure—headings, paragraphs, lists,
+   tables, drawings, equations, image metadata, captions, and references—and writes a
+   BADGERS content-tree page spine for every page.
+3. A temporary LibreOffice PDF establishes final page boundaries. It is not a default
+   Vision input: only pages selected for OCR or visual analysis are rasterized.
+4. `native_docx` pages remain schema-conformant native output. Image-only pages use a
+   single Textract OCR pass. Accepted OCR becomes a BADGERS page spine; empty,
+   low-confidence, or symbol-dominated OCR is retained as audit evidence and escalates
+   only that page to BADGERS Vision. `hybrid` and `vision_ai` pages follow the visual
+   specialist workflow directly.
+
+The page plan retains the original page order, native relationships, route decision
+reasons, and artifact URIs, so reports can reconstruct a mixed native/OCR/visual document
+without losing its spine.
+
 ## 🚀 Deployment
 
 

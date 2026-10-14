@@ -278,7 +278,7 @@ function MyComposer({ attachmentAdapter }) {
           📎
         </ComposerPrimitive.AddAttachment>
         <ComposerPrimitive.Input
-          placeholder="Provide an S3 URI or attach a PDF by clicking the paperclip icon."
+          placeholder="Provide an S3 URI or attach a DOCX, PDF, or image by clicking the paperclip icon."
           style={{
             flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
             color: 'var(--text)', padding: '8px 10px', borderRadius: 'var(--radius)',
@@ -299,7 +299,7 @@ function MyComposer({ attachmentAdapter }) {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf,image/png,image/jpeg,image/tiff,image/webp,image/gif'
+  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
 
   // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
   // The server mints it per upload; we hold the most recent one so subsequent
@@ -567,7 +567,7 @@ function ChatInner({ onNewSession }) {
             session_id: sessionId,
             audit_mode: auditMode,
             dynamic_tokens: dynamicTokens,
-            // Empty until a PDF has been uploaded in this session; the agent
+            // Empty until a document has been uploaded in this session; the agent
             // treats an absent doc_id as "not attributable to a document".
             doc_id: attachmentAdapter.lastDocId,
           }),
