@@ -9,6 +9,10 @@
                     "type": "string",
                     "description": "S3 URI of the full_text_specialist result (required as canonical spine)"
                 },
+                "native_spine_uri": {
+                    "type": "string",
+                    "description": "Optional schema-valid native DOCX page spine. For hybrid DOCX pages, preserve it as the structural base and merge visual results as enrichments."
+                },
                 "specialist_uris": {
                     "type": "array",
                     "items": {

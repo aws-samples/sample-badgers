@@ -1,0 +1,42 @@
+[
+  {
+    "name": "extract_textract_ocr_tool",
+    "description": "Run Amazon Textract OCR on one DOCX page marked textract_ocr. Accepted output is emitted as a schema-valid BADGERS content-tree XML page. Low-quality, empty, symbol-dominated, or low-confidence OCR is explicitly routed to BADGERS Vision instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URI for a rendered DOCX page image."
+        },
+        "page_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "doc_id": {
+          "type": "string"
+        }
+      },
+      "required": ["image_path", "page_number"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON with ocr_result_uri, optional content_tree_uri, schema validation status, quality metrics, and next_route. next_route=native_complete means content_tree_uri is the canonical page spine; next_route=vision_ai means use the same source image in the BADGERS visual workflow."
+        },
+        "success": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+]

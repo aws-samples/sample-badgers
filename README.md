@@ -158,6 +158,9 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | Specialist                             | Purpose                                                                                     |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
+| 🧭 `document_intake_router`              | Route uploaded inputs by extension to the appropriate document-processing contract             |
+| 📝 `docx_processor`                      | Natively parse DOCX, validate BADGERS page spines, and route individual pages to native extraction, Textract OCR, or Vision AI |
+| 🔤 `textract_ocr`                        | Run low-volume first-pass Textract OCR for image-only DOCX pages; escalate weak OCR to Vision AI |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |

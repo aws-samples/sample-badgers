@@ -230,28 +230,39 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     app.post('/api/upload', upload.single('file'), async (req, res) => {
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
         if (!UPLOAD_BUCKET) return res.status(500).json({ error: 'S3_UPLOAD_BUCKET not configured' });
-        // Accept a PDF or a single image. Sniff the magic bytes rather than
-        // trusting the client-declared MIME type; the extension is not evidence.
-        // A PDF is rasterized into page images downstream; an image is already
-        // a page and skips that step (the agent routes on the S3 key's extension).
+        // The extension selects the intake contract. Magic bytes only validate
+        // that the upload is coherent with that contract; content inspection is
+        // repeated by the selected processor before it extracts anything.
         const buf = req.file.buffer;
+        const filename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const extension = filename.slice(filename.lastIndexOf('.')).toLowerCase();
         const hex = (n) => buf.slice(0, n).toString('hex');
         const ascii = (a, b) => buf.slice(a, b).toString('latin1');
         const isPdf = buf.length >= 5 && ascii(0, 5) === '%PDF-';
+        const isZip = buf.length >= 4 && ascii(0, 4) === 'PK\u0003\u0004';
         const isPng = buf.length >= 8 && hex(8) === '89504e470d0a1a0a';
         const isJpeg = buf.length >= 3 && hex(3) === 'ffd8ff';
         const isGif = buf.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a');
         const isWebp = buf.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
         const isTiff = buf.length >= 4 && (hex(4) === '49492a00' || hex(4) === '4d4d002a');
         const isImage = isPng || isJpeg || isGif || isWebp || isTiff;
-        if (!isPdf && !isImage) return res.status(400).json({ error: 'Only PDF or image files (PNG, JPEG, TIFF, WebP, GIF) are accepted' });
+        const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.webp', '.gif']);
+        if (extension === '.doc') return res.status(400).json({ error: 'Legacy .doc files are not supported. Save as DOCX or PDF.' });
+        if (extension === '.docm') return res.status(400).json({ error: 'Macro-enabled .docm files are not supported.' });
+        if (!['.pdf', '.docx', ...imageExtensions].includes(extension)) return res.status(400).json({ error: 'Supported extensions: DOCX, PDF, PNG, JPEG, TIFF, WebP, and GIF' });
+        if (extension === '.pdf' && !isPdf) return res.status(400).json({ error: 'The .pdf upload does not contain PDF data' });
+        if (extension === '.docx' && !isZip) return res.status(400).json({ error: 'The .docx upload does not contain an OOXML ZIP package' });
+        if (imageExtensions.has(extension) && !isImage) return res.status(400).json({ error: 'The image extension does not match the uploaded file data' });
         // Images are sent to the vision models without the PDF flow's per-page
         // recompression, so the raw bytes hit the foundation ImageProcessor's
         // 20MB validation cap. Reject early with a clear message instead of
         // failing mid-pipeline. PDFs keep the 50MB multer limit.
-        if (isImage && req.file.size > 20 * 1024 * 1024) return res.status(400).json({ error: 'Image files must be 20MB or smaller' });
+        if (imageExtensions.has(extension) && req.file.size > 20 * 1024 * 1024) return res.status(400).json({ error: 'Image files must be 20MB or smaller' });
 
-        const filename = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const inputType = extension === '.docx' ? 'docx' : extension === '.pdf' ? 'pdf' : 'image';
+        const contentType = extension === '.docx'
+            ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            : req.file.mimetype;
         // doc_id is the top level of the job-tracking hierarchy
         // (doc_id -> job_id -> subtask_id). A fresh UUID per upload, so
         // re-uploading the same file is treated as a new document.
@@ -262,10 +273,10 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
                 Bucket: UPLOAD_BUCKET,
                 Key: s3Key,
                 Body: req.file.buffer,
-                ContentType: req.file.mimetype,
-                Metadata: { doc_id: docId },
+                ContentType: contentType,
+                Metadata: { doc_id: docId, input_type: inputType },
             }));
-            res.json({ s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`, docId, filename, size: req.file.size });
+            res.json({ s3Uri: `s3://${UPLOAD_BUCKET}/${s3Key}`, docId, filename, size: req.file.size, inputType });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }

@@ -37,6 +37,7 @@ def lambda_handler(
         session_id = body.get("session_id", "no_session")
         full_text_uri = body.get("full_text_uri")
         specialist_uris = body.get("specialist_uris", [])
+        native_spine_uri = body.get("native_spine_uri", "")
         page_number = body.get("page_number", "1")
         source_image_path = body.get("source_image_path", "")
 
@@ -89,6 +90,9 @@ def lambda_handler(
 
         # Fetch specialist outputs from S3
         full_text_content = _fetch_s3_content(s3, full_text_uri)
+        native_spine_content = (
+            _fetch_s3_content(s3, native_spine_uri) if native_spine_uri else ""
+        )
 
         specialist_contents = []
         for specialist in specialist_uris:
@@ -111,6 +115,8 @@ def lambda_handler(
             specialist_contents,
             page_number,
             source_image_path,
+            native_spine_uri,
+            native_spine_content,
         )
 
         # Get model configuration from manifest
@@ -321,6 +327,8 @@ def _build_user_message(
     specialist_contents: list,
     page_number: str,
     source_image_path: str,
+    native_spine_uri: str = "",
+    native_spine_content: str = "",
 ) -> str:
     """Build the user message with all specialist outputs."""
     parts = [
@@ -333,6 +341,16 @@ def _build_user_message(
         full_text_content,
         "",
     ]
+    if native_spine_uri:
+        parts.extend(
+            [
+                "=== NATIVE DOCX BADGERS SPINE (PRESERVE AS BASE STRUCTURE) ===",
+                f"S3 URI: {native_spine_uri}",
+                "",
+                native_spine_content,
+                "",
+            ]
+        )
 
     for specialist in specialist_contents:
         parts.extend(
