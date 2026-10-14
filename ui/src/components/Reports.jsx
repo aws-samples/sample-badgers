@@ -118,6 +118,7 @@ export default function Reports() {
     // Only requested when the manifest declares one, so an un-enhanced page (or a
     // report generated before enhanced copies were kept) costs no extra request.
     const hasEnhanced = Boolean(currentPage.enhanced_image_key)
+    const hasPageImage = Boolean(currentPage.image_key)
     const inspections = currentPage.inspections || []
     const cropRequests = inspections.map((inspection, index) => {
       if (!inspection.crop_image_key) return Promise.resolve(null)
@@ -126,10 +127,12 @@ export default function Reports() {
         .catch(() => null)
     })
     Promise.all([
-      fetch(`${base}/image`).then(async response => {
-        if (!response.ok) throw new Error('Could not load page image')
-        return response.blob()
-      }),
+      hasPageImage
+        ? fetch(`${base}/image`).then(async response => {
+            if (!response.ok) throw new Error('Could not load page image')
+            return response.blob()
+          })
+        : Promise.resolve(null),
       fetch(`${base}/xml`).then(async response => {
         if (!response.ok) throw new Error('Could not load page spine')
         return response.text()
@@ -144,9 +147,11 @@ export default function Reports() {
       Promise.all(cropRequests),
     ]).then(([blob, pageXml, enhancedBlob, cropBlobs]) => {
       if (cancelled) return
-      const url = URL.createObjectURL(blob)
-      objectUrls.push(url)
-      setImageUrl(url)
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        objectUrls.push(url)
+        setImageUrl(url)
+      }
       setXml(pageXml)
       if (enhancedBlob) {
         const enhancedUrl = URL.createObjectURL(enhancedBlob)
@@ -351,7 +356,7 @@ function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, enhance
     <div className="report-page-context">Spine: <code>{page.spine_key}</code> · {pageSpecialists.length} specialists · Keyboard ← → navigates pages</div>
     <div className="report-reader-grid">
       <div className="card report-image-pane">
-        <div className="report-pane-head">🖼 Analysis Image <span>{imageTab === 'inspection' && selectedInspection ? selectedInspection.region_id : 'durable report copy'}</span></div>
+        <div className="report-pane-head">🖼 Analysis Image <span>{imageTab === 'inspection' && selectedInspection ? selectedInspection.region_id : page.processing_mode === 'native_docx' ? 'native DOCX extraction; Vision image not required' : 'durable report copy'}</span></div>
         {imageTabs.length > 1 && <div className="report-spine-tabs">
           {imageTabs.map(([id, label]) => <button key={id} className={imageTab === id ? 'active' : ''} onClick={() => setImageTab(id)}>{label}</button>)}
         </div>}
@@ -362,7 +367,9 @@ function PageReader({ manifest, page, pageIndex, setPageIndex, imageUrl, enhance
               ? <img src={enhancedImageUrl} alt={`Enhanced page ${page.page_number}`} />
               : imageUrl
                 ? <img src={imageUrl} alt={`Page ${page.page_number} as analysed`} />
-                : <span>Loading image...</span>}
+                : page.processing_mode === 'native_docx'
+                  ? <span>Native DOCX extraction was sufficient for this page. No Vision image was created.</span>
+                  : <span>Loading image...</span>}
         </div>
       </div>
       <div className="card report-spine-pane"><div className="report-pane-head">🌳 Correlated Page Spine <span>schema v2.0</span></div><div className="report-spine-tabs">{tabs.map(([id, label]) => <button key={id} className={spineTab === id ? 'active' : ''} onClick={() => setSpineTab(id)}>{label}</button>)}</div>

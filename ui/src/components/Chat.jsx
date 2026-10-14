@@ -323,14 +323,13 @@ class S3AttachmentAdapter {
   // Holds the file in memory only. Nothing is uploaded here, so an attachment
   // the user removes -- or never sends -- leaves no object in S3.
   async add({ file }) {
-    // Routing by type is deterministic: a PDF is rasterized into page images,
-    // an image is already a single page. Accept both. The server re-checks by
-    // magic bytes -- this client gate is just for a fast, friendly rejection.
+    // Routing by extension is deterministic: DOCX enters native Office intake,
+    // PDFs are rasterized into page images, and an image is already a single
+    // page. The server verifies byte-level coherence before accepting the upload.
     const name = file.name.toLowerCase()
-    const okExt = /\.(pdf|png|jpe?g|tiff?|webp|gif)$/.test(name)
-    const okMime = file.type === 'application/pdf' || file.type.startsWith('image/')
-    if (!okExt && !okMime) {
-      const message = 'Only PDF or image files (PNG, JPEG, TIFF, WebP, GIF) are supported'
+    const okExt = /\.(pdf|docx|png|jpe?g|tiff?|webp|gif)$/.test(name)
+    if (!okExt) {
+      const message = 'Supported extensions: DOCX, PDF, PNG, JPEG, TIFF, WebP, and GIF'
       this.notify({ state: 'error', filename: file.name, message })
       throw new Error(message)
     }

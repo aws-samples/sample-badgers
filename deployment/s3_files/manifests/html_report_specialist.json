@@ -31,12 +31,15 @@
                             },
                             "source_image_path": {
                                 "type": "string"
+                            },
+                            "processing_mode": {
+                                "type": "string",
+                                "enum": ["native_docx", "textract_ocr", "hybrid", "vision_ai"]
                             }
                         },
                         "required": [
                             "page_number",
-                            "correlation_specialist_uri",
-                            "source_image_path"
+                            "correlation_specialist_uri"
                         ]
                     }
                 },

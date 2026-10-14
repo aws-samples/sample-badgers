@@ -7,7 +7,7 @@
       "properties": {
         "source_document_path": {
           "type": "string",
-          "description": "S3 URI of the source PDF"
+          "description": "S3 URI of the source PDF, image, or DOCX document"
         },
         "document_title": {
           "type": "string",
@@ -16,8 +16,8 @@
         "expected_page_count": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 50,
-          "description": "Page count returned by pdf_to_images_converter"
+          "maximum": 250,
+          "description": "Page count returned by the document converter or DOCX page plan"
         },
         "pages": {
           "type": "array",
@@ -35,12 +35,16 @@
               },
               "source_image_path": {
                 "type": "string"
+              },
+              "processing_mode": {
+                "type": "string",
+                "enum": ["native_docx", "textract_ocr", "hybrid", "vision_ai"],
+                "description": "native_docx pages have no source image. textract_ocr pages use an accepted Textract canonical spine and retain their page image. hybrid and vision_ai pages require a correlation spine and image."
               }
             },
             "required": [
               "page_number",
-              "correlation_specialist_uri",
-              "source_image_path"
+              "correlation_specialist_uri"
             ]
           }
         },
