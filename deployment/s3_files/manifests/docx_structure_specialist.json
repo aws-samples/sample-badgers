@@ -1,0 +1,77 @@
+{
+  "tool": {
+    "name": "analyze_docx_structure_tool",
+    "description": "Interpret a native DOCX structure graph using deterministic OOXML and optional layout evidence plus a text model. Produces additive relationship enrichments; it never replaces the native BADGERS spine and does not consume document pixels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_structure_graph": {
+          "type": "string",
+          "description": "JSON graph of stable OOXML-derived nodes. Each node has id, type, order, optional parent/list/anchor/reference fields, and optional normalized renderer layout."
+        },
+        "structure_graph_uri": {
+          "type": "string",
+          "description": "S3 URI containing the JSON document structure graph. Use instead of document_structure_graph for large graphs."
+        },
+        "source_document_path": {
+          "type": "string",
+          "description": "S3 URI or source path of the Word document."
+        },
+        "scope_id": {
+          "type": "string",
+          "description": "Stable native scope identifier, such as a document, section, or page scope."
+        },
+        "page_number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional page number when the supplied graph is a renderer-derived page scope."
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "doc_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_document_path",
+        "session_id"
+      ]
+    }
+  },
+  "specialist": {
+    "name": "docx_structure_specialist",
+    "description": "Derives evidence-backed structural, referential, and optional layout relationship enrichments from a native DOCX graph.",
+    "prompt_specialist_prompt_base_path": "prompts",
+    "prompt_files": [
+      "docx_structure_prompt.xml"
+    ],
+    "expected_output_tokens": 3000,
+    "model_selections": {
+      "primary": {
+        "model_id": "us.anthropic.claude-sonnet-4-6",
+        "adaptive_thinking": true,
+        "effort": "medium"
+      },
+      "fallback_list": [
+        {
+          "model_id": "us.amazon.nova-2-lite-v1:0",
+          "effort": "medium"
+        }
+      ]
+    },
+    "output_extension": "xml",
+    "revision_eligible": false
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "dependencies": [
+      "boto3"
+    ],
+    "wizard_managed": false,
+    "specialist_type": "docx_native_structure"
+  }
+}

@@ -162,6 +162,7 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | 🧭 `document_intake_router`              | Route uploaded inputs by extension to the appropriate native-first processing contract       |
 | 📝 `docx_processor`                      | Natively parse DOCX, validate BADGERS page spines, and route individual pages to native extraction, Textract OCR, or Vision AI |
 | 🔤 `textract_ocr`                        | Run low-volume first-pass Textract OCR for selected DOCX or PDF pages; escalate weak OCR to Vision AI |
+| 🧭 `docx_structure_specialist`           | Add evidence-backed DOCX hierarchy and optional layout relationships; does not render pixels or replace the DOCX spine |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |

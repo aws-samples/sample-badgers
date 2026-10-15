@@ -19,6 +19,7 @@ BADGERS uses five types of Lambda functions:
 | 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor` |
 | 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
+| 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist` |
 
 ---
 
@@ -88,7 +89,7 @@ invoke a model. The routing decision evaluates native fidelity separately from
 visual-semantic risk: a schema-valid, well-aligned text-only multi-column page remains
 native; columns or alignment uncertainty alone never require Vision. Pages marked
 `textract_ocr` have no useful native text and receive one
-`extract_textract_ocr_tool` pass on their already-rendered page image.
+`textract_ocr_tool` pass on their already-rendered page image.
 
 Textract output must pass its deterministic quality gate (non-empty, sufficient readable
 text, mean line confidence of at least 75, and no symbol-dominated output) before it is
@@ -97,6 +98,21 @@ decision—not a Textract retry—and preserves the raw OCR artifact before rout
 page to BADGERS Vision. `hybrid` and `vision_ai` pages bypass Textract and use Vision
 directly. Moderate risk is recorded as `deterministic_review_required` while retaining
 native output; it does not create an image or call a model by itself.
+
+### Native Structure Analysts
+
+`docx_structure_specialist` accepts a graph emitted by a native DOCX parser:
+stable OOXML node IDs, node type, document order, hierarchy, list and table
+metadata, drawing anchors, and explicit cross-references. A layout engine may
+add normalized bounds and a page number, but that optional layout map is
+evidence only; it does not turn the document into a vision workload.
+
+The specialist calculates hierarchy, document-order, heading-scope, list,
+anchor, reference, and optional layout evidence in Python. It then returns an
+additive, evidence-cited XML relationship artifact plus the exact evidence
+artifact used. The native DOCX content tree remains the canonical BADGERS
+spine. Vision is an escalation for pixel-only ambiguity such as rendered
+wrapping, image meaning, color, or overlap.
 
 ---
 

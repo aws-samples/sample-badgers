@@ -17,6 +17,7 @@
             "category": "Document Processing"
         },
         "textract_ocr": {
+        "docx_structure_specialist": {
             "enabled": true,
             "category": "Document Processing"
         },
