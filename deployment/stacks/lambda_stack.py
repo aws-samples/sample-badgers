@@ -39,7 +39,12 @@ if TYPE_CHECKING:
 SPECIALIST_MEMORY_MB = 6144
 
 # Container-based functions (too large for layers)
-CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist", "docx_processor"]
+CONTAINER_FUNCTIONS = [
+    "image_enhancer",
+    "remediation_specialist",
+    "docx_processor",
+    "pptx_processor",
+]
 
 
 class LambdaSpecialistStack(Stack):
@@ -461,7 +466,9 @@ class LambdaSpecialistStack(Stack):
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
             ephemeral_storage_size=(
-                Size.gibibytes(4) if func_name == "docx_processor" else None
+                Size.gibibytes(4)
+                if func_name in {"docx_processor", "pptx_processor"}
+                else None
             ),
             description=description,
             environment=environment,

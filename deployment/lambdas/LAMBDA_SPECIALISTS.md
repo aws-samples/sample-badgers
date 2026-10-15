@@ -16,7 +16,7 @@ BADGERS uses five types of Lambda functions:
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
 | 🔍 **Vision Specialists** | Analyze images using Bedrock vision models          | `full_text_specialist`, `table_specialist`, etc. |
-| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor` |
+| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
 | 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
 | 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist` |
@@ -83,13 +83,13 @@ BADGERS uses five types of Lambda functions:
 ### DOCX and Textract OCR Routing
 
 `route_document_input_tool` is always the first tool for an uploaded document. A `.docx`
-is sent to `process_docx_tool`, which produces an ordered page plan. Pages marked
+or `.pptx` is sent to its native processor, which produces an ordered page/slide plan. Pages marked
 `native_docx` already have a canonical BADGERS page spine and do not create an image or
 invoke a model. The routing decision evaluates native fidelity separately from
 visual-semantic risk: a schema-valid, well-aligned text-only multi-column page remains
 native; columns or alignment uncertainty alone never require Vision. Pages marked
 `textract_ocr` have no useful native text and receive one
-`textract_ocr_tool` pass on their already-rendered page image.
+`textract_ocr_tool` pass on their already-rendered page or slide image.
 
 Textract output must pass its deterministic quality gate (non-empty, sufficient readable
 text, mean line confidence of at least 75, and no symbol-dominated output) before it is

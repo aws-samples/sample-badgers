@@ -26,6 +26,12 @@ _ROUTES = {
         "processor_specialist": "native_pdf_processor",
         "result_contract": "page_plan",
     },
+    ".pptx": {
+        "input_type": "pptx",
+        "processor_tool": "process_pptx_tool",
+        "processor_specialist": "pptx_processor",
+        "result_contract": "page_plan",
+    },
 }
 for _extension in _IMAGE_EXTENSIONS:
     _ROUTES[_extension] = {
@@ -58,7 +64,7 @@ def lambda_handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
             raise ValueError(
                 "Macro-enabled .docm files are not supported. Remove macros and save as .docx."
             )
-        if extension in {".pptx", ".xlsx"}:
+        if extension == ".xlsx":
             raise ValueError(
                 f"{extension} is reserved for a future Office intake feature and is not supported yet."
             )

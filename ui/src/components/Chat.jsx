@@ -278,7 +278,7 @@ function MyComposer({ attachmentAdapter }) {
           📎
         </ComposerPrimitive.AddAttachment>
         <ComposerPrimitive.Input
-          placeholder="Provide an S3 URI or attach a DOCX, PDF, or image by clicking the paperclip icon."
+          placeholder="Provide an S3 URI or attach a DOCX, PDF, PowerPoint, or image by clicking the paperclip icon."
           style={{
             flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
             color: 'var(--text)', padding: '8px 10px', borderRadius: 'var(--radius)',
@@ -299,7 +299,7 @@ function MyComposer({ attachmentAdapter }) {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
+  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
 
   // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
   // The server mints it per upload; we hold the most recent one so subsequent
@@ -323,13 +323,13 @@ class S3AttachmentAdapter {
   // Holds the file in memory only. Nothing is uploaded here, so an attachment
   // the user removes -- or never sends -- leaves no object in S3.
   async add({ file }) {
-    // Routing by extension is deterministic: DOCX enters native Office intake,
-    // PDFs are rasterized into page images, and an image is already a single
-    // page. The server verifies byte-level coherence before accepting the upload.
+    // Routing by extension is deterministic: Office documents enter their
+    // native planners, PDFs use native-first analysis, and an image is a
+    // single page. The server verifies byte-level coherence after upload.
     const name = file.name.toLowerCase()
-    const okExt = /\.(pdf|docx|png|jpe?g|tiff?|webp|gif)$/.test(name)
+    const okExt = /\.(pdf|docx|pptx|png|jpe?g|tiff?|webp|gif)$/.test(name)
     if (!okExt) {
-      const message = 'Supported extensions: DOCX, PDF, PNG, JPEG, TIFF, WebP, and GIF'
+      const message = 'Supported extensions: DOCX, PPTX, PDF, PNG, JPEG, TIFF, WebP, and GIF'
       this.notify({ state: 'error', filename: file.name, message })
       throw new Error(message)
     }

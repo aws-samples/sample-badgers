@@ -219,19 +219,6 @@ class IAMStack(Stack):
             )
         )
 
-        # Textract OCR is an intentionally narrow first pass for image-only
-        # DOCX pages. DetectDocumentText does not support resource-level IAM
-        # permissions, so AWS requires "*"; no AnalyzeDocument, async, or
-        # adapter actions are granted.
-        self.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                sid="TextractDetectDocumentText",
-                effect=iam.Effect.ALLOW,
-                actions=["textract:DetectDocumentText"],
-                resources=["*"],
-            )
-        )
-
         # S3 access for specific buckets (config and output only)
         # Additional bucket access should be granted explicitly
 

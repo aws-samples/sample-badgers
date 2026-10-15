@@ -36,13 +36,15 @@ def test_docx_selects_the_native_page_plan_processor() -> None:
     assert result["session_id"] == "session-1"
 
 
-def test_legacy_and_future_office_formats_return_actionable_errors() -> None:
+def test_legacy_document_and_pptx_return_actionable_routing() -> None:
     legacy = _body(
         lambda_handler({"document_path": "s3://input-bucket/legacy.doc"}, None)
     )
-    future = _body(
+    pptx = _body(
         lambda_handler({"document_path": "s3://input-bucket/deck.pptx"}, None)
     )
 
     assert "Save the document as .docx or PDF" in str(legacy["error"])
-    assert "future Office intake feature" in str(future["error"])
+    result = json.loads(str(pptx["result"]))
+    assert result["processor_tool"] == "process_pptx_tool"
+    assert result["result_contract"] == "page_plan"
