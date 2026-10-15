@@ -157,7 +157,9 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 
 | Specialist                             | Purpose                                                                                     |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 📄 `native_pdf_processor`               | Deterministically inspect native PDF text/objects and create the page routing plan          |
 | 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
+| 🔤 `textract_ocr`                       | Recover text from selected raster pages before escalating them to Vision                    |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |
@@ -310,8 +312,13 @@ layer/python/
 
 **📄 Poppler Layer** (`poppler-qpdf-layer.zip`)
 
-- PDF rendering library for `pdf_to_images_converter`
+- PDF rendering library for selective-page `pdf_to_images_converter` fallback
 - Built via `deployment/lambdas/build_poppler_qdf_layer.sh`
+
+**📄 PDF Processing Layer** (`pdf-processing-layer.zip`)
+
+- PyMuPDF/pikepdf dependencies for `native_pdf_processor`
+- Reads native text, geometry, image/vector objects, and tagged-PDF evidence before rendering
 
 ### 🔬 How an Specialist Works
 

@@ -1,7 +1,7 @@
 [
   {
     "name": "pdf_to_images_converter",
-    "description": "Convert a source document (a PDF, or a single uploaded image: PNG, JPEG, TIFF, WebP, or GIF) into optimized page images for AI analysis. A PDF is rasterized one image per page; an image is already a single page and is only normalized (resized and re-encoded), never rasterized. Returns S3 paths to pre-encoded base64 image files that can be passed directly to specialist tools via the image_path parameter. Images are stored temporarily and auto-deleted after 1 day.",
+    "description": "Convert a source document (a PDF, or a single uploaded image: PNG, JPEG, TIFF, WebP, or GIF) into optimized page images for AI analysis. When page_numbers is supplied, rasterizes only those PDF pages. Use after native PDF routing, never as the default for every PDF page. An image input is only normalized, never rasterized.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -16,6 +16,15 @@
         "dpi": {
           "type": "integer",
           "description": "Resolution in dots per inch for PDF-to-image rasterization. Ignored for image inputs. Default: 128"
+        },
+        "page_numbers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "description": "Optional one-indexed PDF pages to render. Omit only when every page must be rasterized."
         },
         "aws_profile": {
           "type": "string",
@@ -39,7 +48,7 @@
       "properties": {
         "result": {
           "type": "string",
-          "description": "JSON object with: images (array of S3 paths like s3://bucket/temp/session/page_001.b64), page_count (number of pages), session_id (unique identifier). Pass these S3 paths to specialist tools via image_path."
+          "description": "JSON object with: images (array of S3 paths), pages (array of page_number and image_path mappings), page_count (rendered-page count), and session_id. Preserve page_number when dispatching downstream."
         },
         "success": {
           "type": "boolean",

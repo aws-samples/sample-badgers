@@ -88,6 +88,7 @@ def lambda_handler(event, context):
 
         max_image_size_mb = body.get("max_image_size_mb", 4.0)
         dpi = body.get("dpi", 128)
+        page_numbers = _parse_page_numbers(body.get("page_numbers"))
 
         # Fetch the source bytes, then route on content. A PDF is rasterized
         # page-by-page via poppler; an already-image upload is a single page and
@@ -98,18 +99,24 @@ def lambda_handler(event, context):
         document_data = _get_document_data(document_path)
 
         if b"%PDF-" in document_data[:1024]:
-            base64_images = _convert_pdf_to_images(
-                document_data, dpi, max_image_size_mb
+            rendered_pages = _convert_pdf_to_images(
+                document_data, dpi, max_image_size_mb, page_numbers=page_numbers
             )
         else:
-            base64_images = [_convert_image_to_base64(document_data, max_image_size_mb)]
+            if page_numbers and page_numbers != [1]:
+                raise ValidationError(
+                    message="An image input has exactly one page; page_numbers may only contain 1.",
+                    details={"page_numbers": page_numbers},
+                )
+            rendered_pages = [(1, _convert_image_to_base64(document_data, max_image_size_mb))]
 
         # Store base64 in S3 temp location. _store_images_to_s3 raises when
         # OUTPUT_BUCKET is unset, so a missing artifact destination already
         # fails the invocation rather than returning an empty success.
         logger.info("Processing request for runtime session_id: %s", session_id)
 
-        s3_paths = _store_images_to_s3(base64_images, session_id)
+        rendered_page_paths = _store_images_to_s3(rendered_pages, session_id)
+        s3_paths = [page["image_path"] for page in rendered_page_paths]
 
         # The converter's artifact is the set of page images; record the first as
         # the representative key so the row points into the right prefix.
@@ -129,6 +136,7 @@ def lambda_handler(event, context):
                         {
                             "images": s3_paths,
                             "page_count": len(s3_paths),
+                            "pages": rendered_page_paths,
                             "session_id": session_id,
                         }
                     ),
@@ -262,20 +270,64 @@ def _convert_image_to_base64(image_data: bytes, max_size_mb: float) -> str:
     return b64_str
 
 
-def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> list[str]:
-    """Convert PDF bytes to base64-encoded images."""
+def _parse_page_numbers(value) -> list[int] | None:
+    """Validate an optional one-indexed, de-duplicated list of PDF pages."""
+    if value is None:
+        return None
+    if not isinstance(value, list) or not value:
+        raise ValidationError(
+            message="page_numbers must be a non-empty array of positive integers.",
+            details={"page_numbers": value},
+        )
+    if any(not isinstance(page, int) or isinstance(page, bool) or page < 1 for page in value):
+        raise ValidationError(
+            message="page_numbers must contain only positive integers.",
+            details={"page_numbers": value},
+        )
+    return sorted(set(value))
+
+
+def _convert_pdf_to_images(
+    pdf_data: bytes,
+    dpi: int,
+    max_size_mb: float,
+    *,
+    page_numbers: list[int] | None = None,
+) -> list[tuple[int, str]]:
+    """Convert all PDF pages, or only the explicitly requested pages, to JPEG base64."""
     from pdf2image import convert_from_bytes
     from PIL import Image
     import io
 
     pdf_data = _decrypt_pdf_if_needed(pdf_data)
-    # Convert PDF to PIL images
-    pil_images = convert_from_bytes(pdf_data, dpi=dpi)
+    if page_numbers is None:
+        pil_pages = list(enumerate(convert_from_bytes(pdf_data, dpi=dpi), start=1))
+    else:
+        pil_pages = []
+        for page_number in page_numbers:
+            try:
+                rendered = convert_from_bytes(
+                    pdf_data,
+                    dpi=dpi,
+                    first_page=page_number,
+                    last_page=page_number,
+                )
+            except Exception as error:
+                raise ValidationError(
+                    message="Unable to render requested PDF page.",
+                    details={"page_number": page_number, "error": str(error)},
+                ) from error
+            if len(rendered) != 1:
+                raise ValidationError(
+                    message="Requested PDF page does not exist.",
+                    details={"page_number": page_number},
+                )
+            pil_pages.append((page_number, rendered[0]))
 
-    base64_images = []
+    rendered_pages: list[tuple[int, str]] = []
     max_size_bytes = int(max_size_mb * 1024 * 1024)
 
-    for idx, img in enumerate(pil_images):
+    for page_number, img in pil_pages:
         # Convert to RGB if needed
         if img.mode != "RGB":
             img = img.convert("RGB")
@@ -294,15 +346,17 @@ def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> lis
 
         buffer.seek(0)
         b64_str = base64.b64encode(buffer.read()).decode("utf-8")
-        base64_images.append(b64_str)
+        rendered_pages.append((page_number, b64_str))
 
-        logger.info("Page %d: quality=%d, size=%d bytes", idx + 1, quality, size)
+        logger.info("Page %d: quality=%d, size=%d bytes", page_number, quality, size)
 
-    return base64_images
+    return rendered_pages
 
 
-def _store_images_to_s3(base64_images: list[str], session_id: str) -> list[str]:
-    """Store base64 images to S3 temp location, return S3 paths."""
+def _store_images_to_s3(
+    rendered_pages: list[tuple[int, str]], session_id: str
+) -> list[dict[str, object]]:
+    """Store page image artifacts, retaining the original PDF page number."""
     import boto3
 
     if not OUTPUT_BUCKET:
@@ -312,10 +366,10 @@ def _store_images_to_s3(base64_images: list[str], session_id: str) -> list[str]:
         )
 
     s3 = boto3.client("s3")
-    s3_paths = []
+    pages = []
 
-    for idx, b64_str in enumerate(base64_images):
-        key = f"temp/{session_id}/page_{idx + 1:03d}.b64"
+    for page_number, b64_str in rendered_pages:
+        key = f"temp/{session_id}/page_{page_number:03d}.b64"
 
         # Store base64 string as text
         s3.put_object(
@@ -326,7 +380,7 @@ def _store_images_to_s3(base64_images: list[str], session_id: str) -> list[str]:
         )
 
         s3_path = f"s3://{OUTPUT_BUCKET}/{key}"
-        s3_paths.append(s3_path)
-        logger.info("Stored page %d to %s", idx + 1, s3_path)
+        pages.append({"page_number": page_number, "image_path": s3_path})
+        logger.info("Stored page %d to %s", page_number, s3_path)
 
-    return s3_paths
+    return pages

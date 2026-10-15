@@ -1,7 +1,7 @@
 [
   {
     "name": "generate_html_report_tool",
-    "description": "Generates one document-level BADGERS HTML analysis and audit report after all page correlations are complete. Preserves every page-level spine, copies page images into durable report storage, and returns report artifact URIs.",
+    "description": "Generates one document-level BADGERS HTML analysis and audit report after every page has a canonical BADGERS spine. A spine may come from native PDF parsing, Textract OCR, or visual correlation.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -33,14 +33,21 @@
               "correlation_specialist_uri": {
                 "type": "string"
               },
+              "canonical_spine_uri": {
+                "type": "string",
+                "description": "Schema-valid native PDF, Textract OCR, or visual correlation spine."
+              },
+              "processing_mode": {
+                "type": "string",
+                "enum": ["native_pdf", "textract_ocr", "hybrid", "vision_ai"]
+              },
               "source_image_path": {
                 "type": "string"
               }
             },
             "required": [
               "page_number",
-              "correlation_specialist_uri",
-              "source_image_path"
+              "canonical_spine_uri"
             ]
           }
         },

@@ -323,7 +323,7 @@ class LambdaSpecialistStack(Stack):
         # NOTE: Container functions (remediation_specialist) are built via
         # _create_ecr_container_function and never reach this code path.
         # They bundle their own deps in the Docker image.
-        pdf_processing_functions: list[str] = []
+        pdf_processing_functions = ["native_pdf_processor"]
         if self.pdf_processing_layer and specialist_name in pdf_processing_functions:
             layers.append(self.pdf_processing_layer)
 

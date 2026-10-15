@@ -1,0 +1,45 @@
+[
+  {
+    "name": "textract_ocr_tool",
+    "description": "Run Amazon Textract OCR on one selected, already-rendered PDF page. Produces a schema-compatible BADGERS spine and quality score. Escalate the same page to Vision only when quality_passed is false.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {
+          "type": "string",
+          "description": "S3 URI of the selected rendered page image."
+        },
+        "source_document_path": {
+          "type": "string",
+          "description": "S3 URI of the original PDF."
+        },
+        "page_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "doc_id": {
+          "type": "string"
+        }
+      },
+      "required": ["image_path", "source_document_path", "page_number", "session_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON result with quality_passed, ocr_output_uri, canonical_output_uri, and escalation decision."
+        },
+        "success": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+]
