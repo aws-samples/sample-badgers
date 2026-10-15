@@ -1,0 +1,25 @@
+[
+  {
+    "name": "process_pptx_tool",
+    "description": "Native-first PowerPoint processor. Plan mode inspects all slide OOXML objects and produces schema-valid BADGERS spines plus per-slide routes. Render mode creates images only for explicitly selected slide numbers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {"type": "string", "description": "S3 URI or absolute path to a .pptx file."},
+        "operation": {"type": "string", "enum": ["plan", "render"], "description": "plan is the default; render requires slide_numbers."},
+        "slide_numbers": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "session_id": {"type": "string"},
+        "job_id": {"type": "string"},
+        "doc_id": {"type": "string"}
+      },
+      "required": ["document_path", "session_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {"type": "string", "description": "Plan or selected-slide rendering result."},
+        "success": {"type": "boolean"}
+      }
+    }
+  }
+]
