@@ -130,7 +130,7 @@ def lambda_handler(
         correlation_records = {
             str(record.get("result_s3_key") or ""): record
             for record in job_records
-            if record.get("specialist") == "correlation_specialist"
+            if record.get("specialist") in {"correlation_specialist", "textract_ocr"}
             and record.get("status") == "COMPLETE"
         }
         region_inspector_records = {
@@ -148,6 +148,59 @@ def lambda_handler(
             page_number = page["page_number"]
             correlation_uri = page["correlation_specialist_uri"]
             image_uri = page["source_image_path"]
+            processing_mode = page["processing_mode"]
+            if processing_mode == "native_pdf":
+                native_record = next(
+                    (
+                        record
+                        for record in job_records
+                        if record.get("specialist") == "native_pdf_processor"
+                        and record.get("status") == "COMPLETE"
+                        and record.get("result_s3_key") == correlation_uri
+                    ),
+                    None,
+                )
+                if not native_record:
+                    raise ValueError(
+                        f"Page {page_number} native PDF spine does not belong to this job"
+                    )
+                correlation_xml = _get_text(
+                    s3, correlation_uri, output_bucket, max_bytes=_MAX_XML_BYTES
+                )
+                parsed = _parse_spine(correlation_xml)
+                page_token = _safe_id(page_number, str(len(report_pages) + 1))
+                spine_key = f"{report_prefix}/pages/page-{page_token}.xml"
+                s3.put_object(
+                    Bucket=output_bucket,
+                    Key=spine_key,
+                    Body=correlation_xml.encode("utf-8"),
+                    ContentType="application/xml; charset=utf-8",
+                    CacheControl="private, max-age=3600",
+                )
+                report_pages.append(
+                    {
+                        "page_number": page_number,
+                        "summary": parsed["summary"],
+                        "specialists": parsed["specialists"],
+                        "elements": parsed["elements"],
+                        "audit": _page_audit(
+                            job_records,
+                            parsed["source_image"],
+                            correlation_uri,
+                            parsed["specialists"],
+                        ),
+                        "image_key": "",
+                        "enhanced_image_key": "",
+                        "inspections": [],
+                        "spine_key": spine_key,
+                        "correlation_specialist_uri": correlation_uri,
+                        "source_image_path": parsed["source_image"],
+                        "image_data": "",
+                        "enhanced_image_data": "",
+                        "xml": correlation_xml,
+                    }
+                )
+                continue
             correlation_record = correlation_records.get(correlation_uri)
             if not correlation_record:
                 raise ValueError(
@@ -388,14 +441,21 @@ def _validate_pages(pages: list[dict[str, Any]]) -> list[dict[str, str]]:
         if not isinstance(page, dict):
             raise ValueError(f"Page entry {index} must be an object")
         page_number = str(page.get("page_number") or "").strip()
-        correlation_uri = str(page.get("correlation_specialist_uri") or "").strip()
+        correlation_uri = str(
+            page.get("canonical_spine_uri")
+            or page.get("correlation_specialist_uri")
+            or ""
+        ).strip()
         image_uri = str(page.get("source_image_path") or "").strip()
+        processing_mode = str(page.get("processing_mode") or "vision_ai").strip()
         if not _PAGE_NUMBER.fullmatch(page_number):
             raise ValueError(
                 f"Page entry {index} page_number must be a positive integer"
             )
-        if not correlation_uri or not image_uri:
-            raise ValueError(f"Page entry {index} is missing required artifact URIs")
+        if not correlation_uri:
+            raise ValueError(f"Page entry {index} is missing canonical spine URI")
+        if processing_mode != "native_pdf" and not image_uri:
+            raise ValueError(f"Page entry {index} is missing source_image_path")
         if page_number in seen:
             raise ValueError(f"Duplicate page number: {page_number}")
         seen.add(page_number)
@@ -404,6 +464,7 @@ def _validate_pages(pages: list[dict[str, Any]]) -> list[dict[str, str]]:
                 "page_number": page_number,
                 "correlation_specialist_uri": correlation_uri,
                 "source_image_path": image_uri,
+                "processing_mode": processing_mode,
             }
         )
     return normalized

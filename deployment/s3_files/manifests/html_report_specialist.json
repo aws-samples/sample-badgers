@@ -1,7 +1,7 @@
 {
     "tool": {
         "name": "generate_html_report_tool",
-        "description": "Generates one document-level HTML analysis and audit report after all page correlations complete.",
+        "description": "Generates one document-level HTML analysis and audit report after every page has a canonical BADGERS spine. A page may be native PDF, Textract OCR, or visual correlation output.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -29,14 +29,19 @@
                             "correlation_specialist_uri": {
                                 "type": "string"
                             },
+                            "canonical_spine_uri": {
+                                "type": "string"
+                            },
+                            "processing_mode": {
+                                "type": "string"
+                            },
                             "source_image_path": {
                                 "type": "string"
                             }
                         },
                         "required": [
                             "page_number",
-                            "correlation_specialist_uri",
-                            "source_image_path"
+                            "canonical_spine_uri"
                         ]
                     }
                 },
