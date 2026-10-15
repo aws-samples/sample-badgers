@@ -39,20 +39,46 @@ aws ecr get-login-password --region ${REGION} | docker login --username AWS --pa
 
 # Copy foundation and config modules to container build context
 echo "Copying foundation and config modules to build context..."
-if [ -d "./layer/python/foundation" ]; then
+LAYER_SOURCE="./layer/python"
+LAYER_STAGE_DIR=""
+if [ ! -d "${LAYER_SOURCE}/foundation" ] || [ ! -d "${LAYER_SOURCE}/config" ]; then
+    if [ ! -f "./layer.zip" ]; then
+        echo "Error: foundation layer not found. Run ./build_foundation_layer.sh first."
+        exit 1
+    fi
+    LAYER_STAGE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/badgers-container-layer.XXXXXX")
+    unzip -q "./layer.zip" "python/foundation/*" "python/config/*" -d "${LAYER_STAGE_DIR}"
+    LAYER_SOURCE="${LAYER_STAGE_DIR}/python"
+fi
+
+if [ -d "${LAYER_SOURCE}/foundation" ]; then
     rm -rf "${CONTAINER_DIR}/foundation"
-    cp -r "./layer/python/foundation" "${CONTAINER_DIR}/foundation"
+    cp -r "${LAYER_SOURCE}/foundation" "${CONTAINER_DIR}/foundation"
 else
     echo "Error: foundation module not found at ./layer/python/foundation"
     exit 1
 fi
 
-if [ -d "./layer/python/config" ]; then
+if [ -d "${LAYER_SOURCE}/config" ]; then
     rm -rf "${CONTAINER_DIR}/config"
-    cp -r "./layer/python/config" "${CONTAINER_DIR}/config"
+    cp -r "${LAYER_SOURCE}/config" "${CONTAINER_DIR}/config"
 else
     echo "Error: config module not found at ./layer/python/config"
     exit 1
+fi
+if [ -n "${LAYER_STAGE_DIR}" ]; then
+    rm -rf "${LAYER_STAGE_DIR}"
+fi
+
+if [ "$CONTAINER_NAME" = "docx_processor" ]; then
+    echo "Copying BADGERS schemas to DOCX processor build context..."
+    if [ -d "../../schemas" ]; then
+        rm -rf "${CONTAINER_DIR}/schemas"
+        cp -r "../../schemas" "${CONTAINER_DIR}/schemas"
+    else
+        echo "Error: BADGERS schemas not found at ../../schemas"
+        exit 1
+    fi
 fi
 
 # Build for x86_64 (Lambda runtime)
@@ -66,6 +92,9 @@ docker build \
 # Clean up foundation and config copies
 rm -rf "${CONTAINER_DIR}/foundation"
 rm -rf "${CONTAINER_DIR}/config"
+if [ "$CONTAINER_NAME" = "docx_processor" ]; then
+    rm -rf "${CONTAINER_DIR}/schemas"
+fi
 
 # Push to ECR
 echo "Pushing ${FULL_URI}..."

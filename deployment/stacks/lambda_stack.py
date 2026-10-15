@@ -11,6 +11,7 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     Duration,
+    Size,
     aws_lambda as lambda_,
     aws_dynamodb as dynamodb,
     aws_iam as iam,
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
 SPECIALIST_MEMORY_MB = 6144
 
 # Container-based functions (too large for layers)
-CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist"]
+CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist", "docx_processor"]
 
 
 class LambdaSpecialistStack(Stack):
@@ -342,7 +343,6 @@ class LambdaSpecialistStack(Stack):
             layers=layers,
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
-            reserved_concurrent_executions=5,
             description=description,
             environment=environment,
         )
@@ -435,6 +435,16 @@ class LambdaSpecialistStack(Stack):
                 "us.anthropic.claude-sonnet-4-6"
             )
 
+        # DOCX rendering needs a writable LibreOffice profile and temporary PDF
+        # artifacts. The handler confines both to request-scoped paths under
+        # Lambda's encrypted /tmp volume and does not expose a network listener.
+        if func_name == "docx_processor":
+            environment.update(
+                {
+                    "DOCX_RENDER_TIMEOUT_SECONDS": "120",
+                    "BADGERS_SCHEMA_DIRECTORY": "/var/task/schemas",
+                }
+            )
         # Container image functions do NOT support Lambda layers.
         # All dependencies (including foundation libs) must be baked into the container image.
         function = lambda_.Function(
@@ -450,7 +460,9 @@ class LambdaSpecialistStack(Stack):
             role=self.execution_role,
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
-            reserved_concurrent_executions=5,
+            ephemeral_storage_size=(
+                Size.gibibytes(4) if func_name == "docx_processor" else None
+            ),
             description=description,
             environment=environment,
         )

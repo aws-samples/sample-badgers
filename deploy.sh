@@ -76,9 +76,9 @@ step_layers() {
     _confirm || return 0
   fi
 
-  # The foundation layer must be built before the container Lambdas: their build
-  # script copies foundation/ out of layer/python/, so a stale layer ships stale
-  # code into the images.
+  # The foundation layer must be built before container Lambdas: their build
+  # scripts stage foundation/config from layer.zip (or a legacy expanded
+  # layer/python directory), so a stale archive would ship stale code.
   log_info "Building foundation layer..."
   (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_foundation_layer.sh) \
     || { log_error "Foundation layer build failed."; return 1; }
@@ -116,9 +116,16 @@ step_infra() {
   # otherwise surfaces as AccessDenied deep inside a document run, where _should_fallback
   # correctly refuses to retry it — so a chain with a healthy fallback still hard-fails.
   # Order matters: access (is the model there) → invocation (does a real call succeed).
-  # Each is cheap next to a failed deploy.
-  preflight_model_access || return 1
-  preflight_model_invocation || return 1
+  #
+  # An infrastructure-only update (for example, a narrowly scoped IAM grant)
+  # may deliberately bypass these account-wide model checks. The opt-out is
+  # explicit and logged; normal deployments retain both safety gates.
+  if [ "${BADGERS_SKIP_MODEL_PREFLIGHT:-0}" = "1" ]; then
+    log_warn "BADGERS_SKIP_MODEL_PREFLIGHT=1 — skipping Bedrock model access and invocation preflights."
+  else
+    preflight_model_access || return 1
+    preflight_model_invocation || return 1
+  fi
 
   # Decide about X-Ray before deploying anything. Enabling Transaction Search needs a
   # CloudWatch Logs resource policy from a hard quota of 10 per region, and finding that
@@ -291,8 +298,8 @@ step_specialists() {
     _confirm || return 0
   fi
 
-  # The container Lambda build copies foundation/ out of the layer build dir, and
-  # the Lambda stack ships layer.zip as-is, so both need a current layer. Catch a
+  # The container Lambda build stages foundation/config from layer.zip, and the
+  # Lambda stack ships that archive as-is, so both need a current layer. Catch a
   # stale one here and offer to rebuild rather than failing inside CDK synth.
   _ensure_foundation_layer_fresh || return 1
 

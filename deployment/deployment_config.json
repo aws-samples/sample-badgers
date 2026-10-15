@@ -4,7 +4,11 @@
             "enabled": true,
             "category": "Document Processing"
         },
-        "native_pdf_processor": {
+        "document_intake_router": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "docx_processor": {
             "enabled": true,
             "category": "Document Processing"
         },

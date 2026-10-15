@@ -4,6 +4,24 @@
 
 ### Added
 
+- **Page-aware DOCX intake with native-first OCR and Vision routing.** `.docx` uploads now
+  route through native WordprocessingML extraction and per-page BADGERS content-tree
+  generation. A temporary PDF establishes page boundaries only; simple native pages never
+  become images. Image-only pages receive one Textract `DetectDocumentText` pass, and
+  accepted output becomes a canonical BADGERS spine. Empty, low-confidence, or
+  symbol-dominated OCR is retained as audit evidence and escalates only that page to
+  Vision. Routing now evaluates native fidelity separately from visual-semantic risk:
+  text-only multi-column pages and alignment uncertainty alone remain native, while
+  Vision requires a high-risk semantic visual such as a chart, diagram, map, equation,
+  or wrapped/floating layout. The ordered plan preserves native relationships, route
+  reasons, fidelity state, deterministic-review flags, and artifacts across mixed
+  native/OCR/visual documents.
+
+- **Mantle-aware deployment preflights.** Step 2 recognizes `transport: "mantle"` models
+  as intentionally non-profile and non-Converse, reports them, and skips incompatible
+  checks. `BADGERS_SKIP_MODEL_PREFLIGHT=1` is an explicit, logged one-run opt-out for
+  known infrastructure-only updates.
+
 - **Qwen3 VL 235B (`qwen.qwen3-vl-235b-a22b`, `$0.53`/`$2.66`) — the first In-Region-only
   model.** A vision-capable model reached over **Converse** on `bedrock-runtime`, but with no
   `us.*`/`global.*` cross-Region inference profile: its model card lists Geo and Global as
