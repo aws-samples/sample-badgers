@@ -11,7 +11,7 @@ This document explains how Lambda specialists work in BADGERS—their anatomy, r
 
 ## 🏗️ Lambda Types
 
-BADGERS uses four types of Lambda functions:
+BADGERS uses five types of Lambda functions:
 
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
@@ -19,6 +19,7 @@ BADGERS uses four types of Lambda functions:
 | 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`       |
 | 🔧 **Utilities**          | Transform or prepare data                           | `pdf_to_images_converter`                        |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
+| 🧭 **Native Layout Analysts** | Interpret deterministic source-format geometry without pixels | `pptx_gestalt_specialist`                 |
 
 ---
 
@@ -77,6 +78,21 @@ BADGERS uses four types of Lambda functions:
 | Variable        | Required | Description                            |
 | --------------- | -------- | -------------------------------------- |
 | `OUTPUT_BUCKET` | ✅        | S3 bucket for storing converted images |
+
+### Native Layout Analysts
+
+`pptx_gestalt_specialist` accepts a native slide scene graph rather than an image.
+The PPTX parser must supply normalized `x`, `y`, `width`, and `height` values for
+every shape, along with each shape's stable ID, type, optional text, group membership,
+and connector endpoints. The specialist calculates alignment, proximity, containment,
+and connector evidence in Python, then uses a text model only to express additive,
+evidence-cited relationship candidates.
+
+Its XML is not a replacement document tree. The native PPTX content tree remains the
+canonical BADGERS spine; the returned relationship artifact and its accompanying
+`deterministic_evidence_uri` are provenance-bearing enrichments to attach during
+correlation. A separate visual path remains appropriate only when image meaning,
+rendered overlap, color, or other pixel-only facts are needed.
 
 ---
 
