@@ -1,0 +1,19 @@
+[
+  {
+    "name": "textract_ocr_tool",
+    "description": "Run Amazon Textract on one selected rendered page or slide. Its output becomes canonical only when quality_passed is true; otherwise send that same image to Vision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "image_path": {"type": "string"},
+        "source_document_path": {"type": "string"},
+        "page_number": {"type": "integer", "minimum": 1},
+        "session_id": {"type": "string"},
+        "job_id": {"type": "string"},
+        "doc_id": {"type": "string"}
+      },
+      "required": ["image_path", "source_document_path", "page_number", "session_id"]
+    },
+    "outputSchema": {"type": "object", "properties": {"result": {"type": "string"}, "success": {"type": "boolean"}}}
+  }
+]

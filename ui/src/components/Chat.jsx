@@ -278,7 +278,7 @@ function MyComposer({ attachmentAdapter }) {
           📎
         </ComposerPrimitive.AddAttachment>
         <ComposerPrimitive.Input
-          placeholder="Provide an S3 URI or attach a PDF by clicking the paperclip icon."
+          placeholder="Provide an S3 URI or attach a PDF, PowerPoint, or image by clicking the paperclip icon."
           style={{
             flex: 1, background: 'var(--bg)', border: '1px solid var(--border)',
             color: 'var(--text)', padding: '8px 10px', borderRadius: 'var(--radius)',
@@ -299,7 +299,7 @@ function MyComposer({ attachmentAdapter }) {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf,image/png,image/jpeg,image/tiff,image/webp,image/gif'
+  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
 
   // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
   // The server mints it per upload; we hold the most recent one so subsequent
@@ -323,14 +323,16 @@ class S3AttachmentAdapter {
   // Holds the file in memory only. Nothing is uploaded here, so an attachment
   // the user removes -- or never sends -- leaves no object in S3.
   async add({ file }) {
-    // Routing by type is deterministic: a PDF is rasterized into page images,
-    // an image is already a single page. Accept both. The server re-checks by
+    // Routing by type is deterministic: PPTX is natively inspected per slide,
+    // a PDF is rasterized into page images, and an image is a single page. The server re-checks by
     // magic bytes -- this client gate is just for a fast, friendly rejection.
     const name = file.name.toLowerCase()
-    const okExt = /\.(pdf|png|jpe?g|tiff?|webp|gif)$/.test(name)
-    const okMime = file.type === 'application/pdf' || file.type.startsWith('image/')
+    const okExt = /\.(pdf|pptx|png|jpe?g|tiff?|webp|gif)$/.test(name)
+    const okMime = file.type === 'application/pdf' ||
+      file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      file.type.startsWith('image/')
     if (!okExt && !okMime) {
-      const message = 'Only PDF or image files (PNG, JPEG, TIFF, WebP, GIF) are supported'
+      const message = 'Only PDF, PowerPoint, or image files (PNG, JPEG, TIFF, WebP, GIF) are supported'
       this.notify({ state: 'error', filename: file.name, message })
       throw new Error(message)
     }

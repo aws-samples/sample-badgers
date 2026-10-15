@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 SPECIALIST_MEMORY_MB = 6144
 
 # Container-based functions (too large for layers)
-CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist"]
+CONTAINER_FUNCTIONS = ["image_enhancer", "remediation_specialist", "pptx_processor"]
 
 
 class LambdaSpecialistStack(Stack):

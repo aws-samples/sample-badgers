@@ -27,7 +27,7 @@ echo "Logging into ECR..."
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
 # Container functions to build
-CONTAINERS=("image_enhancer" "remediation_specialist")
+CONTAINERS=("image_enhancer" "remediation_specialist" "pptx_processor")
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     CONTAINER_DIR="./containers/${CONTAINER}"

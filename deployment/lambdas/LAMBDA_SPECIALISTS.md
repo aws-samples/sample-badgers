@@ -18,6 +18,7 @@ BADGERS uses four types of Lambda functions:
 | 🔍 **Vision Specialists** | Analyze images using Bedrock vision models          | `full_text_specialist`, `table_specialist`, etc. |
 | 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`       |
 | 🔧 **Utilities**          | Transform or prepare data                           | `pdf_to_images_converter`                        |
+| 🖥️ **Presentation intake** | Inspect PPTX slides, write native spines, and render selected slides | `pptx_processor` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
 
 ---
