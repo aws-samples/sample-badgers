@@ -16,7 +16,14 @@
             "enabled": true,
             "category": "Document Processing"
         },
+        "pptx_processor": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
         "textract_ocr": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
         "docx_structure_specialist": {
             "enabled": true,
             "category": "Document Processing"

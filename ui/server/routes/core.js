@@ -249,9 +249,10 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.webp', '.gif']);
         if (extension === '.doc') return res.status(400).json({ error: 'Legacy .doc files are not supported. Save as DOCX or PDF.' });
         if (extension === '.docm') return res.status(400).json({ error: 'Macro-enabled .docm files are not supported.' });
-        if (!['.pdf', '.docx', ...imageExtensions].includes(extension)) return res.status(400).json({ error: 'Supported extensions: DOCX, PDF, PNG, JPEG, TIFF, WebP, and GIF' });
+        if (!['.pdf', '.docx', '.pptx', ...imageExtensions].includes(extension)) return res.status(400).json({ error: 'Supported extensions: DOCX, PPTX, PDF, PNG, JPEG, TIFF, WebP, and GIF' });
         if (extension === '.pdf' && !isPdf) return res.status(400).json({ error: 'The .pdf upload does not contain PDF data' });
         if (extension === '.docx' && !isZip) return res.status(400).json({ error: 'The .docx upload does not contain an OOXML ZIP package' });
+        if (extension === '.pptx' && !isZip) return res.status(400).json({ error: 'The .pptx upload does not contain an OOXML ZIP package' });
         if (imageExtensions.has(extension) && !isImage) return res.status(400).json({ error: 'The image extension does not match the uploaded file data' });
         // Images are sent to the vision models without the PDF flow's per-page
         // recompression, so the raw bytes hit the foundation ImageProcessor's
@@ -259,10 +260,12 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         // failing mid-pipeline. PDFs keep the 50MB multer limit.
         if (imageExtensions.has(extension) && req.file.size > 20 * 1024 * 1024) return res.status(400).json({ error: 'Image files must be 20MB or smaller' });
 
-        const inputType = extension === '.docx' ? 'docx' : extension === '.pdf' ? 'pdf' : 'image';
+        const inputType = extension === '.docx' ? 'docx' : extension === '.pptx' ? 'pptx' : extension === '.pdf' ? 'pdf' : 'image';
         const contentType = extension === '.docx'
             ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            : req.file.mimetype;
+            : extension === '.pptx'
+                ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                : req.file.mimetype;
         // doc_id is the top level of the job-tracking hierarchy
         // (doc_id -> job_id -> subtask_id). A fresh UUID per upload, so
         // re-uploading the same file is treated as a new document.

@@ -2,7 +2,7 @@
 # Build and push container Lambda images to the badgers ECR repository
 # Usage: ./build_container_lambdas.sh <deployment_id>
 #
-# This script builds the image_enhancer, remediation_specialist, and docx_processor containers
+# This script builds the image_enhancer, remediation_specialist, docx_processor, and pptx_processor containers
 # and pushes them to the shared badgers-<deployment_id> ECR repository.
 
 set -e
@@ -27,7 +27,7 @@ echo "Logging into ECR..."
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
 # Container functions to build
-CONTAINERS=("image_enhancer" "remediation_specialist" "docx_processor")
+CONTAINERS=("image_enhancer" "remediation_specialist" "docx_processor" "pptx_processor")
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     CONTAINER_DIR="./containers/${CONTAINER}"
