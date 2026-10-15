@@ -1,19 +1,23 @@
 {
   "tool": {
-    "name": "extract_textract_ocr_tool",
-    "description": "Run this only for a DOCX page-plan entry with route=textract_ocr. It performs one low-cost Amazon Textract OCR pass on that page image and evaluates readability. When quality.status=passed, content_tree_uri is a schema-valid canonical BADGERS page spine and no Vision call is needed. When quality.status=escalate_to_vision, retain ocr_result_uri as audit evidence and run the normal BADGERS visual workflow on the same image_path.",
+    "name": "textract_ocr_tool",
+    "description": "Run this only for a DOCX or PDF page-plan entry with route=textract_ocr. It performs one low-cost Amazon Textract OCR pass on that page image and evaluates readability. When quality.status=passed, content_tree_uri is a schema-valid canonical BADGERS page spine and no Vision call is needed. When quality.status=escalate_to_vision, retain ocr_result_uri as audit evidence and run the normal BADGERS visual workflow on the same image_path.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "image_path": {
           "type": "string",
-          "description": "S3 URI for the page image from process_docx_tool's image_uri."
+          "description": "S3 URI for the page image supplied by the DOCX or PDF page plan."
+        },
+        "source_document_path": {
+          "type": "string",
+          "description": "Optional S3 URI of the original DOCX or PDF document."
         },
         "page_number": {
           "type": "integer",
           "minimum": 1,
           "maximum": 250,
-          "description": "Original DOCX page number; must be preserved in the returned page spine."
+          "description": "Original document page number; must be preserved in the returned page spine."
         },
         "session_id": {
           "type": "string",
@@ -28,7 +32,7 @@
           "description": "Source document ID."
         }
       },
-      "required": ["image_path", "page_number"]
+      "required": ["image_path", "page_number", "session_id"]
     }
   },
   "specialist": {

@@ -22,9 +22,9 @@ _ROUTES = {
     },
     ".pdf": {
         "input_type": "pdf",
-        "processor_tool": "pdf_to_images_converter",
-        "processor_specialist": "pdf_to_images_converter",
-        "result_contract": "page_images",
+        "processor_tool": "process_native_pdf_tool",
+        "processor_specialist": "native_pdf_processor",
+        "result_contract": "page_plan",
     },
 }
 for _extension in _IMAGE_EXTENSIONS:

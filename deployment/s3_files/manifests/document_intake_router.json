@@ -1,7 +1,7 @@
 {
   "tool": {
     "name": "route_document_input_tool",
-    "description": "Call this first for every uploaded document. It uses the source file extension to choose the intake path. For .docx, call process_docx_tool next. For PDF or supported image extensions, call pdf_to_images_converter next. Do not bypass this router or send .doc, .docm, .pptx, or .xlsx files to a different processor.",
+    "description": "Call this first for every uploaded document. It uses the source file extension to choose the intake path. For .docx, call process_docx_tool next; for .pdf, call process_native_pdf_tool next; for supported image extensions, call pdf_to_images_converter next. Do not bypass this router or send .doc, .docm, .pptx, or .xlsx files to a different processor.",
     "inputSchema": {
       "type": "object",
       "properties": {

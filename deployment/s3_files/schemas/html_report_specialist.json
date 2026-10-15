@@ -1,7 +1,7 @@
 [
   {
     "name": "generate_html_report_tool",
-    "description": "Generates one document-level BADGERS HTML analysis and audit report after every page has a canonical BADGERS spine. A spine may come from native PDF parsing, Textract OCR, or visual correlation.",
+    "description": "Generates one document-level BADGERS HTML analysis and audit report after every page has a canonical BADGERS spine. A spine may come from native PDF parsing, native DOCX parsing, Textract OCR, or visual correlation.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -22,7 +22,7 @@
         "pages": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 50,
+          "maxItems": 250,
           "description": "Ordered pages to include in the document report",
           "items": {
             "type": "object",
@@ -37,17 +37,13 @@
                 "type": "string",
                 "description": "Schema-valid native PDF, Textract OCR, or visual correlation spine."
               },
-              "processing_mode": {
-                "type": "string",
-                "enum": ["native_pdf", "textract_ocr", "hybrid", "vision_ai"]
-              },
               "source_image_path": {
                 "type": "string"
               },
               "processing_mode": {
                 "type": "string",
-                "enum": ["native_docx", "textract_ocr", "hybrid", "vision_ai"],
-                "description": "native_docx pages have no source image. textract_ocr pages use an accepted Textract canonical spine and retain their page image. hybrid and vision_ai pages require a correlation spine and image."
+                "enum": ["native_pdf", "native_docx", "textract_ocr", "hybrid", "vision_ai"],
+                "description": "Native PDF and DOCX pages have no source image. Textract OCR pages use an accepted canonical spine and retain their page image. Hybrid and vision_ai pages require a correlation spine and image."
               }
             },
             "required": [

@@ -163,8 +163,27 @@ def lambda_handler(
             image_uri = page["source_image_path"]
             processing_mode = page["processing_mode"]
             native_docx = processing_mode == "native_docx"
+            native_pdf = processing_mode == "native_pdf"
+            native_only = native_docx or native_pdf
+            if native_pdf:
+                native_record = next(
+                    (
+                        record
+                        for record in job_records
+                        if record.get("specialist") == "native_pdf_processor"
+                        and record.get("status") == "COMPLETE"
+                        and record.get("result_s3_key") == correlation_uri
+                    ),
+                    None,
+                )
+                if not native_record:
+                    raise ValueError(
+                        f"Page {page_number} native PDF spine does not belong to this job"
+                    )
             correlation_record = correlation_records.get(correlation_uri)
-            if native_docx:
+            if native_pdf:
+                pass
+            elif native_docx:
                 if not _is_owned_native_docx_page(
                     correlation_uri,
                     page_number,
@@ -204,13 +223,13 @@ def lambda_handler(
                 max_bytes=_MAX_XML_BYTES,
             )
             parsed = _parse_spine(correlation_xml)
-            if not native_docx and parsed["source_image"] != image_uri:
+            if not native_only and parsed["source_image"] != image_uri:
                 raise ValueError(
                     f"Page {page_number} image does not match its correlation artifact"
                 )
             image_base64 = ""
             image_bytes = b""
-            if not native_docx:
+            if not native_only:
                 image_base64, image_bytes = _get_image(s3, image_uri, output_bucket)
             aggregate_bytes += len(correlation_xml.encode("utf-8")) + len(image_base64)
             if aggregate_bytes > _MAX_AGGREGATE_BYTES:
@@ -219,7 +238,7 @@ def lambda_handler(
             page_token = _safe_id(page_number, str(len(report_pages) + 1))
             image_key = f"{report_prefix}/pages/page-{page_token}.jpg"
             spine_key = f"{report_prefix}/pages/page-{page_token}.xml"
-            if not native_docx:
+            if not native_only:
                 s3.put_object(
                     Bucket=output_bucket,
                     Key=image_key,
@@ -276,7 +295,7 @@ def lambda_handler(
                     enhanced_image_data = ""
 
             inspections: list[dict[str, Any]] = []
-            if not native_docx:
+            if not native_only:
                 allowed_image_ids = {job_state.image_identifier(image_uri)}
                 if enhanced_uri:
                     allowed_image_ids.add(job_state.image_identifier(enhanced_uri))
@@ -303,7 +322,7 @@ def lambda_handler(
             )
             audit = _page_audit(
                 job_records,
-                image_uri,
+                parsed["source_image"] if native_pdf else image_uri,
                 correlation_uri,
                 parsed["specialists"],
             )
@@ -322,7 +341,7 @@ def lambda_handler(
                     "inspections": inspections,
                     "spine_key": spine_key,
                     "correlation_specialist_uri": correlation_uri,
-                    "source_image_path": image_uri,
+                    "source_image_path": parsed["source_image"] if native_pdf else image_uri,
                     "image_data": image_base64,
                     "enhanced_image_data": enhanced_image_data,
                     "xml": correlation_xml,
@@ -446,9 +465,17 @@ def _validate_pages(pages: list[dict[str, Any]]) -> list[dict[str, str]]:
             raise ValueError(
                 f"Page entry {index} page_number must be a positive integer"
             )
-        if processing_mode not in {"native_docx", "textract_ocr", "hybrid", "vision_ai"}:
+        if processing_mode not in {
+            "native_pdf",
+            "native_docx",
+            "textract_ocr",
+            "hybrid",
+            "vision_ai",
+        }:
             raise ValueError(f"Page entry {index} has an invalid processing_mode")
-        if not correlation_uri or (processing_mode != "native_docx" and not image_uri):
+        if not correlation_uri or (
+            processing_mode not in {"native_pdf", "native_docx"} and not image_uri
+        ):
             raise ValueError(f"Page entry {index} is missing required artifact URIs")
         if page_number in seen:
             raise ValueError(f"Duplicate page number: {page_number}")

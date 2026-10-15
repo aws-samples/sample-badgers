@@ -1,13 +1,17 @@
 [
   {
-    "name": "extract_textract_ocr_tool",
-    "description": "Run Amazon Textract OCR on one DOCX page marked textract_ocr. Accepted output is emitted as a schema-valid BADGERS content-tree XML page. Low-quality, empty, symbol-dominated, or low-confidence OCR is explicitly routed to BADGERS Vision instead.",
+    "name": "textract_ocr_tool",
+    "description": "Run Amazon Textract OCR on one selected DOCX or PDF page. Accepted output is emitted as a schema-valid BADGERS content-tree XML page. Low-quality, empty, symbol-dominated, or low-confidence OCR is explicitly routed to BADGERS Vision instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "image_path": {
           "type": "string",
-          "description": "S3 URI for a rendered DOCX page image."
+          "description": "S3 URI for the selected rendered DOCX or PDF page image."
+        },
+        "source_document_path": {
+          "type": "string",
+          "description": "Optional S3 URI of the original DOCX or PDF document."
         },
         "page_number": {
           "type": "integer",
@@ -24,7 +28,7 @@
           "type": "string"
         }
       },
-      "required": ["image_path", "page_number"]
+      "required": ["image_path", "page_number", "session_id"]
     },
     "outputSchema": {
       "type": "object",
