@@ -158,6 +158,8 @@ def lambda_handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
                                         "complexity_score",
                                         "decision_reasons",
                                         "content_tree_schema_valid",
+                                        "native_fidelity",
+                                        "deterministic_review_required",
                                         "native_output_uri",
                                         "image_uri",
                                     )

@@ -42,6 +42,11 @@ MAX_ARCHIVE_MEMBERS = 2_000
 MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 MAX_RENDERED_PAGES = 250
+SEMANTIC_VISUAL_PATTERN = re.compile(
+    r"\b(?:architecture|chart|diagram|equation|flowchart|graph|map|"
+    r"matrix|process|schema|workflow)\b",
+    re.IGNORECASE,
+)
 
 
 class DocxProcessingError(ValueError):
@@ -58,9 +63,12 @@ class NativeBlock:
     style: str = ""
     level: int | None = None
     list_id: str | None = None
+    list_level: int | None = None
     table_rows: int = 0
     table_columns: int = 0
     has_merged_cells: bool = False
+    has_nested_tables: bool = False
+    has_repeated_header: bool = False
     table_cells: list[list[dict[str, Any]]] = field(default_factory=list)
     has_page_break: bool = False
     column_count: int = 1
@@ -391,6 +399,9 @@ def inspect_docx(payload: bytes) -> tuple[list[NativeBlock], dict[str, Any]]:
             if local_name == "p":
                 style = _paragraph_style(child)
                 list_ids = child.xpath("./w:pPr/w:numPr/w:numId/@w:val", namespaces=NS)
+                list_levels = child.xpath(
+                    "./w:pPr/w:numPr/w:ilvl/@w:val", namespaces=NS
+                )
                 block_images = _drawing_images(
                     child, archive, relationships, page_area_emu
                 )
@@ -429,6 +440,11 @@ def inspect_docx(payload: bytes) -> tuple[list[NativeBlock], dict[str, Any]]:
                     style=style,
                     level=level,
                     list_id=list_ids[0] if list_ids else None,
+                    list_level=(
+                        int(list_levels[0])
+                        if list_levels and list_levels[0].isdigit()
+                        else None
+                    ),
                     has_drawing=has_inline or has_anchor,
                     has_floating_drawing=has_anchor,
                     has_equation=has_equation,
@@ -450,6 +466,10 @@ def inspect_docx(payload: bytes) -> tuple[list[NativeBlock], dict[str, Any]]:
                 ]
                 merged = bool(
                     child.xpath(".//w:gridSpan | .//w:vMerge", namespaces=NS)
+                )
+                nested_tables = bool(child.xpath("./w:tr/w:tc//w:tbl", namespaces=NS))
+                repeated_header = bool(
+                    child.xpath("./w:tr/w:trPr/w:tblHeader", namespaces=NS)
                 )
                 cells = child.xpath(".//w:tc", namespaces=NS)
                 table_cells = [
@@ -480,6 +500,8 @@ def inspect_docx(payload: bytes) -> tuple[list[NativeBlock], dict[str, Any]]:
                     table_rows=len(rows),
                     table_columns=max(column_counts, default=0),
                     has_merged_cells=merged,
+                    has_nested_tables=nested_tables,
+                    has_repeated_header=repeated_header,
                     table_cells=table_cells,
                 )
                 blocks.append(block)
@@ -672,7 +694,13 @@ def decide_page_route(
     document_columns: int,
     relationships: Iterable[dict[str, Any]] = (),
 ) -> tuple[int, str, list[str]]:
-    """Score one page deterministically and return route + explainable reasons."""
+    """Assess visual-semantic risk and return an explainable page route.
+
+    Native schema validity is evaluated separately by ``create_page_plan``.  This
+    score deliberately measures only information whose visual arrangement may add
+    meaning beyond a valid native spine; ordinary Word formatting must not force
+    a Vision route by itself.
+    """
     score = 0
     reasons: list[str] = []
     page_blocks = list(blocks)
@@ -711,59 +739,133 @@ def decide_page_route(
             "textract_ocr_first_pass",
         ]
 
+    # Columns are document structure, not proof of visual complexity. Source-order
+    # Word XML normally retains the reading order of a text-only multi-column page.
     if document_columns > 1:
-        score += 55
+        score += 5
         reasons.append("multi_column_layout")
-    if page.image_count:
-        score += min(20 + page.image_count * 10, 45)
-        reasons.append("rendered_page_images")
-    # LibreOffice represents table rules as PDF vector drawings. They should be
-    # judged by the table's native structure, not mistaken for a diagram.
-    if page.drawing_count >= 8 and not any(
-        block.kind == "table" for block in page_blocks
-    ):
-        score += 35
-        reasons.append("dense_vector_drawings")
 
+    semantic_visual_signal = False
     for block in page_blocks:
         if block.kind == "table":
-            if block.has_merged_cells or block.table_rows > 12 or block.table_columns > 6:
-                score += 45
-                reasons.append("complex_table")
+            if (
+                block.has_nested_tables
+                or block.has_repeated_header
+                or block.table_rows > 25
+                or block.table_columns > 10
+            ):
+                score += 35
+                reasons.append("highly_complex_table")
+            elif (
+                block.has_merged_cells
+                or block.table_rows > 12
+                or block.table_columns > 6
+            ):
+                score += 20
+                reasons.append("moderately_complex_table")
             else:
-                score += 10
-                reasons.append("native_table")
+                score += 5
+                reasons.append("simple_native_table")
         if block.has_equation:
-            score += 50
-            reasons.append("equation")
-        if block.has_floating_drawing:
-            score += 70
-            reasons.append("floating_drawing")
-        elif block.has_drawing:
             score += 40
-            reasons.append("embedded_drawing")
+            reasons.append("equation")
+            semantic_visual_signal = True
+
+        block_visual_relationships = [
+            relationship
+            for relationship in page_relationships
+            if relationship["type"] in {"references", "captioned_by"}
+            and (
+                relationship.get("source_id") == block.source_id
+                or relationship.get("target_id") == block.source_id
+            )
+        ]
+        block_has_visual_relationship = bool(block_visual_relationships)
+        visual_evidence = " ".join(
+            [
+                block.text,
+                *block.image_descriptions,
+                *(
+                    str(relationship.get("evidence", ""))
+                    for relationship in block_visual_relationships
+                ),
+            ]
+        )
+        block_has_semantic_visual = bool(
+            SEMANTIC_VISUAL_PATTERN.search(visual_evidence)
+        )
+        if block_has_semantic_visual:
+            semantic_visual_signal = True
+
+        if block.has_floating_drawing:
+            score += 45
+            reasons.append("floating_or_wrapped_visual")
+            semantic_visual_signal = True
+        elif block.has_drawing and block_has_semantic_visual:
+            score += 40
+            reasons.append("semantic_embedded_visual")
+        elif block.has_drawing and block_has_visual_relationship:
+            score += 15
+            reasons.append("referenced_embedded_visual")
+        elif block.has_drawing:
+            score += 15
+            reasons.append("unreferenced_embedded_visual")
         for image in block.images:
             if image.get("graphic_type", "").endswith("/chart"):
-                score += 70
+                score += 40
                 reasons.append("native_chart")
-            if image.get("display_area_ratio", 0) >= 0.5:
-                score += 25
+                semantic_visual_signal = True
+            area_ratio = float(image.get("display_area_ratio", 0) or 0)
+            if area_ratio >= 0.6:
+                score += 35
                 reasons.append("page_dominant_image")
-            elif image.get("display_area_ratio", 0) >= 0.25:
-                score += 15
+            elif area_ratio >= 0.3:
+                score += 20
                 reasons.append("large_embedded_image")
+            elif area_ratio >= 0.1:
+                score += 10
+                reasons.append("material_embedded_image")
             if image.get("repeated_count", 0) > 1:
                 score = max(0, score - 10)
                 reasons.append("repeated_image_asset")
-        if block.has_drawing and not block.image_descriptions:
-            score += 20
+        if (
+            block.has_drawing
+            and not block.image_descriptions
+            and any(float(image.get("display_area_ratio", 0) or 0) >= 0.1 for image in block.images)
+        ):
+            score += 10
             reasons.append("image_missing_description")
-        if block.alignment_confidence < 0.6:
-            score += 35
-            reasons.append("low_alignment_confidence")
-        if block.warnings:
-            score += 40
-            reasons.extend(block.warnings)
+
+    native_image_count = sum(len(block.images) for block in page_blocks)
+    unmapped_visible_images = max(0, page.image_count - native_image_count)
+    if unmapped_visible_images:
+        score += min(unmapped_visible_images * 10, 20)
+        reasons.append("unmapped_rendered_images")
+
+    # LibreOffice may encode table borders and decorative rules as vectors. Only
+    # a dense collection beyond normal decoration contributes a modest risk score.
+    if not any(block.kind == "table" or block.has_drawing for block in page_blocks):
+        if page.drawing_count >= 40:
+            score += 20
+            reasons.append("dense_non_table_vectors")
+        elif page.drawing_count >= 20:
+            score += 10
+            reasons.append("moderate_non_table_vectors")
+
+    minimum_alignment = min(
+        (block.alignment_confidence for block in page_blocks),
+        default=1.0,
+    )
+    if minimum_alignment < 0.7:
+        score += 20
+        reasons.append("low_alignment_confidence")
+    elif minimum_alignment < 0.9:
+        score += 10
+        reasons.append("partial_alignment_confidence")
+    if any(block.warnings for block in page_blocks):
+        score += 30
+        reasons.append("unsupported_native_structure")
+
     if any(
         relationship["type"] in {"references", "captioned_by"}
         for relationship in page_relationships
@@ -773,9 +875,11 @@ def decide_page_route(
 
     score = min(score, 100)
     unique_reasons = list(dict.fromkeys(reasons)) or ["aligned_native_text"]
-    if score >= 60:
+    # High numeric risk alone is insufficient for the full Vision route: a
+    # difficult native table or imperfect alignment is not a semantic visual.
+    if score >= 70 and semantic_visual_signal:
         return score, "vision_ai", unique_reasons
-    if score >= 30:
+    if score >= 45:
         return score, "hybrid", unique_reasons
     return score, "native_docx", unique_reasons
 
@@ -1014,6 +1118,16 @@ def create_page_plan(
             relationships=page_relationships,
         )
         schema_valid, schema_errors = validate_content_tree(native_xml, schema_directory)
+        minimum_alignment = min(
+            (block.alignment_confidence for block in page_blocks),
+            default=1.0,
+        )
+        has_native_warnings = any(block.warnings for block in page_blocks)
+        native_fidelity = (
+            "complete"
+            if schema_valid and minimum_alignment >= 0.9 and not has_native_warnings
+            else ("uncertain" if schema_valid else "incomplete")
+        )
         if not schema_valid:
             reasons.append("content_tree_schema_validation_failed")
             route = "hybrid" if route == "native_docx" else route
@@ -1026,11 +1140,15 @@ def create_page_plan(
                 "complexity_score": score,
                 "decision_reasons": list(dict.fromkeys(reasons)),
                 "alignment_confidence": round(
-                    min((block.alignment_confidence for block in page_blocks), default=1.0),
+                    minimum_alignment,
                     2,
                 ),
                 "content_tree_schema_valid": schema_valid,
                 "content_tree_schema_errors": schema_errors,
+                "native_fidelity": native_fidelity,
+                "deterministic_review_required": (
+                    schema_valid and 20 <= score < 45
+                ),
                 "native_output_xml": native_xml.decode("utf-8"),
                 "native_blocks": [asdict(block) for block in page_blocks],
                 "relationships": page_relationships,

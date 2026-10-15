@@ -1,7 +1,7 @@
 {
   "tool": {
     "name": "process_docx_tool",
-    "description": "Use for Microsoft Word .docx input. Deeply parses native Word structure, validates canonical BADGERS content-tree XML per page, then returns a page-by-page route. native_docx pages are complete without an image; textract_ocr pages must first use Textract OCR and only go to Vision if its quality gate says so; hybrid and vision_ai pages use visual specialists.",
+    "description": "Use for Microsoft Word .docx input. Deeply parses native Word structure, validates canonical BADGERS content-tree XML per page, and separately evaluates native fidelity and visual-semantic risk before returning a page route. native_docx pages are complete without an image; text-only multi-column pages and alignment uncertainty alone remain native. textract_ocr pages must first use Textract OCR and only go to Vision if its quality gate says so; hybrid and vision_ai pages use visual specialists.",
     "inputSchema": {
       "type": "object",
       "properties": {

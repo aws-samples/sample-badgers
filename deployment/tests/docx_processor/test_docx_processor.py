@@ -61,7 +61,7 @@ def test_inspect_docx_extracts_heading_list_table_and_drawing() -> None:
     payload = _docx(
         """
         <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Introduction</w:t></w:r></w:p>
-        <w:p><w:pPr><w:numPr><w:numId w:val="4"/></w:numPr></w:pPr><w:r><w:t>First item</w:t></w:r></w:p>
+        <w:p><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="4"/></w:numPr></w:pPr><w:r><w:t>First item</w:t></w:r></w:p>
         <w:tbl>
           <w:tr><w:tc><w:p><w:r><w:t>Header</w:t></w:r></w:p></w:tc></w:tr>
           <w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr>
@@ -78,6 +78,7 @@ def test_inspect_docx_extracts_heading_list_table_and_drawing() -> None:
     assert [block.kind for block in blocks] == ["heading", "list", "table", "paragraph"]
     assert blocks[0].level == 1
     assert blocks[1].list_id == "4"
+    assert blocks[1].list_level == 2
     assert blocks[2].has_merged_cells is True
     assert blocks[2].table_cells[0][0]["text"] == "Header"
     assert blocks[2].table_cells[1][0]["column_span"] == 2
@@ -123,6 +124,8 @@ def test_page_route_is_independent_and_explainable() -> None:
         "Diagram caption",
         has_drawing=True,
         has_floating_drawing=True,
+        images=[{"display_area_ratio": 0.4, "graphic_type": ""}],
+        image_descriptions=["Architecture diagram"],
         page_numbers=[2],
         alignment_confidence=0.7,
     )
@@ -131,7 +134,16 @@ def test_page_route_is_independent_and_explainable() -> None:
         simple_page, [simple_block], 1
     )
     visual_score, visual_route, visual_reasons = decide_page_route(
-        visual_page, [visual_block], 1
+        visual_page,
+        [visual_block],
+        1,
+        [
+            {
+                "type": "captioned_by",
+                "source_id": "two",
+                "target_id": "caption",
+            }
+        ],
     )
 
     assert (simple_score, simple_route, simple_reasons) == (
@@ -141,7 +153,85 @@ def test_page_route_is_independent_and_explainable() -> None:
     )
     assert visual_score >= 60
     assert visual_route == "vision_ai"
-    assert "floating_drawing" in visual_reasons
+    assert "floating_or_wrapped_visual" in visual_reasons
+
+
+def test_text_only_columns_and_alignment_uncertainty_do_not_force_vision() -> None:
+    page = PageLayout(1, "Two-column text", 0, 0, 612, 792)
+    aligned_block = NativeBlock(
+        "one",
+        "paragraph",
+        "Two-column text",
+        column_count=2,
+        alignment_confidence=0.98,
+    )
+    uncertain_block = NativeBlock(
+        "two",
+        "paragraph",
+        "Uncertainly aligned text",
+        alignment_confidence=0.35,
+    )
+
+    column_score, column_route, column_reasons = decide_page_route(
+        page, [aligned_block], 2
+    )
+    uncertain_score, uncertain_route, uncertain_reasons = decide_page_route(
+        page, [uncertain_block], 1
+    )
+
+    assert (column_score, column_route, column_reasons) == (
+        5,
+        "native_docx",
+        ["multi_column_layout"],
+    )
+    assert (uncertain_score, uncertain_route) == (20, "native_docx")
+    assert uncertain_reasons == ["low_alignment_confidence"]
+
+
+def test_complex_native_table_requires_review_but_not_full_vision() -> None:
+    page = PageLayout(1, "Wide table", 0, 0, 612, 792)
+    table = NativeBlock(
+        "table",
+        "table",
+        "Wide table",
+        table_rows=30,
+        table_columns=12,
+        has_repeated_header=True,
+        alignment_confidence=0.98,
+    )
+
+    score, route, reasons = decide_page_route(page, [table], 1)
+
+    assert (score, route) == (35, "native_docx")
+    assert reasons == ["highly_complex_table"]
+
+
+def test_captioned_photo_does_not_become_vision_without_semantic_visual_evidence() -> None:
+    page = PageLayout(1, "Store photograph", 1, 0, 612, 792)
+    photograph = NativeBlock(
+        "photo",
+        "paragraph",
+        has_drawing=True,
+        images=[{"display_area_ratio": 0.4, "graphic_type": ""}],
+        image_descriptions=["Storefront photograph"],
+        alignment_confidence=0.98,
+    )
+    relationships = [
+        {
+            "type": "captioned_by",
+            "source_id": "photo",
+            "target_id": "caption",
+            "evidence": "Figure 1 — Storefront photograph",
+        }
+    ]
+
+    score, route, reasons = decide_page_route(
+        page, [photograph], 1, relationships
+    )
+
+    assert (score, route) == (50, "hybrid")
+    assert "referenced_embedded_visual" in reasons
+    assert "semantic_embedded_visual" not in reasons
 
 
 def test_image_only_page_routes_to_textract_before_vision() -> None:
@@ -279,10 +369,12 @@ def test_page_plan_rasterizes_only_the_visual_page() -> None:
 
     assert [page["route"] for page in page_plan["pages"]] == [
         "native_docx",
-        "vision_ai",
+        "hybrid",
     ]
     assert set(images) == {2}
     assert page_plan["pages"][0]["content_tree_schema_valid"] is True
+    assert page_plan["pages"][0]["native_fidelity"] == "complete"
+    assert page_plan["pages"][0]["deterministic_review_required"] is False
     assert any(
         relationship["type"] == "captioned_by"
         for relationship in page_plan["pages"][1]["relationships"]

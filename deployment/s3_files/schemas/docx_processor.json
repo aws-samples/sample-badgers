@@ -33,7 +33,7 @@
       "properties": {
         "result": {
           "type": "string",
-          "description": "JSON object containing page_plan_uri, rendered_pdf_uri, page_count, and one entry per page with route (native_docx, textract_ocr, hybrid, vision_ai), score, reasons, schema validation status, native output URI, and optional image URI."
+          "description": "JSON object containing page_plan_uri, rendered_pdf_uri, page_count, and one entry per page with route (native_docx, textract_ocr, hybrid, vision_ai), visual-semantic risk score, reasons, schema validation status, native_fidelity, deterministic_review_required, native output URI, and optional image URI. A text-only multi-column page or alignment uncertainty alone does not require Vision."
         },
         "success": {
           "type": "boolean",
