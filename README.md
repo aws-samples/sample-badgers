@@ -158,6 +158,7 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | Specialist                             | Purpose                                                                                     |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
+| 🧭 `docx_structure_specialist`           | Add evidence-backed DOCX hierarchy and optional layout relationships; does not render pixels or replace the DOCX spine |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |

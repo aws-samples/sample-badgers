@@ -4,6 +4,10 @@
             "enabled": true,
             "category": "Document Processing"
         },
+        "docx_structure_specialist": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
         "classify_pdf_content": {
             "enabled": true,
             "category": "Document Processing"

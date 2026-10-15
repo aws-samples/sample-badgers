@@ -11,7 +11,7 @@ This document explains how Lambda specialists work in BADGERS—their anatomy, r
 
 ## 🏗️ Lambda Types
 
-BADGERS uses four types of Lambda functions:
+BADGERS uses five types of Lambda functions:
 
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
@@ -19,6 +19,7 @@ BADGERS uses four types of Lambda functions:
 | 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`       |
 | 🔧 **Utilities**          | Transform or prepare data                           | `pdf_to_images_converter`                        |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
+| 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist` |
 
 ---
 
@@ -77,6 +78,21 @@ BADGERS uses four types of Lambda functions:
 | Variable        | Required | Description                            |
 | --------------- | -------- | -------------------------------------- |
 | `OUTPUT_BUCKET` | ✅        | S3 bucket for storing converted images |
+
+### Native Structure Analysts
+
+`docx_structure_specialist` accepts a graph emitted by a native DOCX parser:
+stable OOXML node IDs, node type, document order, hierarchy, list and table
+metadata, drawing anchors, and explicit cross-references. A layout engine may
+add normalized bounds and a page number, but that optional layout map is
+evidence only; it does not turn the document into a vision workload.
+
+The specialist calculates hierarchy, document-order, heading-scope, list,
+anchor, reference, and optional layout evidence in Python. It then returns an
+additive, evidence-cited XML relationship artifact plus the exact evidence
+artifact used. The native DOCX content tree remains the canonical BADGERS
+spine. Vision is an escalation for pixel-only ambiguity such as rendered
+wrapping, image meaning, color, or overlap.
 
 ---
 
