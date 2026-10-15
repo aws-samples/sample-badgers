@@ -1,7 +1,7 @@
 [
   {
     "name": "route_document_input_tool",
-    "description": "Select the BADGERS document intake workflow from the source file extension. DOCX routes to native DOCX page planning; PDFs and supported image files route to the existing page-image converter. Legacy DOC, DOCM, PowerPoint, and Excel files are not accepted by this feature.",
+    "description": "Select the BADGERS document intake workflow from the source file extension. DOCX and PDF route to their native page planners; supported image files route to the page-image converter. Legacy DOC, DOCM, PowerPoint, and Excel files are not accepted by this feature.",
     "inputSchema": {
       "type": "object",
       "properties": {

@@ -1,7 +1,7 @@
 {
     "tool": {
         "name": "generate_html_report_tool",
-        "description": "Generates one document-level HTML analysis and audit report after every page has a canonical BADGERS spine. A page may be native PDF, Textract OCR, or visual correlation output.",
+        "description": "Generates one document-level HTML analysis and audit report after every page has a canonical BADGERS spine. A page may be native PDF, native DOCX, Textract OCR, or visual correlation output.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -19,7 +19,7 @@
                 "pages": {
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 50,
+                    "maxItems": 250,
                     "items": {
                         "type": "object",
                         "properties": {
@@ -32,15 +32,12 @@
                             "canonical_spine_uri": {
                                 "type": "string"
                             },
-                            "processing_mode": {
-                                "type": "string"
-                            },
                             "source_image_path": {
                                 "type": "string"
                             },
                             "processing_mode": {
                                 "type": "string",
-                                "enum": ["native_docx", "textract_ocr", "hybrid", "vision_ai"]
+                                "enum": ["native_pdf", "native_docx", "textract_ocr", "hybrid", "vision_ai"]
                             }
                         },
                         "required": [

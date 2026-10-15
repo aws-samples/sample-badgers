@@ -66,6 +66,6 @@ def test_password_protected_pdf_is_detectable_before_page_analysis(tmp_path):
 
     opened = fitz.open(protected)
     try:
-        assert opened.needs_pass is True
+        assert bool(opened.needs_pass) is True
     finally:
         opened.close()

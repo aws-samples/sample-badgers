@@ -133,6 +133,41 @@ def assess_ocr_quality(response: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _quality(lines: list[dict[str, Any]]) -> dict[str, Any]:
+    """Compatibility view for the PDF routing tests and legacy callers.
+
+    The public OCR result uses the richer ``status``-based quality contract.
+    This adapter retains the former boolean/score fields without maintaining a
+    second, potentially divergent OCR decision algorithm.
+    """
+    quality = assess_ocr_quality(
+        {
+            "Blocks": [
+                {"BlockType": "LINE", **line}
+                for line in lines
+            ]
+        }
+    )
+    reasons = list(quality["reasons"])
+    if "insufficient_readable_text" in reasons:
+        reasons.append("too_little_recovered_text")
+    if "low_mean_line_confidence" in reasons:
+        reasons.append("low_textract_confidence")
+    score = 100
+    score -= 45 if "insufficient_readable_text" in quality["reasons"] else 0
+    score -= 30 if "low_mean_line_confidence" in quality["reasons"] else 0
+    score -= 25 if "symbol_dominated_text" in quality["reasons"] else 0
+    score -= 20 if "no_detected_text_lines" in quality["reasons"] else 0
+    return {
+        "quality_passed": quality["status"] == "passed",
+        "quality_score": max(score, 0),
+        "reasons": reasons,
+        "text_characters": quality["character_count"],
+        "line_count": quality["line_count"],
+        "mean_confidence": quality["mean_line_confidence"],
+    }
+
+
 def build_content_tree_xml(
     *,
     page_number: int,
