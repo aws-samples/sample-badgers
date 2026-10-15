@@ -183,6 +183,15 @@ class IAMStack(Stack):
         # S3 output bucket read/write access
         output_bucket.grant_read_write(self.lambda_role)
 
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="TextractDetectDocumentText",
+                effect=iam.Effect.ALLOW,
+                actions=["textract:DetectDocumentText"],
+                resources=["*"],
+            )
+        )
+
         # DynamoDB jobs table access for job state tracking.
         # Specialists upsert their own subtask row (RUNNING -> COMPLETE/FAILED)
         # via foundation.job_state. Without this grant those calls fail at the

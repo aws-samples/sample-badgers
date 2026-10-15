@@ -157,6 +157,8 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 
 | Specialist                             | Purpose                                                                                     |
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 🖥️ `pptx_processor`                    | Inspect native PowerPoint slide objects and selectively render routed slides               |
+| 🔤 `textract_ocr`                      | OCR selected image-led slides before escalating them to Vision                             |
 | 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |

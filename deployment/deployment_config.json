@@ -4,6 +4,14 @@
             "enabled": true,
             "category": "Document Processing"
         },
+        "pptx_processor": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
+        "textract_ocr": {
+            "enabled": true,
+            "category": "Document Processing"
+        },
         "classify_pdf_content": {
             "enabled": true,
             "category": "Document Processing"
