@@ -159,7 +159,9 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | -------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 📄 `native_pdf_processor`               | Deterministically inspect native PDF text/objects and create the page routing plan          |
 | 📸 `pdf_to_images_converter`            | Convert a PDF (per page) or a single uploaded image (PNG/JPEG/TIFF/WebP/GIF) to page images |
-| 🔤 `textract_ocr`                       | Recover text from selected raster pages before escalating them to Vision                    |
+| 🧭 `document_intake_router`              | Route uploaded inputs by extension to the appropriate document-processing contract             |
+| 📝 `docx_processor`                      | Natively parse DOCX, validate BADGERS page spines, and route individual pages to native extraction, Textract OCR, or Vision AI |
+| 🔤 `textract_ocr`                        | Run low-volume first-pass Textract OCR for image-only DOCX pages; escalate weak OCR to Vision AI |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |
@@ -185,6 +187,30 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | 🎓 `edu_transcript_specialist`          | Educational transcript analysis                                                             |
 | 🔗 `correlation_specialist`             | Correlate multi-specialist results per page                                                 |
 | 🖼️ `image_enhancer`                     | Image enhancement and preprocessing                                                         |
+
+### 📄 Page-Aware DOCX Intake
+
+Word documents use an extension-keyed intake path rather than the PDF/image converter:
+
+1. `document_intake_router` accepts `.docx` and rejects legacy `.doc`, macro-enabled
+   `.docm`, and the future-reserved `.pptx` / `.xlsx` formats.
+2. `docx_processor` safely reads WordprocessingML structure—headings, paragraphs, lists,
+   tables, drawings, equations, image metadata, captions, and references—and writes a
+   BADGERS content-tree page spine for every page.
+3. A temporary LibreOffice PDF establishes final page boundaries. It is not a default
+   Vision input: only pages selected for OCR or visual analysis are rasterized.
+4. Routing separates native fidelity from visual-semantic risk. A schema-valid,
+   well-aligned text-only page—including an ordinary two-column layout—remains
+   `native_docx`; columns and alignment uncertainty alone do not invoke Vision.
+   Image-only pages use a
+   single Textract OCR pass. Accepted OCR becomes a BADGERS page spine; empty,
+   low-confidence, or symbol-dominated OCR is retained as audit evidence and escalates
+   only that page to BADGERS Vision. `hybrid` and `vision_ai` pages follow the visual
+   specialist workflow directly.
+
+The page plan retains the original page order, native relationships, route decision
+reasons, native-fidelity state, deterministic-review flag, and artifact URIs, so reports
+can reconstruct a mixed native/OCR/visual document without losing its spine.
 
 ## 🚀 Deployment
 

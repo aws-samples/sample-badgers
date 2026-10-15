@@ -38,14 +38,18 @@ each completed one to ask whether to re-run. Option `r` skips completed steps be
 them, so those prompts never fire, and starts at the first outstanding step.
 
 Step 2 runs two Bedrock preflights before any stack is created, both driven by the model
-registry: `preflight_model_access` checks that each `us.*` geo profile is ACTIVE from the
-deployment Region (falling back to the base-model catalog only when that lookup fails for
-an unrelated reason), and `preflight_model_invocation` sends a minimal Converse request
-(`"hi"`, 64 output tokens) to each model as the operator and judges the result by exit
-code. Either failing stops the
+registry: `preflight_model_access` checks each Converse model's `us.*` geo profile or
+in-Region catalog availability, and `preflight_model_invocation` sends a minimal Converse
+request (`"hi"`, 64 output tokens) to each compatible model as the operator and judges the
+result by exit code. Mantle models, such as Gemma 4 31B, are reported but skipped because
+they intentionally have neither inference profiles nor a Converse endpoint. Either failing stops the
 deploy with the models named. The invocation preflight runs on *your* credentials, so for
 the OpenAI models the deploying principal needs `bedrock:InvokeModel` on
 `arn:aws:bedrock:{region}:{account}:project/default`, not only the Lambda role.
+
+For a known infrastructure-only update, set `BADGERS_SKIP_MODEL_PREFLIGHT=1` when invoking
+`deploy.sh`. This skips both account-wide model checks for that run only; it does not change
+the default behavior and should not be used when changing the model registry or runtime.
 
 Behaviour worth knowing:
 
@@ -75,6 +79,7 @@ Environment variables:
 | `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step.                                |
 | `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                                                          |
 | `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                                                             |
+| `BADGERS_SKIP_MODEL_PREFLIGHT`                   | `1` skips Step 2's account-wide Bedrock profile/catalog and Converse invocation checks for that run. Use only for a known infrastructure-only update; Mantle models are already skipped automatically because they do not use inference profiles or Converse. |
 | `BADGERS_ALLOW_STALE_LAYER`                      | `1` lets the Lambda stack synthesize while `lambdas/layer.zip` is older than its sources, and skips step 4's pre-deploy freshness prompt. Without it, step 4 offers to rebuild and synth refuses outright, so a deploy cannot ship the previous layer. `destroy.sh` sets it itself, since a destroy ships nothing. |
 | `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT`            | `1` skips the log-delivery preflight in steps 6 and 7 with a warning. The deploy will then fail with `AlreadyExists` if any conflicting delivery sources exist. See `scripts/common.sh`.                                                                                                                           |
 | `UI_CONTAINER_PORT`                              | Container port sent with the forced rollout. Default `7860`; must match `CONTAINER_PORT` in `stacks/ecs_stack.py`.                                                                                                                                                                                                 |

@@ -37,11 +37,15 @@
                             },
                             "source_image_path": {
                                 "type": "string"
+                            },
+                            "processing_mode": {
+                                "type": "string",
+                                "enum": ["native_docx", "textract_ocr", "hybrid", "vision_ai"]
                             }
                         },
                         "required": [
                             "page_number",
-                            "canonical_spine_uri"
+                            "correlation_specialist_uri"
                         ]
                     }
                 },

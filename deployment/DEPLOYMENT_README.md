@@ -15,6 +15,7 @@ Step-by-step AWS CDK deployment for BADGERS. For architecture overview and techn
 | --------------------------------------------------------------------- | --------------------------------------------------- |
 | [Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) | Runtime + Gateway for agent orchestration           |
 | [Amazon Bedrock](https://aws.amazon.com/bedrock/)                     | Claude foundation model access                      |
+| [Amazon Textract](https://aws.amazon.com/textract/)                   | Low-volume first-pass OCR for image-only DOCX pages |
 | [AWS Lambda](https://aws.amazon.com/lambda/)                          | Serverless specialist functions                     |
 | [Amazon S3](https://aws.amazon.com/s3/)                               | Configuration and output storage                    |
 | [Amazon DynamoDB](https://aws.amazon.com/dynamodb/)                   | Job and subtask state tracking                      |
@@ -327,8 +328,8 @@ cd ..
 | ------------------------------- | -------------------------- | ------------------------------------------ | ------------------------------------------ |
 | `build_foundation_layer.sh`     | `layer.zip`                | Core specialist framework, AWS SDK, Pillow | All Lambda specialists                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion  | `pdf_to_images_converter`                  |
-| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for native PDF inspection and PDF manipulation | `native_pdf_processor` and non-container specialists needing PDF libs |
-| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist` |
+| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation      | Non-container specialists needing PDF libs |
+| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
 
@@ -342,7 +343,11 @@ cd lambdas
 cd ..
 ```
 
-This builds and pushes Docker images to ECR for `image_enhancer` and `remediation_specialist`.
+This builds and pushes Docker images to ECR for `image_enhancer`,
+`remediation_specialist`, and `docx_processor`. The container build stages `foundation`
+and `config` from `layer.zip`; it also supports the older expanded `layer/python/` layout.
+The foundation-layer builder now stages in a temporary directory to avoid macOS Finder
+recreating `.DS_Store` during cleanup.
 
 #### Automated Build
 
@@ -368,9 +373,17 @@ uv run cdk bootstrap
 
 Same set and order as `deploy.sh` step 2. `IAM` imports the DynamoDB table and the S3
 buckets, `Lambda` imports ECR and the inference profiles, so the order below is not
-optional. The manual path skips the two Bedrock model preflights `deploy.sh` runs here; if
-a model is not reachable from your account you find out from a specialist's
+optional. Interactive Step 2 checks profile/catalog availability and a minimal Converse
+request for every active non-Mantle model. Mantle models such as Gemma 4 31B are reported
+but skipped by those checks: their OpenAI-compatible `bedrock-mantle` endpoint has neither
+an inference profile nor a Converse API. The manual path skips these checks entirely; if a
+Converse model is not reachable from your account you find out from a specialist's
 `AccessDeniedException` instead.
+
+For a narrow infrastructure-only update—for example the Textract
+`DetectDocumentText` IAM grant—run Step 2 with
+`BADGERS_SKIP_MODEL_PREFLIGHT=1`. This is an explicit, one-run bypass of only the
+account-wide model checks; it should not be used for model-registry or Runtime changes.
 
 ```bash
 for s in S3 Cognito DynamoDB IAM ECR InferenceProfiles Memory Vpc; do
@@ -384,7 +397,7 @@ uv run cdk deploy BADGERS-XRay-{id}-{suffix} --require-approval never   # option
 
 ### 5️⃣ Container Images + Specialist Lambdas
 
-The Lambda stack references the two container images by tag, so they must be in ECR before
+The Lambda stack references the three container images by tag, so they must be in ECR before
 it deploys. `build_container_lambdas.sh` takes the resource id (`{id}-{suffix}`).
 
 ```bash

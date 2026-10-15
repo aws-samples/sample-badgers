@@ -238,13 +238,16 @@ cd deployment/lambdas
 
 ### ⚠️ Build order matters
 
-`layer/` is a generated, gitignored directory. `build_foundation_layer.sh` populates
-`layer/python/foundation/` by copying `../badgers-foundation/foundation/*.py`, which is the
-tracked source of truth.
+`layer.zip` is the generated, gitignored deployable artifact.
+`build_foundation_layer.sh` stages its build in a temporary directory, then writes the
+archive. This avoids macOS Finder or Spotlight recreating `layer/python/.DS_Store` while the
+old in-place staging directory is being removed.
 
-`build_container_lambdas.sh` copies the module from `layer/python/foundation/`, so a stale
-or missing `layer/` produces container images without the current foundation code. If a
-container Lambda fails on `from foundation import job_state`, rebuild the layer first:
+`build_container_lambdas.sh` extracts `foundation/` and `config/` from `layer.zip` before
+each container build (and still supports a legacy expanded `layer/python/` directory). A
+stale or missing `layer.zip` would therefore produce container images without the current
+foundation code. If a container Lambda fails on `from foundation import job_state`, rebuild
+the layer first:
 
 ```bash
 ./build_foundation_layer.sh && ./build_container_lambdas.sh

@@ -29,7 +29,7 @@ logger.setLevel(
 
 _S3_URI = re.compile(r"^s3://([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])/([^?#]+)$")
 _PAGE_NUMBER = re.compile(r"^[1-9][0-9]{0,5}$")
-_MAX_PAGES = 50
+_MAX_PAGES = 250
 _MAX_XML_BYTES = 5 * 1024 * 1024
 _MAX_IMAGE_OBJECT_BYTES = 8 * 1024 * 1024
 _MAX_INSPECTION_JSON_BYTES = 5 * 1024 * 1024
@@ -90,7 +90,7 @@ def lambda_handler(
             raise ValueError(f"expected_page_count must be between 1 and {_MAX_PAGES}")
         if len(pages) != expected_page_count:
             raise ValueError(
-                "pages must contain exactly one correlated spine for every PDF page"
+                "pages must contain exactly one canonical spine for every document page"
             )
         if len(pages) > _MAX_PAGES:
             raise ValueError(f"reports support at most {_MAX_PAGES} pages")
@@ -133,6 +133,19 @@ def lambda_handler(
             if record.get("specialist") in {"correlation_specialist", "textract_ocr"}
             and record.get("status") == "COMPLETE"
         }
+        textract_records = {
+            str(record.get("result_s3_key") or ""): record
+            for record in job_records
+            if record.get("specialist") == "textract_ocr"
+            and record.get("status") == "COMPLETE"
+        }
+        docx_page_plan_prefixes = {
+            str(record.get("result_s3_key") or "").rsplit("/", 1)[0]
+            for record in job_records
+            if record.get("specialist") == "docx_processor"
+            and record.get("status") == "COMPLETE"
+            and str(record.get("result_s3_key") or "").endswith("/page_plan.json")
+        }
         region_inspector_records = {
             str(record.get("result_s3_key") or ""): record
             for record in job_records
@@ -149,69 +162,41 @@ def lambda_handler(
             correlation_uri = page["correlation_specialist_uri"]
             image_uri = page["source_image_path"]
             processing_mode = page["processing_mode"]
-            if processing_mode == "native_pdf":
-                native_record = next(
-                    (
-                        record
-                        for record in job_records
-                        if record.get("specialist") == "native_pdf_processor"
-                        and record.get("status") == "COMPLETE"
-                        and record.get("result_s3_key") == correlation_uri
-                    ),
-                    None,
-                )
-                if not native_record:
-                    raise ValueError(
-                        f"Page {page_number} native PDF spine does not belong to this job"
-                    )
-                correlation_xml = _get_text(
-                    s3, correlation_uri, output_bucket, max_bytes=_MAX_XML_BYTES
-                )
-                parsed = _parse_spine(correlation_xml)
-                page_token = _safe_id(page_number, str(len(report_pages) + 1))
-                spine_key = f"{report_prefix}/pages/page-{page_token}.xml"
-                s3.put_object(
-                    Bucket=output_bucket,
-                    Key=spine_key,
-                    Body=correlation_xml.encode("utf-8"),
-                    ContentType="application/xml; charset=utf-8",
-                    CacheControl="private, max-age=3600",
-                )
-                report_pages.append(
-                    {
-                        "page_number": page_number,
-                        "summary": parsed["summary"],
-                        "specialists": parsed["specialists"],
-                        "elements": parsed["elements"],
-                        "audit": _page_audit(
-                            job_records,
-                            parsed["source_image"],
-                            correlation_uri,
-                            parsed["specialists"],
-                        ),
-                        "image_key": "",
-                        "enhanced_image_key": "",
-                        "inspections": [],
-                        "spine_key": spine_key,
-                        "correlation_specialist_uri": correlation_uri,
-                        "source_image_path": parsed["source_image"],
-                        "image_data": "",
-                        "enhanced_image_data": "",
-                        "xml": correlation_xml,
-                    }
-                )
-                continue
+            native_docx = processing_mode == "native_docx"
             correlation_record = correlation_records.get(correlation_uri)
-            if not correlation_record:
-                raise ValueError(
-                    f"Page {page_number} correlation artifact does not belong to this job"
-                )
-            if correlation_record.get("image_identifier") != job_state.image_identifier(
-                image_uri
-            ):
-                raise ValueError(
-                    f"Page {page_number} image does not match the job correlation record"
-                )
+            if native_docx:
+                if not _is_owned_native_docx_page(
+                    correlation_uri,
+                    page_number,
+                    output_bucket,
+                    docx_page_plan_prefixes,
+                ):
+                    raise ValueError(
+                        f"Page {page_number} native DOCX artifact does not belong to this job"
+                    )
+            elif processing_mode == "textract_ocr":
+                textract_record = textract_records.get(correlation_uri)
+                if not textract_record:
+                    raise ValueError(
+                        f"Page {page_number} Textract OCR artifact does not belong to this job"
+                    )
+                if textract_record.get("image_identifier") != job_state.image_identifier(
+                    image_uri
+                ):
+                    raise ValueError(
+                        f"Page {page_number} image does not match its Textract OCR artifact"
+                    )
+            else:
+                if not correlation_record:
+                    raise ValueError(
+                        f"Page {page_number} correlation artifact does not belong to this job"
+                    )
+                if correlation_record.get("image_identifier") != job_state.image_identifier(
+                    image_uri
+                ):
+                    raise ValueError(
+                        f"Page {page_number} image does not match the job correlation record"
+                    )
             correlation_xml = _get_text(
                 s3,
                 correlation_uri,
@@ -219,11 +204,14 @@ def lambda_handler(
                 max_bytes=_MAX_XML_BYTES,
             )
             parsed = _parse_spine(correlation_xml)
-            if parsed["source_image"] != image_uri:
+            if not native_docx and parsed["source_image"] != image_uri:
                 raise ValueError(
                     f"Page {page_number} image does not match its correlation artifact"
                 )
-            image_base64, image_bytes = _get_image(s3, image_uri, output_bucket)
+            image_base64 = ""
+            image_bytes = b""
+            if not native_docx:
+                image_base64, image_bytes = _get_image(s3, image_uri, output_bucket)
             aggregate_bytes += len(correlation_xml.encode("utf-8")) + len(image_base64)
             if aggregate_bytes > _MAX_AGGREGATE_BYTES:
                 raise ValueError("report artifacts exceed the 150 MiB aggregate limit")
@@ -231,13 +219,16 @@ def lambda_handler(
             page_token = _safe_id(page_number, str(len(report_pages) + 1))
             image_key = f"{report_prefix}/pages/page-{page_token}.jpg"
             spine_key = f"{report_prefix}/pages/page-{page_token}.xml"
-            s3.put_object(
-                Bucket=output_bucket,
-                Key=image_key,
-                Body=image_bytes,
-                ContentType="image/jpeg",
-                CacheControl="private, max-age=3600",
-            )
+            if not native_docx:
+                s3.put_object(
+                    Bucket=output_bucket,
+                    Key=image_key,
+                    Body=image_bytes,
+                    ContentType="image/jpeg",
+                    CacheControl="private, max-age=3600",
+                )
+            else:
+                image_key = ""
 
             # The image above is whatever the correlation artifact names as its
             # source, which for an enhanced run is the *original* — so the report
@@ -250,7 +241,7 @@ def lambda_handler(
             # back to a single view.
             enhanced_image_key = ""
             enhanced_image_data = ""
-            enhanced_uri = _enhanced_source(job_records, image_uri)
+            enhanced_uri = _enhanced_source(job_records, image_uri) if image_uri else ""
             if enhanced_uri:
                 try:
                     enhanced_base64, enhanced_bytes = _get_image(
@@ -284,22 +275,24 @@ def lambda_handler(
                     enhanced_image_key = ""
                     enhanced_image_data = ""
 
-            allowed_image_ids = {job_state.image_identifier(image_uri)}
-            if enhanced_uri:
-                allowed_image_ids.add(job_state.image_identifier(enhanced_uri))
-            inspections, aggregate_bytes = _copy_page_inspections(
-                s3,
-                page_number=page_number,
-                specialists=parsed["specialists"],
-                records_by_uri=region_inspector_records,
-                output_bucket=output_bucket,
-                report_prefix=report_prefix,
-                page_token=page_token,
-                session_id=session_id,
-                doc_id=doc_id,
-                allowed_image_ids=allowed_image_ids,
-                aggregate_bytes=aggregate_bytes,
-            )
+            inspections: list[dict[str, Any]] = []
+            if not native_docx:
+                allowed_image_ids = {job_state.image_identifier(image_uri)}
+                if enhanced_uri:
+                    allowed_image_ids.add(job_state.image_identifier(enhanced_uri))
+                inspections, aggregate_bytes = _copy_page_inspections(
+                    s3,
+                    page_number=page_number,
+                    specialists=parsed["specialists"],
+                    records_by_uri=region_inspector_records,
+                    output_bucket=output_bucket,
+                    report_prefix=report_prefix,
+                    page_token=page_token,
+                    session_id=session_id,
+                    doc_id=doc_id,
+                    allowed_image_ids=allowed_image_ids,
+                    aggregate_bytes=aggregate_bytes,
+                )
 
             s3.put_object(
                 Bucket=output_bucket,
@@ -317,6 +310,7 @@ def lambda_handler(
             report_pages.append(
                 {
                     "page_number": page_number,
+                    "processing_mode": processing_mode,
                     "summary": parsed["summary"],
                     "specialists": parsed["specialists"],
                     "elements": parsed["elements"],
@@ -452,10 +446,10 @@ def _validate_pages(pages: list[dict[str, Any]]) -> list[dict[str, str]]:
             raise ValueError(
                 f"Page entry {index} page_number must be a positive integer"
             )
-        if not correlation_uri:
-            raise ValueError(f"Page entry {index} is missing canonical spine URI")
-        if processing_mode != "native_pdf" and not image_uri:
-            raise ValueError(f"Page entry {index} is missing source_image_path")
+        if processing_mode not in {"native_docx", "textract_ocr", "hybrid", "vision_ai"}:
+            raise ValueError(f"Page entry {index} has an invalid processing_mode")
+        if not correlation_uri or (processing_mode != "native_docx" and not image_uri):
+            raise ValueError(f"Page entry {index} is missing required artifact URIs")
         if page_number in seen:
             raise ValueError(f"Duplicate page number: {page_number}")
         seen.add(page_number)
@@ -468,6 +462,28 @@ def _validate_pages(pages: list[dict[str, Any]]) -> list[dict[str, str]]:
             }
         )
     return normalized
+
+
+def _is_owned_native_docx_page(
+    uri: str,
+    page_number: str,
+    output_bucket: str,
+    page_plan_prefixes: set[str],
+) -> bool:
+    """Allow a native page only under a page-plan artifact tracked for this job."""
+    if not page_plan_prefixes:
+        return False
+    try:
+        bucket, key = _parse_s3_uri(uri)
+    except ValueError:
+        return False
+    if bucket != output_bucket:
+        return False
+    expected_suffix = f"/native/page_{int(page_number):03d}.xml"
+    return any(
+        uri.startswith(prefix + "/") and key.endswith(expected_suffix)
+        for prefix in page_plan_prefixes
+    )
 
 
 def _parse_s3_uri(uri: str) -> tuple[str, str]:
@@ -686,21 +702,39 @@ def _parse_spine(xml_text: str) -> dict[str, Any]:
         root = _defused_fromstring(xml_text, forbid_dtd=True)
     except ET.ParseError as error:
         raise ValueError(f"Invalid correlation XML: {error}") from error
-    summary = (root.findtext("summary") or "Correlation completed.").strip()
-    source_image = (root.findtext("./metadata/source_image") or "").strip()
+
+    def local_name(node: ET.Element) -> str:
+        return node.tag.rsplit("}", 1)[-1]
+
+    def child(node: ET.Element, name: str) -> ET.Element | None:
+        return next((item for item in list(node) if local_name(item) == name), None)
+
+    def child_text(node: ET.Element, name: str) -> str:
+        item = child(node, name)
+        return (item.text or "").strip() if item is not None else ""
+
+    metadata = child(root, "metadata")
+    source_image = child_text(metadata, "source_image") if metadata is not None else ""
     if not source_image:
         raise ValueError("Correlation XML is missing metadata/source_image")
+    summary = child_text(root, "summary") or (
+        "Native DOCX extraction completed."
+        if source_image == "native:docx"
+        else "Correlation completed."
+    )
+    executed = child(metadata, "specialists_executed") if metadata is not None else None
     specialists = [
         {"name": node.attrib.get("name", ""), "s3_uri": node.attrib.get("s3_uri", "")}
-        for node in root.findall("./metadata/specialists_executed/specialist")
+        for node in list(executed or [])
+        if local_name(node) == "specialist"
     ]
     elements: list[dict[str, Any]] = []
 
     def walk(node: ET.Element, depth: int = 0) -> None:
         for child in list(node):
-            if child.tag == "element":
+            if local_name(child) == "element":
                 text = (
-                    child.findtext("text") or child.findtext("alt_text") or ""
+                    child_text(child, "text") or child_text(child, "alt_text") or ""
                 ).strip()
                 elements.append(
                     {
@@ -713,14 +747,14 @@ def _parse_spine(xml_text: str) -> dict[str, Any]:
                     }
                 )
                 walk(child, depth + 1)
-            elif child.tag == "sect":
+            elif local_name(child) == "sect":
                 walk(child, depth + 1)
             else:
                 # Wrapper nodes such as children and inline preserve structural
                 # depth while still exposing their descendant elements.
                 walk(child, depth)
 
-    content_tree = root.find("content_tree")
+    content_tree = child(root, "content_tree")
     if content_tree is not None:
         walk(content_tree)
     return {

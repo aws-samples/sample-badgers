@@ -1,0 +1,40 @@
+{
+  "tool": {
+    "name": "route_document_input_tool",
+    "description": "Call this first for every uploaded document. It uses the source file extension to choose the intake path. For .docx, call process_docx_tool next. For PDF or supported image extensions, call pdf_to_images_converter next. Do not bypass this router or send .doc, .docm, .pptx, or .xlsx files to a different processor.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 URI or absolute path to the uploaded document."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Active BADGERS job ID."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Source document ID."
+        }
+      },
+      "required": ["document_path"]
+    }
+  },
+  "specialist": {
+    "name": "document_intake_router",
+    "description": "Routes an uploaded source file to the appropriate BADGERS intake processor by extension.",
+    "output_extension": "json",
+    "revision_eligible": false
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "dependencies": [],
+    "wizard_managed": false,
+    "specialist_type": "standard"
+  }
+}

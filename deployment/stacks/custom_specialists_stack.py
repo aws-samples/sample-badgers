@@ -239,7 +239,6 @@ class CustomSpecialistsStack(Stack):
             layers=[self.foundation_layer, self.pillow_layer],
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
-            reserved_concurrent_executions=5,
             description=description,
             environment=environment,
         )
