@@ -1,0 +1,47 @@
+[
+  {
+    "name": "process_native_pdf_tool",
+    "description": "Inspect a PDF's native text, coordinates, image/vector objects, and tagged-PDF structure before rendering. Returns a page plan that routes each page to native_pdf, textract_ocr, hybrid, or vision_ai and saves schema-valid native BADGERS spines for usable pages.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) or absolute path to a PDF document."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the analysis run."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document."
+        }
+      },
+      "required": ["document_path", "session_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON page plan with routes, native fidelity, evidence, and native_output_uri for every page."
+        },
+        "page_plan_uri": {
+          "type": "string",
+          "description": "S3 URI of the durable page plan."
+        },
+        "page_count": {
+          "type": "integer"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+]

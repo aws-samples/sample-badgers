@@ -183,6 +183,18 @@ class IAMStack(Stack):
         # S3 output bucket read/write access
         output_bucket.grant_read_write(self.lambda_role)
 
+        # Textract's synchronous DetectDocumentText API accepts the selected page
+        # bytes from the Lambda. The API has no resource-level ARN scope, so this
+        # is intentionally limited to the single read-only OCR action.
+        self.lambda_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="TextractDetectDocumentText",
+                effect=iam.Effect.ALLOW,
+                actions=["textract:DetectDocumentText"],
+                resources=["*"],
+            )
+        )
+
         # DynamoDB jobs table access for job state tracking.
         # Specialists upsert their own subtask row (RUNNING -> COMPLETE/FAILED)
         # via foundation.job_state. Without this grant those calls fail at the
@@ -389,14 +401,15 @@ class IAMStack(Stack):
                 {
                     "id": "AwsSolutions-IAM5",
                     "reason": (
-                        "aws-marketplace:ViewSubscriptions and aws-marketplace:Subscribe "
-                        "do not support resource-level permissions, so Resource must be "
-                        '"*" -- a narrower ARN makes the statement match nothing. The '
-                        "grant exists because Bedrock subscribes the account through "
-                        "Marketplace on a model's first invocation; without it that "
-                        "invocation fails with AccessDeniedException. See "
-                        "github.com/aws-samples/sample-badgers/issues/33 and the "
-                        "AWS Marketplace actions in the Service Authorization Reference."
+                        "aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe, "
+                        "and textract:DetectDocumentText do not support resource-level "
+                        'permissions, so Resource must be "*" -- a narrower ARN makes '
+                        "the statement match nothing. Marketplace allows Bedrock's "
+                        "first model invocation; DetectDocumentText is the single "
+                        "read-only OCR action used only after native PDF extraction "
+                        "marks a selected page as incomplete. See "
+                        "github.com/aws-samples/sample-badgers/issues/33 and the AWS "
+                        "service authorization references."
                     ),
                     "appliesTo": ["Resource::*"],
                 },
