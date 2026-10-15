@@ -10,8 +10,12 @@
   become images. Image-only pages receive one Textract `DetectDocumentText` pass, and
   accepted output becomes a canonical BADGERS spine. Empty, low-confidence, or
   symbol-dominated OCR is retained as audit evidence and escalates only that page to
-  Vision. The ordered plan preserves native relationships, route reasons, and artifacts
-  across mixed native/OCR/visual documents.
+  Vision. Routing now evaluates native fidelity separately from visual-semantic risk:
+  text-only multi-column pages and alignment uncertainty alone remain native, while
+  Vision requires a high-risk semantic visual such as a chart, diagram, map, equation,
+  or wrapped/floating layout. The ordered plan preserves native relationships, route
+  reasons, fidelity state, deterministic-review flags, and artifacts across mixed
+  native/OCR/visual documents.
 
 - **Mantle-aware deployment preflights.** Step 2 recognizes `transport: "mantle"` models
   as intentionally non-profile and non-Converse, reports them, and skips incompatible

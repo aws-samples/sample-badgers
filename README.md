@@ -198,15 +198,18 @@ Word documents use an extension-keyed intake path rather than the PDF/image conv
    BADGERS content-tree page spine for every page.
 3. A temporary LibreOffice PDF establishes final page boundaries. It is not a default
    Vision input: only pages selected for OCR or visual analysis are rasterized.
-4. `native_docx` pages remain schema-conformant native output. Image-only pages use a
+4. Routing separates native fidelity from visual-semantic risk. A schema-valid,
+   well-aligned text-only page—including an ordinary two-column layout—remains
+   `native_docx`; columns and alignment uncertainty alone do not invoke Vision.
+   Image-only pages use a
    single Textract OCR pass. Accepted OCR becomes a BADGERS page spine; empty,
    low-confidence, or symbol-dominated OCR is retained as audit evidence and escalates
    only that page to BADGERS Vision. `hybrid` and `vision_ai` pages follow the visual
    specialist workflow directly.
 
 The page plan retains the original page order, native relationships, route decision
-reasons, and artifact URIs, so reports can reconstruct a mixed native/OCR/visual document
-without losing its spine.
+reasons, native-fidelity state, deterministic-review flag, and artifact URIs, so reports
+can reconstruct a mixed native/OCR/visual document without losing its spine.
 
 ## 🚀 Deployment
 
