@@ -164,6 +164,7 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 | 🖥️ `pptx_processor`                     | Natively inspect PowerPoint slide objects and selectively render only routed slides          |
 | 🔤 `textract_ocr`                        | Run low-volume first-pass Textract OCR for selected DOCX or PDF pages; escalate weak OCR to Vision AI |
 | 🧭 `docx_structure_specialist`           | Add evidence-backed DOCX hierarchy and optional layout relationships; does not render pixels or replace the DOCX spine |
+| 🧭 `pptx_gestalt_specialist`             | Add evidence-backed spatial relationships from a native PowerPoint scene graph; does not render pixels or replace the PPTX spine |
 | 🏷️ `classify_pdf_content`               | Classify document content type                                                              |
 | 📝 `full_text_specialist`               | Extract all text content                                                                    |
 | 📊 `table_specialist`                   | Extract and structure tables                                                                |

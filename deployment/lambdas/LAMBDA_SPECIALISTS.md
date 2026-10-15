@@ -19,7 +19,7 @@ BADGERS uses five types of Lambda functions:
 | 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
 | 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
-| 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist` |
+| 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist`, `pptx_gestalt_specialist` |
 
 ---
 
@@ -113,6 +113,21 @@ additive, evidence-cited XML relationship artifact plus the exact evidence
 artifact used. The native DOCX content tree remains the canonical BADGERS
 spine. Vision is an escalation for pixel-only ambiguity such as rendered
 wrapping, image meaning, color, or overlap.
+
+### Native Layout Analysts
+
+`pptx_gestalt_specialist` accepts a native slide scene graph rather than an image.
+The PPTX parser must supply normalized `x`, `y`, `width`, and `height` values for
+every shape, along with each shape's stable ID, type, optional text, group membership,
+and connector endpoints. The specialist calculates alignment, proximity, containment,
+and connector evidence in Python, then uses a text model only to express additive,
+evidence-cited relationship candidates.
+
+Its XML is not a replacement document tree. The native PPTX content tree remains the
+canonical BADGERS spine; the returned relationship artifact and its accompanying
+`deterministic_evidence_uri` are provenance-bearing enrichments to attach during
+correlation. A separate visual path remains appropriate only when image meaning,
+rendered overlap, color, or other pixel-only facts are needed.
 
 ---
 
