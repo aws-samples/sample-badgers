@@ -34,7 +34,7 @@ dependencies = [
     "botocore",
     "bedrock-agentcore>=1.18.1",
     "defusedxml>=0.7.1",
-    "mcp>=1.28.1",
+    "mcp>=1.30.0",
     "opencv-python>=4.13.0.92",
     "pdf2image",
     "pikepdf>=10.0.2",
