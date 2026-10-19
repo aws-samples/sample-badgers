@@ -93,6 +93,7 @@ STACKS=(
   "$(_sn CustomSpecialists)"
   "$(_sn ECS)"
   "$(_sn RuntimeWebSocket)"
+  "$(_sn WorkflowRunner)"
   "$(_sn Gateway)"
   "$(_sn Lambda)"
   "$(_sn Memory)"

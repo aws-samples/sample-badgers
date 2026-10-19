@@ -23,15 +23,26 @@ Interactive deployment menu, resumable and idempotent. Step completion is record
 it stopped rather than starting over.
 
 ```bash
-./deploy.sh           # choose a deployment, then the menu
+./deploy.sh           # choose Full, Headless, or Specialists; then choose a deployment
 ./deploy.sh 9         # choose a deployment, then run option 9 (full deployment)
 ./deploy.sh resume    # choose a deployment, then run only outstanding steps
+./deploy.sh headless  # select Headless explicitly, then choose a deployment
+./deploy.sh specialists --pack tables-and-forms 9
 ```
 
 **`DEPLOYMENT_ID` is unset on startup and never read from the environment.** The script
 scans `.deploy-state/` and offers every deployment it finds — complete and in progress —
 newest activity first, plus `n` to start a new one. A new id must match
 `^[a-z][a-z0-9-]{0,15}$` and must not already have state; pick it from the list instead.
+
+With a terminal, a bare `./deploy.sh` first presents the three supported
+product profiles: Full, Headless, and Specialists. The product wrappers
+(`badgers-full/deploy.sh`, `badgers-headless/deploy.sh`, and
+`badger-specialists/deploy.sh`) select the corresponding profile explicitly.
+Automated callers without a terminal retain the legacy Full default unless
+they pass a profile argument or set `BADGERS_PROFILE`. `--pack` is accepted
+only for Specialists. The future BADGERS Gateway MCP product has no deployment
+profile or menu option until its implementation is complete.
 
 Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
 5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, `r` resume,

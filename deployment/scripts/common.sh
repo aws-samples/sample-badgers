@@ -559,7 +559,7 @@ _sn() { echo "${STACK_PREFIX}-$1-${DEPLOYMENT_ID}-${STACK_SUFFIX}"; }
 
 # Every stack base name this project deploys, used to parse identity back out of a
 # stack name. Kept beside _sn so the two cannot drift.
-STACK_BASE_NAMES="CustomSpecialists ECS RuntimeWebSocket Gateway Lambda Memory XRay ECR InferenceProfiles IAM DynamoDB S3 Cognito Vpc"
+STACK_BASE_NAMES="CustomSpecialists ECS RuntimeWebSocket WorkflowRunner Gateway Lambda Memory XRay ECR InferenceProfiles IAM DynamoDB S3 Cognito Vpc"
 
 # Splits BADGERS-{Name}-{id}-{suffix} into "id suffix". The base name is matched from
 # the known set, so an id containing hyphens (my-app) parses unambiguously. Echoes
@@ -657,10 +657,26 @@ ensure_region() {
 }
 
 ensure_account() {
-  if [ -z "${ACCOUNT_ID:-}" ]; then
-    ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-    export ACCOUNT_ID
+  if [ -n "${ACCOUNT_ID:-}" ]; then
+    if [[ ! "${ACCOUNT_ID}" =~ ^[0-9]{12}$ ]]; then
+      log_error "ACCOUNT_ID must be a 12-digit AWS account ID."
+      return 1
+    fi
+    return 0
   fi
+
+  local resolved_account
+  if ! resolved_account="$(aws sts get-caller-identity --query Account --output text 2>/dev/null)"; then
+    log_error "Unable to identify the AWS account. Check AWS credentials and profile configuration."
+    return 1
+  fi
+  if [[ ! "${resolved_account}" =~ ^[0-9]{12}$ ]]; then
+    log_error "AWS STS returned an invalid account identity. Check AWS credentials and profile configuration."
+    return 1
+  fi
+
+  ACCOUNT_ID="${resolved_account}"
+  export ACCOUNT_ID
 }
 
 # stack_output <StackName> <OutputKey> -> value, or empty string

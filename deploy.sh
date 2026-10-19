@@ -29,15 +29,42 @@ source "${SCRIPT_DIR}/deployment/scripts/common.sh"
 trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; exit 1' ERR
 
 # Product profile is selected before deployment identity so its safety checks happen
-# before any AWS preflight or resource creation.  A deployment ID can belong to only
+# before any AWS preflight or resource creation. A deployment ID can belong to only
 # one product profile; this prevents a Headless run from reusing Full stack state.
-BADGERS_PROFILE="${BADGERS_PROFILE:-full}"
+#
+# An explicit argument (including the three product wrapper scripts) always wins.
+# An interactive bare ./deploy.sh exposes the product chooser. Non-interactive
+# callers retain the legacy Full default unless BADGERS_PROFILE is set.
+BADGERS_PROFILE="${BADGERS_PROFILE:-}"
 case "${1:-}" in
   full|headless|specialists)
     BADGERS_PROFILE="$1"
     shift
     ;;
 esac
+
+if [ -z "${BADGERS_PROFILE}" ]; then
+  if [ -t 0 ]; then
+    echo ""
+    echo "Choose a BADGERS product:"
+    echo "  1) Full        Agent, UI, all enabled specialists, and operations tooling"
+    echo "  2) Headless    Authenticated agent API, curated packs, and durable operations"
+    echo "  3) Specialists Direct AWS Lambda specialist packs"
+    read -r -p "Product (1-3) [1]: " profile_choice
+    case "${profile_choice:-1}" in
+      1|full) BADGERS_PROFILE="full" ;;
+      2|headless) BADGERS_PROFILE="headless" ;;
+      3|specialists) BADGERS_PROFILE="specialists" ;;
+      *)
+        log_error "Invalid product choice. Select 1, 2, or 3."
+        exit 1
+        ;;
+    esac
+  else
+    BADGERS_PROFILE="full"
+  fi
+fi
+
 SPECIALIST_PACK_ARGS=()
 if [ "${BADGERS_PROFILE}" = "specialists" ]; then
   while [ "${1:-}" = "--pack" ]; do
@@ -48,6 +75,9 @@ if [ "${BADGERS_PROFILE}" = "specialists" ]; then
     SPECIALIST_PACK_ARGS+=(--pack "$2")
     shift 2
   done
+elif [ "${1:-}" = "--pack" ]; then
+  log_error "--pack is supported only by the Specialists product."
+  exit 1
 fi
 case "${BADGERS_PROFILE}" in
   full)
@@ -66,7 +96,7 @@ case "${BADGERS_PROFILE}" in
     OPERATION_LEDGER_ENABLED=0; ECR_ENABLED=0
     ;;
   *)
-    log_error "Unknown BADGERS profile: ${BADGERS_PROFILE}. Supported profiles: full, headless."
+    log_error "Unknown BADGERS profile: ${BADGERS_PROFILE}. Supported profiles: full, headless, specialists."
     exit 1
     ;;
 esac
@@ -78,7 +108,14 @@ if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
 else
   unset BADGERS_SPECIALIST_PACKS
 fi
-if ! python3 "${SCRIPT_DIR}/deployment/profile_resolver.py" "${BADGERS_PROFILE}" "${SPECIALIST_PACK_ARGS[@]}" >/dev/null; then
+
+# Keep the resolver command non-empty under `set -u`: expanding an explicitly
+# declared-but-empty array is an unbound-variable error in some Bash versions.
+PROFILE_RESOLVER_ARGS=("${BADGERS_PROFILE}")
+if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
+  PROFILE_RESOLVER_ARGS+=("${SPECIALIST_PACK_ARGS[@]}")
+fi
+if ! python3 "${SCRIPT_DIR}/deployment/profile_resolver.py" "${PROFILE_RESOLVER_ARGS[@]}" >/dev/null; then
   log_error "Profile '${BADGERS_PROFILE}' is invalid. Fix its profile or specialist-pack configuration before deploying."
   exit 1
 fi

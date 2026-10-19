@@ -121,6 +121,10 @@ deploying a second copy of everything by accident.
 Run the product entry point from the repository root:
 
 ```bash
+# Choose Full, Headless, or Specialists interactively
+./deploy.sh
+
+# Or select a product explicitly
 ./badgers-full/deploy.sh
 # or
 ./badgers-headless/deploy.sh
@@ -129,10 +133,14 @@ Run the product entry point from the repository root:
 ```
 
 The entry point selects its product profile before asking for a deployment ID.
-It then runs preflight checks and presents only the steps supported by that
-profile. **`deploy.sh` does not read `DEPLOYMENT_ID` from the environment** — it
-unsets it and always asks, because a value left exported in your shell silently
-targets another deployment's stacks and state file.
+Bare `./deploy.sh` presents the Full, Headless, and Specialists chooser in an
+interactive terminal. The three product wrappers select one explicitly.
+Non-interactive callers retain the legacy Full default unless they pass a
+profile argument or set `BADGERS_PROFILE`. It then runs preflight checks and
+presents only the steps supported by that profile. **`deploy.sh` does not read
+`DEPLOYMENT_ID` from the environment** — it unsets it and always asks, because
+a value left exported in your shell silently targets another deployment's
+stacks and state file.
 
 On start it scans `.deploy-state/` and offers what it finds:
 
