@@ -133,6 +133,32 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         return createHash('sha256').update(user.sub).digest('hex').slice(0, 24);
     }
 
+    function chatLogDir(user, { create = false } = {}) {
+        // Authentication is enforced before this router, but the caller identity
+        // remains the authorization boundary for the shared service filesystem.
+        if (!user?.sub) return null;
+
+        if (create) mkdirSync(LOGS_DIR, { recursive: true });
+        if (!existsSync(LOGS_DIR)) return null;
+
+        const logsDirReal = realpathSync(LOGS_DIR);
+        const ownerDir = resolve(logsDirReal, reportOwnerKey(user));
+        if (!ownerDir.startsWith(logsDirReal + '/')) {
+            throw Object.assign(new Error('Forbidden'), { status: 403 });
+        }
+
+        if (create) mkdirSync(ownerDir, { recursive: true });
+        if (!existsSync(ownerDir)) return null;
+
+        // Resolve after creation too, so a symlink in the logs root cannot make
+        // a request read or append outside its caller-scoped directory.
+        const ownerDirReal = realpathSync(ownerDir);
+        if (!ownerDirReal.startsWith(logsDirReal + '/')) {
+            throw Object.assign(new Error('Forbidden'), { status: 403 });
+        }
+        return ownerDirReal;
+    }
+
     function validReportId(value) {
         return typeof value === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(value);
     }
@@ -367,16 +393,19 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         const chatStarted = Date.now();
         console.log(`${new Date().toISOString()} User chat send session=${session_id}`);
 
-        mkdirSync(LOGS_DIR, { recursive: true });
         const safeSessionId = session_id.replace(/[^a-zA-Z0-9_-]/g, '');
-        // Resolve the logs directory (which exists after mkdir) rather than the
-        // log file, which does not exist yet for a new session — realpathSync on
-        // a missing path throws ENOENT. safeSessionId is already stripped to
-        // [a-zA-Z0-9_-], so the constructed filename cannot escape the directory;
-        // the containment check below is defense-in-depth.
-        const logsDirReal = realpathSync(LOGS_DIR);
-        const logFile = resolve(logsDirReal, `${safeSessionId}.log`);
-        if (!logFile.startsWith(logsDirReal + '/')) return res.status(403).json({ error: 'Forbidden' });
+        // The session ID is a correlation identifier, never an access token.
+        // Store it below an opaque caller-specific directory so another
+        // authenticated user cannot enumerate or open this transcript.
+        let ownerLogDir;
+        try {
+            ownerLogDir = chatLogDir(req.user, { create: true });
+        } catch {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (!ownerLogDir) return res.status(403).json({ error: 'Forbidden' });
+        const logFile = resolve(ownerLogDir, `${safeSessionId}.log`);
+        if (!logFile.startsWith(ownerLogDir + '/')) return res.status(403).json({ error: 'Forbidden' });
         const log = (line) => { appendFile(logFile, line + '\n').catch(() => { }); };
         log(`\n${'='.repeat(60)}`);
         log(`[${new Date().toISOString()}] USER: ${message}`);
@@ -632,6 +661,32 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     // the record. Deriving it on read keeps that policy in exactly one place.
     const ORCHESTRATOR_SUBTASK = 'orchestrator';
 
+    async function loadJobRecords(table, jobId) {
+        const items = [];
+        let key;
+        do {
+            const page = await ddbClient.send(new QueryCommand({
+                TableName: table,
+                KeyConditionExpression: 'job_id = :jid',
+                ExpressionAttributeValues: { ':jid': jobId },
+                ExclusiveStartKey: key,
+            }));
+            items.push(...(page.Items || []));
+            key = page.LastEvaluatedKey;
+        } while (key);
+        return items;
+    }
+
+    function callerOwnsJob(items, user) {
+        const ownerSub = user?.sub;
+        if (!ownerSub) return false;
+        // owner_sub is written only to the job-level record. A matching value on
+        // a subtask is never sufficient to grant access.
+        return items.some(item =>
+            item.subtask_id === ORCHESTRATOR_SUBTASK && item.owner_sub === ownerSub
+        );
+    }
+
     function summarizeJob(items) {
         const jobRow = items.find(i => i.subtask_id === ORCHESTRATOR_SUBTASK) || null;
         const subtasks = items.filter(i => i.subtask_id !== ORCHESTRATOR_SUBTASK);
@@ -679,74 +734,90 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         const { jobId } = req.params;
         if (!/^[a-zA-Z0-9-]{1,64}$/.test(jobId)) return res.status(400).json({ error: 'Invalid job id' });
         try {
-            const items = [];
-            let key;
-            do {
-                const page = await ddbClient.send(new QueryCommand({
-                    TableName: table,
-                    KeyConditionExpression: 'job_id = :jid',
-                    ExpressionAttributeValues: { ':jid': jobId },
-                    ExclusiveStartKey: key,
-                }));
-                items.push(...(page.Items || []));
-                key = page.LastEvaluatedKey;
-            } while (key);
-
-            if (items.length === 0) return res.status(404).json({ error: 'Job not found' });
+            const items = await loadJobRecords(table, jobId);
+            // Do not distinguish a missing job from a job owned by someone else.
+            if (items.length === 0 || !callerOwnsJob(items, req.user)) {
+                return res.status(404).json({ error: 'Job not found' });
+            }
             res.json({ job_id: jobId, ...summarizeJob(items) });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
     });
 
-    // Every job recorded against one document, newest first, via the doc-index GSI.
+    // Every job owned by the caller for one document, newest first. Querying the
+    // doc-index alone would treat a document ID as an authorization token.
     app.get('/api/jobs', async (req, res) => {
         const table = jobsTable();
         if (!table) return res.status(503).json({ error: 'JOBS_TABLE_NAME not configured' });
         const docId = req.query.doc_id;
         if (!docId || !/^[a-zA-Z0-9-]{1,64}$/.test(docId)) return res.status(400).json({ error: 'A valid doc_id query parameter is required' });
+        const ownerSub = req.user?.sub;
+        if (!ownerSub) return res.status(403).json({ error: 'Forbidden' });
         try {
-            const page = await ddbClient.send(new QueryCommand({
-                TableName: table,
-                IndexName: 'doc-index',
-                KeyConditionExpression: 'doc_id = :did',
-                ExpressionAttributeValues: { ':did': docId },
-                ScanIndexForward: false,
-            }));
-            const items = page.Items || [];
+            const jobIds = [];
+            let key;
+            do {
+                const page = await ddbClient.send(new QueryCommand({
+                    TableName: table,
+                    IndexName: 'owner-index',
+                    KeyConditionExpression: 'owner_sub = :owner',
+                    FilterExpression: 'doc_id = :did',
+                    ExpressionAttributeValues: { ':owner': ownerSub, ':did': docId },
+                    ProjectionExpression: 'job_id',
+                    ScanIndexForward: false,
+                    ExclusiveStartKey: key,
+                }));
+                jobIds.push(...(page.Items || []).map(item => item.job_id).filter(Boolean));
+                key = page.LastEvaluatedKey;
+            } while (key);
 
-            // The GSI returns job and subtask rows interleaved; group them so each
-            // job is summarized the same way the single-job route reports it.
-            // Note: doc-index projects a subset of attributes, so session_id and
-            // reason come back empty here. Fetch /api/jobs/:jobId for the full row.
-            const byJob = new Map();
-            for (const item of items) {
-                if (!byJob.has(item.job_id)) byJob.set(item.job_id, []);
-                byJob.get(item.job_id).push(item);
+            const jobs = [];
+            for (const jobId of jobIds) {
+                const items = await loadJobRecords(table, jobId);
+                // The owner index finds candidates; the base-table orchestrator
+                // row is still the final authority for each returned job.
+                if (callerOwnsJob(items, req.user)) {
+                    jobs.push({ job_id: jobId, ...summarizeJob(items) });
+                }
             }
             res.json({
                 doc_id: docId,
-                jobs: [...byJob.entries()].map(([job_id, rows]) => ({ job_id, ...summarizeJob(rows) })),
+                jobs,
             });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
     });
 
-    app.get('/api/chat-sessions', async (_req, res) => {
+    app.get('/api/chat-sessions', async (req, res) => {
         try {
-            if (!existsSync(LOGS_DIR)) return res.json([]);
-            const files = (await readdir(LOGS_DIR)).filter(f => f.endsWith('.log')).sort().reverse().map(f => f.replace('.log', ''));
+            const ownerLogDir = chatLogDir(req.user);
+            if (!ownerLogDir) return res.json([]);
+            const files = (await readdir(ownerLogDir))
+                .filter(f => f.endsWith('.log'))
+                .sort()
+                .reverse()
+                .map(f => f.replace('.log', ''));
             res.json(files);
-        } catch { res.json([]); }
+        } catch (e) {
+            res.status(e.status || 500).json({ error: e.message });
+        }
     });
 
     app.get('/api/chat-sessions/:sid', async (req, res) => {
-        const sid = req.params.sid.replace(/[^a-zA-Z0-9_-]/g, '');
-        const filePath = resolve(LOGS_DIR, `${sid}.log`);
-        if (!filePath.startsWith(LOGS_DIR)) return res.status(403).json({ error: 'Forbidden' });
-        try { res.json({ content: await readFile(filePath, 'utf-8') }); }
-        catch { res.json({ content: 'Session not found' }); }
+        const sid = req.params.sid;
+        if (!/^[a-zA-Z0-9_-]+$/.test(sid)) return res.status(400).json({ error: 'Invalid session id' });
+        try {
+            const ownerLogDir = chatLogDir(req.user);
+            if (!ownerLogDir) return res.status(404).json({ error: 'Session not found' });
+            const filePath = resolve(ownerLogDir, `${sid}.log`);
+            if (!filePath.startsWith(ownerLogDir + '/')) return res.status(403).json({ error: 'Forbidden' });
+            res.json({ content: await readFile(filePath, 'utf-8') });
+        } catch (e) {
+            if (e.code === 'ENOENT') return res.status(404).json({ error: 'Session not found' });
+            res.status(e.status || 500).json({ error: e.message });
+        }
     });
 
     // ── Specialists ──
@@ -809,6 +880,20 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         const sid = session_id.trim();
         const safeSid = Array.from(sid).filter(c => /[a-zA-Z0-9_\-:.]/.test(c)).join('');
         if (!safeSid || safeSid !== sid) return res.json({ error: 'Session ID contains invalid characters' });
+        // CloudWatch spans can contain prompts, tool inputs, and tool outputs.
+        // A session ID therefore remains a correlation identifier, not an
+        // authorization credential. Only permit traces for a transcript in the
+        // caller-specific log namespace.
+        let ownerLogDir;
+        try {
+            ownerLogDir = chatLogDir(req.user);
+        } catch {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (!ownerLogDir) return res.status(404).json({ error: 'Session not found' });
+        const sessionLog = resolve(ownerLogDir, `${sid}.log`);
+        if (!sessionLog.startsWith(ownerLogDir + '/')) return res.status(403).json({ error: 'Forbidden' });
+        if (!existsSync(sessionLog)) return res.status(404).json({ error: 'Session not found' });
         const hoursBack = Math.min(Math.max(parseInt(req.body.hours_back) || 24, 1), 720);
         const endTime = Date.now();
         const startTime = endTime - hoursBack * 60 * 60 * 1000;

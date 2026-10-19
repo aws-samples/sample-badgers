@@ -115,8 +115,8 @@ The UI is the read side of the doc/job/subtask hierarchy described in
 
 | Endpoint                | Returns                                                              |
 | ----------------------- | -------------------------------------------------------------------- |
-| `GET /api/jobs/:jobId`  | One job: computed status, counts, and every subtask with its outcome |
-| `GET /api/jobs?doc_id=` | Every job recorded against one document, newest first                |
+| `GET /api/jobs/:jobId`  | The caller's job: computed status, counts, and every subtask outcome |
+| `GET /api/jobs?doc_id=` | The caller's jobs for one document, newest first                    |
 
 `POST /api/upload` mints a `doc_id` per upload and returns it. `POST /api/chat` accepts
 that `doc_id` and forwards it to the agent, which stamps it onto each specialist call.
@@ -125,6 +125,12 @@ log as `[job] job_id=… doc_id=…`, so a chat transcript can be traced to its 
 
 Job status is computed at read time rather than stored — see the endpoint comments in
 `server/routes/core.js` for why.
+
+The server authorizes these routes against `owner_sub` on the job-level
+`orchestrator` record; a `job_id` or `doc_id` is only a correlation identifier,
+not proof that its data belongs to the caller. Chat transcripts follow the same
+rule: they are stored under an opaque directory derived from the authenticated
+user and can only be listed or read by that user.
 
 ## Report Endpoints
 
