@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Release management
+
+- **Established documented release channels.** Stable, reproducible customer
+  deployments use immutable `v*` tags; `main` is the stable source line and
+  `dev` is the shared integration line. The platform redesign is isolated on
+  `release/6.0.0-beta` and will be offered to evaluators through immutable
+  preview tags beginning with `v6.0.0-beta.1`. Until then, `v5.0.2` remains the
+  current production release.
+
 ### Added
 
 - **Qwen3 VL 235B (`qwen.qwen3-vl-235b-a22b`, `$0.53`/`$2.66`) — the first In-Region-only

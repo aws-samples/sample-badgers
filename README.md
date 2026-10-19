@@ -6,7 +6,7 @@
 
 ---
 
-# 🦡 BADGERS v5.0.1 as of September 2026
+# 🦡 BADGERS v5.0.2 as of October 2026
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
@@ -38,6 +38,28 @@ release process. The only difference is the capability boundary you choose.
 The path guides begin with one command and expose more choices only when they
 are relevant. The detailed deployment reference remains available for people
 operating or extending the platform.
+
+## Release channels
+
+Use a release tag when you need a reproducible deployment. Tags are immutable
+snapshots: `v5.0.2` is the current stable release and is the appropriate
+starting point for production deployments. `main` represents the source of the
+current stable line; `dev` is the shared integration branch and can contain
+work that has not been released.
+
+The platform redesign is developed on `release/6.0.0-beta`. It is an opt-in
+preview line, not a replacement for 5.x production deployments. Preview
+milestones will be published as immutable tags such as `v6.0.0-beta.1`; a
+customer testing the new architecture should pin to one of those tags rather
+than following the branch. See the [Changelog](CHANGELOG.md) for the active
+milestone and compatibility notes.
+
+| Need | Use |
+| --- | --- |
+| Production deployment of the existing platform | A stable release tag, currently `v5.0.2` |
+| Integration or contribution work | `dev` |
+| Evaluation of the redesigned platform | A `v6.0.0-beta.*` tag when published |
+| Development of the 6.0 preview | `release/6.0.0-beta` |
 
 ## 🤔 Why BADGERS?
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-gateway-mcp/v1",
+  "title": "BADGERS Gateway MCP Tool Contracts v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tools"],
+  "properties": {
+    "schema_version": { "const": "badgers-gateway-mcp/v1" },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "input_schema", "output_schema"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "badgers_submit_analysis",
+              "badgers_get_analysis",
+              "badgers_cancel_analysis",
+              "badgers_get_workflow_catalog"
+            ]
+          },
+          "input_schema": { "type": "object" },
+          "output_schema": { "type": "object" }
+        }
+      }
+    }
+  }
+}

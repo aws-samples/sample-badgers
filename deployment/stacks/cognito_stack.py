@@ -66,6 +66,7 @@ class CognitoStack(Stack):
         ui_callback_url: str | None = None,
         ui_logout_url: str | None = None,
         enable_ui: bool = True,
+        enable_headless_runtime_auth: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -73,6 +74,7 @@ class CognitoStack(Stack):
         self.deployment_id = deployment_id
         self.deployment_tags = deployment_tags
         self.enable_ui = enable_ui
+        self.enable_headless_runtime_auth = enable_headless_runtime_auth
         self._apply_common_tags()
 
         # Callback / logout URLs — default to the local dev origin. The ECS stack
@@ -142,6 +144,65 @@ class CognitoStack(Stack):
                 )
             ],
         )
+
+        # Headless callers authenticate to the AgentCore Runtime itself. Keep
+        # that audience separate from the runtime's own outbound credential
+        # used to invoke its internal specialist Gateway.
+        self.headless_resource_server = None
+        self.headless_client = None
+        self.headless_credentials_secret = None
+        self.headless_discovery_url = (
+            f"{authority}/.well-known/openid-configuration"
+        )
+        if self.enable_headless_runtime_auth:
+            self.headless_resource_server = self.user_pool.add_resource_server(
+                "HeadlessResourceServer",
+                identifier="badgers-headless",
+                scopes=[
+                    cognito.ResourceServerScope(
+                        scope_name="invoke",
+                        scope_description="Invoke the BADGERS Headless runtime",
+                    )
+                ],
+            )
+            self.headless_client = self.user_pool.add_client(
+                "HeadlessRuntimeClient",
+                user_pool_client_name=f"badgers-headless-client-{deployment_id}",
+                generate_secret=True,
+                auth_flows=cognito.AuthFlow(custom=True),
+                o_auth=cognito.OAuthSettings(
+                    flows=cognito.OAuthFlows(client_credentials=True),
+                    scopes=[cognito.OAuthScope.custom("badgers-headless/invoke")],
+                ),
+                prevent_user_existence_errors=True,
+            )
+            self.headless_client.node.add_dependency(self.headless_resource_server)
+            cfn_headless_client = self.headless_client.node.default_child
+            assert isinstance(cfn_headless_client, cognito.CfnUserPoolClient)
+            cfn_headless_client.add_property_override(
+                "ExplicitAuthFlows", ["ALLOW_CUSTOM_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+            )
+            self.headless_credentials_secret = secretsmanager.Secret(
+                self,
+                "HeadlessCredentialsSecret",
+                secret_name=f"badgers/cognito-headless-{deployment_id}",
+                description=(
+                    "Cognito client credentials for the authenticated BADGERS "
+                    "Headless runtime"
+                ),
+                secret_object_value={
+                    "client_id": SecretValue.unsafe_plain_text(
+                        self.headless_client.user_pool_client_id
+                    ),
+                    "client_secret": self.headless_client.user_pool_client_secret,
+                    "token_endpoint": SecretValue.unsafe_plain_text(
+                        f"{domain_url}/oauth2/token"
+                    ),
+                    "scope": SecretValue.unsafe_plain_text(
+                        "badgers-headless/invoke"
+                    ),
+                },
+            )
 
         self.ui_client = None
         self.identity_pool = None
@@ -333,6 +394,14 @@ class CognitoStack(Stack):
             string_value=self.user_pool_client.user_pool_client_id,
             description="Cognito M2M app client ID (non-sensitive)",
         )
+        if self.headless_client is not None:
+            ssm.StringParameter(
+                self,
+                "HeadlessClientIdParam",
+                parameter_name=f"{ssm_prefix}/cognito-headless-client-id",
+                string_value=self.headless_client.user_pool_client_id,
+                description="Cognito M2M client ID for authenticated Headless calls",
+            )
 
         # ── Resource tags ──────────────────────────────────────────
         self._apply_resource_tags(
@@ -349,6 +418,12 @@ class CognitoStack(Stack):
             "cognito-credentials-secret",
             "Secrets Manager secret for Cognito client credentials",
         )
+        if self.headless_credentials_secret is not None:
+            self._apply_resource_tags(
+                self.headless_credentials_secret,
+                "headless-credentials-secret",
+                "Secrets Manager secret for authenticated Headless client credentials",
+            )
         if self.identity_pool is not None:
             self._apply_resource_tags(
                 self.identity_pool,
@@ -432,6 +507,21 @@ class CognitoStack(Stack):
             description="Secrets Manager ARN for Cognito credentials",
             export_name=f"{Stack.of(self).stack_name}-CredentialsSecretArn",
         )
+        if self.headless_client is not None and self.headless_credentials_secret is not None:
+            CfnOutput(
+                self,
+                "HeadlessClientId",
+                value=self.headless_client.user_pool_client_id,
+                description="Cognito M2M client ID for BADGERS Headless",
+                export_name=f"{Stack.of(self).stack_name}-HeadlessClientId",
+            )
+            CfnOutput(
+                self,
+                "HeadlessCredentialsSecretArn",
+                value=self.headless_credentials_secret.secret_arn,
+                description="Secrets Manager ARN for BADGERS Headless client credentials",
+                export_name=f"{Stack.of(self).stack_name}-HeadlessCredentialsSecretArn",
+            )
 
         # ── CDK Nag suppressions ───────────────────────────────────
         if _HAVE_CDK_NAG:
@@ -467,14 +557,34 @@ class CognitoStack(Stack):
                     {
                         "id": "AwsSolutions-SMG4",
                         "reason": (
-                            "This secret mirrors a Cognito M2M client secret. Rotation is "
-                            "performed by regenerating the Cognito app client secret and "
-                            "updating this secret — Secrets Manager automatic rotation is "
-                            "not applicable for Cognito-managed credentials."
+                            "This secret mirrors a Cognito M2M client secret. Cognito "
+                            "supports overlap rotation with two active client secrets, "
+                            "but the approved customer workload must adopt the new "
+                            "credential before the prior secret is removed. An "
+                            "unattended Secrets Manager rotation cannot verify that "
+                            "external workload update, so it would risk an outage."
                         ),
                     },
                 ],
             )
+            if self.headless_credentials_secret is not None:
+                NagSuppressions.add_resource_suppressions(
+                    self.headless_credentials_secret,
+                    [
+                        {
+                            "id": "AwsSolutions-SMG4",
+                            "reason": (
+                                "This secret mirrors a Cognito M2M client secret. "
+                                "Cognito supports overlap rotation with two active "
+                                "client secrets, but the approved customer workload "
+                                "must adopt the new credential before the prior secret "
+                                "is removed. An unattended Secrets Manager rotation "
+                                "cannot verify that external update, so it would risk "
+                                "an outage."
+                            ),
+                        },
+                    ],
+                )
             # CDK provisions an AwsCustomResource singleton Lambda for parts of the
             # user pool configuration; its role and runtime are framework-managed.
             NagSuppressions.add_stack_suppressions(

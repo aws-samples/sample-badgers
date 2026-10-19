@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-operation-record/v1",
+  "title": "BADGERS Operation Record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id",
+    "session_id",
+    "owner_sub",
+    "status",
+    "workflow_id",
+    "routing_mode",
+    "started_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "badgers-operation-record/v1" },
+    "operation_id": { "type": "string", "pattern": "^op_[a-f0-9]{32}$" },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "owner_sub": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "status": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "validating",
+        "converting",
+        "classifying",
+        "planning",
+        "running",
+        "correlating",
+        "finalizing",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "current_stage": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "workflow_execution_arn": {
+      "type": "string",
+      "pattern": "^arn:[^\\s]+:states:[^\\s]+$"
+    },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "workflow_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "routing_mode": { "type": "string", "enum": ["auto", "manual"] },
+    "routing_policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "routing_policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "source_document_s3_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "config_release_id": { "type": "string", "maxLength": 128 },
+    "correlation_id": { "type": "string", "maxLength": 256 },
+    "principal_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "identity_provider": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "status_manifest_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "plan_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "completion_manifest_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

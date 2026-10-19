@@ -13,6 +13,7 @@
     "classify_pdf_content",
     "full_text_specialist",
     "layout_specialist",
-    "elements_specialist"
+    "elements_specialist",
+    "correlation_specialist"
   ]
 }

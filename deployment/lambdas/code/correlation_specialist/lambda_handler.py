@@ -14,8 +14,8 @@ import boto3
 
 from foundation.bedrock_client import BedrockClient
 from foundation.model_selection import max_tokens_from, parse_model_selection
-from foundation.s3_config_loader import load_manifest_from_s3
-from foundation import job_state
+from foundation.s3_config_loader import config_key, load_manifest_from_s3
+from foundation import job_state, operation_state
 
 logger = logging.getLogger()
 log_level = os.environ.get("LOGGING_LEVEL", "INFO").upper()
@@ -204,6 +204,14 @@ def lambda_handler(
 
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         s3_key = f"{session_id}/correlated/correlation_specialist_page_{page_number}_{timestamp}.xml"
+        if job_id.startswith("op_"):
+            operation = operation_state.get_operation(job_id)
+            if not operation or not operation.get("owner_sub"):
+                raise RuntimeError("Could not derive private operation artifact prefix")
+            s3_key = (
+                f"{operation_state.operation_prefix(str(operation['owner_sub']), job_id)}"
+                f"/correlation/correlation_specialist_page_{page_number}_{timestamp}.xml"
+            )
 
         # Verify we have content before writing
         if not unified_document or len(unified_document.strip()) == 0:
@@ -305,7 +313,7 @@ def _load_correlation_prompts(s3, config_bucket: str, config: dict) -> str:
 
     prompts = []
     for filename in prompt_files:
-        key = f"prompts/correlation_specialist/{filename}"
+        key = config_key(f"prompts/correlation_specialist/{filename}")
         try:
             response = s3.get_object(Bucket=config_bucket, Key=key)
             prompts.append(response["Body"].read().decode("utf-8"))

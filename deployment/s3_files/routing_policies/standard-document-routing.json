@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "policy_id": "standard-document-routing",
+  "policy_version": "1.0.0",
+  "default_workflow": "standard-document-analysis",
+  "limits": {
+    "max_specialized_tools_per_page": 5,
+    "max_pages": 500
+  },
+  "required_capabilities": [
+    "source_conversion",
+    "classification",
+    "full_text",
+    "elements",
+    "correlation"
+  ],
+  "routes": [
+    {
+      "when": {
+        "content_type": "table_dominant",
+        "minimum_confidence": 0.75
+      },
+      "add_capabilities": ["table"]
+    }
+  ],
+  "low_confidence": {
+    "below": 0.75,
+    "action": "fail",
+    "capabilities": []
+  }
+}

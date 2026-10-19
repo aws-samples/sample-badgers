@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "workflow_id": "standard-document-analysis",
+  "version": "1.0.0",
+  "display_name": "Standard Document Analysis",
+  "supported_routing_modes": ["auto", "manual"],
+  "input_contract": {
+    "accepted_source_types": ["application/pdf", "image/png", "image/jpeg"],
+    "requires_document_uri": true
+  },
+  "invariants": [
+    "validate_source",
+    "convert_source",
+    "classify_pages",
+    "full_text",
+    "elements",
+    "correlate",
+    "write_completion_manifest"
+  ],
+  "invariant_capabilities": {
+    "convert_source": "source_conversion",
+    "classify_pages": "classification",
+    "full_text": "full_text",
+    "elements": "elements",
+    "correlate": "correlation"
+  },
+  "routing_policy_id": "standard-document-routing",
+  "allowed_capabilities": [
+    "source_conversion",
+    "classification",
+    "full_text",
+    "elements",
+    "table",
+    "correlation"
+  ],
+  "manual_capability_selection_allowed": true,
+  "result_contract": "badgers-operation-result/v1"
+}

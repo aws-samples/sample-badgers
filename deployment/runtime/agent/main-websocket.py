@@ -12,9 +12,11 @@ Key differences from main.py:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -41,12 +43,14 @@ from bedrock_agentcore.memory.integrations.strands.session_manager import (
 # missing transitive dependency both land here, and reporting only the first sent
 # an investigation to the build script when the actual cause was foundation's
 # package __init__ importing Pillow, which this image does not install.
-_JOB_STATE_IMPORT_ERROR: str = ""
+_FOUNDATION_IMPORT_ERROR: str = ""
 try:
-    from foundation import job_state
+    from foundation import job_state, operation_contract, operation_state
 except ImportError as e:  # pragma: no cover - foundation is present in the container
     job_state = None  # type: ignore[assignment]
-    _JOB_STATE_IMPORT_ERROR = f"{type(e).__name__}: {e}"
+    operation_contract = None  # type: ignore[assignment]
+    operation_state = None  # type: ignore[assignment]
+    _FOUNDATION_IMPORT_ERROR = f"{type(e).__name__}: {e}"
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -58,6 +62,21 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
+
+_HEADLESS_CLIENT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+
+class HeadlessIdentityError(PermissionError):
+    """Raised when a versioned Headless call has no verified workload identity."""
+
+
+@dataclass(frozen=True)
+class AuthenticatedHeadlessCaller:
+    """Identity derived from the runtime's already-validated JWT."""
+
+    owner_sub: str
+    principal_id: str
+    identity_provider: str = "cognito-jwt"
 
 
 def log(message: str, level: str = "info") -> None:
@@ -505,12 +524,17 @@ class JobTrackingHook:
         session_id: str = "",
         actor_id: str = "local",
         user_name: str = "local",
+        operation_id: str = "",
     ) -> None:
         self.doc_id = doc_id
         self.session_id = session_id
         self.actor_id = actor_id
         self.user_name = user_name
-        self.job_id = ""
+        # Versioned Headless requests mint their operation before invoking the
+        # agent. Reuse it as the existing job partition key so specialist
+        # subtask records and the operation manifest describe one durable run.
+        self.operation_id = operation_id
+        self.job_id = operation_id
 
         if job_state is None and not JobTrackingHook._warned_unavailable:
             JobTrackingHook._warned_unavailable = True
@@ -518,7 +542,7 @@ class JobTrackingHook:
                 "foundation.job_state is not importable — job tracking is DISABLED, "
                 "so no job_id is minted and specialists that require it (such as "
                 "html_report_specialist) will fail. Cause: "
-                f"{_JOB_STATE_IMPORT_ERROR or 'unknown'}",
+                f"{_FOUNDATION_IMPORT_ERROR or 'unknown'}",
                 level="warning",
             )
 
@@ -531,7 +555,7 @@ class JobTrackingHook:
 
     def _on_turn_start(self, _event: Any) -> None:
         """Clear the current job so each turn mints at most one new job."""
-        self.job_id = ""
+        self.job_id = self.operation_id
 
     @staticmethod
     def _declared_properties(tool: Any) -> dict[str, Any]:
@@ -748,6 +772,157 @@ def sanitize_event_for_json(obj: Any, max_depth: int = 10) -> Any:
     return str(obj)
 
 
+def versioned_progress_event(event: dict[str, Any], operation_id: str) -> dict[str, Any] | None:
+    """Reduce v1 progress events to bounded metadata only.
+
+    Raw tool results, reasoning blocks, and arbitrary model events can be much
+    larger than an integration response and may contain specialist artifact
+    bodies. The durable result contract is the final S3-pointer manifest.
+    """
+
+    event_type = event.get("type")
+    if event_type == "complete":
+        return event
+    if event_type == "status":
+        return {
+            "type": "status",
+            "operation_id": operation_id,
+            "message": str(event.get("message") or "")[:512],
+        }
+    if event_type == "job":
+        return {
+            "type": "job",
+            "operation_id": operation_id,
+            "job_id": str(event.get("job_id") or operation_id),
+            "doc_id": str(event.get("doc_id") or ""),
+        }
+    if event_type == "tool_use":
+        return {
+            "type": "tool_use",
+            "operation_id": operation_id,
+            "name": str(event.get("name") or "unknown"),
+            "toolUseId": event.get("toolUseId"),
+        }
+    if event_type == "tool_result":
+        return {
+            "type": "tool_result",
+            "operation_id": operation_id,
+            "toolUseId": event.get("toolUseId"),
+        }
+    current_tool = event.get("current_tool_use")
+    if isinstance(current_tool, dict):
+        return {
+            "type": "tool_use",
+            "operation_id": operation_id,
+            "name": str(current_tool.get("name") or "unknown"),
+            "toolUseId": current_tool.get("toolUseId"),
+        }
+    return None
+
+
+def _header_value(headers: Any, name: str) -> str:
+    """Return a case-insensitive request-header value without logging it."""
+
+    if not isinstance(headers, dict):
+        return ""
+    wanted = name.lower()
+    for key, value in headers.items():
+        if isinstance(key, str) and key.lower() == wanted and isinstance(value, str):
+            return value
+    return ""
+
+
+def _jwt_claims_from_validated_bearer(authorization: str) -> dict[str, Any]:
+    """Decode claims only after AgentCore Runtime has validated the JWT.
+
+    Signature validation and issuer/audience/scope enforcement are performed by
+    the deployed Runtime authorizer. This helper intentionally does not accept
+    a token from the request payload and does not implement a second,
+    home-grown authentication scheme; it extracts the verified client's
+    identity from the forwarded bearer token for durable ownership tracking.
+    """
+
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not separator or not token:
+        raise HeadlessIdentityError("A validated bearer token is required")
+    parts = token.split(".")
+    if len(parts) != 3:
+        raise HeadlessIdentityError("Validated bearer token claims are unavailable")
+    encoded_claims = parts[1] + ("=" * (-len(parts[1]) % 4))
+    try:
+        claims = json.loads(
+            base64.urlsafe_b64decode(encoded_claims.encode("ascii")).decode("utf-8")
+        )
+    except (UnicodeEncodeError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        raise HeadlessIdentityError(
+            "Validated bearer token claims are unavailable"
+        ) from error
+    if not isinstance(claims, dict):
+        raise HeadlessIdentityError("Validated bearer token claims are unavailable")
+    return claims
+
+
+def authenticated_headless_caller(context: Any) -> AuthenticatedHeadlessCaller:
+    """Bind an operation to the JWT client admitted by the Runtime authorizer."""
+
+    if os.environ.get("HEADLESS_AUTH_MODE") != "cognito_jwt":
+        raise HeadlessIdentityError("Headless JWT authentication is not configured")
+    authorized_client = os.environ.get("HEADLESS_AUTHORIZED_CLIENT_ID", "")
+    if not _HEADLESS_CLIENT_ID_RE.fullmatch(authorized_client):
+        raise HeadlessIdentityError("Headless JWT client authorization is not configured")
+
+    claims = _jwt_claims_from_validated_bearer(
+        _header_value(getattr(context, "request_headers", None), "Authorization")
+    )
+    client_id = str(claims.get("client_id") or "")
+    scopes = str(claims.get("scope") or "").split()
+    if (
+        claims.get("token_use") != "access"
+        or client_id != authorized_client
+        or "badgers-headless/invoke" not in scopes
+    ):
+        raise HeadlessIdentityError("The authenticated workload is not authorized")
+
+    # The client ID is server-validated and therefore safe to use as the
+    # stable operation owner. It deliberately differs from the caller-owned
+    # session ID and from legacy actor_id/user_name request fields.
+    return AuthenticatedHeadlessCaller(
+        owner_sub=f"headless-{client_id}",
+        principal_id=client_id,
+    )
+
+
+def start_headless_workflow_execution(
+    *,
+    operation_id: str,
+    owner_sub: str,
+    requested_capabilities: tuple[str, ...],
+    audit_mode: bool,
+    runtime_session_id: str,
+) -> None:
+    """Start only the deployment-pinned workflow with compact trusted input."""
+
+    state_machine_arn = os.environ.get("WORKFLOW_STATE_MACHINE_ARN", "")
+    if not state_machine_arn.startswith("arn:"):
+        raise RuntimeError("WORKFLOW_STATE_MACHINE_ARN is not configured")
+    import boto3
+
+    boto3.client("stepfunctions").start_execution(
+        stateMachineArn=state_machine_arn,
+        name=operation_id,
+        input=json.dumps(
+            {
+                "operation_id": operation_id,
+                "owner_sub": owner_sub,
+                "requested_capabilities": list(requested_capabilities),
+                "audit_mode": audit_mode,
+                "runtime_session_id": runtime_session_id,
+            },
+            separators=(",", ":"),
+        ),
+    )
+
+
 # =============================================================================
 # STREAMING AGENT INVOCATION
 # =============================================================================
@@ -761,6 +936,7 @@ async def stream_agent_events(
     user_name: str,
     runtime_session_id: str,
     doc_id: str = "",
+    operation_id: str = "",
 ) -> AsyncIterator[dict[str, Any]]:
     """Stream agent events as they occur.
 
@@ -812,6 +988,7 @@ Include session_id: "{runtime_session_id}" in ALL tool calls."""
         session_id=session_id,
         actor_id=actor_id,
         user_name=user_name,
+        operation_id=operation_id,
     )
 
     # Create agent
@@ -973,21 +1150,137 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
     runtime_session_id = context.session_id
     log(f"Runtime Session ID: {runtime_session_id}")
 
-    # Extract request parameters
-    query = "Hello!"
-    session_id = f"session_{uuid.uuid4().hex}"
-    actor_id = "default_user"
-    user_name = "local"
+    request_payload = payload if isinstance(payload, dict) else {}
+    if operation_contract is None:
+        yield {
+            "type": "error",
+            "code": "FOUNDATION_UNAVAILABLE",
+            "message": "BADGERS operation contracts are unavailable in this runtime image.",
+        }
+        return
 
-    doc_id = ""
+    try:
+        request = operation_contract.normalize_agent_request(request_payload)
+    except operation_contract.OperationContractError as error:
+        yield {
+            "type": "error",
+            "code": "INVALID_REQUEST",
+            "message": str(error),
+        }
+        return
 
-    if isinstance(payload, dict):
-        query = str(payload.get("prompt", "Hello!"))
-        session_id = str(payload.get("session_id") or f"session_{uuid.uuid4().hex}")
-        actor_id = str(payload.get("actor_id", "default_user"))
-        user_name = str(payload.get("user_name", "local"))
-        # Top level of the job hierarchy, minted by the UI server at upload time.
-        doc_id = str(payload.get("doc_id") or "")
+    # Versioned Headless calls are asynchronous workflow submissions. The
+    # Runtime authorizer has already authenticated the client before this
+    # handler runs; bind ownership to that verified client identity rather
+    # than accepting actor_id or user_name from the request body.
+    if request.versioned:
+        if operation_state is None:
+            yield {
+                "type": "error",
+                "code": "OPERATION_PERSISTENCE_UNAVAILABLE",
+                "message": "Versioned BADGERS requests require durable operation state.",
+            }
+            return
+        try:
+            caller = authenticated_headless_caller(context)
+        except HeadlessIdentityError as error:
+            log("Rejected versioned Headless request without an authorized workload identity", level="warning")
+            yield {
+                "type": "error",
+                "code": "UNAUTHENTICATED",
+                "message": str(error),
+            }
+            return
+
+        operation_id = operation_contract.new_operation_id()
+        runtime_session_id = str(getattr(context, "session_id", "") or "")
+        deployment_id = os.environ.get("DEPLOYMENT_ID", "")
+        try:
+            created = operation_state.create_operation(
+                operation_id=operation_id,
+                session_id=request.session_id,
+                owner_sub=caller.owner_sub,
+                workflow_id=request.workflow_id,
+                routing_mode=request.routing_mode,
+                source_document_s3_uri=request.document_uri,
+                correlation_id=request.correlation_id,
+                principal_id=caller.principal_id,
+                identity_provider=caller.identity_provider,
+                executor="workflow_runner",
+                deployment_id=deployment_id,
+            )
+            start_headless_workflow_execution(
+                operation_id=operation_id,
+                owner_sub=caller.owner_sub,
+                requested_capabilities=request.requested_capabilities,
+                audit_mode=request.audit_mode,
+                runtime_session_id=runtime_session_id,
+            )
+        except Exception as error:
+            log(
+                f"Could not submit versioned operation {operation_id}: {type(error).__name__}",
+                level="error",
+            )
+            try:
+                failure = operation_state.fail_operation(
+                    operation_id=operation_id,
+                    owner_sub=caller.owner_sub,
+                    error_code="WORKFLOW_START_FAILED",
+                    error_message="The durable workflow could not be started.",
+                    runtime_session_id=runtime_session_id,
+                    deployment_id=deployment_id,
+                )
+            except Exception as persistence_error:
+                log(
+                    "Could not persist workflow-start failure for operation "
+                    f"{operation_id}: {type(persistence_error).__name__}",
+                    level="error",
+                )
+                yield {
+                    "type": "error",
+                    "code": "WORKFLOW_START_FAILED",
+                    "operation_id": operation_id,
+                    "message": "The durable workflow could not be started.",
+                }
+            else:
+                yield {
+                    "type": "error",
+                    "code": "WORKFLOW_START_FAILED",
+                    "message": "The durable workflow could not be started.",
+                    **failure,
+                }
+            return
+
+        # The accepted event is bounded and intentionally contains no artifact
+        # body or bearer-token data. The durable status object, updated by the
+        # runner, is the bridge for a disconnected caller.
+        yield {
+            "type": "status",
+            "status": "accepted",
+            "stage": "accepted",
+            "operation_id": operation_id,
+            "session_id": request.session_id,
+            "workflow_id": request.workflow_id,
+            "routing_mode": request.routing_mode,
+            "config_release_id": created["config_release_id"],
+            "plan_uri": created["plan_uri"],
+            "status_manifest_uri": created["status_manifest_uri"],
+        }
+        return
+
+    query = request.instruction
+    session_id = request.session_id
+    # Existing Full callers inject these fields after their authenticated UI
+    # session is verified. Versioned Headless callers do not supply them in the
+    # public contract; the Gateway adapter will later derive ownership from its
+    # verified machine identity.
+    actor_id = str(request_payload.get("actor_id", "default_user"))
+    user_name = str(request_payload.get("user_name", "local"))
+    # Top level of the existing job hierarchy, minted by the UI server at upload time.
+    doc_id = str(request_payload.get("doc_id") or "")
+    deployment_id = os.environ.get("DEPLOYMENT_ID", "")
+    operation_id = ""
+    operation_started = False
 
     log(f"Session: {session_id}, Query: {query[:100]}...")
 
@@ -995,12 +1288,28 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
         try:
             gateway_url = os.environ.get("GATEWAY_URL")
             if not gateway_url:
+                if operation_started and operation_state is not None:
+                    operation_state.fail_operation(
+                        operation_id=operation_id,
+                        owner_sub=actor_id,
+                        error_code="GATEWAY_NOT_CONFIGURED",
+                        error_message="GATEWAY_URL not set",
+                        runtime_session_id=runtime_session_id,
+                        deployment_id=deployment_id,
+                    )
                 yield {"type": "error", "message": "GATEWAY_URL not set"}
                 return
 
-            yield {"type": "status", "message": "Connecting to Gateway..."}
+            status_event: dict[str, Any] = {
+                "type": "status",
+                "message": "Connecting to Gateway...",
+            }
+            if operation_id:
+                status_event["operation_id"] = operation_id
+            yield status_event
 
             # Stream events from agent
+            final_response = ""
             async for event in stream_agent_events(
                 gateway_url=gateway_url,
                 query=query,
@@ -1009,14 +1318,64 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 user_name=user_name,
                 runtime_session_id=runtime_session_id,
                 doc_id=doc_id,
+                operation_id=operation_id,
             ):
+                if request.versioned and event.get("type") == "complete":
+                    final_response = str(event.get("response") or "")
+                    continue
+                if request.versioned:
+                    safe_event = versioned_progress_event(event, operation_id)
+                    if safe_event is None:
+                        continue
+                    yield safe_event
+                    continue
                 yield event
+
+            if operation_started and operation_state is not None:
+                completion = operation_state.complete_operation(
+                    operation_id=operation_id,
+                    owner_sub=actor_id,
+                    runtime_session_id=runtime_session_id,
+                    deployment_id=deployment_id,
+                    summary=final_response,
+                )
+                # Keep legacy ``response`` consumers working while making the
+                # pointer manifest the complete versioned response contract.
+                yield {
+                    "type": "complete",
+                    "response": operation_contract.bounded_summary(final_response),
+                    **completion,
+                }
 
             log("STREAMING INVOKE COMPLETED")
 
         except Exception as e:
             log(f"Error: {e}", level="error")
             log(traceback.format_exc(), level="error")
+            if operation_started and operation_state is not None:
+                try:
+                    failure = operation_state.fail_operation(
+                        operation_id=operation_id,
+                        owner_sub=actor_id,
+                        error_code="AGENT_OPERATION_FAILED",
+                        error_message=str(e),
+                        runtime_session_id=runtime_session_id,
+                        deployment_id=deployment_id,
+                    )
+                except Exception as persistence_error:
+                    log(
+                        f"Could not persist failure for operation {operation_id}: "
+                        f"{persistence_error}",
+                        level="error",
+                    )
+                else:
+                    yield {
+                        "type": "error",
+                        "code": "AGENT_OPERATION_FAILED",
+                        "message": str(e),
+                        **failure,
+                    }
+                    return
             yield {
                 "type": "error",
                 "message": str(e),

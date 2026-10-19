@@ -294,6 +294,7 @@ class LambdaSpecialistStack(Stack):
             "FAIL_AFTER_ERROR": "False",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
+            "OUTPUT_BUCKET_NAME": self.output_bucket.bucket_name,
             "JPEG_QUALITY": "85",
             "MAX_DIMENSIONS": "2048",
             "MAX_IMAGE_SIZE": "20971520",
@@ -432,6 +433,7 @@ class LambdaSpecialistStack(Stack):
             "CACHE_ENABLED": "True",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
+            "OUTPUT_BUCKET_NAME": self.output_bucket.bucket_name,
             "MAX_TOKENS": "16000",
             "TEMPERATURE": "0.1",
         }

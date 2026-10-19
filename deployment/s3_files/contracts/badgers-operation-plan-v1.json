@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-operation-plan/v1",
+  "title": "BADGERS Operation Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation_id",
+    "session_id",
+    "workflow_id",
+    "workflow_version",
+    "routing_mode",
+    "routing_policy_id",
+    "routing_policy_version",
+    "config_release_id",
+    "invariants",
+    "recommended_capabilities",
+    "resolved_specialists",
+    "classification_artifacts"
+  ],
+  "properties": {
+    "schema_version": { "const": "badgers-operation-plan/v1" },
+    "operation_id": { "type": "string", "pattern": "^op_[a-f0-9]{32}$" },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "workflow_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "routing_mode": { "type": "string", "enum": ["auto", "manual"] },
+    "routing_policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "routing_policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "config_release_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_/-]{0,127}$" }
+    },
+    "recommended_capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+    },
+    "resolved_specialists": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+    },
+    "classification_artifacts": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" }
+    },
+    "requested_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+    }
+  }
+}

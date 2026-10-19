@@ -20,6 +20,7 @@
     "specialist_wizard": false,
     "job_tracking": false,
     "minimal_operation_ledger": true,
+    "workflow_runner": true,
     "session_memory": false,
     "advanced_tracing": false
   }

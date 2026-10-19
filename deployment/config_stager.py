@@ -8,7 +8,9 @@ small and gives a release process one concrete directory to hash and publish.
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
+import sys
 from pathlib import Path
 
 try:
@@ -16,12 +18,18 @@ try:
 except ImportError:  # Script execution: python deployment/config_stager.py ...
     from profile_resolver import ResolvedProfile, resolve_profile
 
+_DEPLOYMENT_DIR = Path(__file__).parent
+_FOUNDATION_DIR = _DEPLOYMENT_DIR / "badgers-foundation"
+if str(_FOUNDATION_DIR) not in sys.path:
+    sys.path.insert(0, str(_FOUNDATION_DIR))
+
+from foundation.workflow_planner import validate_release_configuration
+
 
 class ConfigurationStagingError(ValueError):
     """Raised when a profile cannot be staged into a complete configuration set."""
 
 
-_DEPLOYMENT_DIR = Path(__file__).parent
 _DEFAULT_SOURCE = _DEPLOYMENT_DIR / "s3_files"
 
 
@@ -45,6 +53,45 @@ def _copy_tree_if_present(
             f"Expected a configuration directory but found a file: {source}"
         )
     shutil.copytree(source, destination / relative_path, dirs_exist_ok=True)
+
+
+def _stage_workflow_configuration(
+    source_root: Path, destination: Path, profile: ResolvedProfile
+) -> None:
+    """Validate and stage only the workflow metadata relevant to a runtime profile."""
+
+    try:
+        validate_release_configuration(source_root, profile.specialists)
+    except ValueError as error:
+        raise ConfigurationStagingError(
+            f"Workflow configuration is invalid for profile '{profile.name}': {error}"
+        ) from error
+
+    _copy_tree_if_present(source_root, "workflows", destination)
+    _copy_tree_if_present(source_root, "routing_policies", destination)
+
+    metadata_path = source_root / "workflow_metadata" / "specialist_capabilities.json"
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        selected = {
+            specialist: metadata["specialists"][specialist]
+            for specialist in profile.specialists
+        }
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ConfigurationStagingError(
+            f"Could not stage specialist capability metadata: {metadata_path}"
+        ) from error
+    target = destination / "workflow_metadata" / "specialist_capabilities.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {"schema_version": 1, "specialists": selected},
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def stage_profile_config(
@@ -73,6 +120,7 @@ def stage_profile_config(
         "agent_system_prompt",
         "config",
         "core_system_prompts",
+        "contracts",
         "wrappers",
         "prompts/shared",
     ):
@@ -89,6 +137,16 @@ def stage_profile_config(
             _copy_file(source_root, f"manifests/{specialist}.json", destination)
         _copy_tree_if_present(source_root, f"prompts/{specialist}", destination)
         staged.append(specialist)
+
+    # Direct specialist packs need no workflow control plane. Any profile that
+    # owns agent orchestration or a deterministic workflow runner stages these
+    # artifacts under the same immutable release prefix as prompts/manifests.
+    # This lets the future gateway-only profile consume the same release
+    # without duplicating workflow configuration.
+    if profile.capabilities.get("agent_runtime", False) or profile.capabilities.get(
+        "workflow_runner", False
+    ):
+        _stage_workflow_configuration(source_root, destination, profile)
 
     return tuple(staged)
 

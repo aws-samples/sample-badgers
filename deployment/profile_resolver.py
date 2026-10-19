@@ -96,6 +96,12 @@ def _capabilities(profile: dict[str, Any], source: Path) -> dict[str, bool]:
         raise ProfileResolutionError(
             f"{source}: session_memory requires the 'agent_runtime' capability"
         )
+    if resolved.get("workflow_runner", False) and not resolved.get(
+        "minimal_operation_ledger", False
+    ):
+        raise ProfileResolutionError(
+            f"{source}: workflow_runner requires the 'minimal_operation_ledger' capability"
+        )
     return resolved
 
 

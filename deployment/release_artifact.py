@@ -15,10 +15,20 @@ except ImportError:
     from profile_resolver import resolve_profile
 
 
-def build_release(profile_name: str, destination: Path, packs: tuple[str, ...] = ()) -> str:
+def build_release(
+    profile_name: str,
+    destination: Path,
+    packs: tuple[str, ...] = (),
+    *,
+    source_root: Path | None = None,
+) -> str:
     """Stage config, write a canonical manifest, and return its content hash."""
     profile = resolve_profile(profile_name, specialist_packs=packs or None)
-    stage_profile_config(profile, destination)
+    stage_profile_config(
+        profile,
+        destination,
+        source_root=source_root or (Path(__file__).parent / "s3_files"),
+    )
     files = {
         path.relative_to(destination).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(destination.rglob("*"))

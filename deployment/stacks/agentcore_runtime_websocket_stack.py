@@ -53,6 +53,9 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         image_tag: str = "websocket",
         websocket_enabled: bool = True,
         config_prefix: str = "",
+        workflow_state_machine_arn: str | None = None,
+        headless_jwt_discovery_url: str | None = None,
+        headless_jwt_client_id: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -75,6 +78,13 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         self.jobs_table = jobs_table
         self.websocket_enabled = websocket_enabled
         self.config_prefix = config_prefix.strip("/")
+        self.workflow_state_machine_arn = workflow_state_machine_arn
+        self.headless_jwt_discovery_url = headless_jwt_discovery_url
+        self.headless_jwt_client_id = headless_jwt_client_id
+        if bool(self.headless_jwt_discovery_url) != bool(self.headless_jwt_client_id):
+            raise ValueError(
+                "Headless runtime JWT authentication requires both discovery URL and client ID"
+            )
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -256,6 +266,15 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                 ],
             )
         )
+        if self.workflow_state_machine_arn:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="StartPinnedWorkflow",
+                    effect=iam.Effect.ALLOW,
+                    actions=["states:StartExecution"],
+                    resources=[self.workflow_state_machine_arn],
+                )
+            )
 
         role.add_to_policy(
             iam.PolicyStatement(
@@ -392,13 +411,20 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         )
 
         # Scoped to PutItem alone: the agent's only write is job_state.create_job,
-        # a conditional put of the job-level row. Subtask rows are written by the
-        # specialist Lambdas under their own role (see iam_stack.py).
+        # a conditional put of the job-level row. Versioned Headless operations
+        # also write/read their own operation row and small private status /
+        # completion manifests. Subtask rows remain written by specialist
+        # Lambdas under their own role (see iam_stack.py).
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="DynamoDBJobState",
                 effect=iam.Effect.ALLOW,
-                actions=["dynamodb:PutItem"],
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                ],
                 resources=[self.jobs_table.table_arn],
             )
         )
@@ -439,6 +465,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
 
         environment_variables = {
             "AWS_DEFAULT_REGION": self.region,
+            "DEPLOYMENT_ID": self.deployment_id,
             "GATEWAY_URL": self.gateway_url,
             "COGNITO_CREDENTIALS_SECRET_ARN": self.cognito_credentials_secret_arn,
             "OUTPUT_BUCKET_NAME": self.output_bucket_name,
@@ -461,6 +488,35 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             environment_variables["AGENTCORE_MEMORY_ID"] = self.memory_id
         if self.config_prefix:
             environment_variables["CONFIG_PREFIX"] = self.config_prefix
+        if self.workflow_state_machine_arn:
+            environment_variables["WORKFLOW_STATE_MACHINE_ARN"] = (
+                self.workflow_state_machine_arn
+            )
+        if self.headless_jwt_client_id:
+            environment_variables["HEADLESS_AUTH_MODE"] = "cognito_jwt"
+            environment_variables["HEADLESS_AUTHORIZED_CLIENT_ID"] = (
+                self.headless_jwt_client_id
+            )
+
+        authorizer_configuration = None
+        request_header_configuration = None
+        if self.headless_jwt_client_id and self.headless_jwt_discovery_url:
+            authorizer_configuration = (
+                agentcore.CfnRuntime.AuthorizerConfigurationProperty(
+                    custom_jwt_authorizer=(
+                        agentcore.CfnRuntime.CustomJWTAuthorizerConfigurationProperty(
+                            discovery_url=self.headless_jwt_discovery_url,
+                            allowed_clients=[self.headless_jwt_client_id],
+                            allowed_scopes=["badgers-headless/invoke"],
+                        )
+                    )
+                )
+            )
+            request_header_configuration = (
+                agentcore.CfnRuntime.RequestHeaderConfigurationProperty(
+                    request_header_allowlist=["Authorization"]
+                )
+            )
 
         runtime = agentcore.CfnRuntime(
             self,
@@ -483,6 +539,8 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             role_arn=self.agent_role.role_arn,
             description="BADGERS agent runtime with WebSocket streaming",
             environment_variables=environment_variables,
+            authorizer_configuration=authorizer_configuration,
+            request_header_configuration=request_header_configuration,
         )
 
         runtime.node.add_dependency(self.agent_role)

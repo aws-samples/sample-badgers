@@ -128,6 +128,7 @@ def lambda_handler(event, context):
             output_bucket=output_bucket,
             session_id=session_id,
             image_path=body.get("image_path"),
+            job_id=job_id,
         )
         result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
         job_state.mark_complete(job_id, subtask, s3_uri)

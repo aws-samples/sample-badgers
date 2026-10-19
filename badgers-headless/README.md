@@ -27,7 +27,64 @@ run to continue only unfinished steps.
 
 WebSockets are not required for Headless. Invoke the AgentCore runtime through
 its normal request interface from your application or service, and use the
-Gateway for the agent's specialist tools.
+Gateway MCP product when a customer-owned agent needs workflow-level BADGERS
+tools. The private durable runner is deployed for Headless, but the existing
+Headless runtime will submit versioned requests to it in the next compatibility
+increment. Headless retains the repository's existing AgentCore Gateway for
+runtime-to-specialist calls; it is not the future customer-facing BADGERS
+Gateway v1 product and its credentials must not be distributed as an external
+specialist-tool integration.
+
+## Versioned Agent API
+
+Headless now recognizes `badgers-agent-request/v1`. Versioned requests require
+a private S3 source URI and produce an authenticated, durable operation:
+
+```json
+{
+  "schema_version": "badgers-agent-request/v1",
+  "session_id": "contract-review-104",
+  "document_uri": "s3://<source-bucket>/tenants/<your-workload-owner>/contracts/msa.pdf",
+  "instruction": "Identify renewal and termination obligations.",
+  "routing_mode": "auto"
+}
+```
+
+Progress events are deliberately metadata-only. The terminal event contains a
+bounded `badgers-operation-result/v1` pointer manifest with the operation ID,
+source URI, classifier URI, correlated URI, individual specialist artifact
+URIs, configuration release ID, and trace ID only when one is available.
+Native artifacts remain private in S3; they are not returned inline.
+
+For a versioned request, Headless authenticates the caller at the AgentCore
+Runtime using the dedicated Cognito client-credentials client and
+`badgers-headless/invoke` scope provisioned by this profile. The runtime derives
+the operation owner from the validated JWT `client_id`; it does not trust
+request-body identity fields. Upload sources below
+`tenants/headless-<client-id>/` in the deployed source bucket. The generated
+client secret is retained in Secrets Manager, never printed in deployment
+output, and must be used only by the approved deployment integration.
+
+### Credential rotation
+
+Treat the Headless client secret as a customer-managed workload credential.
+Cognito supports two active app-client secrets, allowing zero-downtime
+rotation: add a new secret, update the customer workload from the current
+Secrets Manager value, verify it can obtain an access token and submit a
+request, then remove the previous Cognito secret. Existing access tokens
+remain valid until they expire, so rotate immediately if a secret is exposed.
+Do not configure unattended rotation unless every calling workload reads the
+current value from an approved secret provider; otherwise automatic rotation
+can cause a customer outage.
+
+See the staged [integration contracts](../deployment/s3_files/contracts/README.md)
+for the exact schemas. Headless releases now also contain a validated,
+declarative workflow catalog and classifier-led routing policies. The catalog
+resolves only stable capability tags against the selected specialist pack; its
+deterministic plan is persisted privately before the runner invokes page
+specialists. Versioned requests now submit to that runner and immediately
+receive the durable operation identifiers and status pointers. Gateway workflow
+MCP tools remain a later implementation increment.
 
 ## Before you start
 

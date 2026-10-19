@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-operation-result/v1",
+  "title": "BADGERS Operation Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "operation_id",
+    "session_id",
+    "workflow_id",
+    "routing_mode",
+    "individual_specialists",
+    "report_artifacts",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": { "const": "badgers-operation-result/v1" },
+    "status": { "type": "string", "enum": ["completed", "failed", "cancelled"] },
+    "operation_id": { "type": "string", "pattern": "^op_[a-f0-9]{32}$" },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "runtime_session_id": { "type": "string", "maxLength": 256 },
+    "trace_id": { "type": "string", "maxLength": 512 },
+    "deployment_id": { "type": "string", "maxLength": 128 },
+    "workflow_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "routing_mode": { "type": "string", "enum": ["auto", "manual"] },
+    "config_release_id": { "type": "string", "maxLength": 128 },
+    "correlation_id": { "type": "string", "maxLength": 256 },
+    "source_document_s3_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "original_pdf_s3_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "s3_classification_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "s3_correlated_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "plan_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "completion_manifest_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+    "individual_specialists": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "report_artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "summary": { "type": "string", "maxLength": 2000 },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "maxLength": 128 },
+        "message": { "type": "string", "maxLength": 1024 }
+      }
+    },
+    "completed_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["s3_uri", "content_type"],
+      "properties": {
+        "specialist": { "type": "string", "maxLength": 128 },
+        "kind": { "type": "string", "maxLength": 128 },
+        "s3_uri": { "type": "string", "pattern": "^s3://[^/\\s]+/.+$" },
+        "content_type": { "type": "string", "maxLength": 256 },
+        "page_numbers": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

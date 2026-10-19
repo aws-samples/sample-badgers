@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-routing-policy/v1",
+  "title": "BADGERS Routing Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "policy_version",
+    "default_workflow",
+    "limits",
+    "required_capabilities",
+    "routes",
+    "low_confidence"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "policy_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "default_workflow": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_specialized_tools_per_page", "max_pages"],
+      "properties": {
+        "max_specialized_tools_per_page": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "max_pages": { "type": "integer", "minimum": 1, "maximum": 10000 }
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["when", "add_capabilities"],
+        "properties": {
+          "when": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["content_type", "minimum_confidence"],
+            "properties": {
+              "content_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "minimum_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          },
+          "add_capabilities": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+          }
+        }
+      }
+    },
+    "low_confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["below", "action", "capabilities"],
+      "properties": {
+        "below": { "type": "number", "minimum": 0, "maximum": 1 },
+        "action": { "type": "string", "enum": ["add_capabilities", "fail"] },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,127}$" }
+        }
+      }
+    }
+  }
+}

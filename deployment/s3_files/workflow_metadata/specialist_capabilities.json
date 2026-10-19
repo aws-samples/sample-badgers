@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "specialists": {
+    "pdf_to_images_converter": { "capabilities": ["source_conversion"] },
+    "classify_pdf_content": { "capabilities": ["classification"] },
+    "full_text_specialist": { "capabilities": ["full_text"] },
+    "layout_specialist": { "capabilities": ["layout"] },
+    "elements_specialist": { "capabilities": ["elements"] },
+    "table_specialist": { "capabilities": ["table"] },
+    "correlation_specialist": { "capabilities": ["correlation"] },
+    "charts_specialist": { "capabilities": ["chart"] },
+    "diagram_specialist": { "capabilities": ["diagram"] },
+    "general_visual_analysis_specialist": { "capabilities": ["general_visual_analysis"] },
+    "handwriting_specialist": { "capabilities": ["handwriting"] },
+    "handwriting_math_specialist": { "capabilities": ["handwriting_math"] },
+    "code_block_specialist": { "capabilities": ["code_block"] },
+    "scientific_specialist": { "capabilities": ["scientific"] },
+    "keyword_topic_specialist": { "capabilities": ["keyword_topic"] },
+    "html_report_specialist": { "capabilities": ["html_report"] },
+    "image_enhancer": { "capabilities": ["image_enhancement"] },
+    "region_inspector": { "capabilities": ["region_inspection"] },
+    "remediation_specialist": { "capabilities": ["remediation"] },
+    "page_specialist": { "capabilities": ["page_analysis"] },
+    "decision_tree_specialist": { "capabilities": ["decision_tree"] },
+    "editorial_specialist": { "capabilities": ["editorial"] },
+    "edu_transcript_specialist": { "capabilities": ["education_transcript"] },
+    "war_map_specialist": { "capabilities": ["war_map"] },
+    "metadata_generic_specialist": { "capabilities": ["metadata_generic"] },
+    "metadata_mads_specialist": { "capabilities": ["metadata_mads"] },
+    "metadata_mods_specialist": { "capabilities": ["metadata_mods"] },
+    "robust_elements_specialist": { "capabilities": ["robust_elements"] }
+  }
+}

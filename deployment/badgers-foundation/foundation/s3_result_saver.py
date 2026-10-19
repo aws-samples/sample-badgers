@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -36,12 +36,14 @@ def _get_output_extension(specialist_name: str) -> str:
         return _manifest_cache[specialist_name]
 
     # Try to load from S3 manifest bucket or local file
-    manifest_bucket = os.environ.get("MANIFEST_BUCKET")
+    manifest_bucket = os.environ.get("MANIFEST_BUCKET") or os.environ.get("CONFIG_BUCKET")
 
     if manifest_bucket:
         try:
             s3 = boto3.client("s3")
-            manifest_key = f"manifests/{specialist_name}.json"
+            from foundation.s3_config_loader import config_key
+
+            manifest_key = config_key(f"manifests/{specialist_name}.json")
             response = s3.get_object(Bucket=manifest_bucket, Key=manifest_key)
             manifest = json.loads(response["Body"].read().decode("utf-8"))
             ext = manifest.get("specialist", {}).get("output_extension", "xml")
@@ -61,6 +63,7 @@ def save_result_to_s3(
     output_bucket: str,
     session_id: str,
     image_path: Optional[str] = None,
+    job_id: str = "",
 ) -> str:
     """Save analysis result to S3.
 
@@ -70,6 +73,7 @@ def save_result_to_s3(
         output_bucket: S3 bucket name for output
         session_id: Session ID for organizing results
         image_path: Optional source image path for naming
+        job_id: Durable operation ID when this is runner-managed
 
     Returns:
         S3 URI of the saved result (s3://bucket/key)
@@ -86,7 +90,7 @@ def save_result_to_s3(
     result = result.strip()
 
     # Generate filename with timestamp
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
 
     # Get source image identifier if available
     image_identifier = _extract_image_identifier(image_path)
@@ -96,6 +100,29 @@ def save_result_to_s3(
     content_type = "application/json" if ext == "json" else "application/xml"
     filename = f"{specialist_name}_{image_identifier}_{timestamp}.{ext}"
     s3_key = f"{session_id}/{specialist_name}/{filename}"
+    # A durable workflow never accepts an output key from a caller. When its
+    # server-generated operation ID is present, derive the result prefix from
+    # the operation's owner in DynamoDB. Legacy direct specialist invocation
+    # retains the historical session-based layout.
+    if job_id.startswith("op_"):
+        try:
+            from foundation import operation_state
+
+            record = operation_state.get_operation(job_id)
+            if not record or not record.get("owner_sub"):
+                raise S3ResultSaverError(
+                    "Runner-managed result has no durable operation owner"
+                )
+            s3_key = (
+                f"{operation_state.operation_prefix(str(record['owner_sub']), job_id)}"
+                f"/specialists/{specialist_name}/{filename}"
+            )
+        except S3ResultSaverError:
+            raise
+        except Exception as error:
+            raise S3ResultSaverError(
+                "Could not derive the private operation artifact prefix"
+            ) from error
 
     # Save to S3
     s3.put_object(

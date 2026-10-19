@@ -6,7 +6,7 @@ import base64
 import os
 import uuid
 from pathlib import Path
-from foundation import job_state
+from foundation import job_state, operation_state
 from foundation.lambda_error_handler import (
     create_error_response,
     ValidationError,
@@ -109,14 +109,14 @@ def lambda_handler(event, context):
         # fails the invocation rather than returning an empty success.
         logger.info("Processing request for runtime session_id: %s", session_id)
 
-        s3_paths = _store_images_to_s3(base64_images, session_id)
+        s3_paths = _store_images_to_s3(base64_images, session_id, job_id=job_id)
 
         # The converter's artifact is the set of page images; record the first as
         # the representative key so the row points into the right prefix.
         job_state.mark_complete(job_id, subtask, s3_paths[0] if s3_paths else "")
 
         logger.info(
-            "Converted source document to %d page image(s), stored in S3 temp/ (session: %s)",
+            "Converted source document to %d page image(s) (session: %s)",
             len(s3_paths),
             session_id,
         )
@@ -301,8 +301,10 @@ def _convert_pdf_to_images(pdf_data: bytes, dpi: int, max_size_mb: float) -> lis
     return base64_images
 
 
-def _store_images_to_s3(base64_images: list[str], session_id: str) -> list[str]:
-    """Store base64 images to S3 temp location, return S3 paths."""
+def _store_images_to_s3(
+    base64_images: list[str], session_id: str, *, job_id: str = ""
+) -> list[str]:
+    """Store pages under a durable operation prefix or the legacy temp prefix."""
     import boto3
 
     if not OUTPUT_BUCKET:
@@ -314,16 +316,51 @@ def _store_images_to_s3(base64_images: list[str], session_id: str) -> list[str]:
     s3 = boto3.client("s3")
     s3_paths = []
 
-    for idx, b64_str in enumerate(base64_images):
-        key = f"temp/{session_id}/page_{idx + 1:03d}.b64"
-
-        # Store base64 string as text
-        s3.put_object(
-            Bucket=OUTPUT_BUCKET,
-            Key=key,
-            Body=b64_str.encode("utf-8"),
-            ContentType="text/plain",
+    operation_pages_prefix = ""
+    if job_id.startswith("op_"):
+        record = operation_state.get_operation(job_id)
+        owner_sub = str(record.get("owner_sub") or "")
+        if not owner_sub:
+            raise ValidationError(
+                message="Runner-managed conversion has no durable operation owner",
+                details={"job_id": job_id},
+            )
+        operation_pages_prefix = (
+            f"{operation_state.operation_prefix(owner_sub, job_id)}/pages"
         )
+
+    for idx, b64_str in enumerate(base64_images):
+        key = (
+            f"{operation_pages_prefix}/page_{idx + 1:03d}.b64"
+            if operation_pages_prefix
+            else f"temp/{session_id}/page_{idx + 1:03d}.b64"
+        )
+
+        # A durable workflow may retry conversion after a worker interruption.
+        # Operation page keys are deterministic, so make those objects
+        # write-once instead of replacing a page produced by an earlier attempt.
+        # Legacy temp objects retain their historical overwrite behavior.
+        put_arguments = {
+            "Bucket": OUTPUT_BUCKET,
+            "Key": key,
+            "Body": b64_str.encode("utf-8"),
+            "ContentType": "text/plain",
+        }
+        if operation_pages_prefix:
+            put_arguments["IfNoneMatch"] = "*"
+        try:
+            s3.put_object(**put_arguments)
+        except Exception as error:
+            error_code = str(
+                getattr(error, "response", {}).get("Error", {}).get("Code", "")
+            )
+            if operation_pages_prefix and error_code in {
+                "PreconditionFailed",
+                "ConditionalRequestConflict",
+            }:
+                logger.info("Reusing already-written runner page %s", key)
+            else:
+                raise
 
         s3_path = f"s3://{OUTPUT_BUCKET}/{key}"
         s3_paths.append(s3_path)

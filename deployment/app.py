@@ -24,6 +24,7 @@ from stacks import (
     VpcStack,
     DynamoDBStack,
     ECSStack,
+    WorkflowRunnerStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -155,8 +156,9 @@ if CAPABILITIES.get("gateway", False):
         deployment_id=deployment_id,
         deployment_tags=deployment_tags,
         enable_ui=CAPABILITIES.get("ui_identity", False),
+        enable_headless_runtime_auth=(profile.name == "headless"),
         env=env,
-        description="Cognito authentication for AgentCore Gateway",
+        description="Cognito authentication for BADGERS Gateway and Headless",
     )
 
 # Full and Headless use the operation ledger. Direct-use specialists are
@@ -260,6 +262,36 @@ lambda_stack.add_stack_dependency(inference_profiles_stack)
 if dynamodb_stack is not None:
     lambda_stack.add_stack_dependency(dynamodb_stack)
 
+# The durable runner is a private control-plane component. It has no
+# customer-facing endpoint in this increment; a later adapter submits
+# authenticated operations to this State Machine.
+workflow_runner_stack = None
+if CAPABILITIES.get("workflow_runner", False):
+    assert dynamodb_stack is not None
+    if not CONFIG_PREFIX:
+        raise SystemExit(
+            "BADGERS_CONFIG_RELEASE_ID is required when workflow_runner is enabled"
+        )
+    workflow_runner_stack = WorkflowRunnerStack(
+        app,
+        _sn("WorkflowRunner"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        config_bucket=s3_stack.config_bucket,
+        source_bucket=s3_stack.source_bucket,
+        output_bucket=s3_stack.output_bucket,
+        s3_kms_key=s3_stack.s3_kms_key,
+        jobs_table=dynamodb_stack.jobs_table,
+        foundation_layer=lambda_stack.foundation_layer,
+        specialist_functions=lambda_stack.functions,
+        config_prefix=CONFIG_PREFIX,
+        env=env,
+        description="Private durable BADGERS workflow runner",
+    )
+    workflow_runner_stack.add_stack_dependency(s3_stack)
+    workflow_runner_stack.add_stack_dependency(dynamodb_stack)
+    workflow_runner_stack.add_stack_dependency(lambda_stack)
+
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
 #
 # Transaction Search is a singleton per account and region, and enabling it requires a
@@ -348,6 +380,21 @@ if CAPABILITIES.get("agent_runtime", False):
         image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
         websocket_enabled=CAPABILITIES.get("websocket_transport", False),
         config_prefix=CONFIG_PREFIX,
+        workflow_state_machine_arn=(
+            workflow_runner_stack.state_machine.state_machine_arn
+            if workflow_runner_stack is not None
+            else None
+        ),
+        headless_jwt_discovery_url=(
+            cognito_stack.headless_discovery_url
+            if profile.name == "headless"
+            else None
+        ),
+        headless_jwt_client_id=(
+            cognito_stack.headless_client.user_pool_client_id
+            if profile.name == "headless" and cognito_stack.headless_client is not None
+            else None
+        ),
         env=env,
         description="AgentCore Runtime for BADGERS agent",
     )
@@ -360,6 +407,8 @@ if CAPABILITIES.get("agent_runtime", False):
     if xray_stack is not None:
         runtime_websocket_stack.add_stack_dependency(xray_stack)
     runtime_websocket_stack.add_stack_dependency(dynamodb_stack)
+    if workflow_runner_stack is not None:
+        runtime_websocket_stack.add_stack_dependency(workflow_runner_stack)
 
 # Add dependencies
 iam_stack.add_stack_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions

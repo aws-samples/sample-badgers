@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "badgers-agent-request/v1",
+  "title": "BADGERS Agent Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "document_uri", "instruction"],
+  "properties": {
+    "schema_version": { "const": "badgers-agent-request/v1" },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "document_uri": {
+      "type": "string",
+      "pattern": "^s3://[^/\\s]+/.+$",
+      "maxLength": 2048
+    },
+    "instruction": { "type": "string", "minLength": 1, "maxLength": 8192 },
+    "workflow_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$",
+      "default": "standard-document-analysis"
+    },
+    "routing_mode": {
+      "type": "string",
+      "enum": ["auto", "manual"],
+      "default": "auto"
+    },
+    "requested_capabilities": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,127}$"
+      },
+      "description": "Optional approved capability tags for manual routing; never Lambda or specialist identifiers."
+    },
+    "audit_mode": { "type": "boolean", "default": false },
+    "caller_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": { "type": "string", "maxLength": 256 }
+      }
+    }
+  }
+}

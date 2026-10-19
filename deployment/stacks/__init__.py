@@ -14,6 +14,7 @@ from .xray_transaction_search_stack import XRayTransactionSearchStack
 from .vpc_stack import VpcStack
 from .dynamodb_stack import DynamoDBStack
 from .ecs_stack import ECSStack
+from .workflow_runner_stack import WorkflowRunnerStack
 
 __all__ = [
     "S3Stack",
@@ -30,4 +31,5 @@ __all__ = [
     "VpcStack",
     "DynamoDBStack",
     "ECSStack",
+    "WorkflowRunnerStack",
 ]
