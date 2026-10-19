@@ -559,14 +559,19 @@ def test_runner_managed_converter_pages_use_server_derived_operation_prefix(
         lambda _id: {"owner_sub": "tenant-a"},
     )
 
-    paths = converter._store_images_to_s3(
-        ["cGFnZS0x"],
+    pages = converter._store_images_to_s3(
+        [(7, "cGFnZS0x")],
         "untrusted-session",
         job_id=operation_id,
     )
 
-    expected_key = f"operations/tenant-a/{operation_id}/pages/page_001.b64"
-    assert paths == [f"s3://badgers-output-test/{expected_key}"]
+    expected_key = f"operations/tenant-a/{operation_id}/pages/page_007.b64"
+    assert pages == [
+        {
+            "page_number": 7,
+            "image_path": f"s3://badgers-output-test/{expected_key}",
+        }
+    ]
     assert page_s3.puts[0]["Key"] == expected_key
     assert page_s3.puts[0]["IfNoneMatch"] == "*"
 
@@ -607,7 +612,13 @@ def test_runner_managed_converter_reuses_existing_page_on_retry(
     )
 
     assert converter._store_images_to_s3(
-        ["cGFnZS0x"], "untrusted-session", job_id=operation_id
+        [(1, "cGFnZS0x")], "untrusted-session", job_id=operation_id
     ) == [
-        f"s3://badgers-output-test/operations/tenant-a/{operation_id}/pages/page_001.b64"
+        {
+            "page_number": 1,
+            "image_path": (
+                f"s3://badgers-output-test/"
+                f"operations/tenant-a/{operation_id}/pages/page_001.b64"
+            ),
+        }
     ]

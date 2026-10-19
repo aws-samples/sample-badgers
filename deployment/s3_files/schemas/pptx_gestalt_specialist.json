@@ -1,0 +1,31 @@
+[
+  {
+    "name": "analyze_pptx_gestalt_tool",
+    "description": "Interpret a native PowerPoint slide scene graph using deterministic coordinate evidence plus a text model. Produces additive relationship enrichments; it never replaces the native BADGERS spine and does not consume slide pixels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "slide_scene_graph": {"type": "string", "description": "JSON scene graph with normalized shape bounds, types, text, groups, and connector endpoints."},
+        "scene_graph_uri": {"type": "string", "description": "S3 URI containing the JSON scene graph. Use instead of slide_scene_graph for large graphs."},
+        "source_document_path": {"type": "string"},
+        "slide_number": {"type": "integer", "minimum": 1},
+        "session_id": {"type": "string"},
+        "job_id": {"type": "string"},
+        "doc_id": {"type": "string"}
+      },
+      "required": ["source_document_path", "slide_number", "session_id"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "pptx_gestalt_uri": {"type": "string"},
+        "deterministic_evidence_uri": {
+          "type": "string",
+          "description": "S3 URI of the scene graph and calculated geometry evidence used for the enrichment."
+        },
+        "result": {"type": "string"},
+        "success": {"type": "boolean"}
+      }
+    }
+  }
+]

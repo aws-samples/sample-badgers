@@ -11,14 +11,15 @@ This document explains how Lambda specialists work in BADGERS—their anatomy, r
 
 ## 🏗️ Lambda Types
 
-BADGERS uses four types of Lambda functions:
+BADGERS uses five types of Lambda functions:
 
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
 | 🔍 **Vision Specialists** | Analyze images using Bedrock vision models          | `full_text_specialist`, `table_specialist`, etc. |
-| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`       |
-| 🔧 **Utilities**          | Transform or prepare data                           | `pdf_to_images_converter`                        |
+| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
+| 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
+| 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist`, `pptx_gestalt_specialist` |
 
 ---
 
@@ -30,11 +31,12 @@ BADGERS uses four types of Lambda functions:
 | ---------------------- | ---------------------------------------------------------- |
 | 🧠 **Foundation Layer** | Core framework, boto3, Pillow, pdf2image, shared utilities |
 
-### PDF Converter Only
+### PDF Intake Layers
 
-| Layer               | Purpose                                                 |
-| ------------------- | ------------------------------------------------------- |
-| 📄 **Poppler Layer** | `pdf2image` requires Poppler binaries for PDF rendering |
+| Layer                    | Purpose                                                               |
+| ------------------------ | --------------------------------------------------------------------- |
+| 📄 **Poppler Layer**     | `pdf2image` requires Poppler binaries for selected-page rasterization |
+| 📄 **PDF Processing Layer** | PyMuPDF/pikepdf for native PDF text/object inspection                 |
 
 ---
 
@@ -77,6 +79,55 @@ BADGERS uses four types of Lambda functions:
 | Variable        | Required | Description                            |
 | --------------- | -------- | -------------------------------------- |
 | `OUTPUT_BUCKET` | ✅        | S3 bucket for storing converted images |
+
+### DOCX and Textract OCR Routing
+
+`route_document_input_tool` is always the first tool for an uploaded document. A `.docx`
+or `.pptx` is sent to its native processor, which produces an ordered page/slide plan. Pages marked
+`native_docx` already have a canonical BADGERS page spine and do not create an image or
+invoke a model. The routing decision evaluates native fidelity separately from
+visual-semantic risk: a schema-valid, well-aligned text-only multi-column page remains
+native; columns or alignment uncertainty alone never require Vision. Pages marked
+`textract_ocr` have no useful native text and receive one
+`textract_ocr_tool` pass on their already-rendered page or slide image.
+
+Textract output must pass its deterministic quality gate (non-empty, sufficient readable
+text, mean line confidence of at least 75, and no symbol-dominated output) before it is
+stored as a canonical BADGERS content-tree page. A failed gate is a successful routing
+decision—not a Textract retry—and preserves the raw OCR artifact before routing the same
+page to BADGERS Vision. `hybrid` and `vision_ai` pages bypass Textract and use Vision
+directly. Moderate risk is recorded as `deterministic_review_required` while retaining
+native output; it does not create an image or call a model by itself.
+
+### Native Structure Analysts
+
+`docx_structure_specialist` accepts a graph emitted by a native DOCX parser:
+stable OOXML node IDs, node type, document order, hierarchy, list and table
+metadata, drawing anchors, and explicit cross-references. A layout engine may
+add normalized bounds and a page number, but that optional layout map is
+evidence only; it does not turn the document into a vision workload.
+
+The specialist calculates hierarchy, document-order, heading-scope, list,
+anchor, reference, and optional layout evidence in Python. It then returns an
+additive, evidence-cited XML relationship artifact plus the exact evidence
+artifact used. The native DOCX content tree remains the canonical BADGERS
+spine. Vision is an escalation for pixel-only ambiguity such as rendered
+wrapping, image meaning, color, or overlap.
+
+### Native Layout Analysts
+
+`pptx_gestalt_specialist` accepts a native slide scene graph rather than an image.
+The PPTX parser must supply normalized `x`, `y`, `width`, and `height` values for
+every shape, along with each shape's stable ID, type, optional text, group membership,
+and connector endpoints. The specialist calculates alignment, proximity, containment,
+and connector evidence in Python, then uses a text model only to express additive,
+evidence-cited relationship candidates.
+
+Its XML is not a replacement document tree. The native PPTX content tree remains the
+canonical BADGERS spine; the returned relationship artifact and its accompanying
+`deterministic_evidence_uri` are provenance-bearing enrichments to attach during
+correlation. A separate visual path remains appropriate only when image meaning,
+rendered overlap, color, or other pixel-only facts are needed.
 
 ---
 
@@ -343,14 +394,30 @@ as error cards without a crop.
 
 ---
 
+## 📄 Native PDF Intake and OCR Fallback
+
+`native_pdf_processor` is the required first tool for PDF uploads. It writes a
+schema-compatible native BADGERS spine when the PDF’s selectable text and order
+are trustworthy, and returns a page plan:
+
+- `native_pdf` → retain the native spine, no rendering or visual calls
+- `textract_ocr` → render only that page, then accept Textract only if its quality gate passes
+- `hybrid` → retain native text while adding targeted visual enrichment
+- `vision_ai` → render only that page and use the visual workflow
+
+The Textract quality gate requires sufficient recovered text, printable/coherent
+lines, and mean line confidence. A failing page is escalated to Vision; a passing
+OCR result becomes the canonical BADGERS spine.
+
+Password-protected PDFs are rejected during native intake with
+`PASSWORD_PROTECTED_PDF`; BADGERS does not solicit, retain, or attempt passwords.
+
 ## 🔧 Utility Lambda: Document-to-Images Converter
 
-The converter turns a source document into analyzable page images. It routes on the
-content of the fetched bytes (`document_path`, formerly `pdf_path`): a PDF is rasterized
-with pdf2image + Poppler; an already-uploaded image (PNG/JPEG/TIFF/WebP/GIF) skips
-Poppler entirely and is normalized into a single page. Either way it emits the same
-`page_NNN.b64` artifacts in the output bucket, so everything downstream is identical
-regardless of source type.
+The converter is the controlled fallback after native routing. Supplying
+`page_numbers` rasterizes only those one-indexed PDF pages; omitting it retains the
+legacy all-pages behavior. It returns `{page_number, image_path}` mappings so a
+non-contiguous route cannot lose its original document order.
 
 ```python
 def lambda_handler(event, context):

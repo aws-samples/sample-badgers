@@ -1,0 +1,44 @@
+{
+  "tool": {
+    "name": "process_docx_tool",
+    "description": "Use for Microsoft Word .docx input. Deeply parses native Word structure, validates canonical BADGERS content-tree XML per page, and separately evaluates native fidelity and visual-semantic risk before returning a page route. native_docx pages are complete without an image; text-only multi-column pages and alignment uncertainty alone remain native. textract_ocr pages must first use Textract OCR and only go to Vision if its quality gate says so; hybrid and vision_ai pages use visual specialists.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 path or absolute local path to a .docx document."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID."
+        },
+        "max_image_size_mb": {
+          "type": "number",
+          "description": "Maximum rendered Vision page image size in MiB. Default 4.0."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Active BADGERS job ID."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Source document ID."
+        }
+      },
+      "required": ["document_path"]
+    }
+  },
+  "specialist": {
+    "name": "docx_processor",
+    "description": "Safely parses DOCX OOXML, maps native structure to BADGERS content-tree XML, renders for page boundaries, and routes pages to native extraction, Textract OCR, or Vision AI.",
+    "output_extension": "json",
+    "revision_eligible": false
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "dependencies": ["python-docx", "lxml", "PyMuPDF", "LibreOffice"],
+    "wizard_managed": false,
+    "specialist_type": "container"
+  }
+}

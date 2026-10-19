@@ -1,0 +1,73 @@
+{
+  "tool": {
+    "name": "analyze_pptx_gestalt_tool",
+    "description": "Interpret a native PowerPoint slide scene graph using deterministic coordinate evidence plus a text model. Produces additive relationship enrichments; it never replaces the native BADGERS spine and does not consume slide pixels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "slide_scene_graph": {
+          "type": "string",
+          "description": "JSON scene graph with normalized (0..1) shape bounds, types, text, groups, and connector endpoints."
+        },
+        "scene_graph_uri": {
+          "type": "string",
+          "description": "S3 URI containing the JSON scene graph. Use instead of slide_scene_graph for large graphs."
+        },
+        "source_document_path": {
+          "type": "string",
+          "description": "S3 URI or source path of the PowerPoint file."
+        },
+        "slide_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "doc_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_document_path",
+        "slide_number",
+        "session_id"
+      ]
+    }
+  },
+  "specialist": {
+    "name": "pptx_gestalt_specialist",
+    "description": "Derives evidence-backed spatial and structural relationship enrichments from a native PowerPoint slide scene graph.",
+    "prompt_specialist_prompt_base_path": "prompts",
+    "prompt_files": [
+      "pptx_gestalt_prompt.xml"
+    ],
+    "expected_output_tokens": 3000,
+    "model_selections": {
+      "primary": {
+        "model_id": "us.anthropic.claude-sonnet-4-6",
+        "adaptive_thinking": true,
+        "effort": "medium"
+      },
+      "fallback_list": [
+        {
+          "model_id": "us.amazon.nova-2-lite-v1:0",
+          "effort": "medium"
+        }
+      ]
+    },
+    "output_extension": "xml",
+    "revision_eligible": false
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "dependencies": [
+      "boto3"
+    ],
+    "wizard_managed": false,
+    "specialist_type": "pptx_native_layout"
+  }
+}

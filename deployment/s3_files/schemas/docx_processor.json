@@ -1,0 +1,45 @@
+[
+  {
+    "name": "process_docx_tool",
+    "description": "Inspect a Microsoft Word .docx document natively, validate native page output against the BADGERS content-tree schema, and create an adaptive page plan. It produces page images only for individual pages that need visual interpretation or Textract OCR; simple pages remain native DOCX output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 URL (s3://bucket/key) or absolute local path to a .docx source document. Legacy .doc and macro-enabled documents are rejected."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID. A deterministic session-scoped artifact prefix is used when supplied."
+        },
+        "max_image_size_mb": {
+          "type": "number",
+          "description": "Maximum size in MiB for a rendered image selected for Vision AI or Textract OCR. Default: 4.0."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the active analysis run."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source document."
+        }
+      },
+      "required": ["document_path"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON object containing page_plan_uri, rendered_pdf_uri, page_count, and one entry per page with route (native_docx, textract_ocr, hybrid, vision_ai), visual-semantic risk score, reasons, schema validation status, native_fidelity, deterministic_review_required, native output URI, and optional image URI. A text-only multi-column page or alignment uncertainty alone does not require Vision."
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether DOCX inspection, rendering, and page-plan generation succeeded."
+        }
+      }
+    }
+  }
+]

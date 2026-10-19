@@ -9,6 +9,10 @@
           "type": "string",
           "description": "S3 URI of the full_text_specialist result (required as canonical spine)"
         },
+        "native_spine_uri": {
+          "type": "string",
+          "description": "Optional schema-valid native DOCX BADGERS page spine. For a hybrid DOCX page, preserve its structure and merge visual specialist enrichments into it."
+        },
         "specialist_uris": {
           "type": "array",
           "items": {
