@@ -4,6 +4,11 @@ Deploy self-contained document analyzer packs as direct AWS Lambda tools. This
 is the smallest BADGERS product: no agent, Gateway, UI, Cognito, session memory,
 or operation ledger.
 
+> [!IMPORTANT]
+> `release/6.0.0-beta` is a private, untagged candidate, not a customer
+> release. Use `v5.0.2` for a current production deployment and read the
+> [Release Guide](../RELEASE_GUIDE.md) before consuming a future beta tag.
+
 ```bash
 ./badger-specialists/deploy.sh
 ```
@@ -59,6 +64,16 @@ existing enabled specialists; then deploy it under a new deployment ID. Shared
 prompts and specialist configuration are released together in Step 3, so a
 function has a stable configuration release rather than mutable configuration
 at invocation time.
+
+The current selectable packs cover PDF/image processing. The native DOCX/PPTX
+processors integrated in this branch belong to Full and are not automatically
+part of a Specialists pack. Making them directly deployable requires an
+explicit pack definition, container/build prerequisites, IAM review, and
+profile tests before it can be considered a supported product option.
+
+Step 3's configuration SHA is an immutable private deployment artifact, not a
+Git product version. Source releases are Git tags; see the [Release
+Guide](../RELEASE_GUIDE.md#release-terminology) for the lifecycle.
 
 For deployment mechanics and cleanup, see the
 [deployment reference](../deployment/DEPLOYMENT_README.md).

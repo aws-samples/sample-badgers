@@ -4,6 +4,12 @@ The complete BADGERS application: agent, Gateway, every enabled specialist,
 browser UI, session memory, operation ledger, and the specialist-creation
 workflow.
 
+> [!IMPORTANT]
+> On `release/6.0.0-beta`, this is an internal beta candidate, not a published
+> customer release. Use the `v5.0.2` tag for current production deployments.
+> See the [Release Guide](../RELEASE_GUIDE.md) before choosing a source branch
+> or release tag.
+
 ```bash
 ./badgers-full/deploy.sh
 ```
@@ -15,6 +21,7 @@ command later and choose **`r`** to resume unfinished work.
 
 - AgentCore Runtime and MCP Gateway
 - All specialists enabled in `deployment/deployment_config.json`
+- Native PDF, DOCX, and PPTX intake, with selective OCR and visual fallback
 - Shared prompt/configuration release, model profiles, S3 storage, IAM, Cognito,
   DynamoDB operation ledger, and ECR
 - Session memory and X-Ray Transaction Search when available
@@ -44,6 +51,11 @@ Prompts, manifests, schemas, and agent configuration are uploaded as one
 immutable, content-addressed release. Changing one of them means running Step
 3, then redeploying the affected consumers so the agent, Gateway, and
 specialists advance to the new release together.
+
+This configuration release pins one deployment's runtime behavior. It is not a
+Git source release or customer version: source releases are immutable Git tags,
+while Step 3 creates the private S3 configuration SHA. The [Release
+Guide](../RELEASE_GUIDE.md#release-terminology) explains the distinction.
 
 For individual stack operations, cleanup, and troubleshooting, see the
 [deployment reference](../deployment/DEPLOYMENT_README.md). For the capability

@@ -1,11 +1,18 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Specialists** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Release guide](../../RELEASE_GUIDE.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Specialists** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
 # ⚡ Lambda Specialists
 
 This document explains how Lambda specialists work in BADGERS—their anatomy, required layers, environment variables, and code patterns.
+
+The descriptions cover the Full specialist catalog. Headless and Specialists
+deploy only the explicit functions resolved from their profile packs. In
+particular, the native DOCX/PPTX intake path below is currently a Full
+capability; it is not included in the Headless starter workflow or the
+selectable Specialist packs. This branch is a private beta candidate; see the
+[Release Guide](../../RELEASE_GUIDE.md) for release status.
 
 ---
 
@@ -82,7 +89,8 @@ BADGERS uses five types of Lambda functions:
 
 ### DOCX and Textract OCR Routing
 
-`route_document_input_tool` is always the first tool for an uploaded document. A `.docx`
+In Full's native-document flow, `route_document_input_tool` is the first tool
+for an uploaded document. A `.docx`
 or `.pptx` is sent to its native processor, which produces an ordered page/slide plan. Pages marked
 `native_docx` already have a canonical BADGERS page spine and do not create an image or
 invoke a model. The routing decision evaluates native fidelity separately from

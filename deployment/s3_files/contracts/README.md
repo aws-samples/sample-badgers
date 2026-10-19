@@ -2,6 +2,8 @@
 
 These versioned JSON Schema documents define the shared non-UI integration
 boundary. They are staged into every configuration release under `contracts/`.
+Their configuration-release version is independent of the Git source release;
+see the repository [Release Guide](../../../RELEASE_GUIDE.md).
 
 | Contract | Purpose |
 | --- | --- |
@@ -27,3 +29,8 @@ capability tags, never specialist or Lambda identifiers. A resolved plan must
 include every workflow invariant. The authoritative catalog is staged from
 `workflows/`, `routing_policies/`, and `workflow_metadata/` into each
 agent-runtime or workflow-runner profile's immutable release.
+
+The implemented entry point in this candidate is the authenticated Headless
+Agent API. `badgers-gateway-mcp-v1.json` is a forward contract only: no
+customer-facing BADGERS Gateway MCP endpoint or raw specialist MCP tools are
+published yet.

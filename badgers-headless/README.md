@@ -4,6 +4,12 @@ An API-oriented BADGERS deployment for teams that provide their own user
 experience, integration layer, or workflow. It retains the agent and tool
 orchestration but leaves browser application infrastructure out.
 
+> [!IMPORTANT]
+> This branch is a private, untagged 6.0 beta candidate. The Headless API is
+> implemented for maintainer validation, but no 6.0 customer beta has been
+> published. For source/tag, configuration-release, and support status, see the
+> [Release Guide](../RELEASE_GUIDE.md).
+
 ```bash
 ./badgers-headless/deploy.sh
 ```
@@ -26,13 +32,11 @@ run to continue only unfinished steps.
 - WebSocket handler registration
 
 WebSockets are not required for Headless. Invoke the AgentCore runtime through
-its normal request interface from your application or service, and use the
-Gateway MCP product when a customer-owned agent needs workflow-level BADGERS
-tools. The private durable runner is deployed for Headless, but the existing
-Headless runtime will submit versioned requests to it in the next compatibility
-increment. Headless retains the repository's existing AgentCore Gateway for
-runtime-to-specialist calls; it is not the future customer-facing BADGERS
-Gateway v1 product and its credentials must not be distributed as an external
+its normal request interface from your application or service. Versioned
+Headless requests authenticate, create durable operations, and submit to the
+private runner. Headless retains the repository's existing AgentCore Gateway
+for runtime-to-specialist calls; it is not the future customer-facing BADGERS
+Gateway MCP product, and its credentials must not be distributed as an external
 specialist-tool integration.
 
 ## Versioned Agent API
@@ -82,9 +86,12 @@ for the exact schemas. Headless releases now also contain a validated,
 declarative workflow catalog and classifier-led routing policies. The catalog
 resolves only stable capability tags against the selected specialist pack; its
 deterministic plan is persisted privately before the runner invokes page
-specialists. Versioned requests now submit to that runner and immediately
-receive the durable operation identifiers and status pointers. Gateway workflow
-MCP tools remain a later implementation increment.
+specialists. Versioned requests submit to that runner and immediately receive
+durable operation identifiers and status pointers. The initial
+`standard-document-analysis` workflow accepts PDF, PNG, and JPEG sources only.
+DOCX and PPTX native intake is currently a Full capability, not an implied
+Headless starter-pack feature. Gateway workflow MCP tools remain a later
+implementation increment.
 
 ## Before you start
 
@@ -107,4 +114,6 @@ The curated pack definitions live in
 [`deployment/profiles/`](../deployment/profiles/README.md). Use the model menu
 (**`m`**) to understand which deployment steps are required after a registry
 change. The detailed infrastructure contract is in the
-[deployment reference](../deployment/DEPLOYMENT_README.md).
+[deployment reference](../deployment/DEPLOYMENT_README.md). Step 3's
+configuration SHA is private to this deployment and is separate from the Git
+source release; see the [Release Guide](../RELEASE_GUIDE.md#release-terminology).

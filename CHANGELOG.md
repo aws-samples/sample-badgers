@@ -2,14 +2,20 @@
 
 ## [Unreleased]
 
-### Release management
+### 6.0 beta candidate — private and untagged
 
-- **Established documented release channels.** Stable, reproducible customer
-  deployments use immutable `v*` tags; `main` is the stable source line and
-  `dev` is the shared integration line. The platform redesign is isolated on
-  `release/6.0.0-beta` and will be offered to evaluators through immutable
-  preview tags beginning with `v6.0.0-beta.1`. Until then, `v5.0.2` remains the
-  current production release.
+- **Established the private 6.0 release candidate.** It combines the product
+  profile foundation, authenticated Headless operation runner, and the native
+  PDF/DOCX/PPTX work integrated from `dev`. It is not a customer release:
+  `v5.0.2` remains the current production tag, no `v6.0.0-beta.*` tag exists,
+  and the candidate branch is not published.
+- **Documented the release contract.** Source tags, per-deployment
+  content-addressed configuration releases, and deployment identities now have
+  distinct definitions and lifecycle rules in [the Release Guide](RELEASE_GUIDE.md).
+- **Deferred the external BADGERS Gateway MCP product.** The candidate exposes
+  the authenticated BADGERS-owned Headless Agent API, not customer-facing MCP
+  tools. Workflow-level MCP tools and their catalog remain a future beta
+  increment; raw individual-specialist MCP tools remain out of scope.
 
 ### Added
 

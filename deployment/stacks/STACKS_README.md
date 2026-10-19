@@ -1,11 +1,15 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | 🔵 **CDK Stacks** | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Release guide](../../RELEASE_GUIDE.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | 🔵 **CDK Stacks** | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
 # 📦 CDK Stacks
 
-13 CloudFormation stacks, plus 1 optional, deployed in dependency order.
+Full synthesizes 13 CloudFormation stacks plus one optional custom-specialist
+stack. Headless synthesizes 10 stacks, including the private workflow runner;
+Specialists synthesizes only S3, IAM, inference profiles, and Lambda. This
+branch is an untagged private beta candidate; see the
+[Release Guide](../../RELEASE_GUIDE.md) for publication status.
 
 ## Stack Overview
 
@@ -22,6 +26,7 @@
 | Gateway            | `agentcore_gateway_stack.py`           | AgentCore MCP Gateway with Lambda targets                  |
 | Memory             | `agentcore_memory_stack.py`            | Session persistence (90-day TTL)                           |
 | Runtime WebSocket  | `agentcore_runtime_websocket_stack.py` | Strands agent container with WebSocket streaming           |
+| Workflow Runner    | `workflow_runner_stack.py`             | Private Step Functions runner for Headless operations      |
 | VPC                | `vpc_stack.py`                         | Public/private subnets and VPC endpoints for the UI        |
 | ECS                | `ecs_stack.py`                         | Unified UI on an ECS Express Gateway service               |
 | Custom Specialists | `custom_specialists_stack.py`          | *(Optional)* Wizard-created specialists                    |
@@ -39,7 +44,9 @@ rather than resolving another deployment's. See
 
 ## Dependency Graph
 
-Arrows point from a stack to the stacks it depends on.
+Arrows point from a Full-product stack to the stacks it depends on. Headless
+omits Memory, VPC, ECS, X-Ray, UI, and custom specialists; it adds Workflow
+Runner between Lambda and Runtime. Specialists stops after Lambda.
 
 ```
         S3   Cognito   DynamoDB   ECR   Inference Profiles   X-Ray   Memory   VPC
@@ -77,7 +84,8 @@ Creates 3 buckets:
 - **Output** — Analysis results with 1-day TTL on `temp/` prefix
 
 ### Cognito (`cognito_stack.py`)
-One user pool carrying two app clients, plus Managed Login v2 with explicit branding.
+One user pool carries the profile-appropriate app clients, plus Managed Login
+v2 with explicit branding when Full enables the UI.
 
 **UI client** — authorization code + PKCE, used by the React frontend via
 `react-oidc-context`:
@@ -89,6 +97,10 @@ One user pool carrying two app clients, plus Managed Login v2 with explicit bran
 Runtime to mint tokens for Gateway auth:
 - Has a client secret, mirrored into Secrets Manager as `credentials_secret`
 - Resource server with the `agentcore-gateway/invoke` scope
+
+**Headless client** — Headless adds a dedicated client-credentials client with
+the `badgers-headless/invoke` scope. Its validated `client_id` becomes the
+operation owner; the runtime does not trust a caller-supplied tenant field.
 
 Also creates `admin` and `tester` groups. Group membership is what the UI server
 turns into a role — see [UI](../../ui/UI_README.md).
@@ -133,6 +145,17 @@ MCP Gateway configuration:
 - Tool schemas loaded from S3
 - CloudWatch + X-Ray logging via custom resources
 
+This is BADGERS' internal runtime-to-specialist tool plane. It is not yet the
+customer-facing BADGERS Gateway MCP product described by the 6.0 design; no
+external workflow-level MCP tools are published in this candidate.
+
+### Workflow Runner (`workflow_runner_stack.py`)
+Headless only. Creates a private Step Functions Standard state machine and a
+least-privilege stage-handler Lambda. The runner reads only SHA-pinned
+configuration, tenant-scoped sources, and operation-scoped artifacts; it
+records durable operation state in DynamoDB. It has no public endpoint and is
+started only after the Headless runtime validates the caller identity.
+
 ### ECR (`agentcore_ecr_stack.py`)
 Container registry:
 - Keeps last 5 images
@@ -162,14 +185,16 @@ Enables X-Ray Transaction Search, a prerequisite for AgentCore tracing:
   deploying a second one.
 
 ### Runtime WebSocket (`agentcore_runtime_websocket_stack.py`)
-Strands agent hosting with WebSocket streaming:
+Strands agent hosting. The implementation file retains its historical name,
+but transport is profile-specific:
 - Pulls container from ECR
 - Environment variables for Gateway URL, Cognito secret, Memory ID, inference profile
   ARNs, and `JOBS_TABLE_NAME`
 - IAM role with Bedrock, S3, Secrets Manager, Memory permissions, plus
   `dynamodb:PutItem` on the jobs table — the agent writes the job-level record when
   it mints a `job_id`
-- WebSocket support for streaming responses
+- Full enables WebSocket streaming; Headless disables it and enables validated
+  Cognito JWT agent requests plus the private workflow-runner ARN
 
 ### VPC (`vpc_stack.py`)
 Network for the UI ECS service:

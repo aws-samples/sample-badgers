@@ -3,6 +3,11 @@
 The two entry points live at the repository root. Everything under `deployment/` is a
 helper invoked either by them or directly for targeted work.
 
+This branch is the private, untagged `release/6.0.0-beta` candidate. A
+deployment Step 3 configuration release is an S3 artifact for one deployment;
+it is not a public source release. For the stable-tag, beta-publication, and
+maintainer workflow, see the [Release Guide](../RELEASE_GUIDE.md).
+
 All scripts resolve stack names through `deployment/scripts/common.sh`, which composes
 `BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}` and reads `STACK_SUFFIX` from
 `.deploy-state/{DEPLOYMENT_ID}.json`.
@@ -32,6 +37,12 @@ Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
 5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, `r` resume,
 10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), `m` models (prints
 the registry and which steps a registry edit requires), 0 exit.
+
+For Headless, Step 3 is a release gate rather than merely an upload: it creates
+the SHA-pinned workflow/routing/configuration artifact the durable runner uses.
+The initial Headless workflow accepts PDF, PNG, and JPEG inputs. Its
+customer-facing Agent API is authenticated; the separate BADGERS Gateway MCP
+product is not exposed by this candidate.
 
 **9 vs r** — both reach a complete deployment. Option 9 runs all eight steps and stops at
 each completed one to ask whether to re-run. Option `r` skips completed steps before calling

@@ -2,11 +2,16 @@
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🗺️ **Navigation:**</sub><br>
-<sub>🔵 **Home** | [BADGERS Full](badgers-full/README.md) | [BADGERS Headless](badgers-headless/README.md) | [BADGERS Specialists](badger-specialists/README.md) | [Deployment reference](deployment/DEPLOYMENT_README.md) | [UI](ui/UI_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [Prompting system](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Schema](schemas/VOCABULARY.md)</sub>
+<sub>🔵 **Home** | [Release guide](RELEASE_GUIDE.md) | [BADGERS Full](badgers-full/README.md) | [BADGERS Headless](badgers-headless/README.md) | [BADGERS Specialists](badger-specialists/README.md) | [Deployment reference](deployment/DEPLOYMENT_README.md) | [UI](ui/UI_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [Prompting system](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Schema](schemas/VOCABULARY.md)</sub>
 
 ---
 
-# 🦡 BADGERS v5.0.2 as of October 2026
+# 🦡 BADGERS 6.0 beta candidate
+
+> [!IMPORTANT]
+> This is the private, untagged `release/6.0.0-beta` branch. The current
+> customer production release remains [`v5.0.2`](RELEASE_GUIDE.md#current-release-status).
+> Do not present this branch as a customer release or pin a deployment to it.
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
@@ -20,8 +25,8 @@ release process. The only difference is the capability boundary you choose.
 
 | I want to… | Start here | Deploys | Does not deploy |
 | --- | --- | --- | --- |
-| Run the complete BADGERS application | [BADGERS Full](badgers-full/README.md) | Agent, Gateway, all enabled specialists, browser UI, session memory, operations tooling | Nothing intentionally omitted |
-| Integrate BADGERS into my own application or workflow | [BADGERS Headless](badgers-headless/README.md) | Agent, Gateway, curated specialist packs, shared prompts, machine identity, operation ledger | Browser UI, ECS, VPC, session memory, UI wizard, WebSocket handler |
+| Run the complete BADGERS application | [BADGERS Full](badgers-full/README.md) | Agent, internal Gateway, all enabled specialists, native PDF/DOCX/PPTX intake, browser UI, session memory, operations tooling | Nothing intentionally omitted |
+| Integrate BADGERS into my own application or workflow | [BADGERS Headless](badgers-headless/README.md) | Authenticated agent API, internal Gateway, curated PDF/image workflow packs, durable runner, shared prompts, machine identity, operation ledger | Browser UI, ECS, VPC, session memory, UI wizard, WebSocket handler, external Gateway MCP product |
 | Invoke document analyzers directly from my own code | [BADGERS Specialists](badger-specialists/README.md) | Selected specialist packs, shared foundation, prompts, schemas, model profiles | Agent, Gateway, Cognito, UI, operation ledger, runtime |
 
 ### Quick table of contents
@@ -30,6 +35,7 @@ release process. The only difference is the capability boundary you choose.
   - [BADGERS Full](badgers-full/README.md)
   - [BADGERS Headless](badgers-headless/README.md)
   - [BADGERS Specialists](badger-specialists/README.md)
+- [Release guide](RELEASE_GUIDE.md)
 - [What BADGERS does](#-why-badgers)
 - [How it works](#️-how-it-works)
 - [Deployment identity and cleanup](#deployment-identity)
@@ -42,24 +48,17 @@ operating or extending the platform.
 ## Release channels
 
 Use a release tag when you need a reproducible deployment. Tags are immutable
-snapshots: `v5.0.2` is the current stable release and is the appropriate
-starting point for production deployments. `main` represents the source of the
-current stable line; `dev` is the shared integration branch and can contain
-work that has not been released.
-
-The platform redesign is developed on `release/6.0.0-beta`. It is an opt-in
-preview line, not a replacement for 5.x production deployments. Preview
-milestones will be published as immutable tags such as `v6.0.0-beta.1`; a
-customer testing the new architecture should pin to one of those tags rather
-than following the branch. See the [Changelog](CHANGELOG.md) for the active
-milestone and compatibility notes.
+snapshots: `v5.0.2` remains the current stable release. This branch is an
+internal beta candidate, not an externally consumable preview. The complete
+source-release, configuration-release, deployment-identity, support, and
+publication policy is in the [Release Guide](RELEASE_GUIDE.md).
 
 | Need | Use |
 | --- | --- |
 | Production deployment of the existing platform | A stable release tag, currently `v5.0.2` |
 | Integration or contribution work | `dev` |
-| Evaluation of the redesigned platform | A `v6.0.0-beta.*` tag when published |
-| Development of the 6.0 preview | `release/6.0.0-beta` |
+| Evaluation of the redesigned platform | No customer beta is published yet |
+| Maintainer work on the 6.0 preview | `release/6.0.0-beta` |
 
 ## 🤔 Why BADGERS?
 

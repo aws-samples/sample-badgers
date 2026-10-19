@@ -1,5 +1,5 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [BADGERS Full](../badgers-full/README.md) | [BADGERS Headless](../badgers-headless/README.md) | [BADGERS Specialists](../badger-specialists/README.md) | 🔵 **Deployment reference** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../README.md) | [Release guide](../RELEASE_GUIDE.md) | [BADGERS Full](../badgers-full/README.md) | [BADGERS Headless](../badgers-headless/README.md) | [BADGERS Specialists](../badger-specialists/README.md) | 🔵 **Deployment reference** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
@@ -20,6 +20,26 @@ Every route uses the same profile-aware deployment engine. This reference
 describes the complete infrastructure surface; sections about UI, VPC, session
 memory, X-Ray, and custom-specialist administration apply only to Full unless
 explicitly noted.
+
+## Release and configuration identity
+
+This branch is the private, untagged `release/6.0.0-beta` candidate. Do not
+use it as a customer deployment reference; `v5.0.2` remains the stable source
+release. The [Release Guide](../RELEASE_GUIDE.md) defines the approval and
+publication process.
+
+Three different identifiers participate in a deployment:
+
+| Identifier | Scope | Purpose |
+| --- | --- | --- |
+| Git source tag | Repository | Pins the customer-visible source release, such as `v5.0.2`. |
+| Step 3 configuration SHA | One deployment | Pins prompts, schemas, manifests, workflow definitions, and routing policies under private S3 `releases/<sha256>/`. |
+| `DEPLOYMENT_ID` + `STACK_SUFFIX` | One AWS account and Region | Names and resumes the deployed resources. |
+
+Do not substitute one for another. In particular, Step 3 does not publish a
+Git release: it creates a private, content-addressed configuration artifact.
+Headless requires that artifact because its durable runner only accepts
+SHA-pinned workflows.
 
 ## ☁️ AWS Services in the Full product
 
@@ -137,7 +157,7 @@ steps. The profile determines the menu:
 | Profile | Steps shown |
 | ------ | ----------- |
 | Full | 1 layers; 2 foundation; 3 immutable configuration release; 4 specialists; 5 Gateway; 6 Runtime; 7 UI image; 8 UI ECS |
-| Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime |
+| Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime; the runner requires the Step 3 SHA |
 | Specialists | 1 layers; 2 foundation; 3 immutable configuration release; 4 selected direct-invocation specialists |
 
 All profiles include **10** (status), **11** (reset local state without deleting

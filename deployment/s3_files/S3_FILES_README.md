@@ -1,11 +1,17 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../../README.md) | [Release guide](../../RELEASE_GUIDE.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | 🔵 **S3 Files** | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
 # 📦 S3 Files Directory Structure
 
 This directory contains all configuration, prompts, schemas, and manifests that are deployed to S3 for the specialist system. These files are loaded at runtime by Lambda functions to configure and execute document analysis.
+
+> [!IMPORTANT]
+> A Step 3 `releases/<sha256>/` prefix is a private configuration release for
+> one deployment, not a Git product release. See the repository [Release
+> Guide](../../RELEASE_GUIDE.md) for the relationship between source tags,
+> configuration releases, and deployment identity.
 
 ## 🗂️ Directory Overview
 
@@ -14,10 +20,14 @@ s3_files/
 ├── agent_config/          # 🤖 Agent orchestrator configuration
 ├── agent_system_prompt/   # 💬 System prompt for the orchestrating agent
 ├── config/                # 🗂️ Runtime config: model_registry.json, document_type_contexts.json
+├── contracts/             # 🔐 Versioned Headless request/result contracts
 ├── core_system_prompts/   # 🔧 Shared prompt components (rules, error handling, wrapper)
 ├── manifests/             # 📋 Tool and specialist configuration manifests
 ├── prompts/               # 📝 Specialist-specific prompt files
+├── routing_policies/      # 🧭 Classifier-led, release-pinned routing rules
 ├── schemas/               # 📐 JSON schemas for tool input/output validation
+├── workflow_metadata/     # 🧩 Capability-to-specialist mapping
+├── workflows/             # 🏃 Declarative workflow definitions
 └── wrappers/              # 🎁 System prompt wrapper templates
 ```
 
