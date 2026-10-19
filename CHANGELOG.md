@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Release management
+
+- **Documented the release contract.** Customers should deploy immutable
+  `v*` release tags, with `v5.0.2` as the current stable release. `main` is
+  the stable source line and `dev` is the integration line. The next major
+  architecture remains unpublished until an explicit `v6.0.0-beta.*` preview
+  tag is released.
+
 ### Added
 
 - **Page-aware DOCX intake with native-first OCR and Vision routing.** `.docx` uploads now
