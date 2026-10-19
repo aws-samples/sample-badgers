@@ -78,7 +78,8 @@ If the file is missing or the value is empty, the system operates without any en
 ## 🗂️ config/
 
 Runtime configuration read from S3 by the UI server and the Lambdas. `deploy.sh` step 3
-option 6 syncs this directory on its own; option 7 syncs everything.
+stages this directory with the resolved profile and publishes one immutable configuration
+release; consumers are pinned to that release rather than reading mutable bucket-root keys.
 
 | File                          | Purpose                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

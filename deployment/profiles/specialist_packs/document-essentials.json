@@ -1,0 +1,18 @@
+{
+  "name": "document-essentials",
+  "display_name": "Document Essentials",
+  "version": 1,
+  "description": "PDF/image ingestion, classification, full text, and structural analysis.",
+  "tags": [
+    "documents",
+    "text",
+    "layout"
+  ],
+  "specialists": [
+    "pdf_to_images_converter",
+    "classify_pdf_content",
+    "full_text_specialist",
+    "layout_specialist",
+    "elements_specialist"
+  ]
+}

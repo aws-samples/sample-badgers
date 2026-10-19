@@ -316,12 +316,17 @@ deployment_progress() {
   [ -f "${f}" ] || { echo "0 ${#STEP_KEYS[@]} "; return; }
   STEP_KEYS_CSV="$(IFS=,; echo "${STEP_KEYS[*]}")" python3 -c "
 import json, os, sys
-keys = os.environ['STEP_KEYS_CSV'].split(',')
 try:
     d = json.load(open(sys.argv[1]))
 except Exception:
-    print('0 ' + str(len(keys)) + ' ')
+    print('0 ' + str(len(os.environ['STEP_KEYS_CSV'].split(','))) + ' ')
     sys.exit(0)
+profile = d.get('product_profile', 'full')
+keys = os.environ['STEP_KEYS_CSV'].split(',')
+if profile == 'headless':
+    keys = keys[:7]
+elif profile == 'specialists':
+    keys = keys[:4]
 done = sum(1 for k in keys if d.get(k) is True)
 stamps = sorted(v for k, v in d.items()
                 if k.endswith('_at') and isinstance(v, str) and v)
@@ -734,11 +739,15 @@ reconcile_gateway_target() {
     return 0
   fi
 
-  local schema_mtime
-  schema_mtime="$(aws s3api head-object --bucket "${config_bucket}" --key "schemas/${name}.json" \
+  local schema_mtime schema_key
+  schema_key="schemas/${name}.json"
+  if [ -n "${BADGERS_CONFIG_RELEASE_ID:-}" ]; then
+    schema_key="releases/${BADGERS_CONFIG_RELEASE_ID}/${schema_key}"
+  fi
+  schema_mtime="$(aws s3api head-object --bucket "${config_bucket}" --key "${schema_key}" \
     --region "${AWS_REGION}" --query LastModified --output text 2>/dev/null || echo "")"
   if [ -z "${schema_mtime}" ]; then
-    log_warn "reconcile: schemas/${name}.json not found in ${config_bucket}; skipping ${tname}"
+    log_warn "reconcile: ${schema_key} not found in ${config_bucket}; skipping ${tname}"
     return 0
   fi
 
@@ -753,8 +762,11 @@ reconcile_gateway_target() {
   fi
 
   # Live ARN for the recreation guard (function rename/recreate changes the ARN).
-  local live_arn
-  live_arn="$(aws lambda get-function-configuration --function-name "badgers_${name}" \
+  local live_arn function_prefix
+  function_prefix="$(stack_output "$(_sn Lambda)" FunctionNamePrefix)"
+  [ "${function_prefix}" = "None" ] && function_prefix=""
+  function_prefix="${function_prefix:-badgers_}"
+  live_arn="$(aws lambda get-function-configuration --function-name "${function_prefix}${name}" \
     --region "${AWS_REGION}" --query FunctionArn --output text 2>/dev/null || echo "")"
   [ "${live_arn}" = "None" ] && live_arn=""
 
@@ -1140,6 +1152,7 @@ export_cdk_env() {
   # step pushed. Default it here so CDK-only entry points stay in sync with the
   # build without every caller having to set it.
   export RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
+  export BADGERS_CONFIG_RELEASE_ID="$(get_state "config_release_id")"
 }
 
 cdk_deploy() {

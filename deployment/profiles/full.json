@@ -1,0 +1,23 @@
+{
+  "name": "full",
+  "display_name": "BADGERS Full",
+  "profile_version": 1,
+  "specialist_selection": "enabled",
+  "specialist_packs": [],
+  "capabilities": {
+    "agent_runtime": true,
+    "gateway": true,
+    "container_images": true,
+    "direct_invocation": true,
+    "progress_events": true,
+    "websocket_transport": true,
+    "ui": true,
+    "ui_identity": true,
+    "report_viewer": true,
+    "specialist_wizard": true,
+    "job_tracking": true,
+    "minimal_operation_ledger": true,
+    "session_memory": true,
+    "advanced_tracing": true
+  }
+}

@@ -2,7 +2,7 @@
 > 🚧 **This repository is under active development.** Watch the repo, monitor branches and issues, and check the [Changelog](CHANGELOG.md) for the latest updates.
 
 <sub>🗺️ **Navigation:**</sub><br>
-<sub>🔵 **Home** | [Vision LLM Theory](VISION_LLM_THEORY_README.md) | [UI](ui/UI_README.md) | [Deployment](deployment/DEPLOYMENT_README.md) | [CDK Stacks](deployment/stacks/STACKS_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [S3 Files](deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Schema](schemas/VOCABULARY.md)</sub>
+<sub>🔵 **Home** | [BADGERS Full](badgers-full/README.md) | [BADGERS Headless](badgers-headless/README.md) | [BADGERS Specialists](badger-specialists/README.md) | [Deployment reference](deployment/DEPLOYMENT_README.md) | [UI](ui/UI_README.md) | [Runtime](deployment/runtime/RUNTIME_README.md) | [Prompting system](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) | [Schema](schemas/VOCABULARY.md)</sub>
 
 ---
 
@@ -11,6 +11,33 @@
 **Broad Agentic Document Generative Extraction & Recognition System**
 
 BADGERS transforms document processing through vision-enabled AI and deep layout analysis. Unlike traditional text extraction tools, BADGERS understands document structure and meaning by recognizing visual hierarchies, reading patterns, and contextual relationships between elements.
+
+## Choose your path
+
+Start with one deployment shape. All three use the same source repository,
+deployment engine, specialist definitions, and versioned prompt/configuration
+release process. The only difference is the capability boundary you choose.
+
+| I want to… | Start here | Deploys | Does not deploy |
+| --- | --- | --- | --- |
+| Run the complete BADGERS application | [BADGERS Full](badgers-full/README.md) | Agent, Gateway, all enabled specialists, browser UI, session memory, operations tooling | Nothing intentionally omitted |
+| Integrate BADGERS into my own application or workflow | [BADGERS Headless](badgers-headless/README.md) | Agent, Gateway, curated specialist packs, shared prompts, machine identity, operation ledger | Browser UI, ECS, VPC, session memory, UI wizard, WebSocket handler |
+| Invoke document analyzers directly from my own code | [BADGERS Specialists](badger-specialists/README.md) | Selected specialist packs, shared foundation, prompts, schemas, model profiles | Agent, Gateway, Cognito, UI, operation ledger, runtime |
+
+### Quick table of contents
+
+- [Choose your path](#choose-your-path)
+  - [BADGERS Full](badgers-full/README.md)
+  - [BADGERS Headless](badgers-headless/README.md)
+  - [BADGERS Specialists](badger-specialists/README.md)
+- [What BADGERS does](#-why-badgers)
+- [How it works](#️-how-it-works)
+- [Deployment identity and cleanup](#deployment-identity)
+- [Technical reference](#-technical-deep-dive)
+
+The path guides begin with one command and expose more choices only when they
+are relevant. The detailed deployment reference remains available for people
+operating or extending the platform.
 
 ## 🤔 Why BADGERS?
 
@@ -23,9 +50,15 @@ Traditional document processing tools extract text but lose context. They can't 
 
 Use cases: research acceleration, compliance automation, content management, accessibility remediation.
 
-## 📸 Screenshots
+## 📸 Full product screenshots
 
-A single React + Express app is both the testing workbench and the deployment/ops console — the same code runs locally via `npm run dev` or on ECS behind Cognito OIDC. Tabs are role-gated: the **Testing** row below is visible to all users, while an admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not pictured here. See the [UI README](ui/UI_README.md) for the full tab and role breakdown.
+These screens apply to [BADGERS Full](badgers-full/README.md). A single React +
+Express app is both the testing workbench and the deployment/ops console — the
+same code runs locally via `npm run dev` or on ECS behind Cognito OIDC. Tabs are
+role-gated: the **Testing** row below is visible to all users, while an
+admin-only **Deploy** row (Stacks, Specialists, S3 Configs, Deploy Tags) is not
+pictured here. See the [UI README](ui/UI_README.md) for the full tab and role
+breakdown.
 
 ### Testing tabs
 
@@ -75,9 +108,17 @@ specialist that raised the flag.
 
 ![Deployment CLI](.github/assets/07_sample-badgers-deployment-cli.png)
 
-The deployment menu tracks the eight ordered steps — Lambda layers, foundational infrastructure, prompts/manifests/schemas, specialist Lambdas, gateway, runtime, UI image, UI ECS service — per deployment ID and stack suffix. Steps can be run individually, all at once, or resumed from wherever the last run stopped.
+The deployment menu begins with a product profile, then shows only its
+applicable steps. Full has all eight steps; Headless ends after Runtime; and
+Specialists ends after direct-invocation specialist functions. Every profile can
+run its applicable steps individually, all at once, or from the first unfinished
+step.
 
 ## ⚙️ How It Works
+
+This diagram shows the complete Full product. Headless uses the Runtime,
+Gateway, and selected specialist layers without the browser-facing components;
+Specialists uses only the selected Lambda tools and their shared configuration.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -123,7 +164,10 @@ The deployment menu tracks the eight ordered steps — Lambda layers, foundation
 5. ⚡ **Lambda specialists** (standardized and domain-specific functions, including container-based) process document elements using Claude vision models, each recording its own outcome
 6. 📊 **Results aggregate** with preserved structure and semantic relationships
 
-## 🛠️ Tech Stack
+## 🛠️ Full product tech stack
+
+Headless and Specialists intentionally omit the components identified in their
+respective path guides.
 
 | Component          | Technology                                                               |
 | ------------------ | ------------------------------------------------------------------------ |
@@ -186,48 +230,74 @@ See the full [Vocabulary Reference](schemas/VOCABULARY.md) for type definitions,
 
 ## 🚀 Deployment
 
+Choose the product guide that matches the result you want:
 
+- [BADGERS Full](badgers-full/README.md) — complete application with the UI.
+- [BADGERS Headless](badgers-headless/README.md) — agent and Gateway for an
+  application you operate.
+- [BADGERS Specialists](badger-specialists/README.md) — direct-use analyzer
+  functions only.
 
+All paths use an interactive, resumable deployment menu. Select a new
+deployment ID for each profile; a Full deployment cannot be converted in place
+to Headless or Specialists, and a direct-specialist pack selection is fixed for
+that deployment ID.
 
 ### Prerequisites
 
-- ☁️ [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) configured with credentials
-- 📦 [AWS CDK v2](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html) (`npm install -g aws-cdk`)
-- 🐳 [Docker](https://docs.docker.com/get-started/get-docker/) (running)
+- ☁️ [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), configured for the target account and region
+- 📦 [AWS CDK v2](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)
+- 🐳 [Docker](https://docs.docker.com/get-started/get-docker/), running for the deployment build steps
 - 🐍 [Python 3.12+](https://www.python.org/downloads/)
 - ⚡ [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
+The deployment menu checks the local toolchain and AWS identity before it
+creates resources. The first deployment in an account/region may also require
+CDK bootstrap; the menu reports this with the exact command if it is needed.
+
 ### Quick Start
 
-```bash
-./deploy.sh
+Run the entry point for the product you chose:
 
+```bash
+./badgers-full/deploy.sh
+# or
+./badgers-headless/deploy.sh
+# or
+./badger-specialists/deploy.sh
 ```
 
-That is the whole command. `deploy.sh` asks which deployment to work on — listing anything it finds in `.deploy-state/`, or offering to start a new one — and then presents a menu. It is resumable and every step is idempotent, so re-run it after a failure and it picks up where it stopped.
+The script asks which deployment to work on — listing anything it finds in
+`.deploy-state/`, or offering to start a new one — and then presents only the
+steps that apply to that product. It is resumable and every step is idempotent,
+so re-run it after a failure and it picks up where it stopped.
 
 > `DEPLOYMENT_ID` is **not** read from the environment. It is always chosen interactively, because a value left exported in your shell silently targets another deployment's stacks.
 
-Pick option **9** for a full deployment, or **12** to run only what is still outstanding. You can jump straight to one option — `./deploy.sh 6` — and the deployment is still chosen interactively first.
+Pick option **9** to run every applicable step, or **`r`** to run only what is
+still outstanding. You can jump straight to one option — for example,
+`./badgers-headless/deploy.sh 6` — and the deployment is still chosen
+interactively first.
 
-The eight steps:
+The menu adapts to the chosen profile:
 
-| #   | Step               | What it does                                                                                                                         |
-| --- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Lambda Layers      | foundation, PDF processing, Poppler/qpdf                                                                                             |
-| 2   | Foundational Infra | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, X-Ray, Memory, VPC                                                              |
-| 3   | Upload Config      | prompts, manifests and schemas to the config bucket                                                                                  |
-| 4   | Specialist Lambdas | container images, then the Lambda stack (12 of 27 specialists enabled by default; `deployment/deployment_config.json` selects which) |
-| 5   | Gateway            | AgentCore MCP Gateway, records the Gateway URL                                                                                       |
-| 6   | Runtime            | builds and pushes the agent image, then deploys the Runtime                                                                          |
-| 7   | UI — Build         | generates `ui/.env` from Cognito, builds the bundle and image                                                                        |
-| 8   | UI — Deploy        | ECS Express Gateway service, forces the rollout, waits for it                                                                        |
+| Product | Applicable steps |
+| --- | --- |
+| Full | layers; foundation; immutable configuration release; specialists; Gateway; Runtime; UI image; UI ECS deployment |
+| Headless | layers; foundation; immutable configuration release; curated specialists; Gateway; Runtime |
+| Specialists | layers; foundation; immutable configuration release; selected direct-invocation specialists |
 
-Plus **9** full deployment, **12** resume, **10** status, **11** reset state (deletes nothing in AWS), **0** exit.
+All profiles also provide **9** for all applicable steps, **`r`** to resume,
+**10** for status, **11** to reset local deployment state (it deletes nothing
+in AWS), **`m`** to inspect the model registry, and **0** to exit.
 
-Step 8 asks once whether the UI should be publicly reachable. That answer is fixed for the life of the VPC — see Network exposure.
+Full asks whether its UI should be publicly reachable. The default is internal;
+that networking decision is fixed for the life of its VPC. Headless does not
+need WebSocket transport: its AgentCore runtime is invoked over its normal
+request interface. Specialists are invoked directly through AWS IAM.
 
-For the full procedure, prerequisites in depth, and every environment variable, see the Deployment Guide.
+For profile resolution, shared prompt releases, and the full stack-level
+procedure, see the [Deployment reference](deployment/DEPLOYMENT_README.md).
 
 ### Deployment Identity
 
@@ -263,11 +333,15 @@ To tear down by hand when the script cannot run, follow Manual Teardown in the C
 ```
 ├── deployment/
 │   ├── app.py                 # CDK app entry point
+│   ├── profiles/              # Full, Headless, and Specialists capability definitions
 │   ├── stacks/                # CDK stack definitions
 │   ├── lambdas/code/          # Specialist Lambda functions
 │   ├── runtime/               # AgentCore Runtime container
 │   ├── s3_files/              # Prompts, schemas, manifests
 │   └── badgers-foundation/    # Shared specialist framework
+├── badgers-full/              # Full product entry point and guide
+├── badgers-headless/          # Headless product entry point and guide
+├── badger-specialists/        # Direct specialist product entry point and guide
 ├── ui/                        # BADGERS UI (React + Express, runs locally or deployed via Docker)
 │   ├── src/                   # React components (testing + admin tabs, role-gated)
 │   ├── server/                # Express API server (testing + admin routes, OIDC auth)

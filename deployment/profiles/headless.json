@@ -1,0 +1,26 @@
+{
+  "name": "headless",
+  "display_name": "BADGERS Headless",
+  "profile_version": 1,
+  "specialist_selection": "packs",
+  "specialist_packs": [
+    "document-essentials",
+    "tables-and-forms"
+  ],
+  "capabilities": {
+    "agent_runtime": true,
+    "gateway": true,
+    "container_images": true,
+    "direct_invocation": true,
+    "progress_events": true,
+    "websocket_transport": false,
+    "ui": false,
+    "ui_identity": false,
+    "report_viewer": false,
+    "specialist_wizard": false,
+    "job_tracking": false,
+    "minimal_operation_ledger": true,
+    "session_memory": false,
+    "advanced_tracing": false
+  }
+}

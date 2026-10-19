@@ -1,0 +1,14 @@
+{
+  "name": "tables-and-forms",
+  "display_name": "Tables and Forms",
+  "version": 1,
+  "description": "Table extraction for structured document content.",
+  "tags": [
+    "tables",
+    "forms",
+    "structured-data"
+  ],
+  "specialists": [
+    "table_specialist"
+  ]
+}

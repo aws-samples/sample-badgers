@@ -1,7 +1,7 @@
 """Cognito Stack for BADGERS.
 
 Aligned with the media-contracts (MC) reference implementation: one user pool
-carrying two app clients, plus Managed Login v2 with explicit branding.
+always carries the Gateway machine client; Full adds browser-login resources.
 
 1. UI client (OIDC authorization-code + PKCE)
    - Used by the React frontend via react-oidc-context.
@@ -55,7 +55,7 @@ except ImportError:  # pragma: no cover - cdk-nag present in the deploy venv
 
 
 class CognitoStack(Stack):
-    """Cognito User Pool with UI (OIDC/PKCE) and Gateway (M2M) app clients."""
+    """Cognito User Pool with optional UI client and required Gateway M2M client."""
 
     def __init__(
         self,
@@ -65,12 +65,14 @@ class CognitoStack(Stack):
         deployment_tags: dict[str, str],
         ui_callback_url: str | None = None,
         ui_logout_url: str | None = None,
+        enable_ui: bool = True,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.deployment_id = deployment_id
         self.deployment_tags = deployment_tags
+        self.enable_ui = enable_ui
         self._apply_common_tags()
 
         # Callback / logout URLs — default to the local dev origin. The ECS stack
@@ -111,24 +113,7 @@ class CognitoStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # ── Groups (drive UI role gating: admin sees deploy/admin tabs) ──
-        self.admin_group = cognito.CfnUserPoolGroup(
-            self,
-            "AdminGroup",
-            user_pool_id=self.user_pool.user_pool_id,
-            group_name="admin",
-            description="Full access — all UI tabs and admin API routes",
-        )
-
-        self.tester_group = cognito.CfnUserPoolGroup(
-            self,
-            "TesterGroup",
-            user_pool_id=self.user_pool.user_pool_id,
-            group_name="tester",
-            description="Testing access — testing UI tabs and API routes only",
-        )
-
-        # ── Cognito domain (managed login v2) ──────────────────────
+        # ── Cognito domain (OAuth token endpoint for the M2M client) ─────────
         self.domain_prefix = f"badgers-{deployment_id}"
         self.cfn_domain = cognito.CfnUserPoolDomain(
             self,
@@ -158,31 +143,51 @@ class CognitoStack(Stack):
             ],
         )
 
-        # ── App Client 1: UI (OIDC, public, PKCE) ──────────────────
-        self.ui_client = self.user_pool.add_client(
-            "UIClient",
-            user_pool_client_name=f"badgers-ui-{deployment_id}",
-            generate_secret=False,  # public client — PKCE, no secret
-            auth_flows=cognito.AuthFlow(user_srp=True),
-            o_auth=cognito.OAuthSettings(
-                flows=cognito.OAuthFlows(authorization_code_grant=True),
-                scopes=[
-                    cognito.OAuthScope.OPENID,
-                    cognito.OAuthScope.EMAIL,
-                    cognito.OAuthScope.PROFILE,
+        self.ui_client = None
+        self.identity_pool = None
+        self.ui_branding = None
+        if self.enable_ui:
+            # ── Groups (drive UI role gating: admin sees deploy/admin tabs) ──
+            self.admin_group = cognito.CfnUserPoolGroup(
+                self,
+                "AdminGroup",
+                user_pool_id=self.user_pool.user_pool_id,
+                group_name="admin",
+                description="Full access — all UI tabs and admin API routes",
+            )
+            self.tester_group = cognito.CfnUserPoolGroup(
+                self,
+                "TesterGroup",
+                user_pool_id=self.user_pool.user_pool_id,
+                group_name="tester",
+                description="Testing access — testing UI tabs and API routes only",
+            )
+
+            # ── UI client (OIDC, public, PKCE) ─────────────────────
+            self.ui_client = self.user_pool.add_client(
+                "UIClient",
+                user_pool_client_name=f"badgers-ui-{deployment_id}",
+                generate_secret=False,  # public client — PKCE, no secret
+                auth_flows=cognito.AuthFlow(user_srp=True),
+                o_auth=cognito.OAuthSettings(
+                    flows=cognito.OAuthFlows(authorization_code_grant=True),
+                    scopes=[
+                        cognito.OAuthScope.OPENID,
+                        cognito.OAuthScope.EMAIL,
+                        cognito.OAuthScope.PROFILE,
+                    ],
+                    callback_urls=[ui_callback_url],
+                    logout_urls=[ui_logout_url],
+                ),
+                supported_identity_providers=[
+                    cognito.UserPoolClientIdentityProvider.COGNITO,
                 ],
-                callback_urls=[ui_callback_url],
-                logout_urls=[ui_logout_url],
-            ),
-            supported_identity_providers=[
-                cognito.UserPoolClientIdentityProvider.COGNITO,
-            ],
-            prevent_user_existence_errors=True,
-            access_token_validity=Duration.hours(8),
-            id_token_validity=Duration.hours(8),
-            refresh_token_validity=Duration.days(30),
-            enable_token_revocation=True,
-        )
+                prevent_user_existence_errors=True,
+                access_token_validity=Duration.hours(8),
+                id_token_validity=Duration.hours(8),
+                refresh_token_validity=Duration.days(30),
+                enable_token_revocation=True,
+            )
 
         # ── App Client 2: AgentCore Gateway M2M (client credentials) ──
         # Export name UserPoolClientId must keep pointing at THIS client — the
@@ -191,11 +196,11 @@ class CognitoStack(Stack):
             "AgentCoreGatewayClient",
             user_pool_client_name=f"agentcore-gateway-client-{deployment_id}",
             generate_secret=True,  # required for client credentials flow
-            auth_flows=cognito.AuthFlow(
-                user_password=True,
-                user_srp=True,
-                admin_user_password=True,
-            ),
+            # A non-empty explicit set prevents the CDK L2 from injecting
+            # interactive user-password/SRP defaults. No custom-auth trigger is
+            # configured for this pool, so this does not create an alternate
+            # practical login path; the runtime uses OAuth client credentials.
+            auth_flows=cognito.AuthFlow(custom=True),
             o_auth=cognito.OAuthSettings(
                 flows=cognito.OAuthFlows(client_credentials=True),
                 scopes=[cognito.OAuthScope.custom("agentcore-gateway/invoke")],
@@ -203,56 +208,60 @@ class CognitoStack(Stack):
             prevent_user_existence_errors=True,
         )
         self.user_pool_client.node.add_dependency(self.resource_server)
+        # Make the no-password intent explicit at the L1 boundary too. This
+        # protects against an L2 implementation change that reintroduces its
+        # legacy user-password/SRP defaults.
+        cfn_gateway_client = self.user_pool_client.node.default_child
+        assert isinstance(cfn_gateway_client, cognito.CfnUserPoolClient)
+        cfn_gateway_client.add_property_override(
+            "ExplicitAuthFlows", ["ALLOW_CUSTOM_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+        )
 
-        # ── Managed login branding (REQUIRED for managed login v2) ──
+        # ── Managed login branding (Full UI only) ───────────────────
         # An app client with NO branding style returns "Login pages unavailable"
         # at the hosted login URL. Load exported branding when available; fall
         # back to Cognito-provided defaults otherwise.
-        branding_file = (
-            Path(__file__).parent.parent
-            / "assets"
-            / "cognito-branding-definitions.json"
-        )
-        if branding_file.exists():
-            branding_data = json.loads(branding_file.read_text(encoding="utf-8"))
-            branding_root = branding_data.get("ManagedLoginBranding", branding_data)
-            branding_settings = branding_root.get("Settings", {})
-            # Transform assets from PascalCase (API export format) to typed CDK
-            # AssetTypeProperty instances. Deduplicate by (category, color_mode) —
-            # Cognito rejects multiple assets per slot.
-            raw_assets = branding_root.get("Assets", [])
-            seen: set[tuple[str, str]] = set()
-            branding_assets = [
-                cognito.CfnManagedLoginBranding.AssetTypeProperty(
-                    category=a.get("Category", ""),
-                    color_mode=a.get("ColorMode", ""),
-                    extension=a.get("Extension", ""),
-                    bytes=a.get("Bytes", ""),
+        if self.enable_ui:
+            branding_file = (
+                Path(__file__).parent.parent
+                / "assets"
+                / "cognito-branding-definitions.json"
+            )
+            if branding_file.exists():
+                branding_data = json.loads(branding_file.read_text(encoding="utf-8"))
+                branding_root = branding_data.get("ManagedLoginBranding", branding_data)
+                branding_settings = branding_root.get("Settings", {})
+                raw_assets = branding_root.get("Assets", [])
+                seen: set[tuple[str, str]] = set()
+                branding_assets = [
+                    cognito.CfnManagedLoginBranding.AssetTypeProperty(
+                        category=a.get("Category", ""),
+                        color_mode=a.get("ColorMode", ""),
+                        extension=a.get("Extension", ""),
+                        bytes=a.get("Bytes", ""),
+                    )
+                    for a in raw_assets
+                    if (a.get("Category", ""), a.get("ColorMode", "")) not in seen
+                    and not seen.add((a.get("Category", ""), a.get("ColorMode", "")))
+                ]
+                self.ui_branding = cognito.CfnManagedLoginBranding(
+                    self,
+                    "UIManagedLoginBranding",
+                    user_pool_id=self.user_pool.user_pool_id,
+                    client_id=self.ui_client.user_pool_client_id,
+                    use_cognito_provided_values=False,
+                    settings=branding_settings,
+                    assets=branding_assets,
                 )
-                for a in raw_assets
-                if (a.get("Category", ""), a.get("ColorMode", "")) not in seen
-                and not seen.add((a.get("Category", ""), a.get("ColorMode", "")))
-            ]
-
-            ui_branding = cognito.CfnManagedLoginBranding(
-                self,
-                "UIManagedLoginBranding",
-                user_pool_id=self.user_pool.user_pool_id,
-                client_id=self.ui_client.user_pool_client_id,
-                use_cognito_provided_values=False,
-                settings=branding_settings,
-                assets=branding_assets,
-            )
-        else:
-            ui_branding = cognito.CfnManagedLoginBranding(
-                self,
-                "UIManagedLoginBranding",
-                user_pool_id=self.user_pool.user_pool_id,
-                client_id=self.ui_client.user_pool_client_id,
-                use_cognito_provided_values=True,
-            )
-        ui_branding.node.add_dependency(self.cfn_domain)
-        self.ui_branding = ui_branding
+            else:
+                self.ui_branding = cognito.CfnManagedLoginBranding(
+                    self,
+                    "UIManagedLoginBranding",
+                    user_pool_id=self.user_pool.user_pool_id,
+                    client_id=self.ui_client.user_pool_client_id,
+                    use_cognito_provided_values=True,
+                )
+            self.ui_branding.node.add_dependency(self.cfn_domain)
 
         # ── Secrets Manager — Gateway M2M credentials ──────────────
         # Shape preserved: AgentCoreRuntimeWebSocketStack reads this secret.
@@ -272,19 +281,20 @@ class CognitoStack(Stack):
             },
         )
 
-        # ── Identity Pool for AWS credentials ──────────────────────
-        self.identity_pool = cognito.CfnIdentityPool(
-            self,
-            "AgentCoreIdentityPool",
-            identity_pool_name=f"badgers_identity_{deployment_id}",
-            allow_unauthenticated_identities=False,
-            cognito_identity_providers=[
-                cognito.CfnIdentityPool.CognitoIdentityProviderProperty(
-                    client_id=self.user_pool_client.user_pool_client_id,
-                    provider_name=self.user_pool.user_pool_provider_name,
-                )
-            ],
-        )
+        # ── Identity Pool for UI AWS credentials (Full UI only) ────
+        if self.enable_ui:
+            self.identity_pool = cognito.CfnIdentityPool(
+                self,
+                "AgentCoreIdentityPool",
+                identity_pool_name=f"badgers_identity_{deployment_id}",
+                allow_unauthenticated_identities=False,
+                cognito_identity_providers=[
+                    cognito.CfnIdentityPool.CognitoIdentityProviderProperty(
+                        client_id=self.user_pool_client.user_pool_client_id,
+                        provider_name=self.user_pool.user_pool_provider_name,
+                    )
+                ],
+            )
 
         # ── SSM parameters (cross-stack reads by the UI container) ──
         ssm.StringParameter(
@@ -294,27 +304,28 @@ class CognitoStack(Stack):
             string_value=self.user_pool.user_pool_id,
             description="Cognito User Pool ID",
         )
-        ssm.StringParameter(
-            self,
-            "UIClientIdParam",
-            parameter_name=f"{ssm_prefix}/cognito-ui-client-id",
-            string_value=self.ui_client.user_pool_client_id,
-            description="Cognito UI app client ID (public, PKCE)",
-        )
-        ssm.StringParameter(
-            self,
-            "AuthorityParam",
-            parameter_name=f"{ssm_prefix}/cognito-authority",
-            string_value=authority,
-            description="OIDC authority URL for react-oidc-context",
-        )
-        ssm.StringParameter(
-            self,
-            "DomainParam",
-            parameter_name=f"{ssm_prefix}/cognito-domain",
-            string_value=domain_url,
-            description="Cognito hosted UI domain URL",
-        )
+        if self.enable_ui:
+            ssm.StringParameter(
+                self,
+                "UIClientIdParam",
+                parameter_name=f"{ssm_prefix}/cognito-ui-client-id",
+                string_value=self.ui_client.user_pool_client_id,
+                description="Cognito UI app client ID (public, PKCE)",
+            )
+            ssm.StringParameter(
+                self,
+                "AuthorityParam",
+                parameter_name=f"{ssm_prefix}/cognito-authority",
+                string_value=authority,
+                description="OIDC authority URL for react-oidc-context",
+            )
+            ssm.StringParameter(
+                self,
+                "DomainParam",
+                parameter_name=f"{ssm_prefix}/cognito-domain",
+                string_value=domain_url,
+                description="Cognito hosted UI domain URL",
+            )
         ssm.StringParameter(
             self,
             "GatewayClientIdParam",
@@ -327,18 +338,23 @@ class CognitoStack(Stack):
         self._apply_resource_tags(
             self.user_pool,
             "cognito-user-pool",
-            "User pool for BADGERS UI and Gateway auth",
+            (
+                "User pool for BADGERS UI and Gateway auth"
+                if self.enable_ui
+                else "User pool for BADGERS Gateway machine authentication"
+            ),
         )
         self._apply_resource_tags(
             self.credentials_secret,
             "cognito-credentials-secret",
             "Secrets Manager secret for Cognito client credentials",
         )
-        self._apply_resource_tags(
-            self.identity_pool,
-            "cognito-identity-pool",
-            "Identity pool for AWS credentials",
-        )
+        if self.identity_pool is not None:
+            self._apply_resource_tags(
+                self.identity_pool,
+                "cognito-identity-pool",
+                "Identity pool for AWS credentials",
+            )
 
         # ── Outputs ────────────────────────────────────────────────
         CfnOutput(
@@ -362,34 +378,35 @@ class CognitoStack(Stack):
             description="Cognito M2M client ID for AgentCore Gateway",
             export_name=f"{Stack.of(self).stack_name}-UserPoolClientId",
         )
-        CfnOutput(
-            self,
-            "UIClientId",
-            value=self.ui_client.user_pool_client_id,
-            description="Cognito UI app client ID (public, PKCE)",
-            export_name=f"{Stack.of(self).stack_name}-UIClientId",
-        )
-        CfnOutput(
-            self,
-            "Authority",
-            value=authority,
-            description="OIDC authority for VITE_COGNITO_AUTHORITY",
-            export_name=f"{Stack.of(self).stack_name}-Authority",
-        )
-        CfnOutput(
-            self,
-            "CognitoDomain",
-            value=domain_url,
-            description="Cognito domain for VITE_COGNITO_DOMAIN and logout URL",
-            export_name=f"{Stack.of(self).stack_name}-CognitoDomain",
-        )
-        CfnOutput(
-            self,
-            "IdentityPoolId",
-            value=self.identity_pool.ref,
-            description="Cognito Identity Pool ID",
-            export_name=f"{Stack.of(self).stack_name}-IdentityPoolId",
-        )
+        if self.enable_ui:
+            CfnOutput(
+                self,
+                "UIClientId",
+                value=self.ui_client.user_pool_client_id,
+                description="Cognito UI app client ID (public, PKCE)",
+                export_name=f"{Stack.of(self).stack_name}-UIClientId",
+            )
+            CfnOutput(
+                self,
+                "Authority",
+                value=authority,
+                description="OIDC authority for VITE_COGNITO_AUTHORITY",
+                export_name=f"{Stack.of(self).stack_name}-Authority",
+            )
+            CfnOutput(
+                self,
+                "CognitoDomain",
+                value=domain_url,
+                description="Cognito domain for VITE_COGNITO_DOMAIN and logout URL",
+                export_name=f"{Stack.of(self).stack_name}-CognitoDomain",
+            )
+            CfnOutput(
+                self,
+                "IdentityPoolId",
+                value=self.identity_pool.ref,
+                description="Cognito Identity Pool ID",
+                export_name=f"{Stack.of(self).stack_name}-IdentityPoolId",
+            )
         CfnOutput(
             self,
             "UserPoolProviderUrl",

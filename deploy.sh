@@ -5,6 +5,10 @@ set -euo pipefail
 #
 # Usage:
 #   ./deploy.sh             # Pick a deployment, then the interactive menu
+#   ./deploy.sh headless    # Pick a deployment, then deploy the Headless product
+#   ./deploy.sh headless 9  # Run every Headless deployment step
+#   ./deploy.sh full 9      # Run every Full deployment step
+#   ./deploy.sh specialists --pack tables-and-forms 9
 #   ./deploy.sh resume      # Pick a deployment, then run only its remaining steps
 #   ./deploy.sh 4           # Pick a deployment, then run option 4 directly
 #
@@ -23,6 +27,62 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/deployment/scripts/common.sh"
 
 trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; exit 1' ERR
+
+# Product profile is selected before deployment identity so its safety checks happen
+# before any AWS preflight or resource creation.  A deployment ID can belong to only
+# one product profile; this prevents a Headless run from reusing Full stack state.
+BADGERS_PROFILE="${BADGERS_PROFILE:-full}"
+case "${1:-}" in
+  full|headless|specialists)
+    BADGERS_PROFILE="$1"
+    shift
+    ;;
+esac
+SPECIALIST_PACK_ARGS=()
+if [ "${BADGERS_PROFILE}" = "specialists" ]; then
+  while [ "${1:-}" = "--pack" ]; do
+    if [ -z "${2:-}" ]; then
+      log_error "--pack requires a specialist-pack name."
+      exit 1
+    fi
+    SPECIALIST_PACK_ARGS+=(--pack "$2")
+    shift 2
+  done
+fi
+case "${BADGERS_PROFILE}" in
+  full)
+    UI_ENABLED=1; MEMORY_ENABLED=1; X_RAY_ENABLED=1
+    RUNTIME_ENABLED=1; GATEWAY_ENABLED=1; COGNITO_ENABLED=1
+    OPERATION_LEDGER_ENABLED=1; ECR_ENABLED=1
+    ;;
+  headless)
+    UI_ENABLED=0; MEMORY_ENABLED=0; X_RAY_ENABLED=0
+    RUNTIME_ENABLED=1; GATEWAY_ENABLED=1; COGNITO_ENABLED=1
+    OPERATION_LEDGER_ENABLED=1; ECR_ENABLED=1
+    ;;
+  specialists)
+    UI_ENABLED=0; MEMORY_ENABLED=0; X_RAY_ENABLED=0
+    RUNTIME_ENABLED=0; GATEWAY_ENABLED=0; COGNITO_ENABLED=0
+    OPERATION_LEDGER_ENABLED=0; ECR_ENABLED=0
+    ;;
+  *)
+    log_error "Unknown BADGERS profile: ${BADGERS_PROFILE}. Supported profiles: full, headless."
+    exit 1
+    ;;
+esac
+export BADGERS_PROFILE
+if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
+  # The array is (--pack name --pack name); take its values rather than flags.
+  BADGERS_SPECIALIST_PACKS="$(printf '%s\n' "${SPECIALIST_PACK_ARGS[@]}" | awk 'NR % 2 == 0' | paste -sd, -)"
+  export BADGERS_SPECIALIST_PACKS
+else
+  unset BADGERS_SPECIALIST_PACKS
+fi
+if ! python3 "${SCRIPT_DIR}/deployment/profile_resolver.py" "${BADGERS_PROFILE}" "${SPECIALIST_PACK_ARGS[@]}" >/dev/null; then
+  log_error "Profile '${BADGERS_PROFILE}' is invalid. Fix its profile or specialist-pack configuration before deploying."
+  exit 1
+fi
+log_info "Product profile: ${BADGERS_PROFILE}"
 
 # ── Defaults ──
 IMAGE_TAG="${IMAGE_TAG:-latest}"
@@ -49,8 +109,43 @@ log_info "Region OK: ${AWS_REGION}"
 ensure_account || { log_error "ensure_account failed — check AWS credentials"; exit 1; }
 log_info "Account OK: ${ACCOUNT_ID}"
 
+had_existing_state=0
+[ -f "$(state_file)" ] && had_existing_state=1
 ensure_suffix || { log_error "ensure_suffix failed"; exit 1; }
 log_info "Suffix OK: ${STACK_SUFFIX}"
+
+# Persist the product profile with the deployment state.  Existing state without this
+# marker predates profiles and is treated as Full only, avoiding an unsafe implicit
+# conversion of an already-deployed Full stack into Headless.
+recorded_profile="$(get_state "product_profile")"
+if [ -z "${recorded_profile}" ]; then
+  if [ "${BADGERS_PROFILE}" != "full" ] && [ "${had_existing_state}" = "1" ]; then
+    log_error "Deployment '${DEPLOYMENT_ID}' has legacy Full state but no profile marker."
+    log_error "Choose a new deployment ID for Headless; do not reuse this stack identity."
+    exit 1
+  fi
+  set_state "product_profile" "\"${BADGERS_PROFILE}\""
+elif [ "${recorded_profile}" != "${BADGERS_PROFILE}" ]; then
+  log_error "Deployment '${DEPLOYMENT_ID}' belongs to the '${recorded_profile}' profile."
+  log_error "Choose a different deployment ID for '${BADGERS_PROFILE}' so stacks and state cannot collide."
+  exit 1
+fi
+recorded_packs="$(get_state "specialist_packs")"
+requested_packs="${BADGERS_SPECIALIST_PACKS:-}"
+if [ -z "${recorded_packs}" ]; then
+  set_state "specialist_packs" "\"${requested_packs}\""
+elif [ "${recorded_packs}" != "${requested_packs}" ]; then
+  log_error "Deployment '${DEPLOYMENT_ID}' was resolved with specialist packs '${recorded_packs:-default}'."
+  log_error "Choose a different deployment ID rather than changing its selected packs in place."
+  exit 1
+fi
+
+# Headless retains CloudWatch application logs but intentionally omits optional
+# X-Ray Transaction Search.  This avoids account-level quota consumption for an
+# API-only deployment and makes the profile's infrastructure boundary explicit.
+if [ "${X_RAY_ENABLED}" = "0" ]; then
+  export BADGERS_SKIP_XRAY=1
+fi
 
 RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-$(runtime_image_tag 2>/dev/null || echo "websocket")}"
 export RUNTIME_IMAGE_TAG
@@ -130,14 +225,24 @@ step_infra() {
 
   local stacks=(
     "$(_sn S3)"
-    "$(_sn Cognito)"
-    "$(_sn DynamoDB)"
     "$(_sn IAM)"
-    "$(_sn ECR)"
     "$(_sn InferenceProfiles)"
-    "$(_sn Memory)"
-    "$(_sn Vpc)"
   )
+  if [ "${COGNITO_ENABLED}" = "1" ]; then
+    stacks+=("$(_sn Cognito)")
+  fi
+  if [ "${OPERATION_LEDGER_ENABLED}" = "1" ]; then
+    stacks+=("$(_sn DynamoDB)")
+  fi
+  if [ "${ECR_ENABLED}" = "1" ]; then
+    stacks+=("$(_sn ECR)")
+  fi
+  if [ "${MEMORY_ENABLED}" = "1" ]; then
+    stacks+=("$(_sn Memory)")
+  fi
+  if [ "${UI_ENABLED}" = "1" ]; then
+    stacks+=("$(_sn Vpc)")
+  fi
   if [ "${BADGERS_SKIP_XRAY}" != "1" ]; then
     stacks+=("$(_sn XRay)")
   fi
@@ -169,23 +274,16 @@ step_upload() {
     return 1
   fi
 
-  # Submenu: which config to sync
+  # Every product stages and uploads the resolved profile as one release. A
+  # partial root-level sync would be invisible to consumers pinned to a release
+  # prefix and could leave a schema, manifest, and prompt set inconsistent.
   local choice
   if [ "${DEPLOY_RESUME_MODE:-}" = "1" ]; then
     choice="7"
   else
     echo ""
-    echo "  Which config to upload?"
-    echo "    1) Prompts (specialist prompts)"
-    echo "    2) Core System Prompts (shared rules, wrappers, error handling)"
-    echo "    3) Manifests (tool schemas, model selections, prompt file lists)"
-    echo "    4) Schemas (MCP-compatible input schemas)"
-    echo "    5) Agent Config (agent operating environment, model config)"
-    echo "    6) Runtime Config (model registry, document type contexts)"
-    echo "    7) All"
-    echo ""
-    read -rp "  Choice [7]: " choice
-    choice="${choice:-7}"
+    log_info "Uploading a complete, immutable ${BADGERS_PROFILE} configuration release."
+    choice="7"
   fi
   CURRENT_STEP_SUBMENU="${choice}"
 
@@ -201,17 +299,58 @@ step_upload() {
     5) _sync_config_category "agent_config" "$config_bucket" || return 1 ;;
     6) _sync_config_category "config" "$config_bucket" || return 1 ;;
     7)
-      log_info "Syncing all s3_files/ → s3://${config_bucket}/..."
-      aws s3 sync "${DEPLOYMENT_DIR}/s3_files/" "s3://${config_bucket}/" \
-        --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
-        --region "${AWS_REGION}" --quiet \
-        || { log_error "Config upload failed."; return 1; }
+      _sync_profile_config "${config_bucket}" || return 1
       ;;
     *) log_error "Invalid choice: ${choice}"; return 1 ;;
   esac
 
   log_success "Config files uploaded to ${config_bucket}"
   mark_complete "s3_files_uploaded"
+}
+
+# Stage a profile to a fresh temporary directory before S3 upload. This gives
+# Headless an exact configuration footprint today and is the source directory a
+# later release-artifact command can hash, sign, and publish.
+_sync_profile_config() {
+  local bucket="$1" stage_dir rc previous_release
+  stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/badgers-profile-config.XXXXXX")" || {
+    log_error "Could not create a temporary configuration staging directory."
+    return 1
+  }
+
+  local release_id
+  release_id="$(python3 "${DEPLOYMENT_DIR}/release_artifact.py" "${BADGERS_PROFILE}" \
+      "${SPECIALIST_PACK_ARGS[@]}" --destination "${stage_dir}")" || {
+    rm -rf -- "${stage_dir}"
+    log_error "Could not build a deterministic ${BADGERS_PROFILE} configuration release."
+    return 1
+  }
+  if [ -z "${release_id}" ]; then
+    rm -rf -- "${stage_dir}"
+    log_error "Configuration release builder returned no release ID."
+    return 1
+  fi
+
+  log_info "Syncing configuration release ${release_id} → s3://${bucket}/releases/${release_id}/..."
+  rc=0
+  aws s3 sync "${stage_dir}/" "s3://${bucket}/releases/${release_id}/" \
+    --exclude "*.DS_Store" --exclude "*.pyc" --exclude "__pycache__/*" \
+    --region "${AWS_REGION}" --quiet || rc=$?
+  rm -rf -- "${stage_dir}"
+
+  if [ "${rc}" -ne 0 ]; then
+    log_error "Profile configuration upload failed."
+    return 1
+  fi
+  previous_release="$(get_state "config_release_id")"
+  set_state "config_release_id" "\"${release_id}\""
+  log_success "Pinned configuration release: ${release_id}"
+  if [ -n "${previous_release}" ] && [ "${previous_release}" != "${release_id}" ]; then
+    invalidate_state "specialists_complete"
+    invalidate_state "gateway_complete"
+    invalidate_state "runtime_deployed"
+    log_info "Configuration changed; specialist, Gateway, and runtime stages must redeploy."
+  fi
 }
 
 # Sync a single s3_files/ subdirectory to the config bucket. Returns non-zero on a sync
@@ -296,14 +435,21 @@ step_specialists() {
   # stale one here and offer to rebuild rather than failing inside CDK synth.
   _ensure_foundation_layer_fresh || return 1
 
-  ecr_login
+  if [ "${ECR_ENABLED}" = "1" ]; then
+    ecr_login
+  fi
 
-  # Container Lambdas are built before the stack that references their images.
-  log_info "Building container Lambda images..."
-  # build_container_lambdas.sh derives its target as badgers-<arg>, which has to match
-  # the repository the ECR stack creates (badgers-{DEPLOYMENT_ID}-{suffix}).
-  (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_container_lambdas.sh "$(resource_id)") \
-    || { log_error "Container Lambda build failed."; return 1; }
+  # Full currently uses container-based specialists. The Headless and direct
+  # specialist profiles use validated zip-based packs and do not build ECR images.
+  if [ "${BADGERS_PROFILE}" = "full" ]; then
+    log_info "Building container Lambda images..."
+    # build_container_lambdas.sh derives its target as badgers-<arg>, which has to match
+    # the repository the ECR stack creates (badgers-{DEPLOYMENT_ID}-{suffix}).
+    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_container_lambdas.sh "$(resource_id)") \
+      || { log_error "Container Lambda build failed."; return 1; }
+  else
+    log_info "${BADGERS_PROFILE^} selected no container specialists; skipping container Lambda image build."
+  fi
 
   ensure_xray_decision || return 1
   export_cdk_env
@@ -318,6 +464,10 @@ step_specialists() {
 # STEP 5: Gateway
 # ══════════════════════════════════════════════════════════════════════════
 step_gateway() {
+  if [ "${GATEWAY_ENABLED}" != "1" ]; then
+    log_error "Gateway deployment is not part of the ${BADGERS_PROFILE} profile."
+    return 1
+  fi
   log_step "Step 5: Gateway"
 
   if check_completed "gateway_complete"; then
@@ -358,6 +508,10 @@ step_gateway() {
 # STEP 6: Runtime — Build, Push & Deploy
 # ══════════════════════════════════════════════════════════════════════════
 step_runtime() {
+  if [ "${RUNTIME_ENABLED}" != "1" ]; then
+    log_error "Runtime deployment is not part of the ${BADGERS_PROFILE} profile."
+    return 1
+  fi
   log_step "Step 6: Runtime — Build, Push & Deploy"
 
   # Both sub-steps, not just the image push. An earlier guard tested only
@@ -485,8 +639,8 @@ _prompt_ui_public_access() {
   fi
 
   if [ "${BADGERS_ASSUME_YES:-}" = "1" ]; then
-    export UI_PUBLIC_ACCESS=true
-    log_warn "BADGERS_ASSUME_YES=1 — defaulting to a public, internet-facing UI."
+    export UI_PUBLIC_ACCESS=false
+    log_info "BADGERS_ASSUME_YES=1 — defaulting to an internal-only UI."
     _UI_ACCESS_RESOLVED=1
     return 0
   fi
@@ -503,8 +657,8 @@ _prompt_ui_public_access() {
   # abort an entire full deployment.
   local ans
   while true; do
-    read -rp "Make the UI publicly accessible? (y/n) [y]: " ans
-    case "${ans:-y}" in
+    read -rp "Make the UI publicly accessible? (y/n) [n]: " ans
+    case "${ans:-n}" in
       y|Y) export UI_PUBLIC_ACCESS=true;  break ;;
       n|N) export UI_PUBLIC_ACCESS=false; break ;;
       *)   log_error "Answer y or n (got '${ans}')." ;;
@@ -681,7 +835,13 @@ step_ui_deploy() {
 # ══════════════════════════════════════════════════════════════════════════
 # Resume — run only the steps this deployment still needs
 # ══════════════════════════════════════════════════════════════════════════
-ALL_STEPS=(step_layers step_infra step_upload step_specialists step_gateway step_runtime step_ui_build step_ui_deploy)
+ALL_STEPS=(step_layers step_infra step_upload step_specialists step_gateway step_runtime)
+if [ "${GATEWAY_ENABLED}" != "1" ]; then
+  ALL_STEPS=(step_layers step_infra step_upload step_specialists)
+fi
+if [ "${UI_ENABLED}" = "1" ]; then
+  ALL_STEPS+=(step_ui_build step_ui_deploy)
+fi
 
 # Run every step in order, skipping completed ones silently (resume mode).
 run_remaining() {
@@ -704,7 +864,7 @@ step_resume() {
 
   # Only ask if step 8 is actually still pending, so a resume that has nothing left to
   # deploy does not prompt about network exposure it will never apply.
-  if ! check_completed "ecs_deployed"; then
+  if [ "${UI_ENABLED}" = "1" ] && ! check_completed "ecs_deployed"; then
     _prompt_ui_public_access || return 1
   fi
 
@@ -725,12 +885,14 @@ step_full() {
   _confirm || return 0
 
   # Asked up front rather than at step 8, so the run is unattended after this point.
-  _prompt_ui_public_access || return 1
+  if [ "${UI_ENABLED}" = "1" ]; then
+    _prompt_ui_public_access || return 1
+  fi
 
   run_remaining || return 1
 
   echo ""
-  log_success "Full deployment complete!"
+  log_success "${BADGERS_PROFILE^} deployment complete!"
   show_status
 }
 
@@ -759,27 +921,40 @@ show_status() {
   _step_line "infra_complete"       "2. Foundational Infrastructure"
   _step_line "s3_files_uploaded"    "3. Prompts, Manifests & Schemas"
   _step_line "specialists_complete" "4. Specialist Lambdas"
-  _step_line "gateway_complete"     "5. Gateway"
-
-  # Step 6 has two sub-steps.
-  local a b mark6 ts6
-  a="$(check_completed "runtime_image_pushed" && echo "✓" || echo "○")"
-  b="$(check_completed "runtime_deployed" && echo "✓" || echo "○")"
-  mark6="○"; [ "$a" = "✓" ] && [ "$b" = "✓" ] && mark6="✓"
-  ts6="$(get_state "runtime_deployed_at")"
-  if [ -n "${ts6}" ]; then
-    echo -e "  ${mark6}  6. Runtime — Build & Deploy  ${YELLOW}${ts6}${NC}"
-  else
-    echo "  ${mark6}  6. Runtime — Build & Deploy"
+  if [ "${GATEWAY_ENABLED}" = "1" ]; then
+    _step_line "gateway_complete"     "5. Gateway"
   fi
 
-  _step_line "ui_image_pushed"      "7. UI — Build Image"
-  _step_line "ecs_deployed"         "8. UI — Deploy ECS"
+  # Step 6 has two sub-steps.
+  if [ "${RUNTIME_ENABLED}" = "1" ]; then
+    local a b mark6 ts6
+    a="$(check_completed "runtime_image_pushed" && echo "✓" || echo "○")"
+    b="$(check_completed "runtime_deployed" && echo "✓" || echo "○")"
+    mark6="○"; [ "$a" = "✓" ] && [ "$b" = "✓" ] && mark6="✓"
+    ts6="$(get_state "runtime_deployed_at")"
+    if [ -n "${ts6}" ]; then
+      echo -e "  ${mark6}  6. Runtime — Build & Deploy  ${YELLOW}${ts6}${NC}"
+    else
+      echo "  ${mark6}  6. Runtime — Build & Deploy"
+    fi
+  fi
+
+  if [ "${UI_ENABLED}" = "1" ]; then
+    _step_line "ui_image_pushed"      "7. UI — Build Image"
+    _step_line "ecs_deployed"         "8. UI — Deploy ECS"
+  elif [ "${BADGERS_PROFILE}" = "headless" ]; then
+    echo "  —  UI, VPC, session memory, and UI WebSocket workflow are omitted by Headless."
+  else
+    echo "  —  Direct specialist invocation; no agent runtime, Gateway, UI, or operation ledger."
+  fi
   echo ""
 
   local gateway_url
   gateway_url="$(get_state "gateway_url")"
   [ -n "${gateway_url}" ] && echo "  Gateway URL: ${gateway_url}"
+  local config_release
+  config_release="$(get_state "config_release_id")"
+  [ -n "${config_release}" ] && echo "  Config release: ${config_release}"
   echo ""
 }
 
@@ -838,9 +1013,9 @@ PY
   echo "    2) Foundational Infra   profiles, IAM grants and the SSM model→profile map are"
   echo "                            regenerated at synth. The model access and invocation"
   echo "                            preflights re-run here."
-  echo "    3) Upload Config Files  option 6 (or 7) copies the registry to S3, which is what"
-  echo "                            GET /api/models and the wizard read. Skip this and the"
-  echo "                            UI keeps offering the old list."
+  echo "    3) Upload Config Files  builds and uploads a complete immutable configuration"
+  echo "                            release, including the registry. Then redeploy the"
+  echo "                            affected consumers so their pinned release advances."
   echo "    6) Runtime              the agent role's Bedrock grants are generated into the"
   echo "                            Runtime stack, so it must redeploy too. The image is"
   echo "                            unchanged; step 6 will rebuild it anyway."
@@ -877,6 +1052,7 @@ EOF
   echo -e "${NC}"
 
   echo -e "  ${BOLD}Deployment ID:${NC} ${DEPLOYMENT_ID}"
+  echo -e "  ${BOLD}Product Profile:${NC} ${BADGERS_PROFILE}"
   echo -e "  ${BOLD}Stack Suffix:${NC}  ${STACK_SUFFIX}"
   echo -e "  ${BOLD}Stack Names:${NC}   ${STACK_PREFIX}-{Name}-${STACK_SUFFIX}"
   echo -e "  ${BOLD}Resource ID:${NC}   $(resource_id)"
@@ -889,13 +1065,25 @@ EOF
   echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
   echo ""
   echo -e "  ${BOLD} 1${NC}) Build Lambda Layers"
-  echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB, IAM, ECR, Profiles, XRay, Memory, VPC)"
-  echo -e "  ${BOLD} 3${NC}) Upload Config Files     → submenu"
+  if [ "${UI_ENABLED}" = "1" ]; then
+    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB, IAM, ECR, Profiles, XRay, Memory, VPC)"
+  elif [ "${BADGERS_PROFILE}" = "headless" ]; then
+    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB ledger, IAM, ECR, Profiles)"
+  else
+    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, IAM, model profiles)"
+  fi
+  echo -e "  ${BOLD} 3${NC}) Upload Config Release"
   echo -e "  ${BOLD} 4${NC}) Specialist Lambdas      (incl. container images)"
-  echo -e "  ${BOLD} 5${NC}) Gateway"
-  echo -e "  ${BOLD} 6${NC}) Runtime — Build & Deploy"
-  echo -e "  ${BOLD} 7${NC}) UI — Build & Push Image"
-  echo -e "  ${BOLD} 8${NC}) UI — Deploy ECS          → submenu"
+  if [ "${GATEWAY_ENABLED}" = "1" ]; then
+    echo -e "  ${BOLD} 5${NC}) Gateway"
+  fi
+  if [ "${RUNTIME_ENABLED}" = "1" ]; then
+    echo -e "  ${BOLD} 6${NC}) Runtime — Build & Deploy"
+  fi
+  if [ "${UI_ENABLED}" = "1" ]; then
+    echo -e "  ${BOLD} 7${NC}) UI — Build & Push Image"
+    echo -e "  ${BOLD} 8${NC}) UI — Deploy ECS          → submenu"
+  fi
   echo ""
   echo -e "  ${BOLD} 9${NC}) ${GREEN}Full Deployment (Run All Steps)${NC}"
   echo -e "  ${BOLD} r${NC}) ${GREEN}Resume (Run Remaining Steps Only)${NC}"
@@ -917,8 +1105,22 @@ dispatch() {
     4)  step_specialists ;;
     5)  step_gateway ;;
     6)  step_runtime ;;
-    7)  step_ui_build ;;
-    8)  step_ui_deploy ;;
+    7)
+      if [ "${UI_ENABLED}" = "1" ]; then
+        step_ui_build
+      else
+        log_error "UI build is available only in the full profile."
+        return 1
+      fi
+      ;;
+    8)
+      if [ "${UI_ENABLED}" = "1" ]; then
+        step_ui_deploy
+      else
+        log_error "UI deployment is available only in the full profile."
+        return 1
+      fi
+      ;;
     9)  step_full ;;
     10) show_status ;;
     11) reset_state ;;

@@ -51,6 +51,7 @@ class PromptLoader:
 
             # Import S3 loader only when needed
             from foundation.s3_config_loader import (
+                config_key,
                 load_prompt_from_s3,
                 load_wrapper_from_s3,
                 S3ConfigError,
@@ -58,6 +59,7 @@ class PromptLoader:
 
             self._load_prompt_from_s3 = load_prompt_from_s3
             self._load_wrapper_from_s3 = load_wrapper_from_s3
+            self._config_key = config_key
             self._S3ConfigError = S3ConfigError
 
             self.logger.info(
@@ -115,7 +117,7 @@ class PromptLoader:
                     s3 = __import__("boto3").client("s3")
                     response = s3.get_object(
                         Bucket=self.s3_bucket,
-                        Key="agent_config/agent_operating_environment_config.json",
+                        Key=self._config_key("agent_config/agent_operating_environment_config.json"),
                     )
                     import json as _json
 

@@ -50,6 +50,8 @@ class AgentCoreGatewayStack(Stack):
         lambda_functions: dict[str, lambda_.Function],
         config_bucket: s3.Bucket,
         cognito_stack_name: str,
+        specialist_function_name_prefix: str = "badgers",
+        config_prefix: str = "",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -58,6 +60,8 @@ class AgentCoreGatewayStack(Stack):
         self.deployment_tags = deployment_tags
         self.lambda_functions = lambda_functions
         self.config_bucket = config_bucket
+        self.specialist_function_name_prefix = specialist_function_name_prefix
+        self.config_prefix = config_prefix.strip("/")
         # Stack names carry a per-deployment suffix, so the Cognito export names
         # cannot be hardcoded here.
         self.cognito_stack_name = cognito_stack_name
@@ -208,17 +212,19 @@ class AgentCoreGatewayStack(Stack):
                 {
                     "id": "AwsSolutions-IAM5",
                     "reason": (
-                        "lambda:InvokeFunction on function:badgers_* in this account and "
+                        "lambda:InvokeFunction on the deployment's specialist-name prefix "
+                        "in this account and "
                         "Region. The name-prefix wildcard is deliberate: the grant must "
                         "exist before the Gateway creates its targets, target creation "
                         "happens in the same deploy, and the CustomSpecialists stack adds "
                         "further targets against this role in a later deploy, so the full "
                         "set of function ARNs is not knowable here. Every specialist "
-                        "function, base and custom, is named badgers_<specialist>. Region "
+                        "function, base and custom, uses that deployment-scoped prefix. Region "
                         "and account are pinned."
                     ),
                     "appliesTo": [
-                        f"Resource::arn:aws:lambda:{region}:{account}:function:badgers_*"
+                        f"Resource::arn:aws:lambda:{region}:{account}:function:"
+                        f"{self.specialist_function_name_prefix}_*"
                         for region in region_renderings(self.region)
                         for account in account_renderings(self.account)
                     ],
@@ -241,14 +247,16 @@ class AgentCoreGatewayStack(Stack):
         # -- target creation and the per-function grant_invoke() calls in
         # add_lambda_targets() land in the same deploy, and the CustomSpecialists stack
         # adds its own targets against this role later. Region and account are pinned;
-        # only the function-name suffix is wildcarded. The name prefix `badgers_` is what
-        # every specialist function is named with, base and custom alike.
+        # only the function-name suffix is wildcarded. The prefix is supplied by the
+        # product profile, which lets Full retain legacy names while Headless names
+        # cannot collide with it.
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="InvokeSpecialistsByPrefix",
                 actions=["lambda:InvokeFunction"],
                 resources=[
-                    f"arn:aws:lambda:{self.region}:{self.account}:function:badgers_*"
+                    f"arn:aws:lambda:{self.region}:{self.account}:function:"
+                    f"{self.specialist_function_name_prefix}_*"
                 ],
             )
         )
@@ -386,7 +394,11 @@ class AgentCoreGatewayStack(Stack):
                 lambda_function=lambda_function,
                 tool_schema=agentcore.ToolSchema.from_s3_file(
                     bucket=self.config_bucket,
-                    object_key=f"schemas/{specialist_name}.json",
+                    object_key=(
+                        f"{self.config_prefix}/schemas/{specialist_name}.json"
+                        if self.config_prefix
+                        else f"schemas/{specialist_name}.json"
+                    ),
                 ),
             )
 

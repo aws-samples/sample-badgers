@@ -1,0 +1,26 @@
+{
+  "name": "specialists",
+  "display_name": "BADGERS Specialists",
+  "profile_version": 1,
+  "specialist_selection": "packs",
+  "pack_selection": "user_selectable",
+  "specialist_packs": [
+    "document-essentials"
+  ],
+  "capabilities": {
+    "agent_runtime": false,
+    "gateway": false,
+    "container_images": false,
+    "direct_invocation": true,
+    "progress_events": false,
+    "websocket_transport": false,
+    "ui": false,
+    "ui_identity": false,
+    "report_viewer": false,
+    "specialist_wizard": false,
+    "job_tracking": false,
+    "minimal_operation_ledger": false,
+    "session_memory": false,
+    "advanced_tracing": false
+  }
+}

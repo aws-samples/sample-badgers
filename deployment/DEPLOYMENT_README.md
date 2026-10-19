@@ -1,15 +1,27 @@
 <sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | [UI](../ui/UI_README.md) | 🔵 **Deployment** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Lambda Specialists](lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[Home](../README.md) | [BADGERS Full](../badgers-full/README.md) | [BADGERS Headless](../badgers-headless/README.md) | [BADGERS Specialists](../badger-specialists/README.md) | 🔵 **Deployment reference** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 ---
 
-# 🚀 BADGERS Deployment Guide
+# 🚀 BADGERS Deployment Reference
 
 ![Deployment CLI](../.github/assets/07_sample-badgers-deployment-cli.png)
 
-Step-by-step AWS CDK deployment for BADGERS. For architecture overview and technical details, see the [main README](../README.md).
+This is the technical reference for operating or extending a BADGERS
+deployment. For a first deployment, start with one of the three product guides:
 
-## ☁️ AWS Services
+| Desired outcome | Start here |
+| --- | --- |
+| Complete application with UI and specialist administration | [BADGERS Full](../badgers-full/README.md) |
+| Agent and Gateway behind your application or workflow | [BADGERS Headless](../badgers-headless/README.md) |
+| Direct invocation of selected document analyzers | [BADGERS Specialists](../badger-specialists/README.md) |
+
+Every route uses the same profile-aware deployment engine. This reference
+describes the complete infrastructure surface; sections about UI, VPC, session
+memory, X-Ray, and custom-specialist administration apply only to Full unless
+explicitly noted.
+
+## ☁️ AWS Services in the Full product
 
 | Service                                                               | Purpose                                             |
 | --------------------------------------------------------------------- | --------------------------------------------------- |
@@ -85,23 +97,29 @@ deploying a second copy of everything by accident.
 
 ## ⚡ Quick Start
 
-From the repository root:
+Run the product entry point from the repository root:
 
 ```bash
-./deploy.sh
+./badgers-full/deploy.sh
+# or
+./badgers-headless/deploy.sh
+# or
+./badger-specialists/deploy.sh
 ```
 
-That is the whole command. **`deploy.sh` does not read `DEPLOYMENT_ID` from the
-environment** — it unsets it and always asks, because a value left exported in your shell
-silently targets another deployment's stacks and state file.
+The entry point selects its product profile before asking for a deployment ID.
+It then runs preflight checks and presents only the steps supported by that
+profile. **`deploy.sh` does not read `DEPLOYMENT_ID` from the environment** — it
+unsets it and always asks, because a value left exported in your shell silently
+targets another deployment's stacks and state file.
 
 On start it scans `.deploy-state/` and offers what it finds:
 
 ```
 Deployments found — most recent activity first:
 
-    1) dev                8/9 steps  in progress   last activity 2026-08-04T16:14:38Z
-    2) demo               9/9 steps  complete      last activity 2026-08-02T11:02:10Z
+    1) dev                Full       in progress   last activity 2026-10-15T16:14:38Z
+    2) demo               Headless   complete      last activity 2026-10-13T11:02:10Z
 
     n) Start a new deployment instead
 
@@ -112,35 +130,28 @@ Complete and in-progress deployments are both listed, so you can re-run a single
 against a finished deployment. Choosing `n` prompts for a new id and rejects one that
 already has state — pick it from the list instead. Pressing Enter takes the most recent.
 
-Then the menu:
+Choose **9** to run every applicable step, or **`r`** to run only remaining
+steps. The profile determines the menu:
 
-| Option | Step                                | What it does                                                           |
-| ------ | ----------------------------------- | ---------------------------------------------------------------------- |
-| `1`    | Build Lambda Layers                 | foundation, PDF processing, poppler/qdf archives                       |
-| `2`    | Foundational Infra                  | S3, Cognito, DynamoDB, IAM, ECR, Inference Profiles, XRay, Memory, VPC |
-| `3`    | Upload Prompts, Manifests & Schemas | syncs `s3_files/` to the config bucket                                 |
-| `4`    | Specialist Lambdas                  | container images to ECR, then the Lambda stack                         |
-| `5`    | Gateway                             | AgentCore MCP Gateway with Lambda targets                              |
-| `6`    | Runtime — Build & Deploy            | builds/pushes the agent image, deploys the Runtime                     |
-| `7`    | UI — Build & Push Image             | generates `ui/.env`, builds the Vite bundle and image, pushes          |
-| `8`    | UI — Deploy ECS                     | deploys the ECS stack, forces the image rollout, waits                 |
-| `9`    | Full Deployment                     | runs 1 → 8 in order, stopping at the first failure                     |
-| `r`    | Resume                              | runs only the steps still outstanding, without prompting on each       |
-| `10`   | Show Deployment Status              | current suffix, per-step completion with timestamps                    |
-| `11`   | Reset Deployment State              | marks all steps incomplete; **deletes nothing in AWS**                 |
-| `m`    | Models                              | prints the model registry and which steps a registry edit requires     |
-| `0`    | Exit                                |                                                                        |
+| Profile | Steps shown |
+| ------ | ----------- |
+| Full | 1 layers; 2 foundation; 3 immutable configuration release; 4 specialists; 5 Gateway; 6 Runtime; 7 UI image; 8 UI ECS |
+| Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime |
+| Specialists | 1 layers; 2 foundation; 3 immutable configuration release; 4 selected direct-invocation specialists |
 
-You can also run one directly — `./deploy.sh 8` or `./deploy.sh resume` — but the
-deployment is still chosen interactively first.
+All profiles include **10** (status), **11** (reset local state without deleting
+AWS resources), **`m`** (model registry), and **0** (exit). You can also run one
+step directly — for example `./badgers-headless/deploy.sh 6` or
+`./badgers-full/deploy.sh resume` — while deployment identity selection remains
+interactive.
 
 ### Resume vs Full Deployment
 
 Both get you to a complete deployment; they differ in friction.
 
-**Option 9** walks all eight steps. Steps already marked complete stop and ask whether to
-re-run, so resuming from step 4 costs you three prompts. Declining a prompt is treated as
-success and the run continues.
+**Option 9** walks every step applicable to the selected profile. Steps already
+marked complete stop and ask whether to re-run, so declining a prompt treats that
+step as successful and the run continues.
 
 **Option `r`** skips completed steps *before* calling them, so those prompts never fire. It
 starts at the first outstanding step. A step counts as complete only when every state key
@@ -155,11 +166,11 @@ re-entered rather than skipped.
 Each step records completion in `.deploy-state/{DEPLOYMENT_ID}.json` with a timestamp, so
 a re-run after a failure continues rather than starting over. Every step is idempotent.
 
-If step 8 fails, `ui_image_pushed` is cleared deliberately: an ECS rollout almost always
-fails because of something inside the image, and redeploying the stack alone will not pick
-up a code change. Resume therefore rebuilds and pushes in step 7 before retrying step 8.
-When the cause was outside the image — a quota, a permission — step 7 is a no-op rebuild
-that costs only time.
+For Full, if step 8 fails, `ui_image_pushed` is cleared deliberately: an ECS
+rollout almost always fails because of something inside the image, and
+redeploying the stack alone will not pick up a code change. Resume therefore
+rebuilds and pushes in step 7 before retrying step 8. This UI-specific behavior
+does not apply to Headless or Specialists.
 
 See [DEPLOYMENT_SCRIPTS.md](DEPLOYMENT_SCRIPTS.md) for every script and its flags.
 
@@ -286,10 +297,18 @@ build-time `VITE_*` values.
 > non-`VITE_` lines, `ui/server/index.js` reads them when run outside ECS, and the deployed
 > service reads everything from SSM.
 
-## 🔧 Manual Deployment
+## 🔧 Manual Deployment — Full product maintainers
 
-Prefer `./deploy.sh` — it does all of this with resumable state. The steps below are for
-when you need to drive a single stack yourself.
+Prefer the product entry points — they perform profile resolution, preflight
+checks, immutable configuration-release creation, consumer pinning, and
+resumable state tracking. The commands below are a component-level Full-product
+maintainer reference, not a supported replacement for the deployment engine.
+
+> [!WARNING]
+> Do not use this section as an end-to-end installation recipe. In particular,
+> copying files to a mutable `s3_files/` prefix bypasses the release artifact
+> that production consumers pin. Use menu Step 3, **Upload Config Release**, for
+> configuration changes.
 
 Every command assumes the deployment identity is exported, and `{suffix}` below stands for
 your actual suffix from `.deploy-state/{DEPLOYMENT_ID}.json`:
@@ -364,7 +383,7 @@ uv run cdk bootstrap
 > come from [`aws_cdk.aws_bedrockagentcore`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_bedrockagentcore-readme.html)
 > in `aws-cdk-lib` (2.263.0 or later), which is what `uv sync` installs.
 
-### 4️⃣ Foundational Stacks + Upload Config
+### 4️⃣ Foundational Stacks
 
 Same set and order as `deploy.sh` step 2. `IAM` imports the DynamoDB table and the S3
 buckets, `Lambda` imports ECR and the inference profiles, so the order below is not
@@ -377,10 +396,12 @@ for s in S3 Cognito DynamoDB IAM ECR InferenceProfiles Memory Vpc; do
   uv run cdk deploy BADGERS-${s}-{id}-{suffix} --require-approval never
 done
 uv run cdk deploy BADGERS-XRay-{id}-{suffix} --require-approval never   # optional; see X-Ray section
-
-# Sync s3_files/ (prompts, manifests, schemas, agent config, model registry)
-./sync_s3_files.sh
 ```
+
+Create and upload configuration through menu Step 3 before deploying
+specialists, Gateway, or Runtime. It stages only the selected profile's files,
+generates `release-manifest.json`, derives its SHA-256 release ID, and uploads
+to `releases/<sha256>/`.
 
 ### 5️⃣ Container Images + Specialist Lambdas
 
@@ -673,8 +694,8 @@ uv run cdk deploy BADGERS-Gateway-{id}-{suffix} --require-approval never
 cd runtime && ./build_and_push_websocket.sh && cd ..
 uv run cdk deploy BADGERS-RuntimeWebSocket-{id}-{suffix} --require-approval never
 
-# Prompt/manifest changes only
-./sync_s3_files.sh
+# Prompt/manifest/schema/model-registry changes
+# Run menu Step 3, then redeploy the affected consumers so their pinned release advances.
 ```
 
 ## 🔐 Authentication

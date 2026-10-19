@@ -1,5 +1,7 @@
 """IAM Stack for BADGERS."""
 
+from typing import Optional
+
 from aws_cdk import (
     Stack,
     CfnOutput,
@@ -38,7 +40,7 @@ class IAMStack(Stack):
         config_bucket: s3.Bucket,
         source_bucket: s3.Bucket,
         output_bucket: s3.Bucket,
-        jobs_table: dynamodb.ITable,
+        jobs_table: Optional[dynamodb.ITable] = None,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -193,19 +195,20 @@ class IAMStack(Stack):
         # and the Batch* operations. Specialists never delete or scan; the base
         # table alone is enough because job_state.query filters on the job_id
         # partition key and never reads a GSI.
-        self.lambda_role.add_to_policy(
-            iam.PolicyStatement(
-                sid="DynamoDBJobState",
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "dynamodb:PutItem",
-                    "dynamodb:UpdateItem",
-                    "dynamodb:GetItem",
-                    "dynamodb:Query",
-                ],
-                resources=[jobs_table.table_arn],
+        if jobs_table is not None:
+            self.lambda_role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="DynamoDBJobState",
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "dynamodb:PutItem",
+                        "dynamodb:UpdateItem",
+                        "dynamodb:GetItem",
+                        "dynamodb:Query",
+                    ],
+                    resources=[jobs_table.table_arn],
+                )
             )
-        )
 
         # S3 access for specific buckets (config and output only)
         # Additional bucket access should be granted explicitly

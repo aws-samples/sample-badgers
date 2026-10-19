@@ -8,6 +8,7 @@ import warnings
 from pathlib import Path
 
 import aws_cdk as cdk
+from profile_resolver import ProfileResolutionError, resolve_profile
 from stacks import (
     S3Stack,
     IAMStack,
@@ -77,9 +78,31 @@ deployment_id = f"{DEPLOYMENT_ID}-{STACK_SUFFIX}"
 # public subnets produce an internet-facing ALB (and enable public IPs on the tasks),
 # while subnets without an internet gateway produce an internal one. Default is public,
 # because otherwise the UI's *.ecs.<region>.on.aws URL resolves but never answers.
-# Set UI_PUBLIC_ACCESS=false for an internal-only UI reachable from inside the VPC.
-UI_PUBLIC_ACCESS = os.environ.get("UI_PUBLIC_ACCESS", "true").lower() == "true"
-print(f"Deployment ID: {DEPLOYMENT_ID}   Stack suffix: {STACK_SUFFIX}")
+# Set UI_PUBLIC_ACCESS=true only when the deployment operator intentionally wants an
+# internet-facing UI.  Headless never creates the UI or VPC stacks.
+PROFILE_NAME = os.environ.get("BADGERS_PROFILE") or app.node.try_get_context(
+    "badgers_profile"
+) or "full"
+SPECIALIST_PACKS = tuple(
+    pack.strip()
+    for pack in os.environ.get("BADGERS_SPECIALIST_PACKS", "").split(",")
+    if pack.strip()
+)
+try:
+    profile = resolve_profile(
+        PROFILE_NAME, specialist_packs=SPECIALIST_PACKS or None
+    )
+except ProfileResolutionError as error:
+    raise SystemExit(f"Invalid BADGERS profile '{PROFILE_NAME}': {error}") from error
+
+CAPABILITIES = profile.capabilities
+CONFIG_RELEASE_ID = os.environ.get("BADGERS_CONFIG_RELEASE_ID", "").strip()
+CONFIG_PREFIX = f"releases/{CONFIG_RELEASE_ID}" if CONFIG_RELEASE_ID else ""
+UI_PUBLIC_ACCESS = os.environ.get("UI_PUBLIC_ACCESS", "false").lower() == "true"
+print(
+    f"Deployment ID: {DEPLOYMENT_ID}   Stack suffix: {STACK_SUFFIX}   "
+    f"Profile: {profile.display_name}"
+)
 
 # Stack name prefix. Stack names are BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}, carrying
 # the same composite identity as resource names.
@@ -122,25 +145,32 @@ s3_stack = S3Stack(
     description="S3 buckets for BADGERS",
 )
 
-# Cognito for AgentCore Gateway authentication
-cognito_stack = CognitoStack(
-    app,
-    _sn("Cognito"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="Cognito authentication for AgentCore Gateway",
-)
+# Cognito is an agent/Gateway concern. Direct-use specialist packs expose no
+# network endpoint and are invoked through customer-provided AWS IAM grants.
+cognito_stack = None
+if CAPABILITIES.get("gateway", False):
+    cognito_stack = CognitoStack(
+        app,
+        _sn("Cognito"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        enable_ui=CAPABILITIES.get("ui_identity", False),
+        env=env,
+        description="Cognito authentication for AgentCore Gateway",
+    )
 
-# DynamoDB jobs table for specialist job tracking
-dynamodb_stack = DynamoDBStack(
-    app,
-    _sn("DynamoDB"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="DynamoDB jobs table for BADGERS specialist job tracking",
-)
+# Full and Headless use the operation ledger. Direct-use specialists are
+# deliberately stateless and leave JOBS_TABLE_NAME unset.
+dynamodb_stack = None
+if CAPABILITIES.get("minimal_operation_ledger", False):
+    dynamodb_stack = DynamoDBStack(
+        app,
+        _sn("DynamoDB"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="DynamoDB jobs table for BADGERS specialist job tracking",
+    )
 
 # IAM roles and policies
 iam_stack = IAMStack(
@@ -151,21 +181,12 @@ iam_stack = IAMStack(
     config_bucket=s3_stack.config_bucket,
     source_bucket=s3_stack.source_bucket,
     output_bucket=s3_stack.output_bucket,
-    jobs_table=dynamodb_stack.jobs_table,
+    jobs_table=dynamodb_stack.jobs_table if dynamodb_stack else None,
     env=env,
     description="IAM roles for BADGERS",
 )
-iam_stack.add_stack_dependency(dynamodb_stack)
-
-# ECR repository for AgentCore Runtime container (and container Lambdas)
-ecr_stack = AgentCoreECRStack(
-    app,
-    _sn("ECR"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="ECR repository for AgentCore Runtime agent container",
-)
+if dynamodb_stack is not None:
+    iam_stack.add_stack_dependency(dynamodb_stack)
 
 # Inference Profiles for cost tracking
 inference_profiles_stack = InferenceProfilesStack(
@@ -177,23 +198,43 @@ inference_profiles_stack = InferenceProfilesStack(
     description="Application Inference Profiles for cost tracking and usage monitoring",
 )
 
-# Load deployment config for selective specialist deployment
-enabled_specialists = None
+# Resolve a profile to an explicit specialist list before CDK creates resources.  The
+# resolver validates packs against deployment_config.json, including disabled entries.
+enabled_specialists = set(profile.specialists)
 deployment_config_path = Path("./deployment_config.json")
-if deployment_config_path.exists():
-    with open(deployment_config_path, encoding="utf-8") as f:
-        deployment_config = json.load(f)
-    specialists_config = deployment_config.get("specialists", {})
-    enabled_specialists = {
-        name for name, cfg in specialists_config.items() if cfg.get("enabled", True)
-    }
-    disabled = {
-        name for name, cfg in specialists_config.items() if not cfg.get("enabled", True)
-    }
-    if disabled:
-        print(f"Disabled specialists: {', '.join(sorted(disabled))}")
-    print(
-        f"Enabled specialists: {len(enabled_specialists)} of {len(specialists_config)}"
+with open(deployment_config_path, encoding="utf-8") as f:
+    deployment_config = json.load(f)
+specialists_config = deployment_config.get("specialists", {})
+disabled = {
+    name for name, cfg in specialists_config.items() if not cfg.get("enabled", True)
+}
+if disabled:
+    print(f"Disabled specialists: {', '.join(sorted(disabled))}")
+print(
+    f"Profile specialists: {len(enabled_specialists)} of {len(specialists_config)} "
+    f"({', '.join(sorted(enabled_specialists))})"
+)
+
+# Full preserves the legacy names for backwards compatibility.  A Headless
+# deployment gets a deployment-scoped prefix so both products can coexist in an
+# account/Region without Lambda name collisions.
+specialist_resource_prefix = (
+    "badgers"
+    if profile.name == "full"
+    else f"badgers_{deployment_id.replace('-', '_')}"
+)
+
+# An ECR repository is assembled only by profiles that declare container image
+# support. The initial direct specialist packs are zip-based Lambdas.
+ecr_stack = None
+if CAPABILITIES.get("container_images", False):
+    ecr_stack = AgentCoreECRStack(
+        app,
+        _sn("ECR"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="ECR repository for BADGERS runtime and container specialists",
     )
 
 # Lambda functions and layer
@@ -204,16 +245,20 @@ lambda_stack = LambdaSpecialistStack(
     execution_role=iam_stack.lambda_role,
     config_bucket=s3_stack.config_bucket,
     output_bucket=s3_stack.output_bucket,
-    jobs_table=dynamodb_stack.jobs_table,
-    ecr_repository=ecr_stack.repository,
+    jobs_table=dynamodb_stack.jobs_table if dynamodb_stack else None,
+    ecr_repository=ecr_stack.repository if ecr_stack else None,
     inference_profiles_stack=inference_profiles_stack,
     enabled_specialists=enabled_specialists,
+    resource_name_prefix=specialist_resource_prefix,
+    config_prefix=CONFIG_PREFIX,
     env=env,
     description="Lambda specialists for BADGERS",
 )
-lambda_stack.add_stack_dependency(ecr_stack)
+if ecr_stack is not None:
+    lambda_stack.add_stack_dependency(ecr_stack)
 lambda_stack.add_stack_dependency(inference_profiles_stack)
-lambda_stack.add_stack_dependency(dynamodb_stack)
+if dynamodb_stack is not None:
+    lambda_stack.add_stack_dependency(dynamodb_stack)
 
 # X-Ray Transaction Search (account-level prerequisite for AgentCore tracing).
 #
@@ -225,11 +270,14 @@ lambda_stack.add_stack_dependency(dynamodb_stack)
 # Transaction Search is already active. The stack is then left out of the app entirely
 # rather than merely dropped from the deploy list — the Runtime stack depends on it, so
 # cdk would otherwise pull it back in and fail on the quota anyway.
-SKIP_XRAY = os.environ.get("BADGERS_SKIP_XRAY", "").strip() == "1"
+SKIP_XRAY = (
+    os.environ.get("BADGERS_SKIP_XRAY", "").strip() == "1"
+    or not CAPABILITIES.get("advanced_tracing", False)
+)
 
 xray_stack = None
 if SKIP_XRAY:
-    print("BADGERS_SKIP_XRAY=1 — X-Ray Transaction Search stack omitted")
+    print("X-Ray Transaction Search stack omitted by profile or BADGERS_SKIP_XRAY=1")
 else:
     xray_stack = XRayTransactionSearchStack(
         app,
@@ -242,63 +290,76 @@ else:
     )
 
 # AgentCore Gateway with Lambda targets
-gateway_stack = AgentCoreGatewayStack(
-    app,
-    _sn("Gateway"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    lambda_functions=lambda_stack.functions,
-    config_bucket=s3_stack.config_bucket,
-    cognito_stack_name=_sn("Cognito"),
-    env=env,
-    description="AgentCore Gateway with Lambda tool targets",
-)
-gateway_stack.add_stack_dependency(lambda_stack)
-gateway_stack.add_stack_dependency(cognito_stack)
+gateway_stack = None
+if CAPABILITIES.get("gateway", False):
+    assert cognito_stack is not None
+    gateway_stack = AgentCoreGatewayStack(
+        app,
+        _sn("Gateway"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        lambda_functions=lambda_stack.functions,
+        config_bucket=s3_stack.config_bucket,
+        cognito_stack_name=_sn("Cognito"),
+        specialist_function_name_prefix=specialist_resource_prefix,
+        config_prefix=CONFIG_PREFIX,
+        env=env,
+        description="AgentCore Gateway with Lambda tool targets",
+    )
+    gateway_stack.add_stack_dependency(lambda_stack)
+    gateway_stack.add_stack_dependency(cognito_stack)
 
-# AgentCore Memory for session persistence
-memory_stack = AgentCoreMemoryStack(
-    app,
-    _sn("Memory"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="AgentCore Memory for BADGERS session persistence",
-)
+# AgentCore Memory is a Full-product feature.  The runtime remains usable without it:
+# its entrypoint simply runs statelessly when AGENTCORE_MEMORY_ID is absent.
+memory_stack = None
+if CAPABILITIES.get("session_memory", False):
+    memory_stack = AgentCoreMemoryStack(
+        app,
+        _sn("Memory"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="AgentCore Memory for BADGERS session persistence",
+    )
 
 
 # AgentCore Runtime WebSocket
-runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
-    app,
-    _sn("RuntimeWebSocket"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    ecr_repository_uri=ecr_stack.repository.repository_uri,
-    gateway_url=gateway_stack.gateway.gateway_url or "",
-    cognito_credentials_secret_arn=cognito_stack.credentials_secret.secret_arn,
-    output_bucket_name=s3_stack.output_bucket.bucket_name,
-    config_bucket_name=s3_stack.config_bucket.bucket_name,
-    source_bucket_name=s3_stack.source_bucket.bucket_name,
-    memory_id=memory_stack.memory.attr_memory_id,
-    s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
-    inference_profiles_stack=inference_profiles_stack,
-    jobs_table=dynamodb_stack.jobs_table,
-    # Set by common.sh export_cdk_env from the same value the build step tagged.
-    # This has to vary per build: AgentCore runtime versions are immutable and
-    # CfnRuntime only cuts a new one when container_uri changes, so a hardcoded
-    # tag here meant a rebuilt image was pushed but never actually served.
-    image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
-    env=env,
-    description="AgentCore Runtime for BADGERS agent with WebSocket streaming",
-)
-runtime_websocket_stack.add_stack_dependency(ecr_stack)
-runtime_websocket_stack.add_stack_dependency(gateway_stack)
-runtime_websocket_stack.add_stack_dependency(cognito_stack)
-runtime_websocket_stack.add_stack_dependency(memory_stack)
-runtime_websocket_stack.add_stack_dependency(inference_profiles_stack)
-if xray_stack is not None:
-    runtime_websocket_stack.add_stack_dependency(xray_stack)
-runtime_websocket_stack.add_stack_dependency(dynamodb_stack)
+runtime_websocket_stack = None
+if CAPABILITIES.get("agent_runtime", False):
+    assert ecr_stack is not None
+    assert gateway_stack is not None
+    assert cognito_stack is not None
+    assert dynamodb_stack is not None
+    runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
+        app,
+        _sn("RuntimeWebSocket"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        ecr_repository_uri=ecr_stack.repository.repository_uri,
+        gateway_url=gateway_stack.gateway.gateway_url or "",
+        cognito_credentials_secret_arn=cognito_stack.credentials_secret.secret_arn,
+        output_bucket_name=s3_stack.output_bucket.bucket_name,
+        config_bucket_name=s3_stack.config_bucket.bucket_name,
+        source_bucket_name=s3_stack.source_bucket.bucket_name,
+        memory_id=memory_stack.memory.attr_memory_id if memory_stack else None,
+        s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
+        inference_profiles_stack=inference_profiles_stack,
+        jobs_table=dynamodb_stack.jobs_table,
+        image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
+        websocket_enabled=CAPABILITIES.get("websocket_transport", False),
+        config_prefix=CONFIG_PREFIX,
+        env=env,
+        description="AgentCore Runtime for BADGERS agent",
+    )
+    runtime_websocket_stack.add_stack_dependency(ecr_stack)
+    runtime_websocket_stack.add_stack_dependency(gateway_stack)
+    runtime_websocket_stack.add_stack_dependency(cognito_stack)
+    if memory_stack is not None:
+        runtime_websocket_stack.add_stack_dependency(memory_stack)
+    runtime_websocket_stack.add_stack_dependency(inference_profiles_stack)
+    if xray_stack is not None:
+        runtime_websocket_stack.add_stack_dependency(xray_stack)
+    runtime_websocket_stack.add_stack_dependency(dynamodb_stack)
 
 # Add dependencies
 iam_stack.add_stack_dependency(s3_stack)  # IAM needs S3 buckets for grant permissions
@@ -312,7 +373,7 @@ lambda_stack.add_stack_dependency(s3_stack)  # Lambda needs S3 bucket names
 # Custom Specialists Stack (optional - only deployed if custom specialists exist)
 # Custom specialists are created via the wizard UI and saved locally
 custom_specialists_registry = Path("./custom_specialists/specialist_registry.json")
-if custom_specialists_registry.exists():
+if CAPABILITIES.get("specialist_wizard", False) and custom_specialists_registry.exists():
     # Use Fn.import_value to reference exports - no explicit dependencies needed
     custom_specialists_stack = CustomSpecialistsStack(
         app,
@@ -330,61 +391,62 @@ if custom_specialists_registry.exists():
         description="Custom specialists created via the wizard UI",
     )
 
-# --- UI infrastructure (ECS Express Gateway) ---
-# No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
-# service provisions and manages its own load balancer and HTTPS endpoint.
+if CAPABILITIES.get("ui", False):
+    # --- UI infrastructure (ECS Express Gateway) ---
+    # No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
+    # service provisions and manages its own load balancer and HTTPS endpoint.
+    vpc_stack = VpcStack(
+        app,
+        _sn("Vpc"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="VPC for the BADGERS UI ECS service",
+    )
 
-# VPC with private subnets and AWS service VPC endpoints
-vpc_stack = VpcStack(
-    app,
-    _sn("Vpc"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    env=env,
-    description="VPC for the BADGERS UI ECS service",
-)
-
-# Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
-ecs_stack = ECSStack(
-    app,
-    _sn("ECS"),
-    deployment_id=deployment_id,
-    deployment_tags=deployment_tags,
-    config_bucket_arn=s3_stack.config_bucket.bucket_arn,
-    output_bucket_arn=s3_stack.output_bucket.bucket_arn,
-    source_bucket_arn=s3_stack.source_bucket.bucket_arn,
-    config_bucket_name=s3_stack.config_bucket.bucket_name,
-    output_bucket_name=s3_stack.output_bucket.bucket_name,
-    source_bucket_name=s3_stack.source_bucket.bucket_name,
-    jobs_table_arn=dynamodb_stack.jobs_table.table_arn,
-    kms_key_arn=s3_stack.s3_kms_key.key_arn,
-    private_subnet_ids=(
-        vpc_stack.public_subnet_ids
-        if UI_PUBLIC_ACCESS
-        else vpc_stack.private_subnet_ids
-    ),
-    ui_task_sg_id=vpc_stack.ui_task_sg.security_group_id,
-    cognito_user_pool_id=cognito_stack.user_pool.user_pool_id,
-    cognito_ui_client_id=cognito_stack.ui_client.user_pool_client_id,
-    ecr_repository_uri=ecr_stack.repository.repository_uri,
-    agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
-    agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
-    # The Create Specialist wizard calls Bedrock from the UI container; the task role's
-    # grant for that one model is generated from the registry, like every other grant.
-    inference_profiles_stack=inference_profiles_stack,
-    stack_suffix=STACK_SUFFIX,
-    image_tag="frontend",
-    env=env,
-    description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
-)
-ecs_stack.add_stack_dependency(vpc_stack)
-ecs_stack.add_stack_dependency(cognito_stack)
-ecs_stack.add_stack_dependency(ecr_stack)
-ecs_stack.add_stack_dependency(s3_stack)
-ecs_stack.add_stack_dependency(dynamodb_stack)
-ecs_stack.add_stack_dependency(gateway_stack)
-ecs_stack.add_stack_dependency(runtime_websocket_stack)
-ecs_stack.add_stack_dependency(inference_profiles_stack)
+    # Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
+    ecs_stack = ECSStack(
+        app,
+        _sn("ECS"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        config_bucket_arn=s3_stack.config_bucket.bucket_arn,
+        output_bucket_arn=s3_stack.output_bucket.bucket_arn,
+        source_bucket_arn=s3_stack.source_bucket.bucket_arn,
+        config_bucket_name=s3_stack.config_bucket.bucket_name,
+        output_bucket_name=s3_stack.output_bucket.bucket_name,
+        source_bucket_name=s3_stack.source_bucket.bucket_name,
+        jobs_table_arn=dynamodb_stack.jobs_table.table_arn,
+        kms_key_arn=s3_stack.s3_kms_key.key_arn,
+        private_subnet_ids=(
+            vpc_stack.public_subnet_ids
+            if UI_PUBLIC_ACCESS
+            else vpc_stack.private_subnet_ids
+        ),
+        ui_task_sg_id=vpc_stack.ui_task_sg.security_group_id,
+        cognito_user_pool_id=cognito_stack.user_pool.user_pool_id,
+        cognito_ui_client_id=cognito_stack.ui_client.user_pool_client_id,
+        ecr_repository_uri=ecr_stack.repository.repository_uri,
+        agentcore_runtime_websocket_arn=runtime_websocket_stack.runtime.attr_agent_runtime_arn,
+        agentcore_gateway_id=gateway_stack.gateway.gateway_id or "",
+        # The Create Specialist wizard calls Bedrock from the UI container; the task role's
+        # grant for that one model is generated from the registry, like every other grant.
+        inference_profiles_stack=inference_profiles_stack,
+        stack_suffix=STACK_SUFFIX,
+        image_tag="frontend",
+        env=env,
+        description="BADGERS unified UI — ECS Express Gateway + Cognito OIDC auth",
+    )
+    ecs_stack.add_stack_dependency(vpc_stack)
+    ecs_stack.add_stack_dependency(cognito_stack)
+    ecs_stack.add_stack_dependency(ecr_stack)
+    ecs_stack.add_stack_dependency(s3_stack)
+    ecs_stack.add_stack_dependency(dynamodb_stack)
+    ecs_stack.add_stack_dependency(gateway_stack)
+    ecs_stack.add_stack_dependency(runtime_websocket_stack)
+    ecs_stack.add_stack_dependency(inference_profiles_stack)
+else:
+    print("UI, VPC, and wizard stacks omitted by profile")
 
 # ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
 if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):

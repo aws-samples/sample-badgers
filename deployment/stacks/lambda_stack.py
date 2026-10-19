@@ -52,10 +52,12 @@ class LambdaSpecialistStack(Stack):
         execution_role: iam.Role,
         config_bucket: s3.Bucket,
         output_bucket: s3.Bucket,
-        jobs_table: dynamodb.ITable,
-        ecr_repository: ecr.Repository,
+        jobs_table: Optional[dynamodb.ITable],
+        ecr_repository: Optional[ecr.Repository],
         inference_profiles_stack: Optional[InferenceProfilesStack] = None,
         enabled_specialists: Optional[set[str]] = None,
+        resource_name_prefix: str = "badgers",
+        config_prefix: str = "",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -68,6 +70,13 @@ class LambdaSpecialistStack(Stack):
         self.ecr_repository = ecr_repository
         self.inference_profiles_stack = inference_profiles_stack
         self.enabled_specialists = enabled_specialists
+        self.resource_name_prefix = resource_name_prefix
+        self.config_prefix = config_prefix.strip("/")
+        # Existing Full deployments own these historical layer names.  Scope only
+        # non-Full layers, otherwise a Full update would unnecessarily replace them.
+        self.layer_name_prefix = (
+            "" if resource_name_prefix == "badgers" else f"{resource_name_prefix}-"
+        )
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -115,7 +124,7 @@ class LambdaSpecialistStack(Stack):
             code=lambda_.Code.from_asset(str(layer_path)),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             description="Specialist foundation with Strands, Bedrock client, and utilities",
-            layer_version_name="specialist-foundation",
+            layer_version_name=f"{self.layer_name_prefix}specialist-foundation",
         )
 
         # Apply resource-specific tags to layer
@@ -147,7 +156,7 @@ class LambdaSpecialistStack(Stack):
             code=lambda_.Code.from_asset(str(poppler_layer_path)),
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
             description="Poppler utilities for PDF processing",
-            layer_version_name="poppler-utils",
+            layer_version_name=f"{self.layer_name_prefix}poppler-utils",
         )
 
         # Apply resource-specific tags to poppler layer
@@ -172,7 +181,7 @@ class LambdaSpecialistStack(Stack):
                 code=lambda_.Code.from_asset(str(pdf_processing_layer_path)),
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
                 description="PDF processing for accessibility tagging (pymupdf, pikepdf)",
-                layer_version_name="pdf-processing",
+                layer_version_name=f"{self.layer_name_prefix}pdf-processing",
             )
 
             # Apply resource-specific tags to pdf processing layer
@@ -285,7 +294,6 @@ class LambdaSpecialistStack(Stack):
             "FAIL_AFTER_ERROR": "False",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
-            "JOBS_TABLE_NAME": self.jobs_table.table_name,
             "JPEG_QUALITY": "85",
             "MAX_DIMENSIONS": "2048",
             "MAX_IMAGE_SIZE": "20971520",
@@ -293,6 +301,10 @@ class LambdaSpecialistStack(Stack):
             "TEMPERATURE": "0.1",
             "THROTTLE_DELAY": "1.0",
         }
+        if self.config_prefix:
+            environment["CONFIG_PREFIX"] = self.config_prefix
+        if self.jobs_table is not None:
+            environment["JOBS_TABLE_NAME"] = self.jobs_table.table_name
 
         # Point the specialist at the model ID -> profile ARN map in SSM. One
         # deployment-shaped variable replaces five model-shaped ones, so changing the model
@@ -334,7 +346,7 @@ class LambdaSpecialistStack(Stack):
         function = lambda_.Function(
             self,
             f"Function-{specialist_name}",
-            function_name=f"badgers_{specialist_name}",
+            function_name=f"{self.resource_name_prefix}_{specialist_name}",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="lambda_handler.lambda_handler",
             code=lambda_.Code.from_asset(str(code_dir)),
@@ -388,14 +400,17 @@ class LambdaSpecialistStack(Stack):
         """
         logger = logging.getLogger(__name__)
 
-        for func_name in CONTAINER_FUNCTIONS:
-            # Skip disabled specialists
-            if (
-                self.enabled_specialists is not None
-                and func_name not in self.enabled_specialists
-            ):
-                logger.info("Skipping disabled container specialist: %s", func_name)
-                continue
+        selected_containers = [
+            func_name
+            for func_name in CONTAINER_FUNCTIONS
+            if self.enabled_specialists is None or func_name in self.enabled_specialists
+        ]
+        if selected_containers and self.ecr_repository is None:
+            raise RuntimeError(
+                "Container specialists were selected but no ECR repository was assembled"
+            )
+
+        for func_name in selected_containers:
             # Check if image exists in ECR (tag = func_name)
             # CDK will fail at deploy time if image doesn't exist
             function = self._create_ecr_container_function(func_name)
@@ -417,10 +432,13 @@ class LambdaSpecialistStack(Stack):
             "CACHE_ENABLED": "True",
             "CONFIG_BUCKET": self.config_bucket.bucket_name,
             "OUTPUT_BUCKET": self.output_bucket.bucket_name,
-            "JOBS_TABLE_NAME": self.jobs_table.table_name,
             "MAX_TOKENS": "16000",
             "TEMPERATURE": "0.1",
         }
+        if self.config_prefix:
+            environment["CONFIG_PREFIX"] = self.config_prefix
+        if self.jobs_table is not None:
+            environment["JOBS_TABLE_NAME"] = self.jobs_table.table_name
 
         if self.inference_profiles_stack:
             environment["MODEL_PROFILES_PARAM"] = (
@@ -440,7 +458,7 @@ class LambdaSpecialistStack(Stack):
         function = lambda_.Function(
             self,
             f"ContainerFunction-{func_name}",
-            function_name=f"badgers_{func_name}",
+            function_name=f"{self.resource_name_prefix}_{func_name}",
             code=lambda_.Code.from_ecr_image(
                 repository=self.ecr_repository,
                 tag_or_digest=func_name,
@@ -529,7 +547,7 @@ class LambdaSpecialistStack(Stack):
         CfnOutput(
             self,
             "FunctionNamePrefix",
-            value="badgers_",
+            value=f"{self.resource_name_prefix}_",
             description="Function name prefix for filtering",
         )
 

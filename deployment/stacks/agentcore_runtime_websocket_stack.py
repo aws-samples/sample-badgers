@@ -3,7 +3,7 @@
 Separate runtime stack for WebSocket streaming support.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from aws_cdk import (
     Stack,
@@ -46,11 +46,13 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         output_bucket_name: str,
         config_bucket_name: str,
         source_bucket_name: str,
-        memory_id: str,
+        memory_id: Optional[str],
         s3_kms_key_arn: str,
         inference_profiles_stack: "InferenceProfilesStack",
         jobs_table: dynamodb.ITable,
         image_tag: str = "websocket",
+        websocket_enabled: bool = True,
+        config_prefix: str = "",
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -71,6 +73,8 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         # writes the job-level row itself, so the runtime needs table access of its
         # own — the specialist Lambdas only write their own subtask rows.
         self.jobs_table = jobs_table
+        self.websocket_enabled = websocket_enabled
+        self.config_prefix = config_prefix.strip("/")
 
         # Apply common tags to all resources
         self._apply_common_tags()
@@ -399,22 +403,23 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             )
         )
 
-        role.add_to_policy(
-            iam.PolicyStatement(
-                sid="AgentCoreMemoryAccess",
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "bedrock-agentcore:CreateEvent",
-                    "bedrock-agentcore:GetEvent",
-                    "bedrock-agentcore:ListEvents",
-                    "bedrock-agentcore:GetMemory",
-                ],
-                resources=[
-                    f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:memory/{self.memory_id}",
-                    f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:memory/{self.memory_id}/*",
-                ],
+        if self.memory_id:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="AgentCoreMemoryAccess",
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "bedrock-agentcore:CreateEvent",
+                        "bedrock-agentcore:GetEvent",
+                        "bedrock-agentcore:ListEvents",
+                        "bedrock-agentcore:GetMemory",
+                    ],
+                    resources=[
+                        f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:memory/{self.memory_id}",
+                        f"arn:aws:bedrock-agentcore:{self.region}:{self.account}:memory/{self.memory_id}/*",
+                    ],
+                )
             )
-        )
 
         return role
 
@@ -431,6 +436,31 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             "RuntimeUsageLogs",
             log_group_name=f"/aws/bedrock-agentcore/runtimes/{self.deployment_id}-ws/usage",
         )
+
+        environment_variables = {
+            "AWS_DEFAULT_REGION": self.region,
+            "GATEWAY_URL": self.gateway_url,
+            "COGNITO_CREDENTIALS_SECRET_ARN": self.cognito_credentials_secret_arn,
+            "OUTPUT_BUCKET_NAME": self.output_bucket_name,
+            # Injected directly rather than discovered from a well-known SSM
+            # path, which was not deployment-scoped.
+            "CONFIG_BUCKET_NAME": self.config_bucket_name,
+            # foundation.job_state reads this at call time; when it is absent
+            # every write becomes a no-op and tracking is simply off.
+            "JOBS_TABLE_NAME": self.jobs_table.table_name,
+            # Model ID -> profile ARN map, for cost attribution. One deployment-shaped
+            # variable in place of five model-shaped ones.
+            "MODEL_PROFILES_PARAM": (
+                self.inference_profiles_stack.model_profiles_param_name
+            ),
+            # The Full product exposes the browser adapter. Headless invokes the
+            # same entrypoint over HTTP and does not register WebSocket routes.
+            "WEBSOCKET_ENABLED": str(self.websocket_enabled).lower(),
+        }
+        if self.memory_id:
+            environment_variables["AGENTCORE_MEMORY_ID"] = self.memory_id
+        if self.config_prefix:
+            environment_variables["CONFIG_PREFIX"] = self.config_prefix
 
         runtime = agentcore.CfnRuntime(
             self,
@@ -452,24 +482,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             protocol_configuration="HTTP",
             role_arn=self.agent_role.role_arn,
             description="BADGERS agent runtime with WebSocket streaming",
-            environment_variables={
-                "AWS_DEFAULT_REGION": self.region,
-                "GATEWAY_URL": self.gateway_url,
-                "COGNITO_CREDENTIALS_SECRET_ARN": self.cognito_credentials_secret_arn,
-                "AGENTCORE_MEMORY_ID": self.memory_id,
-                "OUTPUT_BUCKET_NAME": self.output_bucket_name,
-                # Injected directly rather than discovered from a well-known SSM
-                # path, which was not deployment-scoped.
-                "CONFIG_BUCKET_NAME": self.config_bucket_name,
-                # foundation.job_state reads this at call time; when it is absent
-                # every write becomes a no-op and tracking is simply off.
-                "JOBS_TABLE_NAME": self.jobs_table.table_name,
-                # Model ID -> profile ARN map, for cost attribution. One deployment-shaped
-                # variable in place of five model-shaped ones.
-                "MODEL_PROFILES_PARAM": (
-                    self.inference_profiles_stack.model_profiles_param_name
-                ),
-            },
+            environment_variables=environment_variables,
         )
 
         runtime.node.add_dependency(self.agent_role)

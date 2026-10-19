@@ -614,6 +614,11 @@ def _s3_read_text(bucket: str, key: str) -> str:
     return text
 
 
+def _config_key(key: str) -> str:
+    prefix = os.environ.get("CONFIG_PREFIX", "").strip("/")
+    return f"{prefix}/{key}" if prefix else key
+
+
 def _ensure_model(model_config: dict[str, Any]) -> Any:
     """Return a BedrockModel for this config, rebuilding only when the config changes."""
     from strands.models import BedrockModel
@@ -662,14 +667,14 @@ def load_config_from_s3() -> tuple[str, dict[str, Any]]:
             )
 
         system_prompt = _s3_read_text(
-            bucket_name, "agent_system_prompt/agent_system_prompt.xml"
+            bucket_name, _config_key("agent_system_prompt/agent_system_prompt.xml")
         )
 
         # Load operating environment config and inject into system prompt
         try:
             env_config = json.loads(
                 _s3_read_text(
-                    bucket_name, "agent_config/agent_operating_environment_config.json"
+                    bucket_name, _config_key("agent_config/agent_operating_environment_config.json")
                 )
             )
             env_value = env_config.get("operating_environment", "")
@@ -686,7 +691,7 @@ def load_config_from_s3() -> tuple[str, dict[str, Any]]:
         try:
             model_config.update(
                 json.loads(
-                    _s3_read_text(bucket_name, "agent_config/agent_model_config.json")
+                    _s3_read_text(bucket_name, _config_key("agent_config/agent_model_config.json"))
                 )
             )
         except Exception:
@@ -1019,7 +1024,6 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
             }
 
 
-@app.websocket
 async def websocket_handler(websocket, context) -> None:
     """WebSocket handler for real-time streaming.
 
@@ -1114,6 +1118,12 @@ async def websocket_handler(websocket, context) -> None:
 
     except Exception as e:
         log(f"WebSocket connection closed: {e}", level="info")
+
+
+if os.environ.get("WEBSOCKET_ENABLED", "true").lower() == "true":
+    app.websocket(websocket_handler)
+else:
+    log("WebSocket handler disabled by deployment profile")
 
 
 # =============================================================================

@@ -6,6 +6,7 @@ Provides cached loading of manifests and prompts from S3 for Lambda functions.
 
 import json
 import logging
+import os
 from functools import lru_cache
 from typing import Dict, Any
 import boto3
@@ -13,6 +14,12 @@ from botocore.exceptions import ClientError
 
 
 logger = logging.getLogger(__name__)
+
+
+def config_key(key: str) -> str:
+    """Return a release-pinned key when CONFIG_PREFIX is set."""
+    prefix = os.environ.get("CONFIG_PREFIX", "").strip("/")
+    return f"{prefix}/{key}" if prefix else key
 
 
 class S3ConfigError(Exception):
@@ -45,6 +52,7 @@ def load_manifest_from_s3(
             key = f"custom-specialists/manifests/{specialist_name}.json"
         else:
             key = f"manifests/{specialist_name}.json"
+        key = config_key(key)
 
         logger.info("Loading manifest from s3://%s/%s", bucket, key)
         response = s3.get_object(Bucket=bucket, Key=key)
@@ -93,6 +101,7 @@ def load_prompt_from_s3(
             key = f"custom-specialists/prompts/{specialist_name}/{prompt_file}"
         else:
             key = f"prompts/{specialist_name}/{prompt_file}"
+        key = config_key(key)
 
         logger.debug("Loading prompt from s3://%s/%s", bucket, key)
         response = s3.get_object(Bucket=bucket, Key=key)
@@ -132,7 +141,7 @@ def load_wrapper_from_s3(
     """
     try:
         s3 = boto3.client("s3")
-        key = f"wrappers/{wrapper_name}"
+        key = config_key(f"wrappers/{wrapper_name}")
 
         logger.debug("Loading wrapper from s3://%s/%s", bucket, key)
         response = s3.get_object(Bucket=bucket, Key=key)
