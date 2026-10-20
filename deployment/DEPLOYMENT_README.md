@@ -142,6 +142,11 @@ presents only the steps supported by that profile. **`deploy.sh` does not read
 a value left exported in your shell silently targets another deployment's
 stacks and state file.
 
+The interactive display highlights the active product, summarizes what it includes,
+groups deployment choices by lifecycle stage, and shows a green-complete/yellow-pending
+progress bar. It is an operator aid only; `.deploy-state/{DEPLOYMENT_ID}.json` remains
+the authoritative record of completion.
+
 On start it scans `.deploy-state/` and offers what it finds:
 
 ```

@@ -36,6 +36,50 @@ trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; 
 # An interactive bare ./deploy.sh exposes the product chooser. Non-interactive
 # callers retain the legacy Full default unless BADGERS_PROFILE is set.
 BADGERS_PROFILE="${BADGERS_PROFILE:-}"
+
+show_product_chooser() {
+  clear
+  echo -e "${CYAN}${BOLD}"
+  cat << "EOF"
+╔══════════════════════════════════════════════════════════════════╗
+║                         BADGERS DEPLOY                           ║
+║                    SELECT A PRODUCT TO DEPLOY                    ║
+╚══════════════════════════════════════════════════════════════════╝
+EOF
+  echo -e "${NC}"
+  echo -e "  ${CYAN}${BOLD}1  FULL EXPERIENCE${NC}"
+  echo -e "     Agent API  •  internal gateway  •  all specialists  •  browser UI"
+  echo ""
+  echo -e "  ${GREEN}${BOLD}2  HEADLESS AGENT${NC}"
+  echo -e "     Authenticated agent API  •  durable operations  •  curated specialist packs"
+  echo ""
+  echo -e "  ${YELLOW}${BOLD}3  SPECIALIST PACKS${NC}"
+  echo -e "     Direct Lambda specialists  •  selected packs  •  no agent, gateway, or UI"
+  echo ""
+  echo -e "  ${RED}${BOLD}4  QUIT${NC}"
+  echo -e "     Leave deployment without selecting a product  ${RED}(or type q, then press Enter)${NC}"
+  echo ""
+  echo -e "${BLUE}  Your next steps: select product → select deployment → run preflight → deploy${NC}"
+  echo ""
+}
+
+show_profile_preflight() {
+  local profile_label profile_color
+  case "${BADGERS_PROFILE}" in
+    full)        profile_label="FULL EXPERIENCE"; profile_color="${CYAN}" ;;
+    headless)    profile_label="HEADLESS AGENT"; profile_color="${GREEN}" ;;
+    specialists) profile_label="SPECIALIST PACKS"; profile_color="${YELLOW}" ;;
+  esac
+
+  [ -t 1 ] || return 0
+  echo ""
+  echo -e "${profile_color}${BOLD}  ┌────────────────────────────────────────────────────────────────┐${NC}"
+  echo -e "${profile_color}${BOLD}  │  ${profile_label} — preparing deployment                         │${NC}"
+  echo -e "${profile_color}${BOLD}  └────────────────────────────────────────────────────────────────┘${NC}"
+  echo -e "  ${BLUE}Next: select deployment identity, validate AWS access, then open the deployment console.${NC}"
+  echo ""
+}
+
 case "${1:-}" in
   full|headless|specialists)
     BADGERS_PROFILE="$1"
@@ -45,18 +89,18 @@ esac
 
 if [ -z "${BADGERS_PROFILE}" ]; then
   if [ -t 0 ]; then
-    echo ""
-    echo "Choose a BADGERS product:"
-    echo "  1) Full        Agent, UI, all enabled specialists, and operations tooling"
-    echo "  2) Headless    Authenticated agent API, curated packs, and durable operations"
-    echo "  3) Specialists Direct AWS Lambda specialist packs"
-    read -r -p "Product (1-3) [1]: " profile_choice
+    show_product_chooser
+    read -r -p "Product (1-4, or q to quit) [1]: " profile_choice
     case "${profile_choice:-1}" in
       1|full) BADGERS_PROFILE="full" ;;
       2|headless) BADGERS_PROFILE="headless" ;;
       3|specialists) BADGERS_PROFILE="specialists" ;;
+      4|q|Q)
+        log_info "Exiting without selecting a product."
+        exit 0
+        ;;
       *)
-        log_error "Invalid product choice. Select 1, 2, or 3."
+        log_error "Invalid product choice. Select 1–4, or q."
         exit 1
         ;;
     esac
@@ -120,6 +164,7 @@ if ! python3 "${SCRIPT_DIR}/deployment/profile_resolver.py" "${PROFILE_RESOLVER_
   exit 1
 fi
 log_info "Product profile: ${BADGERS_PROFILE}"
+show_profile_preflight
 
 # ── Defaults ──
 IMAGE_TAG="${IMAGE_TAG:-latest}"
@@ -943,27 +988,90 @@ step_full() {
 # ══════════════════════════════════════════════════════════════════════════
 # Show Deployment Status
 # ══════════════════════════════════════════════════════════════════════════
+_menu_step_complete() {
+  local key="$1"
+  case "${key}" in
+    runtime)
+      check_completed "runtime_image_pushed" && check_completed "runtime_deployed"
+      ;;
+    *)
+      check_completed "${key}"
+      ;;
+  esac
+}
+
+_deployment_progress() {
+  local steps=(layers_built infra_complete s3_files_uploaded specialists_complete)
+  [ "${GATEWAY_ENABLED}" = "1" ] && steps+=(gateway_complete)
+  [ "${RUNTIME_ENABLED}" = "1" ] && steps+=(runtime)
+  [ "${UI_ENABLED}" = "1" ] && steps+=(ui_image_pushed ecs_deployed)
+
+  local completed=0 step total filled empty bar_done bar_todo
+  total="${#steps[@]}"
+  for step in "${steps[@]}"; do
+    if _menu_step_complete "${step}"; then
+      ((completed += 1))
+    fi
+  done
+
+  filled=$((completed * 18 / total))
+  empty=$((18 - filled))
+  printf -v bar_done '%*s' "${filled}" ''
+  printf -v bar_todo '%*s' "${empty}" ''
+  bar_done="${bar_done// /█}"
+  bar_todo="${bar_todo// /░}"
+  printf '%b' "${GREEN}${bar_done}${NC}${BLUE}${bar_todo}${NC} ${BOLD}${completed}/${total}${NC} stages complete"
+  return 0
+}
+
+_menu_step_line() {
+  local option="$1" key="$2" label="$3" detail="$4" icon
+  if _menu_step_complete "${key}"; then
+    icon="${GREEN}●${NC}"
+  else
+    icon="${YELLOW}○${NC}"
+  fi
+  printf "  %b ${BOLD}%2s${NC}  %-29s ${BLUE}%s${NC}\n" \
+    "${icon}" "${option})" "${label}" "${detail}"
+}
+
+_profile_summary() {
+  case "${BADGERS_PROFILE}" in
+    full)
+      echo "Agent API  •  internal gateway  •  all specialists  •  browser UI"
+      ;;
+    headless)
+      echo "Authenticated agent API  •  durable operations  •  curated specialist packs"
+      ;;
+    specialists)
+      echo "Direct Lambda specialists  •  selected packs  •  no agent, gateway, or UI"
+      ;;
+  esac
+}
+
 show_status() {
   echo ""
-  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
-  echo -e "${BOLD}  Deployment Status: ${DEPLOYMENT_ID}  (suffix: ${STACK_SUFFIX})${NC}"
-  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo -e "${CYAN}${BOLD}  DEPLOYMENT SNAPSHOT${NC}  $(_deployment_progress)"
+  echo -e "${BLUE}  ─────────────────────────────────────────────────────────────────${NC}"
   echo ""
 
   _step_line() {
     local key=$1 label=$2 mark ts
-    mark="$(check_completed "$key" && echo "✓" || echo "○")"
+    mark="$(check_completed "$key" && echo -e "${GREEN}●${NC}" || echo -e "${YELLOW}○${NC}")"
     ts="$(get_state "${key}_at")"
     if [ -n "${ts}" ]; then
-      echo -e "  ${mark}  ${label}  ${YELLOW}${ts}${NC}"
+      echo -e "  ${mark}  ${label}  ${BLUE}${ts}${NC}"
     else
       echo "  ${mark}  ${label}"
     fi
   }
 
+  echo -e "  ${BOLD}BUILD & CONFIGURE${NC}"
   _step_line "layers_built"         "1. Lambda Layers"
   _step_line "infra_complete"       "2. Foundational Infrastructure"
   _step_line "s3_files_uploaded"    "3. Prompts, Manifests & Schemas"
+  echo ""
+  echo -e "  ${BOLD}DEPLOY SERVICES${NC}"
   _step_line "specialists_complete" "4. Specialist Lambdas"
   if [ "${GATEWAY_ENABLED}" = "1" ]; then
     _step_line "gateway_complete"     "5. Gateway"
@@ -975,9 +1083,10 @@ show_status() {
     a="$(check_completed "runtime_image_pushed" && echo "✓" || echo "○")"
     b="$(check_completed "runtime_deployed" && echo "✓" || echo "○")"
     mark6="○"; [ "$a" = "✓" ] && [ "$b" = "✓" ] && mark6="✓"
+    [ "$mark6" = "✓" ] && mark6="${GREEN}●${NC}" || mark6="${YELLOW}○${NC}"
     ts6="$(get_state "runtime_deployed_at")"
     if [ -n "${ts6}" ]; then
-      echo -e "  ${mark6}  6. Runtime — Build & Deploy  ${YELLOW}${ts6}${NC}"
+      echo -e "  ${mark6}  6. Runtime — Build & Deploy  ${BLUE}${ts6}${NC}"
     else
       echo "  ${mark6}  6. Runtime — Build & Deploy"
     fi
@@ -987,9 +1096,9 @@ show_status() {
     _step_line "ui_image_pushed"      "7. UI — Build Image"
     _step_line "ecs_deployed"         "8. UI — Deploy ECS"
   elif [ "${BADGERS_PROFILE}" = "headless" ]; then
-    echo "  —  UI, VPC, session memory, and UI WebSocket workflow are omitted by Headless."
+    echo -e "  ${BLUE}↳ Headless intentionally omits UI, VPC, session memory, and the UI WebSocket workflow.${NC}"
   else
-    echo "  —  Direct specialist invocation; no agent runtime, Gateway, UI, or operation ledger."
+    echo -e "  ${BLUE}↳ Specialists intentionally omit the agent runtime, gateway, UI, and operation ledger.${NC}"
   fi
   echo ""
 
@@ -1087,57 +1196,63 @@ reset_state() {
 # ══════════════════════════════════════════════════════════════════════════
 show_menu() {
   clear
-  echo -e "${CYAN}${BOLD}"
+  local profile_label profile_color
+  case "${BADGERS_PROFILE}" in
+    full)        profile_label="FULL EXPERIENCE"; profile_color="${CYAN}" ;;
+    headless)    profile_label="HEADLESS AGENT";  profile_color="${GREEN}" ;;
+    specialists) profile_label="SPECIALIST PACKS"; profile_color="${YELLOW}" ;;
+  esac
+
+  echo -e "${profile_color}${BOLD}"
   cat << "EOF"
-╔════════════════════════════════════════════════════════════╗
-║              BADGERS — Deployment Menu                     ║
-╚════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║                         BADGERS DEPLOY                           ║
+╚══════════════════════════════════════════════════════════════════╝
 EOF
   echo -e "${NC}"
 
-  echo -e "  ${BOLD}Deployment ID:${NC} ${DEPLOYMENT_ID}"
-  echo -e "  ${BOLD}Product Profile:${NC} ${BADGERS_PROFILE}"
-  echo -e "  ${BOLD}Stack Suffix:${NC}  ${STACK_SUFFIX}"
-  echo -e "  ${BOLD}Stack Names:${NC}   ${STACK_PREFIX}-{Name}-${STACK_SUFFIX}"
-  echo -e "  ${BOLD}Resource ID:${NC}   $(resource_id)"
-  echo -e "  ${BOLD}AWS Region:${NC}    ${AWS_REGION}"
-  echo -e "  ${BOLD}AWS Account:${NC}   ${ACCOUNT_ID}"
+  echo -e "  ${profile_color}${BOLD}${profile_label}${NC}  ${BLUE}$(_profile_summary)${NC}"
+  echo -e "  ${BLUE}──────────────────────────────────────────────────────────────────${NC}"
+  echo -e "  ${BOLD}Deployment${NC} ${DEPLOYMENT_ID}  ${BOLD}Region${NC} ${AWS_REGION}  ${BOLD}Account${NC} ${ACCOUNT_ID}"
+  echo -e "  ${BOLD}Stack suffix${NC} ${STACK_SUFFIX}  ${BOLD}Resource ID${NC} $(resource_id)"
+  echo -e "  ${BLUE}${STACK_PREFIX}-{Name}-${STACK_SUFFIX}${NC}"
   echo ""
 
   show_status
 
-  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
   echo ""
-  echo -e "  ${BOLD} 1${NC}) Build Lambda Layers"
+  echo -e "  ${CYAN}${BOLD}BUILD & CONFIGURE${NC}"
+  _menu_step_line 1 layers_built "Build Lambda Layers" "required artifacts"
   if [ "${UI_ENABLED}" = "1" ]; then
-    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB, IAM, ECR, Profiles, XRay, Memory, VPC)"
+    _menu_step_line 2 infra_complete "Foundational Infra" "S3, identity, data, network"
   elif [ "${BADGERS_PROFILE}" = "headless" ]; then
-    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, Cognito, DynamoDB ledger, IAM, ECR, Profiles)"
+    _menu_step_line 2 infra_complete "Foundational Infra" "S3, identity, data, registry"
   else
-    echo -e "  ${BOLD} 2${NC}) Foundational Infra     (S3, IAM, model profiles)"
+    _menu_step_line 2 infra_complete "Foundational Infra" "S3, IAM, model profiles"
   fi
-  echo -e "  ${BOLD} 3${NC}) Upload Config Release"
-  echo -e "  ${BOLD} 4${NC}) Specialist Lambdas      (incl. container images)"
+  _menu_step_line 3 s3_files_uploaded "Publish Config Release" "immutable, versioned"
+  echo ""
+  echo -e "  ${CYAN}${BOLD}DEPLOY SERVICES${NC}"
+  _menu_step_line 4 specialists_complete "Specialist Lambdas" "functions and containers"
   if [ "${GATEWAY_ENABLED}" = "1" ]; then
-    echo -e "  ${BOLD} 5${NC}) Gateway"
+    _menu_step_line 5 gateway_complete "Internal Gateway" "private API integration"
   fi
   if [ "${RUNTIME_ENABLED}" = "1" ]; then
-    echo -e "  ${BOLD} 6${NC}) Runtime — Build & Deploy"
+    _menu_step_line 6 runtime "Agent Runtime" "build and deploy"
   fi
   if [ "${UI_ENABLED}" = "1" ]; then
-    echo -e "  ${BOLD} 7${NC}) UI — Build & Push Image"
-    echo -e "  ${BOLD} 8${NC}) UI — Deploy ECS          → submenu"
+    _menu_step_line 7 ui_image_pushed "Browser UI Image" "build and push"
+    _menu_step_line 8 ecs_deployed "Browser UI Service" "ECS deployment → submenu"
   fi
   echo ""
-  echo -e "  ${BOLD} 9${NC}) ${GREEN}Full Deployment (Run All Steps)${NC}"
-  echo -e "  ${BOLD} r${NC}) ${GREEN}Resume (Run Remaining Steps Only)${NC}"
+  echo -e "  ${GREEN}${BOLD}LAUNCH${NC}"
+  echo -e "  ${GREEN}▶${NC} ${BOLD} 9)${NC} Run complete deployment"
+  echo -e "  ${GREEN}▶${NC} ${BOLD} r)${NC} Resume remaining stages only"
   echo ""
-  echo -e "  ${BOLD}10${NC}) Show Deployment Status"
-  echo -e "  ${BOLD}11${NC}) Reset Deployment State (start fresh)"
-  echo -e "  ${BOLD} m${NC}) Models — show the registry and how to change it"
-  echo -e "  ${BOLD} 0${NC}) Exit"
+  echo -e "  ${BOLD}TOOLS${NC}   10) Status   11) Reset local state   m) Model registry   0) Exit"
   echo ""
-  echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
+  echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
   echo ""
 }
 

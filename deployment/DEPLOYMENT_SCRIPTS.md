@@ -22,6 +22,12 @@ Interactive deployment menu, resumable and idempotent. Step completion is record
 `.deploy-state/{DEPLOYMENT_ID}.json`, so re-running after a failure continues from where
 it stopped rather than starting over.
 
+The terminal menu is profile-aware: it identifies the selected product and its capabilities,
+groups actions into **Build & Configure**, **Deploy Services**, and **Launch**, and renders a
+stage-progress bar. A green `●` is complete; a yellow `○` is still pending. This is display
+only—the state file remains the source of truth and no deployment action is implied by viewing
+the menu.
+
 ```bash
 ./deploy.sh           # choose Full, Headless, or Specialists; then choose a deployment
 ./deploy.sh 9         # choose a deployment, then run option 9 (full deployment)
