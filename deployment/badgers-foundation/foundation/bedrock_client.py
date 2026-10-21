@@ -9,6 +9,7 @@ import binascii
 import json
 import logging
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -523,6 +524,9 @@ class BedrockClient:
     _MANTLE_SIGV4_SERVICE = "bedrock-mantle"
     # Gemma 4 31B request-body cap (model card: 3.5 MB including images).
     _MANTLE_MAX_PAYLOAD_BYTES = int(3.5 * 1024 * 1024)
+    # Regions are interpolated into the fixed Amazon Bedrock Mantle hostname.
+    # Reject anything that is not an AWS-style region before URL construction.
+    _MANTLE_REGION_PATTERN = re.compile(r"^[a-z]{2}(?:-[a-z0-9]+)+-\d+$")
 
     # Anthropic media types -> data-URL MIME for OpenAI image_url parts.
     _MANTLE_IMAGE_MIME = {
@@ -536,6 +540,8 @@ class BedrockClient:
     def _mantle_chat_completions_url(self, region: str) -> str:
         """Gemma is served under ``/openai/v1`` (its model card), and the mantle SigV4
         signing service is ``bedrock-mantle`` (OpenAI SDK Bedrock provider docs)."""
+        if not self._MANTLE_REGION_PATTERN.fullmatch(region):
+            raise BedrockError(f"Invalid AWS Region for mantle endpoint: {region!r}")
         return f"https://bedrock-mantle.{region}.api.aws/openai/v1/chat/completions"
 
     def _to_openai_content(self, content: Any) -> Any:
@@ -700,7 +706,9 @@ class BedrockClient:
 
         timeout = int(os.environ.get("BEDROCK_READ_TIMEOUT", "900"))
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            # URL is the fixed HTTPS Bedrock Mantle endpoint and its interpolated
+            # Region is validated by _mantle_chat_completions_url.
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:500]

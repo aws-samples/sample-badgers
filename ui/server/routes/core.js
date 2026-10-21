@@ -266,7 +266,7 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
         const ascii = (a, b) => buf.slice(a, b).toString('latin1');
         const isPdf = buf.length >= 5 && ascii(0, 5) === '%PDF-';
         const isZip = buf.length >= 4 && ascii(0, 4) === 'PK\u0003\u0004';
-        const isPng = buf.length >= 8 && hex(8) === '89504e470d0a1a0a';
+        const isPng = buf.length >= 8 && hex(8) === '89504e470d0a1a0a'; // pragma: allowlist secret -- PNG file signature
         const isJpeg = buf.length >= 3 && hex(3) === 'ffd8ff';
         const isGif = buf.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a');
         const isWebp = buf.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';

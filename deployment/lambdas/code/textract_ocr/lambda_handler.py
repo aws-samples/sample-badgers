@@ -15,11 +15,12 @@ import json
 import logging
 import os
 import re
+from xml.etree import ElementTree as ET
 from datetime import UTC, datetime
 from typing import Any
-from xml.etree import ElementTree as ET
-
 import boto3
+from defusedxml.ElementTree import fromstring as safe_fromstring
+from defusedxml.common import DefusedXmlException
 
 from foundation import job_state
 
@@ -234,8 +235,8 @@ def validate_content_tree(xml_payload: bytes) -> tuple[bool, list[str]]:
 
     errors: list[str] = []
     try:
-        root = ET.fromstring(xml_payload)
-    except ET.ParseError as error:
+        root = safe_fromstring(xml_payload)
+    except (ET.ParseError, DefusedXmlException) as error:
         return False, [f"Invalid XML: {error}"]
     if root.tag != f"{{{CONTENT_TREE_NS}}}unified_document":
         errors.append("Root must be the namespaced unified_document element.")

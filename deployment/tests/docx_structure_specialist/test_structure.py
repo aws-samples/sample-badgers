@@ -126,3 +126,15 @@ def test_rejects_result_without_node_ids_in_evidence(structure_module):
 
     with pytest.raises(ValueError, match="cite both"):
         structure_module._validate_model_result(result, "page-2", 2, _graph())
+
+
+def test_rejects_model_xml_with_entity_declaration(structure_module):
+    result = """<!DOCTYPE docx_structure_analysis [<!ENTITY payload "unsafe">]>
+    <docx_structure_analysis scope="page-2" page="2" analysis_mode="native_ooxml_structure">
+      <relationships />
+      <uncertainties />
+      <recommended_visual_analysis required="false">&payload;</recommended_visual_analysis>
+    </docx_structure_analysis>"""
+
+    with pytest.raises(ValueError, match="not valid XML"):
+        structure_module._validate_model_result(result, "page-2", 2, _graph())

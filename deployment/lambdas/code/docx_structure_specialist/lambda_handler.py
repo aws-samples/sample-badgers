@@ -14,9 +14,9 @@ import os
 from datetime import datetime, timezone
 from itertools import combinations
 from typing import Any
-from xml.etree import ElementTree
-
 import boto3
+from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 
 from foundation import job_state
 from foundation.bedrock_client import BedrockClient
@@ -478,7 +478,7 @@ def _validate_model_result(
 ) -> None:
     try:
         root = ElementTree.fromstring(result)
-    except ElementTree.ParseError as error:
+    except (ElementTree.ParseError, DefusedXmlException) as error:
         raise ValueError("Model result is not valid XML") from error
     if root.tag != "docx_structure_analysis":
         raise ValueError("Model result root must be docx_structure_analysis")

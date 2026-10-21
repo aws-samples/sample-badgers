@@ -16,6 +16,8 @@ from typing import Any
 
 import boto3
 import fitz
+from defusedxml.ElementTree import fromstring as safe_fromstring
+from defusedxml.common import DefusedXmlException
 from PIL import Image
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -24,6 +26,8 @@ from foundation import job_state
 
 logger = logging.getLogger()
 logger.setLevel(getattr(logging, os.environ.get("LOGGING_LEVEL", "INFO").upper()))
+
+LIBREOFFICE_BIN = "/usr/bin/libreoffice"
 
 _SEMANTIC = re.compile(
     r"\b(chart|diagram|flow|process|workflow|architecture|map|matrix|"
@@ -291,7 +295,7 @@ def _render_selected(deck: bytes, slide_numbers: Any, session_id: str) -> dict[s
         source = Path(temp) / "source.pptx"
         source.write_bytes(deck)
         process = subprocess.run(
-            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", temp, str(source)],
+            [LIBREOFFICE_BIN, "--headless", "--convert-to", "pdf", "--outdir", temp, str(source)],
             capture_output=True, text=True, check=False, timeout=120,
         )
         rendered = Path(temp) / "source.pdf"
@@ -320,8 +324,8 @@ def _render_selected(deck: bytes, slide_numbers: Any, session_id: str) -> dict[s
 
 def _valid_spine(xml: str, slide_number: int) -> bool:
     try:
-        root = ET.fromstring(xml)
-    except ET.ParseError:
+        root = safe_fromstring(xml)
+    except (ET.ParseError, DefusedXmlException):
         return False
     return (
         root.tag == "unified_document"

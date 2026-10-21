@@ -31,6 +31,16 @@ def test_linear_digital_text_stays_native_and_emits_valid_spine(native_pdf):
     assert "native_pdf_text" in xml
 
 
+def test_native_spine_validation_rejects_entity_declaration(native_pdf):
+    malicious_xml = """<!DOCTYPE unified_document [<!ENTITY payload "unsafe">]>
+    <unified_document schema_version="2.0" page="1">
+      <metadata><source_document>&payload;</source_document></metadata>
+      <content_tree><sect id="sect_root" /></content_tree>
+    </unified_document>"""
+
+    assert native_pdf._validate_native_spine(malicious_xml, 1) is False
+
+
 def test_semantic_visual_reference_routes_to_hybrid(native_pdf):
     page = _page_with_text(
         "Figure 2 shows the proposed architecture and workflow for data processing."

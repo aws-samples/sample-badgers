@@ -84,3 +84,13 @@ def test_accepted_ocr_builds_a_schema_valid_badgers_spine(
     assert valid is True
     assert errors == []
     assert xml_payload.index(b"First line") < xml_payload.index(b"Second line")
+
+
+def test_content_tree_validation_rejects_entity_declaration() -> None:
+    malicious_xml = b"""<!DOCTYPE unified_document [<!ENTITY payload "unsafe">]>
+    <unified_document><metadata>&payload;</metadata></unified_document>"""
+
+    valid, errors = textract_ocr.validate_content_tree(malicious_xml)
+
+    assert valid is False
+    assert errors[0].startswith("Invalid XML:")

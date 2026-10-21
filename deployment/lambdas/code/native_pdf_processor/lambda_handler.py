@@ -22,6 +22,8 @@ from typing import Any
 
 import boto3
 import fitz
+from defusedxml.ElementTree import fromstring as safe_fromstring
+from defusedxml.common import DefusedXmlException
 
 from foundation import job_state
 from foundation.lambda_error_handler import (
@@ -523,8 +525,8 @@ def _build_native_spine(
 
 def _validate_native_spine(xml: str, page_number: int) -> bool:
     try:
-        root = ET.fromstring(xml)
-    except ET.ParseError:
+        root = safe_fromstring(xml)
+    except (ET.ParseError, DefusedXmlException):
         return False
     if root.tag != "unified_document" or root.get("schema_version") != "2.0":
         return False

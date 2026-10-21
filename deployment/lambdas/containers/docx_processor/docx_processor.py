@@ -42,6 +42,7 @@ MAX_ARCHIVE_MEMBERS = 2_000
 MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 MAX_RENDERED_PAGES = 250
+LIBREOFFICE_BIN = "/usr/bin/soffice"
 SEMANTIC_VISUAL_PATTERN = re.compile(
     r"\b(?:architecture|chart|diagram|equation|flowchart|graph|map|"
     r"matrix|process|schema|workflow)\b",
@@ -566,7 +567,7 @@ def render_docx_to_pdf(payload: bytes, timeout_seconds: int = 120) -> bytes:
         output_dir.mkdir()
         input_path.write_bytes(payload)
         command = [
-            "soffice",
+            LIBREOFFICE_BIN,
             "--headless",
             "--nologo",
             "--nodefault",

@@ -99,3 +99,15 @@ def test_rejects_evidence_that_does_not_cite_the_related_shapes(gestalt_module):
 
     with pytest.raises(ValueError, match="cite both"):
         gestalt_module._validate_model_result(result, 2, _graph())
+
+
+def test_rejects_model_xml_with_entity_declaration(gestalt_module):
+    result = """<!DOCTYPE pptx_gestalt_analysis [<!ENTITY payload "unsafe">]>
+    <pptx_gestalt_analysis slide="2" analysis_mode="native_coordinate_gestalt">
+      <relationships />
+      <uncertainties />
+      <recommended_visual_analysis required="false">&payload;</recommended_visual_analysis>
+    </pptx_gestalt_analysis>"""
+
+    with pytest.raises(ValueError, match="not valid XML"):
+        gestalt_module._validate_model_result(result, 2, _graph())

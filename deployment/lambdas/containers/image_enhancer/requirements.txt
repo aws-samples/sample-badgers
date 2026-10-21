@@ -9,4 +9,4 @@ anthropic>=0.40.0
 # AWS SDK (explicitly include for compatibility)
 boto3>=1.34.0
 botocore>=1.34.0
-Pillow>=10.0.0
+Pillow>=13.0.0
