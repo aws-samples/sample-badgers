@@ -1,9 +1,21 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[← BADGERS home](../../README.md) · [Deployment](../DEPLOYMENT_README.md) · [Lambda specialists](LAMBDA_SPECIALISTS.md) · 🔵 <strong>Foundation layer</strong> · [Prompting system](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
 
 # 🧠 Foundation Lambda Layer
 
 The Foundation Layer is a reusable AWS Lambda layer containing the core framework, dependencies, and shared utilities for all specialist tools. It implements the "foundation + specialization" pattern where common functionality lives in the layer while specialist-specific logic remains in individual Lambda functions.
+
+## Start with the right change
+
+| I need to… | Start here |
+| --- | --- |
+| Add or change one document analyzer | [Lambda specialists](LAMBDA_SPECIALISTS.md#-adding-a-new-specialist) |
+| Change a prompt or manifest | [Prompting system](../s3_files/prompts/PROMPTING_SYSTEM_README.md) |
+| Change shared retry, model, persistence, or image behavior | [Core modules](#-core-modules) |
+| Build or attach the shared layer | [Build and deploy](#-build-and-deploy) |
+
+Do not modify the foundation layer merely to add a specialist. A specialist
+normally owns its handler, manifest, schema, and prompts; shared behavior
+belongs here only when every relevant specialist needs the same contract.
 
 ## 🏗️ Architecture
 

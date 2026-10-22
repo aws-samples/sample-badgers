@@ -1,5 +1,4 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Release guide](../../RELEASE_GUIDE.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | [Runtime](../runtime/RUNTIME_README.md) | [S3 Files](../s3_files/S3_FILES_README.md) | 🔵 **Lambda Specialists** | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[← BADGERS home](../../README.md) · [Deployment](../DEPLOYMENT_README.md) · 🔵 <strong>Lambda specialists</strong> · [Foundation layer](FOUNDATION_LAYER_README.md) · [Prompting system](../s3_files/prompts/PROMPTING_SYSTEM_README.md) · [Runtime](../runtime/RUNTIME_README.md)</sub>
 
 ---
 
@@ -13,6 +12,17 @@ particular, the native DOCX/PPTX intake path below is currently a Full
 capability; it is not included in the Headless starter workflow or the
 selectable Specialist packs. This branch is a private beta candidate; see the
 [Release Guide](../../RELEASE_GUIDE.md) for release status.
+
+## Choose a task
+
+| I need to… | Start here |
+| --- | --- |
+| Call an existing specialist | [Input and output format](#-inputoutput-format) |
+| Understand native PDF, DOCX, PPTX, OCR, and visual routing | [Native intake and OCR fallback](#-native-pdf-intake-and-ocr-fallback) |
+| Understand a vision specialist's lifecycle | [Anatomy of a vision specialist](#-anatomy-of-a-vision-specialist) |
+| Trace a document job or partial result | [Job tracking](#-job-tracking) |
+| Resolve a localized reading uncertainty | [Region inspection specialist](#-region-inspection-specialist) |
+| Add a new specialist | [Adding a new specialist](#-adding-a-new-specialist) |
 
 ---
 
@@ -569,8 +579,8 @@ Or with direct base64:
 **Option 1: Use the Wizard (Recommended)**
 
 ```bash
-cd frontend
-uv run python main.py
+cd ui
+npm run dev
 ```
 
 The Specialist Creation Wizard is available as the 🧙 Create Specialist tab in the [UI](../../ui/UI_README.md).

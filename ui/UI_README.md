@@ -1,11 +1,20 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [Vision LLM Theory](../VISION_LLM_THEORY_README.md) | 🔵 **UI** | [Deployment](../deployment/DEPLOYMENT_README.md) | [CDK Stacks](../deployment/stacks/STACKS_README.md) | [Runtime](../deployment/runtime/RUNTIME_README.md) | [S3 Files](../deployment/s3_files/S3_FILES_README.md) | [Lambda Specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](../deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) </sub>
+<sub>[← BADGERS home](../README.md) · [BADGERS Full](../badgers-full/README.md) · [Deployment](../deployment/DEPLOYMENT_README.md) · 🔵 <strong>UI</strong> · [Runtime](../deployment/runtime/RUNTIME_README.md) · [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md)</sub>
 
 ---
 
 # 🦡 BADGERS UI
 
 Single React + Express application that serves as both the developer testing workbench and the deployment/ops console. Runs locally via `npm run dev`, or on AWS as a container on an ECS Express Gateway service authenticated with Cognito OIDC.
+
+## Start with your goal
+
+| I want to… | Start here |
+| --- | --- |
+| Run the UI locally | [Quick Start](#quick-start-local) |
+| Understand what an end user can do | [Product Tour](#product-tour) |
+| Operate the deployed Full application | [BADGERS Full](../badgers-full/README.md) |
+| Understand identity and access | [Authentication](#authentication) |
+| Change the UI service or API | [Architecture](#architecture) |
 
 ## Two Modes, One Codebase
 
@@ -27,6 +36,33 @@ shortcut, so requests fail rather than silently running unauthenticated.
 | ------- | ------------------------------------------------------------------------------------------------------------- | ----------------- |
 | Testing | 🏠 Home, 💬 Chat, ✏️ Edit Specialist, 🧙 Create Specialist, 🧪 Evaluations, 💰 Pricing, 📊 Observability, 📝 Chat Log | All users         |
 | Deploy  | 📦 Stacks, 🔬 Specialists, 📄 S3 Configs, ⚙️ Deploy Tags                                                          | `admin` role only |
+
+## Product Tour
+
+The Full product uses one application for document testing, result review, and
+deployment administration. The testing tabs are available to all signed-in
+users; deployment tabs are restricted to the `admin` role.
+
+| Analyze | Author |
+| --- | --- |
+| ![Chat analysis](../.github/assets/BADGERS-screenshot-chat-analysis-1.png) | ![Create specialist](../.github/assets/BADGERS-screenshot-create-specialist-1.png) |
+| Stream agent responses, extended-thinking blocks, tool activity, and audit or dynamic-token settings. | Build a specialist through basic information, prompt review, examples, and deployment settings. |
+
+| Evaluate | Observe |
+| --- | --- |
+| ![Evaluations](../.github/assets/BADGERS-screenshot-evaluations.png) | ![Observability](../.github/assets/BADGERS-screenshot-observability.png) |
+| Review specialist output by session and score accuracy, element identification, and contextual understanding. | Inspect traces, spans, token usage, and a session event timeline. |
+
+| Review results | Inspect page evidence |
+| --- | --- |
+| ![Report overview](../.github/assets/BADGERS-screenshot-report-overview.png) | ![Page reader](../.github/assets/BADGERS-screenshot-report-page-reader-enhanced.png) |
+| Explore page analysis summaries, element counts, specialist results, and structured XML output. | Compare original and enhanced page images when a run retained both. |
+
+The Page Reader's **Inspections** tab appears when the agent asks
+`inspect_region_tool` to resolve a localized uncertainty. It retains the crop,
+blind reading, original concern, confidence, scale, source dimensions, and the
+specialist that raised the flag. See [Page Reader inspections](#page-reader-inspections)
+for the access and retention contract.
 
 ## Quick Start (Local)
 

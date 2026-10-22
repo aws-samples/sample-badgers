@@ -145,6 +145,11 @@ def test_headless_staging_excludes_unselected_specialists() -> None:
         assert set(staged_metadata["specialists"]) == set(profile.specialists)
         assert not (destination / "schemas/charts_specialist.json").exists()
         assert not (destination / "prompts/charts_specialist").exists()
+        assert not any(
+            path.suffix.lower() in {".md", ".markdown"}
+            for path in destination.rglob("*")
+            if path.is_file()
+        )
 
 
 def test_specialists_profile_allows_an_explicit_pack_selection() -> None:
@@ -204,6 +209,10 @@ def test_release_artifact_is_deterministic_and_has_a_manifest() -> None:
         assert manifest["release_id"] == first_release
         assert "schemas/table_specialist.json" in manifest["files"]
         assert "workflows/standard-document-analysis.json" in manifest["files"]
+        assert not any(
+            Path(path).suffix.lower() in {".md", ".markdown"}
+            for path in manifest["files"]
+        )
 
 
 def test_release_hash_changes_when_workflow_or_policy_changes(tmp_path: Path) -> None:

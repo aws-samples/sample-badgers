@@ -19,7 +19,7 @@ Include the context in any BADGERS JSON output to make it interoperable with lin
 
 ```json
 {
-  "@context": "https://raw.githubusercontent.com/aws-samples/sample-badgers/main/schemas/badgers-elements.jsonld",
+  "@context": "https://raw.githubusercontent.com/aws-samples/sample-badgers/v5.0.2/schemas/badgers-elements.jsonld",
   "elements": [
     {
       "order": 1,
@@ -223,7 +223,10 @@ When a `citation` or `reference` element is detected, the specialist also identi
 
 ## Versioning
 
-This vocabulary is versioned with the BADGERS release. The current version tracks `BADGERS v5.0` (September 2026). Breaking changes to element types or sub-types will increment the major version.
+This vocabulary is versioned with the BADGERS source release. The current
+published version tracks `v5.0.2`. The untagged 6.0 beta candidate is not a
+published interoperability contract. Breaking changes to element types or
+sub-types will increment the major version.
 
 ## Source of Truth
 

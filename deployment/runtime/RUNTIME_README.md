@@ -1,5 +1,4 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../README.md) | [Release guide](../../RELEASE_GUIDE.md) | [Vision LLM Theory](../../VISION_LLM_THEORY_README.md) | [UI](../../ui/UI_README.md) | [Deployment](../DEPLOYMENT_README.md) | [CDK Stacks](../stacks/STACKS_README.md) | 🔵 **Runtime** | [S3 Files](../s3_files/S3_FILES_README.md) | [Lambda Specialists](../lambdas/LAMBDA_SPECIALISTS.md) | [Prompting System](../s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[← BADGERS home](../../README.md) · [Deployment](../DEPLOYMENT_README.md) · [BADGERS Full](../../badgers-full/README.md) · [BADGERS Headless](../../badgers-headless/README.md) · 🔵 <strong>Runtime</strong> · [Lambda specialists](../lambdas/LAMBDA_SPECIALISTS.md)</sub>
 
 ---
 
@@ -9,6 +8,14 @@ Docker container running the Strands agent. Full uses WebSocket streaming;
 Headless disables WebSockets and accepts authenticated versioned agent requests
 that submit to the private durable workflow runner. This branch is a private,
 untagged 6.0 candidate; see the [Release Guide](../../RELEASE_GUIDE.md).
+
+## Choose the runtime mode
+
+| Mode | Reader goal | Start here |
+| --- | --- | --- |
+| Full | Operate the browser-facing, streaming agent | [Quick Start](#quick-start) and [UI guide](../../ui/UI_README.md) |
+| Headless | Integrate authenticated, durable document requests | [Headless request mode](#headless-request-mode) and [Headless product guide](../../badgers-headless/README.md) |
+| Maintainer | Change the image, dependencies, or agent behavior | [Build options](#build-options) and [Customization](#customization) |
 
 ## Contents
 

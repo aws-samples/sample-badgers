@@ -1,3 +1,5 @@
+[← BADGERS home](../README.md)
+
 # BADGERS Specialists
 
 Deploy self-contained document analyzer packs as direct AWS Lambda tools. This
@@ -39,6 +41,26 @@ This product deliberately does not provide an HTTP endpoint, Gateway, MCP
 adapter, user identity, or UI. Put your own API boundary and authorization in
 front of it if your callers are not already AWS principals.
 
+### First successful invocation
+
+Use a selected vision specialist with a page image that the Lambda can read
+from the deployment's source bucket:
+
+```bash
+aws lambda invoke \
+  --function-name <full-text-specialist-function-name> \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"session_id":"example-001","image_path":"s3://<source-bucket>/pages/page-1.png"}' \
+  response.json
+
+cat response.json
+```
+
+Success returns `statusCode` `200` and a body with `success: true`. The
+specialist result includes an `S3_RESULT_URI` marker identifying the retained
+artifact. This is a page-level specialist call; use the PDF/image intake tools
+when your application needs to create page images from a source document.
+
 ## Before you start
 
 Install and configure AWS CLI, CDK v2, Docker, Python 3.12+, and `uv`. The
@@ -75,5 +97,13 @@ Step 3's configuration SHA is an immutable private deployment artifact, not a
 Git product version. Source releases are Git tags; see the [Release
 Guide](../RELEASE_GUIDE.md#release-terminology) for the lifecycle.
 
-For deployment mechanics and cleanup, see the
-[deployment reference](../deployment/DEPLOYMENT_README.md).
+## Go deeper
+
+| Topic | Guide |
+| --- | --- |
+| Follow specialist invocation, input, output, and error behavior | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
+| Understand the shared runtime framework | [Foundation layer](../deployment/lambdas/FOUNDATION_LAYER_README.md) |
+| Select profiles and compose specialist packs | [Deployment profiles](../deployment/profiles/README.md) |
+| Author prompts and specialist manifests | [Prompting system](../deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) |
+| Consume structured document output | [Schema and vocabulary](../schemas/VOCABULARY.md) |
+| Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |

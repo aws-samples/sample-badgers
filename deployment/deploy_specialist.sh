@@ -208,9 +208,13 @@ deploy_specialist() {
     aws s3 sync "$SCRIPT_DIR/s3_files/schemas/" "s3://$CONFIG_BUCKET/schemas/" \
         --exclude "*" --include "${name}.json" --quiet
     if [ -d "$SCRIPT_DIR/s3_files/prompts/${name}" ]; then
-        aws s3 sync "$SCRIPT_DIR/s3_files/prompts/${name}/" "s3://$CONFIG_BUCKET/prompts/${name}/" --quiet
+        aws s3 sync "$SCRIPT_DIR/s3_files/prompts/${name}/" "s3://$CONFIG_BUCKET/prompts/${name}/" \
+            --exclude "*.md" --exclude "*.MD" \
+            --exclude "*.markdown" --exclude "*.MARKDOWN" --quiet
     fi
-    aws s3 sync "$SCRIPT_DIR/s3_files/prompts/shared/" "s3://$CONFIG_BUCKET/prompts/shared/" --quiet
+    aws s3 sync "$SCRIPT_DIR/s3_files/prompts/shared/" "s3://$CONFIG_BUCKET/prompts/shared/" \
+        --exclude "*.md" --exclude "*.MD" \
+        --exclude "*.markdown" --exclude "*.MARKDOWN" --quiet
     log_success "S3 files uploaded to s3://$CONFIG_BUCKET"
 
     # Step 2: Deploy Lambda stack

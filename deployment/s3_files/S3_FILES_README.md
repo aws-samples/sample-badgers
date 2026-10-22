@@ -236,4 +236,9 @@ Files are synced to S3 via:
 ./sync_s3_files.sh
 ```
 
+Only deployable configuration is uploaded. Markdown documentation (`.md` and
+`.markdown`) is excluded from both the legacy sync and profile-aware immutable
+configuration releases; the legacy sync also removes Markdown objects that a
+previous run uploaded.
+
 Lambda functions load these files at runtime using the `S3ConfigLoader` from the foundation layer, enabling prompt updates without redeploying Lambda code.

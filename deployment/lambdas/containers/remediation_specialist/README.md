@@ -1,3 +1,5 @@
+[← BADGERS home](../../../../README.md)
+
 # PDF Accessibility Tagger
 
 Automated PDF/UA remediation pipeline. Takes an untagged PDF and a correlation XML (from the BADGERS specialist system), and produces a fully tagged accessible PDF with structure tree, alt text, and PDF/UA metadata.

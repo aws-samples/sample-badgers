@@ -1,3 +1,5 @@
+[← BADGERS home](../README.md)
+
 # BADGERS Full
 
 The complete BADGERS application: agent, Gateway, every enabled specialist,
@@ -45,6 +47,19 @@ The UI provides document testing, reports, observability, and specialist
 administration. Use option **`m`** to inspect the central model registry before
 changing a model selection.
 
+### First successful result
+
+1. Open the UI endpoint reported by deployment status and sign in with a user
+   provisioned for the deployment.
+2. Upload a PDF, DOCX, PPTX, or supported image from the **Home** or **Chat**
+   experience.
+3. Submit an analysis instruction, then use the report view to inspect the
+   page-level output and retained specialist artifacts.
+
+If the deployment completed but you cannot sign in, start with the
+[UI authentication guide](../ui/UI_README.md#authentication), not the
+infrastructure teardown or runtime documentation.
+
 ## Configuration and specialist changes
 
 Prompts, manifests, schemas, and agent configuration are uploaded as one
@@ -57,6 +72,13 @@ Git source release or customer version: source releases are immutable Git tags,
 while Step 3 creates the private S3 configuration SHA. The [Release
 Guide](../RELEASE_GUIDE.md#release-terminology) explains the distinction.
 
-For individual stack operations, cleanup, and troubleshooting, see the
-[deployment reference](../deployment/DEPLOYMENT_README.md). For the capability
-definition behind this product, see [deployment profiles](../deployment/profiles/README.md).
+## Go deeper
+
+| Topic | Guide |
+| --- | --- |
+| Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |
+| Run the testing workbench and operations console | [UI guide](../ui/UI_README.md) |
+| Understand the agent container and Gateway connection | [Runtime guide](../deployment/runtime/RUNTIME_README.md) |
+| Follow document intake, specialist execution, and results | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
+| See the Full capability definition | [Deployment profiles](../deployment/profiles/README.md) |
+| Choose the correct source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

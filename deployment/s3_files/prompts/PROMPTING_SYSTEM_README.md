@@ -1,11 +1,24 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../../../README.md) | [Vision LLM Theory](../../../VISION_LLM_THEORY_README.md) | [UI](../../../ui/UI_README.md) | [Deployment](../../DEPLOYMENT_README.md) | [CDK Stacks](../../stacks/STACKS_README.md) | [Runtime](../../runtime/RUNTIME_README.md) | [S3 Files](../S3_FILES_README.md) | [Lambda Specialists](../../lambdas/LAMBDA_SPECIALISTS.md) | 🔵 **Prompting System**</sub>
+<sub>[← BADGERS home](../../../README.md) · [Deployment](../../DEPLOYMENT_README.md) · [Lambda specialists](../../lambdas/LAMBDA_SPECIALISTS.md) · [S3 files](../S3_FILES_README.md) · 🔵 <strong>Prompting system</strong></sub>
 
 ---
 
 # 📝 Prompting System Architecture
 
 This document explains the design principles, structure, and rationale behind the modular prompting system used by all specialists.
+
+## Make a prompt change safely
+
+1. Identify the owning specialist's manifest and its ordered prompt files.
+2. Change the smallest applicable prompt component rather than copying shared
+   rules into a specialist-specific file.
+3. Run the relevant focused tests and review the changed output contract.
+4. Create a new configuration release with deployment Step 3, then redeploy
+   each affected consumer so it pins the new release.
+
+Prompts are deployment configuration, not an editable runtime input. The
+[deployment reference](../../DEPLOYMENT_README.md#-redeploying) explains the
+release and redeployment sequence; [Lambda specialists](../../lambdas/LAMBDA_SPECIALISTS.md)
+explains how a manifest reaches a handler.
 
 ## 🎯 Core Design Principles
 

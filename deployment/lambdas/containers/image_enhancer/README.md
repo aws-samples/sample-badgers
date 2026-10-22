@@ -1,3 +1,5 @@
+[← BADGERS home](../../../../README.md)
+
 # Agentic Image Enhancer
 
 **Iterative image enhancement using Claude Sonnet 4.6 vision model with Strands Agents framework.**

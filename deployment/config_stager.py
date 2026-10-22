@@ -31,6 +31,7 @@ class ConfigurationStagingError(ValueError):
 
 
 _DEFAULT_SOURCE = _DEPLOYMENT_DIR / "s3_files"
+_MARKDOWN_SUFFIXES = {".md", ".markdown"}
 
 
 def _copy_file(source_root: Path, relative_path: str, destination: Path) -> None:
@@ -40,6 +41,16 @@ def _copy_file(source_root: Path, relative_path: str, destination: Path) -> None
     target = destination / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
+
+
+def _ignore_markdown_files(_directory: str, names: list[str]) -> set[str]:
+    """Keep repository documentation out of deployed runtime configuration."""
+
+    return {
+        name
+        for name in names
+        if Path(name).suffix.lower() in _MARKDOWN_SUFFIXES
+    }
 
 
 def _copy_tree_if_present(
@@ -52,7 +63,12 @@ def _copy_tree_if_present(
         raise ConfigurationStagingError(
             f"Expected a configuration directory but found a file: {source}"
         )
-    shutil.copytree(source, destination / relative_path, dirs_exist_ok=True)
+    shutil.copytree(
+        source,
+        destination / relative_path,
+        dirs_exist_ok=True,
+        ignore=_ignore_markdown_files,
+    )
 
 
 def _stage_workflow_configuration(

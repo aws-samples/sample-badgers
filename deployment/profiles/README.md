@@ -1,8 +1,23 @@
+[← BADGERS home](../../README.md)
+
 # BADGERS deployment profiles
 
 Profiles are declarative deployment inputs. They resolve a named product
 offering into an explicit specialist set and capability map before CDK or AWS
 resource creation.
+
+## Choose a profile
+
+| Profile | Best for | Includes | Definition |
+| --- | --- | --- | --- |
+| Full | Operating the complete BADGERS application | Agent, Gateway, all enabled specialists, UI, session memory, and operations tooling | [`full.json`](full.json) |
+| Headless | Integrating BADGERS into your own application or workflow | Authenticated agent API, curated PDF/image packs, durable runner, and operation state | [`headless.json`](headless.json) |
+| Specialists | Calling document analyzers directly from AWS code | Selected direct-invocation Lambda packs and their shared foundation | [`specialists.json`](specialists.json) |
+
+Use this reference to inspect or change profile definitions. To deploy a
+profile, start with [BADGERS Full](../../badgers-full/README.md),
+[BADGERS Headless](../../badgers-headless/README.md), or
+[BADGERS Specialists](../../badger-specialists/README.md).
 
 On `release/6.0.0-beta`, profiles are part of a private release candidate. The
 stable customer source release is `v5.0.2`; the beta branch has no public

@@ -36,7 +36,14 @@ if [[ -z "$S3_BUCKET" ]]; then
     exit 1
 fi
 
-echo "Syncing $S3_FILES_DIR to s3://$S3_BUCKET..."
-aws s3 sync "$S3_FILES_DIR" "s3://$S3_BUCKET" $_AWS_PROFILE_ARG
+echo "Removing Markdown documentation from s3://$S3_BUCKET..."
+aws s3 rm "s3://$S3_BUCKET" --recursive \
+    --exclude "*" --include "*.md" --include "*.MD" \
+    --include "*.markdown" --include "*.MARKDOWN" $_AWS_PROFILE_ARG
+
+echo "Syncing deployable configuration from $S3_FILES_DIR to s3://$S3_BUCKET..."
+aws s3 sync "$S3_FILES_DIR" "s3://$S3_BUCKET" \
+    --exclude "*.md" --exclude "*.MD" \
+    --exclude "*.markdown" --exclude "*.MARKDOWN" $_AWS_PROFILE_ARG
 
 echo "Done! Files synced to s3://$S3_BUCKET"

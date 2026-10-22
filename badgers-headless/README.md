@@ -1,3 +1,5 @@
+[← BADGERS home](../README.md)
+
 # BADGERS Headless
 
 An API-oriented BADGERS deployment for teams that provide their own user
@@ -60,6 +62,28 @@ source URI, classifier URI, correlated URI, individual specialist artifact
 URIs, configuration release ID, and trace ID only when one is available.
 Native artifacts remain private in S3; they are not returned inline.
 
+### First successful request
+
+After deployment, use the status menu or CloudFormation outputs to record the
+Runtime ARN, Headless client ID, and Headless credentials-secret ARN. Then:
+
+1. Store a PDF, PNG, or JPEG beneath the Headless client's private source
+   prefix: `s3://<source-bucket>/tenants/headless-<client-id>/...`.
+2. Retrieve the approved Headless client credentials from Secrets Manager and
+   obtain a Cognito client-credentials access token with the
+   `badgers-headless/invoke` scope.
+3. Use the AgentCore Runtime HTTP invocation path with that bearer token and a
+   `badgers-agent-request/v1` payload. Do not use the AWS CLI invocation
+   command for this OAuth-protected integration.
+4. Treat the initial `accepted` status event as a durable submission, not a
+   completed analysis. Save the returned `operation_id`, `status_manifest_uri`,
+   and `plan_uri`; the private status manifest bridges a disconnected caller
+   to the eventual result.
+
+The [integration contracts](../deployment/s3_files/contracts/README.md) are
+the authoritative payload definition. This guide intentionally does not expose
+or print a client secret.
+
 For a versioned request, Headless authenticates the caller at the AgentCore
 Runtime using the dedicated Cognito client-credentials client and
 `badgers-headless/invoke` scope provisioned by this profile. The runtime derives
@@ -117,3 +141,14 @@ change. The detailed infrastructure contract is in the
 [deployment reference](../deployment/DEPLOYMENT_README.md). Step 3's
 configuration SHA is private to this deployment and is separate from the Git
 source release; see the [Release Guide](../RELEASE_GUIDE.md#release-terminology).
+
+## Go deeper
+
+| Topic | Guide |
+| --- | --- |
+| Validate request and result payloads | [Integration contracts](../deployment/s3_files/contracts/README.md) |
+| Understand the approved workflow and routing boundary | [Workflows](../deployment/s3_files/workflows/README.md) and [routing policies](../deployment/s3_files/routing_policies/README.md) |
+| Operate the agent container in Headless mode | [Runtime guide](../deployment/runtime/RUNTIME_README.md#headless-request-mode) |
+| Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |
+| Inspect product capability and selected packs | [Deployment profiles](../deployment/profiles/README.md) |
+| Choose a source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

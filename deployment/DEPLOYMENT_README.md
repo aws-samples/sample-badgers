@@ -1,5 +1,4 @@
-<sub>🧭 **Navigation:**</sub><br>
-<sub>[Home](../README.md) | [Release guide](../RELEASE_GUIDE.md) | [BADGERS Full](../badgers-full/README.md) | [BADGERS Headless](../badgers-headless/README.md) | [BADGERS Specialists](../badger-specialists/README.md) | 🔵 **Deployment reference** | [CDK Stacks](stacks/STACKS_README.md) | [Runtime](runtime/RUNTIME_README.md) | [S3 Files](s3_files/S3_FILES_README.md) | [Prompting System](s3_files/prompts/PROMPTING_SYSTEM_README.md)</sub>
+<sub>[← BADGERS home](../README.md) · [Choose a product](../README.md#choose-your-deployment-path) · [Release guide](../RELEASE_GUIDE.md) · 🔵 <strong>Deployment reference</strong> · [Runtime](runtime/RUNTIME_README.md) · [CDK stacks](stacks/STACKS_README.md)</sub>
 
 ---
 
@@ -20,6 +19,22 @@ Every route uses the same profile-aware deployment engine. This reference
 describes the complete infrastructure surface; sections about UI, VPC, session
 memory, X-Ray, and custom-specialist administration apply only to Full unless
 explicitly noted.
+
+## Choose a task
+
+| I need to… | Start here |
+| --- | --- |
+| Make my first deployment | [Quick Start](#-quick-start), after selecting a product guide above |
+| Resume or re-run an existing deployment | [Resume vs Full Deployment](#resume-vs-full-deployment) |
+| Change prompts, models, code, or infrastructure | [Redeploying](#-redeploying) |
+| Find outputs or understand stack relationships | [CDK Stacks](#-cdk-stacks) and [Stack Outputs](#-stack-outputs) |
+| Tear down a deployment | [Cleanup](#-cleanup) |
+| Diagnose a failed deployment | [Troubleshooting](#-troubleshooting) |
+| Extend BADGERS as a maintainer | [Manual Deployment](#-manual-deployment--full-product-maintainers) and [Custom Specialists](#-custom-specialists) |
+
+New deployers should use the selected product guide first. Read the identity,
+service catalog, and manual deployment sections only when you need to operate
+or extend the platform beyond the guided menu.
 
 ## Release and configuration identity
 

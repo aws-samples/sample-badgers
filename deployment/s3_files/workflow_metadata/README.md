@@ -1,3 +1,5 @@
+[← BADGERS home](../../../README.md)
+
 # Specialist capability metadata
 
 `specialist_capabilities.json` maps stable capability tags to the product's
