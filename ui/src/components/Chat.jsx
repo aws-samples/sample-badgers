@@ -299,7 +299,7 @@ function MyComposer({ attachmentAdapter }) {
 // ── S3 Upload Attachment Adapter ──
 
 class S3AttachmentAdapter {
-  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
+  accept = 'application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx,image/png,image/jpeg,image/tiff,image/webp,image/gif'
 
   // Top level of the job-tracking hierarchy (doc_id -> job_id -> subtask_id).
   // The server mints it per upload; we hold the most recent one so subsequent

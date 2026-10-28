@@ -32,6 +32,12 @@ _ROUTES = {
         "processor_specialist": "pptx_processor",
         "result_contract": "page_plan",
     },
+    ".xlsx": {
+        "input_type": "xlsx",
+        "processor_tool": "process_xlsx_tool",
+        "processor_specialist": "xlsx_processor",
+        "result_contract": "native_workbook",
+    },
 }
 for _extension in _IMAGE_EXTENSIONS:
     _ROUTES[_extension] = {
@@ -64,9 +70,9 @@ def lambda_handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
             raise ValueError(
                 "Macro-enabled .docm files are not supported. Remove macros and save as .docx."
             )
-        if extension == ".xlsx":
+        if extension in {".xls", ".xlsb", ".xlsm", ".xltm"}:
             raise ValueError(
-                f"{extension} is reserved for a future Office intake feature and is not supported yet."
+                f"{extension} is not supported. Save a macro-free workbook as .xlsx."
             )
         route = _ROUTES.get(extension)
         if route is None:

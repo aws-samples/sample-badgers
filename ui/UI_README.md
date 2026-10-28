@@ -129,7 +129,7 @@ Browser (React/Vite)
     ├── /api/* ──→ Express server (port 7860), all behind requireAuth
     │                ├── Core routes (all roles)
     │                │   ├── AgentCore WebSocket proxy (chat, SSE to browser)
-    │                │   ├── DOCX, PDF, or image upload to S3 (mints doc_id)
+    │                │   ├── DOCX, PPTX, PDF, or image upload to S3 (mints doc_id)
     │                │   ├── DOCX: native page plan → Textract OCR or Vision only when needed
     │                │   ├── Job records (/api/jobs)
     │                │   ├── S3 file operations (manifests, prompts, schemas)
@@ -317,7 +317,7 @@ ui/
 │   │   └── useUser.js             # User context (role, email) from ID token claims
 │   └── components/
 │       ├── Home.jsx               # Dashboard
-│       ├── Chat.jsx               # Agent chat interface, DOCX/PDF/image upload, doc_id
+│       ├── Chat.jsx               # Agent chat interface, DOCX/PPTX/PDF/image upload, doc_id
 │       ├── CopyButton.jsx         # Shared copy-to-clipboard control
 │       ├── Reports.jsx            # Report index and Page Reader
 │       ├── SpecialistEditor.jsx   # Manifest/prompt editor

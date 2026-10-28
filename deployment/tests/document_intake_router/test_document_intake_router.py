@@ -36,15 +36,21 @@ def test_docx_selects_the_native_page_plan_processor() -> None:
     assert result["session_id"] == "session-1"
 
 
-def test_legacy_document_and_pptx_return_actionable_routing() -> None:
+def test_legacy_document_pptx_and_xlsx_return_actionable_routing() -> None:
     legacy = _body(
         lambda_handler({"document_path": "s3://input-bucket/legacy.doc"}, None)
     )
     pptx = _body(
         lambda_handler({"document_path": "s3://input-bucket/deck.pptx"}, None)
     )
+    xlsx = _body(
+        lambda_handler({"document_path": "s3://input-bucket/budget.xlsx"}, None)
+    )
 
     assert "Save the document as .docx or PDF" in str(legacy["error"])
     result = json.loads(str(pptx["result"]))
     assert result["processor_tool"] == "process_pptx_tool"
     assert result["result_contract"] == "page_plan"
+    xlsx_result = json.loads(str(xlsx["result"]))
+    assert xlsx_result["processor_tool"] == "process_xlsx_tool"
+    assert xlsx_result["result_contract"] == "native_workbook"

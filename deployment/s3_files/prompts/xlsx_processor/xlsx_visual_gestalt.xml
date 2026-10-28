@@ -1,0 +1,5 @@
+<gestalt>
+  <instruction>First take in the whole visual: its dominant color, text, shape, hierarchy, and apparent emphasis.</instruction>
+  <instruction>Then relate its apparent purpose to the supplied anchor and covered-cell evidence without treating those cells as proof of what the visual means.</instruction>
+  <instruction>Prefer unknown and require human review when the visual might replace, obscure, or materially reinterpret workbook data.</instruction>
+</gestalt>

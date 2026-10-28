@@ -11,7 +11,7 @@ deployment-specific Lambda name.
 Capability metadata is part of the private Step 3 configuration release. It
 does not independently make a specialist available to Headless or Specialists:
 the selected profile and pack remain the authority. The initial Headless packs
-therefore do not expose native DOCX/PPTX processors by default. A Headless or
+therefore do not expose native DOCX/PPTX/XLSX processors by default. A Headless or
 Specialists deployment can select those processors explicitly; an agent profile
 must also select the matching reviewed workflow template before it accepts that
 source type. See the [Release Guide](../../../RELEASE_GUIDE.md).

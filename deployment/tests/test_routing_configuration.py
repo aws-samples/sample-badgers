@@ -5,8 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from deployment.release_artifact import build_release
-from deployment.routing_configuration import _routing_payload, ensure
+from deployment.routing_configuration import (
+    RoutingConfigurationError,
+    _routing_payload,
+    ensure,
+)
 from deployment.specialist_selection import load_or_create_desired
 
 
@@ -51,3 +57,44 @@ def test_native_docx_route_stages_as_part_of_the_immutable_release(
         )
     )
     assert workflow["execution_mode"] == "native_document"
+
+
+def test_native_xlsx_route_requires_the_xlsx_processor(tmp_path: Path) -> None:
+    state = tmp_path / "demo.json"
+    load_or_create_desired(
+        state,
+        "headless",
+        packs=[],
+        direct_specialists=["xlsx_processor"],
+    )
+    saved = json.loads(state.read_text(encoding="utf-8"))
+    saved["desired_routing_configuration"] = _routing_payload(
+        "headless",
+        ["native-xlsx-analysis"],
+        {"xlsx_processor"},
+    )
+    state.write_text(json.dumps(saved), encoding="utf-8")
+
+    build_release(
+        "headless",
+        tmp_path / "release",
+        direct_specialists=("xlsx_processor",),
+        selection_override=True,
+        routing_state=state,
+    )
+
+    workflow = json.loads(
+        (tmp_path / "release/workflows/native-xlsx-analysis.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert workflow["invariant_capabilities"] == {"native_document": "xlsx_analysis"}
+
+
+def test_native_xlsx_route_is_headless_only() -> None:
+    with pytest.raises(RoutingConfigurationError, match="available only for: headless"):
+        _routing_payload(
+            "full",
+            ["native-xlsx-analysis"],
+            {"xlsx_processor"},
+        )

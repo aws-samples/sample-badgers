@@ -22,7 +22,7 @@ command later and choose **`r`** to resume unfinished work.
 ## What gets deployed
 
 - AgentCore Runtime and MCP Gateway
-- All specialists enabled in `deployment/deployment_config.json`
+- All default-enabled specialists
 - Native PDF, DOCX, and PPTX intake, with selective OCR and visual fallback
 - Shared prompt/configuration release, model profiles, S3 storage, IAM, Cognito,
   DynamoDB operation ledger, and ECR
@@ -76,6 +76,12 @@ Use `./deploy.sh configure --ui` before deployment when you want a visual,
 local-only way to select packs or specialists and choose supported workflow
 templates. The planner cannot deploy; it produces a reviewed CLI handoff, and
 the CLI re-runs preflight before applying changes to the same deployment ID.
+
+To use macro-free `.xlsx` files, select the optional **Workbook Analysis** pack
+before deployment. Its single processor safely inspects native workbook evidence,
+conditionally enriches supported embedded raster visuals, and returns one
+canonical BADGERS XML result. Full uses the normal authenticated agent path;
+the separate Headless template is only needed for durable workflow execution.
 
 ## Go deeper
 

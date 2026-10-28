@@ -213,10 +213,11 @@ templates with the same bulk controls), **`k`** (reusable pack library), **`p`**
 **`m`** (model registry), and **0** (exit). The saved desired selection is
 re-resolved each run, so manual pack JSON edits are detected; a change keeps
 the same deployment ID and marks its dependent configuration and service
-stages for reconciliation. Selecting a container specialist such as DOCX or
-PPTX automatically adds the ECR/image-build dependency. The routing menu can
-enable the standard PDF/image workflow and native DOCX/PPTX workflows when
-their required processors are selected. You can also run one step directly — for example `./badgers-headless/deploy.sh 6` or
+stages for reconciliation. Selecting a container specialist such as DOCX,
+PPTX, or XLSX automatically adds the ECR/image-build dependency. The routing
+menu can enable the standard PDF/image workflow and native DOCX/PPTX workflows
+when their required processors are selected; the paired native XLSX workflow is
+available only in Headless. You can also run one step directly — for example `./badgers-headless/deploy.sh 6` or
 `./badgers-full/deploy.sh resume` — while deployment identity selection remains
 interactive.
 
@@ -448,7 +449,7 @@ cd ..
 | `build_foundation_layer.sh`     | `layer.zip`                | Core specialist framework, AWS SDK, Pillow | All Lambda specialists                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion  | `pdf_to_images_converter`                  |
 | `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for native PDF inspection and PDF manipulation | `native_pdf_processor` and non-container specialists needing PDF libs |
-| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
+| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
 
@@ -463,7 +464,7 @@ cd ..
 ```
 
 This builds and pushes Docker images to ECR for `image_enhancer`,
-`remediation_specialist`, `docx_processor`, and `pptx_processor`. The container
+`remediation_specialist`, `docx_processor`, `pptx_processor`, and `xlsx_processor`. The container
 build stages `foundation` and `config` from the repository-built `layer.zip`; it
 also supports the older expanded `layer/python/` layout. The foundation-layer
 builder now stages in a temporary directory to avoid macOS Finder recreating

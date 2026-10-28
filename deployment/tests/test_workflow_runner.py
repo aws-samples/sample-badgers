@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -242,6 +243,68 @@ def test_native_processor_result_is_retained_in_the_private_operation_prefix(
         "specialists/docx_processor/native-result.json"
     )
     assert stages[0]["stage"] == "native_document"
+
+
+def test_xlsx_native_workflow_returns_the_single_processor_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id = "op_" + ("x" * 32)
+    record = _record()
+    record["operation_id"] = operation_id
+    record["workflow_id"] = "native-xlsx-analysis"
+    artifact_store = FakeArtifactS3()
+    calls: list[tuple[str, dict[str, object]]] = []
+    verified: list[str] = []
+    prefix = f"s3://badgers-output/operations/tenant-a/{operation_id}/xlsx"
+    native_analysis = f"{prefix}/digest/workbook-analysis.json"
+    content_tree = f"{prefix}/digest/content-tree.xml"
+
+    monkeypatch.setenv("OUTPUT_BUCKET_NAME", "badgers-output")
+    monkeypatch.setattr(
+        runner.operation_state, "get_operation", lambda *_a, **_k: record
+    )
+    monkeypatch.setattr(
+        runner.operation_state, "update_operation_stage", lambda *_a, **_k: {}
+    )
+    monkeypatch.setattr(
+        runner,
+        "_invoke_specialist",
+        lambda name, payload: calls.append((name, dict(payload)))
+        or {
+            "body": json.dumps(
+                {
+                    "success": True,
+                    "result": json.dumps(
+                        {
+                            "workbook_analysis_uri": native_analysis,
+                            "content_tree_uri": content_tree,
+                        }
+                    ),
+                }
+            )
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "_require_operation_artifact",
+        lambda uri, **_kwargs: verified.append(uri),
+    )
+    monkeypatch.setattr(runner.boto3, "client", lambda _service: artifact_store)
+    monkeypatch.setattr(runner.job_state, "mark_complete", lambda *_a, **_k: None)
+
+    result = runner._native_process(
+        {
+            "operation_id": operation_id,
+            "owner_sub": "tenant-a",
+            "plan": {
+                "resolved_specialists": ["xlsx_processor"]
+            },
+        }
+    )
+
+    assert [name for name, _ in calls] == ["xlsx_processor"]
+    assert verified == [content_tree]
+    assert result["content_tree_uri"] == content_tree
 
 
 def test_native_workflow_finalizes_without_a_correlation_artifact(

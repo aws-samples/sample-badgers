@@ -6,6 +6,7 @@
     "document_intake_router": { "capabilities": ["document_intake"] },
     "docx_processor": { "capabilities": ["docx_conversion"] },
     "pptx_processor": { "capabilities": ["pptx_conversion"] },
+    "xlsx_processor": { "capabilities": ["xlsx_analysis"] },
     "textract_ocr": { "capabilities": ["textract_ocr"] },
     "docx_structure_specialist": { "capabilities": ["docx_structure"] },
     "pptx_gestalt_specialist": { "capabilities": ["pptx_gestalt"] },

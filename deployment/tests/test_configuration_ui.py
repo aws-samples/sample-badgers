@@ -8,7 +8,7 @@ import stat
 import threading
 from pathlib import Path
 
-from deployment.configuration_ui import ConfigurationServer, configuration, plan
+from deployment.configuration_ui import _HTML, ConfigurationServer, configuration, plan
 
 
 def test_configuration_creates_local_desired_state_with_private_permissions(
@@ -28,6 +28,12 @@ def test_plan_is_a_cli_handoff_not_a_deployment_action(tmp_path: Path) -> None:
     assert result["cli_next_step"] == "./deploy.sh headless resume"
     assert "CLI re-runs preflight" in result["apply_note"]
     assert "publish configuration" in result["required_stages"]
+
+
+def test_local_planner_offers_xlsx_as_one_processor_workflow() -> None:
+    assert "native-xlsx-analysis" in _HTML
+    assert "XLSX',['xlsx_processor'],'headless" in _HTML
+    assert "Workbook Analysis pack first" in _HTML
 
 
 def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path) -> None:

@@ -7,7 +7,7 @@ normalized classifier facts and add capability tags; they never reference
 specialist names, Lambda ARNs, or customer executable code.
 
 The standard PDF/image policy uses classifier facts as its primary auto-routing
-signal. Native DOCX and PPTX templates use a zero-route policy: source type
+signal. Native DOCX, PPTX, and XLSX templates use a zero-route policy: source type
 selects the reviewed native workflow, which invokes exactly its selected
 processor. A routing policy is deployed only as part of a SHA-pinned
 configuration release and cannot be supplied or overridden by a request caller. See the

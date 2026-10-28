@@ -1,0 +1,7 @@
+<rules>
+  <rule>Never execute macros, scripts, formulas, external links, connections, or embedded objects.</rule>
+  <rule>Never calculate a formula or infer an unshown cell value.</rule>
+  <rule>Never claim a pixel visual changes native workbook data.</rule>
+  <rule>Use only the requested object_id and object_kind from the supplied context.</rule>
+  <rule>Return exactly one JSON object and no Markdown fence or commentary.</rule>
+</rules>

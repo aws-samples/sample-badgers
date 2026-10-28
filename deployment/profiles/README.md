@@ -38,8 +38,13 @@ the source-release and publication policy.
 ./deploy.sh specialists --pack tables-and-forms --specialist docx_processor 9
 ```
 
-`full.json` intentionally selects every specialist enabled by the existing
-`deployment_config.json`, preserving today’s deployment behavior.
+`full.json` intentionally selects every default-enabled specialist in
+`deployment_config.json`, preserving today’s deployment behavior. Supported
+specialists marked `default_enabled: false` remain available through an
+eligible explicit pack or direct selection without forcing their container
+image into every Full deployment. The paired `workbook-analysis` pack is
+Headless-only because its Vision enrichment stage must run inside the private
+durable workflow.
 
 `headless.json` selects curated specialist packs and is wired into the
 deployment engine. Headless synthesizes and deploys its selected specialists,
@@ -47,7 +52,7 @@ agent runtime, Gateway, Cognito machine identity, storage, model profiles, and
 the minimal DynamoDB operation ledger and private workflow runner. It omits
 ECS, VPC, UI image build, specialist wizard, session memory, X-Ray Transaction
 Search, and WebSocket handler registration. The initial Headless workflow is
-limited to the curated PDF/image capabilities by default. Native DOCX/PPTX
+limited to the curated PDF/image capabilities by default. Native DOCX/PPTX/XLSX
 processors can be selected explicitly; their container build and ECR
 requirements are derived automatically from that selection.
 
@@ -87,7 +92,8 @@ Lambda, Gateway, and runtime stages on the next deploy.
 
 Every agent profile also has a persisted desired routing configuration. Use `w`
 to choose validated templates: the default PDF/image workflow, plus native
-DOCX and PPTX workflows when their processors are selected. The optional
+DOCX and PPTX workflows when their processors are selected and the
+Headless XLSX workflow when the Workbook Analysis pack is selected. The optional
 `./deploy.sh configure --ui` planner presents both desired-state records in one
 local review flow. It saves no AWS state and hands execution back to `deploy.sh`.
 

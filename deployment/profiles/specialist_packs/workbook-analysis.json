@@ -1,0 +1,14 @@
+{
+  "name": "workbook-analysis",
+  "display_name": "Workbook Analysis",
+  "version": 2,
+  "description": "Read-only native XLSX inspection with opt-in, evidence-bound pasted-image Vision enrichment.",
+  "tags": [
+    "workbooks",
+    "spreadsheets",
+    "structured-data"
+  ],
+  "specialists": [
+    "xlsx_processor"
+  ]
+}

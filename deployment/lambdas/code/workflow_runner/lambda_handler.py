@@ -125,6 +125,7 @@ def _expected_source_content_type(
         ".jpeg": "image/jpeg",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }
     for suffix, inferred in extension_types.items():
         if key.lower().endswith(suffix) and inferred in accepted_types:
@@ -338,40 +339,56 @@ def _plan(event: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _native_process(event: Mapping[str, Any]) -> dict[str, Any]:
-    """Run one declared native processor and retain its result privately."""
+    """Run one declared native processor and retain its canonical result."""
 
     operation_id, owner_sub, record = _operation(event)
     plan = event.get("plan")
     if not isinstance(plan, dict):
         raise WorkflowRunnerError("Native workflow has no resolved plan")
     specialists = plan.get("resolved_specialists")
-    if not isinstance(specialists, list) or len(specialists) != 1:
-        raise WorkflowRunnerError("Native workflow must resolve exactly one processor")
-    specialist = specialists[0]
-    if specialist not in {"docx_processor", "pptx_processor", "native_pdf_processor"}:
+    if not isinstance(specialists, list) or not all(
+        isinstance(item, str) for item in specialists
+    ):
+        raise WorkflowRunnerError("Native workflow has invalid specialist selection")
+    if specialists in (
+        ["docx_processor"],
+        ["pptx_processor"],
+        ["xlsx_processor"],
+        ["native_pdf_processor"],
+    ):
+        native_specialist = specialists[0]
+    else:
+        raise WorkflowRunnerError("Native workflow resolved an unsupported processor chain")
+    if native_specialist not in {
+        "docx_processor",
+        "pptx_processor",
+        "xlsx_processor",
+        "native_pdf_processor",
+    }:
         raise WorkflowRunnerError("Native workflow resolved an unsupported processor")
     operation_state.update_operation_stage(
         operation_id, owner_sub=owner_sub, status="running", stage="native_document"
     )
     response = _response_body(
         _invoke_specialist(
-            specialist,
+            native_specialist,
             {
                 "document_path": record["source_document_s3_uri"],
                 "session_id": operation_id,
                 "job_id": operation_id,
                 "doc_id": operation_id,
+                "owner_sub": owner_sub,
                 # PPTX uses explicit plan/render modes. The other native
                 # processors ignore this field, so every native processor gets
                 # the same bounded invocation contract.
                 "operation": "plan",
             },
         ),
-        specialist,
+        native_specialist,
     )
     key = (
         f"{operation_state.operation_prefix(owner_sub, operation_id)}/"
-        f"specialists/{specialist}/native-result.json"
+        f"specialists/{native_specialist}/native-result.json"
     )
     try:
         boto3.client("s3").put_object(
@@ -385,10 +402,26 @@ def _native_process(event: Mapping[str, Any]) -> dict[str, Any]:
     result_uri = f"s3://{os.environ.get('OUTPUT_BUCKET_NAME', '')}/{key}"
     job_state.mark_complete(
         operation_id,
-        job_state.subtask_id(specialist, str(record["source_document_s3_uri"])),
+        job_state.subtask_id(native_specialist, str(record["source_document_s3_uri"])),
         result_uri,
     )
-    return _next_state(event, native_result_uri=result_uri)
+    content_tree_uri = ""
+    if native_specialist == "xlsx_processor":
+        try:
+            final_result = json.loads(str(response["result"]))
+            content_tree_uri = str(final_result.get("content_tree_uri") or "")
+        except (TypeError, KeyError, json.JSONDecodeError) as error:
+            raise WorkflowRunnerError(
+                "XLSX processor returned an unreadable canonical result"
+            ) from error
+        _require_operation_artifact(
+            content_tree_uri, operation_id=operation_id, owner_sub=owner_sub
+        )
+    return _next_state(
+        event,
+        native_result_uri=result_uri,
+        content_tree_uri=content_tree_uri,
+    )
 
 
 def _run_page_specialists(event: Mapping[str, Any]) -> dict[str, Any]:

@@ -1,0 +1,4 @@
+<chart_tasks>
+  <task>When a rendered chart image is supplied in a future request, analyze the visible chart only as additive evidence.</task>
+  <task>Do not derive values, calculate trends, or replace native chart series and source-cell evidence.</task>
+</chart_tasks>

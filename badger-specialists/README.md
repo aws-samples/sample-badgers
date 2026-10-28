@@ -96,11 +96,13 @@ deployment is silently left with invalid desired state. Shared prompts and
 specialist configuration are released together in Step 3, so a function has a
 stable configuration release rather than mutable configuration at invocation time.
 
-Native DOCX/PPTX processors are container-based. Select either one in the
+Native DOCX/PPTX/XLSX processors are container-based. Select one in the
 specialist picker, add it to a reusable pack, or pass `--specialist`. The
 deployment workflow automatically creates or updates the ECR dependency,
 builds the selected image, and updates the Lambda stack under the same
-deployment ID.
+deployment ID. The optional `xlsx_processor` is a normal direct-specialist
+tool: it combines safe native inspection and any eligible embedded-raster
+Vision enrichment into one canonical result.
 
 Step 3's configuration SHA is an immutable private deployment artifact, not a
 Git product version. Source releases are Git tags; see the [Release

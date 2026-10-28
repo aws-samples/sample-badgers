@@ -1,0 +1,46 @@
+{
+  "tool": {
+    "name": "process_xlsx_tool",
+    "description": "Use for macro-free Microsoft Excel .xlsx input. Reads OOXML structure and formulas without calculation or execution, conditionally analyzes supported embedded raster visuals, and returns one canonical BADGERS XML result with private evidence artifacts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 URI or absolute path to a macro-free .xlsx workbook."
+        },
+        "session_id": { "type": "string" },
+        "job_id": { "type": "string" },
+        "doc_id": { "type": "string" }
+      },
+      "required": ["document_path"]
+    }
+  },
+  "specialist": {
+    "name": "xlsx_processor",
+    "description": "Safely parses XLSX OOXML into authoritative BADGERS-native workbook, formula, table, and visual-object evidence without opening a spreadsheet application or executing workbook content. It conditionally adds bounded Vision evidence for supported embedded raster visuals before returning one canonical result.",
+    "output_extension": "xml",
+    "revision_eligible": false,
+    "prompt_specialist_prompt_base_path": "prompts",
+    "prompt_files": [
+      "xlsx_visual_job_role.xml",
+      "xlsx_visual_context.xml",
+      "xlsx_visual_gestalt.xml",
+      "xlsx_visual_image_tasks.xml",
+      "xlsx_visual_chart_tasks.xml",
+      "xlsx_visual_rules.xml",
+      "xlsx_visual_format.xml"
+    ],
+    "model_selections": {
+      "primary": "us.anthropic.claude-sonnet-4-6",
+      "fallback_list": [],
+      "expected_output_tokens": 1200
+    }
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "dependencies": ["boto3", "defusedxml"],
+    "wizard_managed": false,
+    "specialist_type": "container"
+  }
+}

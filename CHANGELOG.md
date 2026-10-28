@@ -19,6 +19,25 @@
 
 ### Added
 
+- **Opt-in native XLSX workbook analysis.** The new `workbook-analysis` pack
+  adds the single `xlsx_processor` container for macro-free `.xlsx` routing
+  when the Workbook Analysis pack is selected. The
+  native processor reads bounded
+  OOXML structure without opening Office or evaluating workbook content:
+  sheets, cells, formulas, direct references, cached-value state, tables, and
+  anchored image/chart inventory are retained as private BADGERS artifacts.
+  Macro/script execution, formula calculation, connection refresh, and
+  external-link resolution are explicitly prohibited. The processor conditionally
+  sends only supported embedded raster images to the configured
+  Claude Sonnet 4.6 Bedrock profile, uses a type-aware Gestalt prompt package,
+  and merges bounded, non-authoritative enrichment into the canonical BADGERS
+  XML content tree before returning one result. Native cell/formula facts remain authoritative. A native
+  chart is detected as its own visual type but is not sent until a faithful
+  rendered-chart input is available; no chart is faked from OOXML metadata.
+  The local configuration planner, Headless workflow guidance, and targeted
+  container build path now all recognize the same opt-in XLSX contract. The
+  Headless deployment additionally offers its durable XLSX workflow template.
+
 - **Requirements-first tailoring guide.** The deployment documentation now
   distinguishes supported product paths from deliberate extension boundaries,
   including XLSX, consumer-specific result adaptation, Pulumi ownership,

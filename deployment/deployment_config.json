@@ -20,6 +20,11 @@
             "enabled": true,
             "category": "Document Processing"
         },
+        "xlsx_processor": {
+            "enabled": true,
+            "default_enabled": false,
+            "category": "Document Processing"
+        },
         "textract_ocr": {
             "enabled": true,
             "category": "Document Processing"

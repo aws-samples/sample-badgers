@@ -1,0 +1,7 @@
+<image_tasks>
+  <task>Read only the pixels of the embedded image supplied with this request.</task>
+  <task>Classify it as data_overlay, annotation, decorative, or unknown.</task>
+  <task>Capture visible text exactly when legible; do not fabricate obscured values.</task>
+  <task>Classify the visual effect on the displayed cells as obscures, partially_obscures, does_not_obscure, or unknown.</task>
+  <task>State whether the visual may semantically replace the displayed cell content. This is a cautious inference, not a data mutation.</task>
+</image_tasks>
