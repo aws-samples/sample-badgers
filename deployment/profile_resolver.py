@@ -27,6 +27,7 @@ class ResolvedProfile:
     display_name: str
     profile_version: int
     specialist_packs: tuple[str, ...]
+    direct_specialists: tuple[str, ...]
     specialists: tuple[str, ...]
     capabilities: dict[str, bool]
 
@@ -38,6 +39,9 @@ class ResolvedProfile:
 
 _DEFAULT_PROFILES_DIR = Path(__file__).parent / "profiles"
 _DEFAULT_DEPLOYMENT_CONFIG = Path(__file__).parent / "deployment_config.json"
+CONTAINER_SPECIALISTS = frozenset(
+    {"image_enhancer", "remediation_specialist", "docx_processor", "pptx_processor"}
+)
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -139,12 +143,20 @@ def _load_pack(pack_name: str, profiles_dir: Path) -> list[str]:
     return specialists
 
 
+def _dedupe_names(names: tuple[str, ...] | list[str]) -> tuple[str, ...]:
+    """Preserve selection order while removing duplicate identifiers."""
+
+    return tuple(dict.fromkeys(names))
+
+
 def resolve_profile(
     profile_name: str,
     *,
     profiles_dir: Path = _DEFAULT_PROFILES_DIR,
     deployment_config_path: Path = _DEFAULT_DEPLOYMENT_CONFIG,
     specialist_packs: tuple[str, ...] | None = None,
+    direct_specialists: tuple[str, ...] | None = None,
+    selection_override: bool = False,
 ) -> ResolvedProfile:
     """Resolve a named profile without performing AWS or filesystem writes."""
 
@@ -169,7 +181,32 @@ def resolve_profile(
 
     specialist_selection = profile.get("specialist_selection")
     packs = profile.get("specialist_packs", [])
-    if specialist_selection == "enabled":
+    direct = _dedupe_names(direct_specialists or ())
+
+    # A deployment-specific selection is an explicit desired-state override.
+    # It remains profile-scoped (the product capabilities stay intact) but may
+    # use packs and individual specialists together.  This is deliberately
+    # separate from changing the profile defaults in source control.
+    if selection_override:
+        if not all(isinstance(pack, str) and pack for pack in specialist_packs or ()):
+            raise ProfileResolutionError(
+                "specialist pack selections must be non-empty strings"
+            )
+        if not all(isinstance(name, str) and name for name in direct):
+            raise ProfileResolutionError(
+                "direct specialist selections must be non-empty strings"
+            )
+        pack_names = _dedupe_names(specialist_packs or ())
+        selected = []
+        for pack_name in pack_names:
+            selected.extend(_load_pack(pack_name, profiles_dir))
+        selected.extend(direct)
+        selected = list(dict.fromkeys(selected))
+        if not selected:
+            raise ProfileResolutionError(
+                "a deployment selection must contain at least one pack or specialist"
+            )
+    elif specialist_selection == "enabled":
         if specialist_packs:
             raise ProfileResolutionError(
                 f"{profile_path}: this profile does not allow specialist-pack overrides"
@@ -203,7 +240,7 @@ def resolve_profile(
                 raise ProfileResolutionError(
                     "specialist pack overrides must be non-empty strings"
                 )
-            pack_names = tuple(dict.fromkeys(specialist_packs))
+            pack_names = _dedupe_names(specialist_packs)
         else:
             pack_names = tuple(packs)
         selected = []
@@ -227,13 +264,21 @@ def resolve_profile(
             f"{', '.join(disabled)}"
         )
 
+    resolved_capabilities = dict(capabilities)
+    # Selecting a container specialist changes the deployment graph.  The
+    # planner and CDK app consume this derived capability to assemble ECR and
+    # build/push the selected images before Lambda deployment.
+    if set(selected) & CONTAINER_SPECIALISTS:
+        resolved_capabilities["container_images"] = True
+
     return ResolvedProfile(
         name=declared_name,
         display_name=display_name,
         profile_version=version,
         specialist_packs=pack_names,
+        direct_specialists=direct,
         specialists=tuple(selected),
-        capabilities=capabilities,
+        capabilities=resolved_capabilities,
     )
 
 
@@ -260,7 +305,18 @@ def main() -> int:
         "--pack",
         action="append",
         default=[],
-        help="Override a user-selectable profile's packs; repeat for multiple packs",
+        help="Select a pack; repeat to compose packs",
+    )
+    parser.add_argument(
+        "--specialist",
+        action="append",
+        default=[],
+        help="Select one specialist in addition to packs; repeat for multiple specialists",
+    )
+    parser.add_argument(
+        "--selection-override",
+        action="store_true",
+        help="Treat --pack and --specialist as the deployment's complete desired selection",
     )
     args = parser.parse_args()
 
@@ -270,6 +326,8 @@ def main() -> int:
             profiles_dir=args.profiles_dir,
             deployment_config_path=args.deployment_config,
             specialist_packs=tuple(args.pack) or None,
+            direct_specialists=tuple(args.specialist) or None,
+            selection_override=args.selection_override,
         )
     except ProfileResolutionError as error:
         parser.error(str(error))

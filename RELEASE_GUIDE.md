@@ -52,7 +52,7 @@ or reusing an ID for a different product shape.
 | Product | Available in this branch | Deliberately not included |
 | --- | --- | --- |
 | BADGERS Full | UI, runtime, internal AgentCore Gateway, all enabled specialists, native PDF/DOCX/PPTX intake, session memory, reports, and specialist administration | Nothing intentionally omitted from the Full product. |
-| BADGERS Headless | Authenticated BADGERS-owned Agent API, curated PDF/image workflow packs, private Step Functions runner, DynamoDB operation state, and private S3 artifacts | Browser UI, WebSocket transport, session memory, external customer MCP tools, and DOCX/PPTX workflow support in the starter packs. |
+| BADGERS Headless | Authenticated BADGERS-owned Agent API, curated PDF/image workflow packs, private Step Functions runner, DynamoDB operation state, private S3 artifacts, and opt-in native DOCX/PPTX templates | Browser UI, WebSocket transport, session memory, and external customer MCP tools. DOCX/PPTX remain absent from the default starter selection. |
 | BADGERS Specialists | Direct IAM-authorized Lambda invocation of selected packs with shared prompts, schemas, and model profiles | Agent, Gateway, Cognito, UI, durable operation ledger, and an HTTP/MCP endpoint. |
 
 The existing AgentCore Gateway remains the private tool plane used by BADGERS
@@ -66,9 +66,12 @@ out of scope.
 ## Headless contract boundary
 
 The implemented `badgers-agent-request/v1` route accepts private S3 source
-URIs for PDF, PNG, and JPEG documents. It supports `auto` and `manual`
-routing modes. Auto routing uses the classifier as the primary signal; manual
-routing accepts approved capability tags, never Lambda or specialist names.
+URIs. The default configuration supports PDF, PNG, and JPEG documents and
+offers `auto` and `manual` routing. Auto routing uses the classifier as the
+primary signal; manual routing accepts approved capability tags, never Lambda
+or specialist names. A deployment that explicitly selects a native processor
+and its matching reviewed template additionally supports DOCX or PPTX through
+content-type routing.
 
 The caller authenticates with the dedicated Headless Cognito client. The
 runtime derives the operation owner from the validated token and rejects
@@ -77,10 +80,11 @@ URI fields. Results are bounded `badgers-operation-result/v1` pointer
 manifests. The underlying source, classification, specialist, correlation,
 and report artifacts remain private and tenant-scoped in S3.
 
-Native DOCX/PPTX capability is integrated in Full, but it is not silently
-advertised by the Headless starter workflow. Extending Headless to those
-formats requires a new versioned workflow definition, a pack that supplies
-the necessary processors, and contract/tests/docs changes before release.
+Native DOCX/PPTX capability is integrated in Full and can be explicitly
+enabled for Headless, but it is not silently advertised by the Headless starter
+workflow. Enabling it requires the matching processor and reviewed template in
+the deployment's desired state, then a normal CLI update that regenerates and
+deploys the private configuration release.
 
 ## Maintainer workflow
 

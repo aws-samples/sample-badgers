@@ -111,10 +111,13 @@ declarative workflow catalog and classifier-led routing policies. The catalog
 resolves only stable capability tags against the selected specialist pack; its
 deterministic plan is persisted privately before the runner invokes page
 specialists. Versioned requests submit to that runner and immediately receive
-durable operation identifiers and status pointers. The initial
-`standard-document-analysis` workflow accepts PDF, PNG, and JPEG sources only.
-DOCX and PPTX native intake is currently a Full capability, not an implied
-Headless starter-pack feature. Gateway workflow MCP tools remain a later
+durable operation identifiers and status pointers. The default
+`standard-document-analysis` workflow accepts PDF, PNG, and JPEG sources.
+A Headless deployment can additionally select `docx_processor` or
+`pptx_processor` and enable its matching native template; omitted workflow IDs
+then dispatch by the source content type, while an explicit workflow ID always
+wins. Native processors are opt-in because they require container image builds
+and appropriate workload testing. Gateway workflow MCP tools remain a later
 implementation increment.
 
 ## Before you start
@@ -142,6 +145,11 @@ change. The detailed infrastructure contract is in the
 configuration SHA is private to this deployment and is separate from the Git
 source release; see the [Release Guide](../RELEASE_GUIDE.md#release-terminology).
 
+For an explicit review surface, run `./deploy.sh configure --ui`. It edits only
+local desired state for one deployment ID: choose packs and direct specialists,
+then select compatible PDF/image or native DOCX/PPTX workflow templates. The
+normal CLI remains the only AWS executor.
+
 ## Go deeper
 
 | Topic | Guide |
@@ -151,4 +159,5 @@ source release; see the [Release Guide](../RELEASE_GUIDE.md#release-terminology)
 | Operate the agent container in Headless mode | [Runtime guide](../deployment/runtime/RUNTIME_README.md#headless-request-mode) |
 | Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |
 | Inspect product capability and selected packs | [Deployment profiles](../deployment/profiles/README.md) |
+| Plan specialist and routing changes locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
 | Choose a source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

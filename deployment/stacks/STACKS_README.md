@@ -133,7 +133,7 @@ Lambda execution role with:
 ### Lambda (`lambda_stack.py`)
 Deploys all specialist functions:
 - Auto-discovers functions from `lambdas/code/` directory
-- Attaches foundation layer + Pillow layer
+- Attaches the repository-built foundation layer, including its governed Pillow dependency
 - PDF converter gets additional Poppler layer
 - Loads descriptions from schema files
 - Injects `JOBS_TABLE_NAME` so each specialist can record its own subtask state

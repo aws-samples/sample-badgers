@@ -16,11 +16,13 @@ or operation ledger.
 ```
 
 The default is the **Document Essentials** pack. To compose a deployment from
-additional packs, pass `--pack` before the menu option:
+additional packs or individual specialists, pass `--pack` / `--specialist`
+before the menu option:
 
 ```bash
 ./badger-specialists/deploy.sh --pack tables-and-forms
 ./badger-specialists/deploy.sh --pack tables-and-forms 9
+./badger-specialists/deploy.sh --specialist docx_processor 9
 ```
 
 ## What gets deployed
@@ -67,9 +69,16 @@ Install and configure AWS CLI, CDK v2, Docker, Python 3.12+, and `uv`. The
 deployment menu verifies the local toolchain, target account/region, Bedrock
 model access, and CDK readiness before it creates resources.
 
-Specialist deployments are pack-bound. Select the pack set before choosing a
-new deployment ID; change the pack set by creating a separate deployment rather
-than changing an existing one in place.
+Specialist selections are stored as desired state under the chosen deployment
+ID. Change them in place with `s` in the menu (Space toggles, Enter saves), or
+use `--pack` / `--specialist` for automation. The next deploy reconciles the
+same stack identity and shows whether its saved desired and applied selections
+are synchronized.
+
+`./deploy.sh configure --ui` offers the same selection and pack management in a
+local browser planner. The Specialists profile has no workflow runner, so the
+planner intentionally omits workflow routing for this product. It cannot
+deploy; use its CLI handoff to apply the reviewed desired state.
 
 ## Choose or create packs
 
@@ -81,17 +90,17 @@ are:
   element analysis.
 - `tables-and-forms` — table analysis, composable with Document Essentials.
 
-To create a customer-specific pack, add a named pack definition that selects
-existing enabled specialists; then deploy it under a new deployment ID. Shared
-prompts and specialist configuration are released together in Step 3, so a
-function has a stable configuration release rather than mutable configuration
-at invocation time.
+Use `k` in the deployment menu to create, edit, or delete reusable packs.
+Deletion is blocked while a saved deployment selects the pack, so no existing
+deployment is silently left with invalid desired state. Shared prompts and
+specialist configuration are released together in Step 3, so a function has a
+stable configuration release rather than mutable configuration at invocation time.
 
-The current selectable packs cover PDF/image processing. The native DOCX/PPTX
-processors integrated in this branch belong to Full and are not automatically
-part of a Specialists pack. Making them directly deployable requires an
-explicit pack definition, container/build prerequisites, IAM review, and
-profile tests before it can be considered a supported product option.
+Native DOCX/PPTX processors are container-based. Select either one in the
+specialist picker, add it to a reusable pack, or pass `--specialist`. The
+deployment workflow automatically creates or updates the ECR dependency,
+builds the selected image, and updates the Lambda stack under the same
+deployment ID.
 
 Step 3's configuration SHA is an immutable private deployment artifact, not a
 Git product version. Source releases are Git tags; see the [Release
@@ -104,6 +113,7 @@ Guide](../RELEASE_GUIDE.md#release-terminology) for the lifecycle.
 | Follow specialist invocation, input, output, and error behavior | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
 | Understand the shared runtime framework | [Foundation layer](../deployment/lambdas/FOUNDATION_LAYER_README.md) |
 | Select profiles and compose specialist packs | [Deployment profiles](../deployment/profiles/README.md) |
+| Use the local pack and specialist planner | [Deployment reference](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
 | Author prompts and specialist manifests | [Prompting system](../deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) |
 | Consume structured document output | [Schema and vocabulary](../schemas/VOCABULARY.md) |
 | Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |

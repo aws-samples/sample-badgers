@@ -17,6 +17,7 @@ FOUNDATION_DIR = DEPLOYMENT_DIR / "badgers-foundation"
 sys.path.insert(0, str(FOUNDATION_DIR))
 
 from foundation import operation_state, workflow_planner  # noqa: E402
+from deployment.routing_configuration import _routing_payload  # noqa: E402
 
 
 SOURCE_ROOT = DEPLOYMENT_DIR / "s3_files"
@@ -162,6 +163,26 @@ def test_manual_capability_selection_cannot_omit_an_invariant() -> None:
             routing_mode="manual",
             requested_capabilities=["full_text", "elements", "correlation"],
         )
+
+
+def test_native_workflow_auto_plan_needs_no_pdf_classifier_artifact() -> None:
+    native = _routing_payload(
+        "headless", ["native-docx-analysis"], {"docx_processor"}
+    )
+    workflow = native["workflows"]["native-docx-analysis"]
+    policy = native["policies"]["native-docx-routing"]
+
+    plan = workflow_planner.resolve_plan(
+        operation_id="op_" + ("n" * 32),
+        session_id="docx-104",
+        config_release_id="a" * 64,
+        workflow=workflow,
+        policy=policy,
+        capability_index={"docx_conversion": "docx_processor"},
+        routing_mode="auto",
+    )
+
+    assert plan["resolved_specialists"] == ["docx_processor"]
 
 
 def test_resolved_plan_replaces_initial_private_plan(

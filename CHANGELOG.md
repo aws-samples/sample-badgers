@@ -19,6 +19,38 @@
 
 ### Added
 
+- **Requirements-first tailoring guide.** The deployment documentation now
+  distinguishes supported product paths from deliberate extension boundaries,
+  including XLSX, consumer-specific result adaptation, Pulumi ownership,
+  native-first selective PDF enrichment, and measured throughput design.
+
+- **Deployment-persisted specialist and workflow configuration.** Each
+  deployment identity now records desired and applied specialist selections,
+  reusable pack composition, and approved routing templates. `s` provides a
+  Space-to-toggle terminal selector with `a`/`d` bulk controls, `k` manages
+  packs with dependency-aware deletion, and `w` selects validated workflow
+  templates. A changed selection preserves the deployment ID and marks only
+  its dependent configuration, Lambda, Gateway, and Runtime stages for
+  reconciliation.
+
+- **Optional local configuration planner.** `./deploy.sh configure --ui`
+  provides a browser-based planner for packs, direct specialists, and workflow
+  templates. It binds only to an ephemeral `127.0.0.1` port, uses a per-run
+  session capability, persists local desired state, and produces a CLI
+  handoff—AWS preflight and mutations remain exclusively in `deploy.sh`.
+
+- **Resumable deployment preflights.** The deployment CLI now presents a
+  profile-aware preflight report before AWS changes, records the completed
+  checks with local deployment state, and lets an operator resume the next
+  required deployment step after correcting a failed prerequisite.
+
+- **Opt-in native workflow templates.** Selecting `docx_processor` or
+  `pptx_processor` now derives the ECR/container build dependency and permits
+  the matching release-pinned native workflow. Full and Headless agent
+  deployments route an omitted workflow ID by configured source content type;
+  an explicit workflow ID continues to take precedence. Native processor
+  artifacts remain private operation output.
+
 - **Page-aware DOCX intake with native-first OCR and Vision routing.** `.docx` uploads now
   route through native WordprocessingML extraction and per-page BADGERS content-tree
   generation. A temporary PDF establishes page boundaries only; simple native pages never
@@ -60,6 +92,26 @@
   correlation, and passes its S3 artifact into correlation. Reports retain validated crop PNGs and
   expose them in the Page Reader's **Inspections** tab with reading confidence, scale, dimensions,
   and provenance. Pages without uncertainty flags are not inspected.
+
+### Fixed
+
+- **Removed the KLayers runtime dependency.** Standard and custom specialist
+  Lambdas now use Pillow from BADGERS' repository-built foundation layer rather
+  than a third-party public Lambda layer. The existing stale-layer guard
+  requires a rebuild before deployment whenever the layer inputs change; the
+  deployment and foundation-layer references now document that ownership.
+
+- **Completed native workflow finalization.** Native DOCX/PPTX workflow
+  results now complete using their private processor artifact rather than
+  incorrectly requiring a visual correlation artifact.
+
+- **Completed configured routing deployment wiring.** The runtime now receives
+  the saved source-type-to-workflow mapping; Headless synthesis no longer
+  passes it to the workflow runner or fails when serializing it.
+
+- **CLI startup and display edge cases.** A deployment with no direct
+  specialists no longer expands an empty Bash array under `set -u`, and the
+  incomplete Runtime marker now renders with its intended terminal color.
 
 ## [5.0.1] - 2026-09-21
 

@@ -6,9 +6,11 @@ Routing policies are immutable JSON release artifacts. They interpret
 normalized classifier facts and add capability tags; they never reference
 specialist names, Lambda ARNs, or customer executable code.
 
-The current Headless policy uses the classifier as the primary auto-routing
-signal. It is deployed only as part of a SHA-pinned configuration release and
-cannot be supplied or overridden by a request caller. See the
+The standard PDF/image policy uses classifier facts as its primary auto-routing
+signal. Native DOCX and PPTX templates use a zero-route policy: source type
+selects the reviewed native workflow, which invokes exactly its selected
+processor. A routing policy is deployed only as part of a SHA-pinned
+configuration release and cannot be supplied or overridden by a request caller. See the
 [Release Guide](../../../RELEASE_GUIDE.md) for the distinction between this
 configuration artifact and a Git release tag.
 

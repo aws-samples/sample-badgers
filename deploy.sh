@@ -9,6 +9,8 @@ set -euo pipefail
 #   ./deploy.sh headless 9  # Run every Headless deployment step
 #   ./deploy.sh full 9      # Run every Full deployment step
 #   ./deploy.sh specialists --pack tables-and-forms 9
+#   ./deploy.sh configure --ui # Open the local configuration planner (no AWS actions)
+#   ./deploy.sh preflight   # Validate the selected product before deployment
 #   ./deploy.sh resume      # Pick a deployment, then run only its remaining steps
 #   ./deploy.sh 4           # Pick a deployment, then run option 4 directly
 #
@@ -25,8 +27,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/deployment/scripts/common.sh"
+source "${SCRIPT_DIR}/deployment/scripts/preflight.sh"
 
 trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; exit 1' ERR
+
+# Configuration UI is deliberately a local planning surface. It starts a
+# loopback-only server which can edit and validate desired state, but cannot
+# deploy or access AWS credentials. The regular CLI remains the executor.
+if [ "${1:-}" = "configure" ]; then
+  if [ "${2:-}" != "--ui" ] || [ "$#" -ne 2 ]; then
+    log_error "Usage: ./deploy.sh configure --ui"
+    exit 1
+  fi
+  exec python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
+fi
 
 # Product profile is selected before deployment identity so its safety checks happen
 # before any AWS preflight or resource creation. A deployment ID can belong to only
@@ -109,20 +123,25 @@ if [ -z "${BADGERS_PROFILE}" ]; then
   fi
 fi
 
+# Selection flags are an explicit desired-state update for this deployment
+# identity.  They compose reusable packs with individual specialists and work
+# for every product profile.  The resulting selection is persisted after the
+# deployment is chosen, not inferred from transient shell arguments.
 SPECIALIST_PACK_ARGS=()
-if [ "${BADGERS_PROFILE}" = "specialists" ]; then
-  while [ "${1:-}" = "--pack" ]; do
-    if [ -z "${2:-}" ]; then
-      log_error "--pack requires a specialist-pack name."
-      exit 1
-    fi
-    SPECIALIST_PACK_ARGS+=(--pack "$2")
-    shift 2
-  done
-elif [ "${1:-}" = "--pack" ]; then
-  log_error "--pack is supported only by the Specialists product."
-  exit 1
-fi
+SPECIALIST_DIRECT_ARGS=()
+SPECIALIST_SELECTION_FROM_CLI=0
+while [ "${1:-}" = "--pack" ] || [ "${1:-}" = "--specialist" ]; do
+  if [ -z "${2:-}" ]; then
+    log_error "$1 requires a specialist or pack name."
+    exit 1
+  fi
+  case "$1" in
+    --pack) SPECIALIST_PACK_ARGS+=(--pack "$2") ;;
+    --specialist) SPECIALIST_DIRECT_ARGS+=(--specialist "$2") ;;
+  esac
+  SPECIALIST_SELECTION_FROM_CLI=1
+  shift 2
+done
 case "${BADGERS_PROFILE}" in
   full)
     UI_ENABLED=1; MEMORY_ENABLED=1; X_RAY_ENABLED=1
@@ -144,20 +163,15 @@ case "${BADGERS_PROFILE}" in
     exit 1
     ;;
 esac
+ECR_REQUIRED_BY_PRODUCT="${ECR_ENABLED}"
 export BADGERS_PROFILE
-if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
-  # The array is (--pack name --pack name); take its values rather than flags.
-  BADGERS_SPECIALIST_PACKS="$(printf '%s\n' "${SPECIALIST_PACK_ARGS[@]}" | awk 'NR % 2 == 0' | paste -sd, -)"
-  export BADGERS_SPECIALIST_PACKS
-else
-  unset BADGERS_SPECIALIST_PACKS
-fi
 
 # Keep the resolver command non-empty under `set -u`: expanding an explicitly
 # declared-but-empty array is an unbound-variable error in some Bash versions.
 PROFILE_RESOLVER_ARGS=("${BADGERS_PROFILE}")
-if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
-  PROFILE_RESOLVER_ARGS+=("${SPECIALIST_PACK_ARGS[@]}")
+if [ "${SPECIALIST_SELECTION_FROM_CLI}" = "1" ]; then
+  PROFILE_RESOLVER_ARGS+=(--selection-override)
+  PROFILE_RESOLVER_ARGS+=("${SPECIALIST_PACK_ARGS[@]}" "${SPECIALIST_DIRECT_ARGS[@]}")
 fi
 if ! python3 "${SCRIPT_DIR}/deployment/profile_resolver.py" "${PROFILE_RESOLVER_ARGS[@]}" >/dev/null; then
   log_error "Profile '${BADGERS_PROFILE}' is invalid. Fix its profile or specialist-pack configuration before deploying."
@@ -212,15 +226,119 @@ elif [ "${recorded_profile}" != "${BADGERS_PROFILE}" ]; then
   log_error "Choose a different deployment ID for '${BADGERS_PROFILE}' so stacks and state cannot collide."
   exit 1
 fi
-recorded_packs="$(get_state "specialist_packs")"
-requested_packs="${BADGERS_SPECIALIST_PACKS:-}"
-if [ -z "${recorded_packs}" ]; then
-  set_state "specialist_packs" "\"${requested_packs}\""
-elif [ "${recorded_packs}" != "${requested_packs}" ]; then
-  log_error "Deployment '${DEPLOYMENT_ID}' was resolved with specialist packs '${recorded_packs:-default}'."
-  log_error "Choose a different deployment ID rather than changing its selected packs in place."
-  exit 1
-fi
+# Resolve (or create) the deployment's persistent desired selection. Every
+# invocation re-resolves the selected pack JSON, so a source-controlled pack
+# edit is visible on the next run. A changed fingerprint marks precisely the
+# configuration consumers as pending while preserving the same stack suffix.
+SPECIALIST_CONTAINER_NAMES=()
+SELECTION_CHANGED=0
+load_specialist_selection() {
+  local use_cli="${1:-0}" selection_command="${2:-ensure}" output line_kind line_value
+  local output_file
+  output_file="$(mktemp "${TMPDIR:-/tmp}/badgers-specialist-selection.XXXXXX")" || return 1
+  local command=(
+    python3 "${SCRIPT_DIR}/deployment/specialist_selection.py" "${selection_command}"
+    --state "$(state_file)" --profile "${BADGERS_PROFILE}" --lines
+  )
+  if [ "${use_cli}" = "1" ]; then
+    command+=("${SPECIALIST_PACK_ARGS[@]}" "${SPECIALIST_DIRECT_ARGS[@]}")
+  fi
+  if ! "${command[@]}" >"${output_file}"; then
+    sed 's/^/  /' "${output_file}" >&2
+    rm -f "${output_file}"
+    log_error "Could not resolve the saved specialist selection."
+    return 1
+  fi
+
+  SPECIALIST_PACK_ARGS=()
+  SPECIALIST_DIRECT_ARGS=()
+  SPECIALIST_CONTAINER_NAMES=()
+  SELECTION_CHANGED=0
+  ECR_ENABLED="${ECR_REQUIRED_BY_PRODUCT}"
+  while IFS=$'\t' read -r line_kind line_value; do
+    case "${line_kind}" in
+      pack) SPECIALIST_PACK_ARGS+=(--pack "${line_value}") ;;
+      specialist) SPECIALIST_DIRECT_ARGS+=(--specialist "${line_value}") ;;
+      container) SPECIALIST_CONTAINER_NAMES+=("${line_value}") ;;
+      changed) [ "${line_value}" = "true" ] && SELECTION_CHANGED=1 ;;
+    esac
+  done <"${output_file}"
+  rm -f "${output_file}"
+
+  # The arrays include alternating flags and values. Rebuild their comma lists
+  # without relying on temporary state variables or a profile-specific default.
+  if [ "${#SPECIALIST_PACK_ARGS[@]}" -gt 0 ]; then
+    BADGERS_SPECIALIST_PACKS="$(python3 - "${SPECIALIST_PACK_ARGS[@]}" <<'PY'
+import sys
+print(",".join(sys.argv[2::2]))
+PY
+)"
+  else
+    BADGERS_SPECIALIST_PACKS=""
+  fi
+  if [ "${#SPECIALIST_DIRECT_ARGS[@]}" -gt 0 ]; then
+    BADGERS_DIRECT_SPECIALISTS="$(python3 - "${SPECIALIST_DIRECT_ARGS[@]}" <<'PY'
+import sys
+print(",".join(sys.argv[2::2]))
+PY
+)"
+  else
+    BADGERS_DIRECT_SPECIALISTS=""
+  fi
+  export BADGERS_SPECIALIST_PACKS BADGERS_DIRECT_SPECIALISTS
+  export BADGERS_SELECTION_OVERRIDE=true
+
+  if [ "${#SPECIALIST_CONTAINER_NAMES[@]}" -gt 0 ]; then
+    ECR_ENABLED=1
+  fi
+
+  if [ "${SELECTION_CHANGED}" = "1" ]; then
+    invalidate_state "infra_complete"
+    invalidate_state "s3_files_uploaded"
+    invalidate_state "specialists_complete"
+    invalidate_state "gateway_complete"
+    invalidate_state "runtime_image_pushed"
+    invalidate_state "runtime_deployed"
+    log_warn "Specialist selection changed for deployment '${DEPLOYMENT_ID}'."
+    log_info "The same deployment ID will reconcile infrastructure, configuration, Lambdas, and enabled consumers."
+  fi
+}
+
+load_specialist_selection "${SPECIALIST_SELECTION_FROM_CLI}" || exit 1
+
+ROUTING_CONFIGURATION_CHANGED=0
+ROUTING_CONFIGURATION_READY=0
+load_routing_configuration() {
+  local routing_command="${1:-ensure}" output_file kind value
+  output_file="$(mktemp "${TMPDIR:-/tmp}/badgers-routing-configuration.XXXXXX")" || return 1
+  if ! python3 "${SCRIPT_DIR}/deployment/routing_configuration.py" "${routing_command}" \
+      --state "$(state_file)" --profile "${BADGERS_PROFILE}" --lines >"${output_file}"; then
+    sed 's/^/  /' "${output_file}" >&2
+    rm -f "${output_file}"
+    return 1
+  fi
+  ROUTING_CONFIGURATION_CHANGED=0
+  while IFS=$'\t' read -r kind value; do
+    [ "${kind}" = "changed" ] && [ "${value}" = "true" ] && ROUTING_CONFIGURATION_CHANGED=1
+  done <"${output_file}"
+  rm -f "${output_file}"
+  ROUTING_CONFIGURATION_READY=1
+  export BADGERS_ROUTING_STATE="$(state_file)"
+  if [ "${ROUTING_CONFIGURATION_CHANGED}" = "1" ]; then
+    invalidate_state "s3_files_uploaded"
+    invalidate_state "specialists_complete"
+    invalidate_state "gateway_complete"
+    invalidate_state "runtime_image_pushed"
+    invalidate_state "runtime_deployed"
+    log_warn "Workflow routing changed for deployment '${DEPLOYMENT_ID}'."
+    log_info "Publish a new configuration release and redeploy its enabled consumers."
+  fi
+}
+
+load_routing_configuration || {
+  log_error "Saved routing configuration is incompatible with the selected specialists."
+  log_error "Use menu option w to choose compatible workflow templates before deploying."
+}
 
 # Headless retains CloudWatch application logs but intentionally omits optional
 # X-Ray Transaction Search.  This avoids account-level quota consumption for an
@@ -240,6 +358,20 @@ ECR_BASE="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 # stack. Both the runtime and UI images live in it under different tags.
 ECR_REPO_NAME="badgers-$(resource_id)"
 ECR_REPO="${ECR_BASE}/${ECR_REPO_NAME}"
+
+record_applied_specialist_selection() {
+  local config_release_id
+  config_release_id="$(get_state "config_release_id")"
+  python3 "${SCRIPT_DIR}/deployment/specialist_selection.py" record-applied \
+    --state "$(state_file)" --profile "${BADGERS_PROFILE}" \
+    --config-release-id "${config_release_id}" >/dev/null \
+    || { log_error "Could not record the applied specialist selection."; return 1; }
+  python3 "${SCRIPT_DIR}/deployment/routing_configuration.py" record-applied \
+    --state "$(state_file)" --profile "${BADGERS_PROFILE}" \
+    --config-release-id "${config_release_id}" >/dev/null \
+    || { log_error "Could not record the applied routing configuration."; return 1; }
+  log_success "Specialist selection and routing reconciled with deployment state."
+}
 
 # ══════════════════════════════════════════════════════════════════════════
 # STEP 1: Build Lambda Layers
@@ -409,7 +541,9 @@ _sync_profile_config() {
 
   local release_id
   release_id="$(python3 "${DEPLOYMENT_DIR}/release_artifact.py" "${BADGERS_PROFILE}" \
-      "${SPECIALIST_PACK_ARGS[@]}" --destination "${stage_dir}")" || {
+      --selection-override "${SPECIALIST_PACK_ARGS[@]}" "${SPECIALIST_DIRECT_ARGS[@]}" \
+      --routing-state "$(state_file)" \
+      --destination "${stage_dir}")" || {
     rm -rf -- "${stage_dir}"
     log_error "Could not build a deterministic ${BADGERS_PROFILE} configuration release."
     return 1
@@ -528,16 +662,15 @@ step_specialists() {
     ecr_login
   fi
 
-  # Full currently uses container-based specialists. The Headless and direct
-  # specialist profiles use validated zip-based packs and do not build ECR images.
-  if [ "${BADGERS_PROFILE}" = "full" ]; then
-    log_info "Building container Lambda images..."
+  if [ "${#SPECIALIST_CONTAINER_NAMES[@]}" -gt 0 ]; then
+    log_info "Building selected container Lambda images: ${SPECIALIST_CONTAINER_NAMES[*]}"
     # build_container_lambdas.sh derives its target as badgers-<arg>, which has to match
     # the repository the ECR stack creates (badgers-{DEPLOYMENT_ID}-{suffix}).
-    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_container_lambdas.sh "$(resource_id)") \
+    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_container_lambdas.sh \
+      "$(resource_id)" "${SPECIALIST_CONTAINER_NAMES[@]}") \
       || { log_error "Container Lambda build failed."; return 1; }
   else
-    log_info "${BADGERS_PROFILE^} selected no container specialists; skipping container Lambda image build."
+    log_info "Selected specialists use ZIP Lambdas only; skipping container image build."
   fi
 
   ensure_xray_decision || return 1
@@ -547,6 +680,9 @@ step_specialists() {
   cdk_deploy "$(_sn Lambda)" || { log_error "Lambda deploy failed."; return 1; }
 
   mark_complete "specialists_complete"
+  if [ "${RUNTIME_ENABLED}" != "1" ]; then
+    record_applied_specialist_selection
+  fi
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -652,6 +788,7 @@ step_runtime() {
   cdk_deploy "$(_sn RuntimeWebSocket)" || { log_error "Runtime deploy failed."; return 1; }
 
   mark_complete "runtime_deployed"
+  record_applied_specialist_selection
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1049,6 +1186,70 @@ _profile_summary() {
   esac
 }
 
+show_specialist_selection() {
+  python3 - "$(state_file)" <<'PY'
+import json
+import sys
+
+try:
+    state = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    print("  Specialist selection: not configured")
+    raise SystemExit(0)
+desired = state.get("desired_specialist_selection", {})
+applied = state.get("applied_specialist_selection", {})
+if not isinstance(desired, dict):
+    print("  Specialist selection: not configured")
+    raise SystemExit(0)
+packs = ", ".join(desired.get("packs", [])) or "none"
+direct = len(desired.get("direct_specialists", []))
+members = len(desired.get("resolved_specialists", []))
+containers = ", ".join(desired.get("container_specialists", [])) or "none"
+sync = isinstance(applied, dict) and applied.get("fingerprint") == desired.get("fingerprint")
+print(f"  Specialist selection: {members} resolved · packs: {packs} · individual: {direct}")
+print(f"  Container images: {containers} · {'synchronized' if sync else 'pending reconciliation'}")
+PY
+}
+
+show_routing_configuration() {
+  python3 - "$(state_file)" <<'PY'
+import json
+import sys
+try:
+    state = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    state = {}
+desired = state.get("desired_routing_configuration", {})
+applied = state.get("applied_routing_configuration", {})
+if not isinstance(desired, dict):
+    print("  Routing: not configured")
+    raise SystemExit(0)
+templates = ", ".join(desired.get("templates", [])) or "direct invocation only"
+sync = isinstance(applied, dict) and applied.get("fingerprint") == desired.get("fingerprint")
+print(f"  Routing: {templates} · {'synchronized' if sync else 'pending reconciliation'}")
+PY
+}
+
+configure_specialists() {
+  load_specialist_selection 0 configure || return 1
+  load_routing_configuration || true
+  log_success "Saved desired specialist selection for deployment '${DEPLOYMENT_ID}'."
+}
+
+manage_specialist_packs() {
+  python3 "${SCRIPT_DIR}/deployment/specialist_selection.py" manage-packs \
+    --state-dir "${REPO_ROOT}/.deploy-state" || return 1
+  # Re-resolve the current deployment after a pack edit. This catches source
+  # controlled/manual JSON edits as well as edits made through the CLI.
+  load_specialist_selection 0 ensure || return 1
+  load_routing_configuration || true
+}
+
+configure_routing() {
+  load_routing_configuration configure || return 1
+  log_success "Saved desired workflow routing for deployment '${DEPLOYMENT_ID}'."
+}
+
 show_status() {
   echo ""
   echo -e "${CYAN}${BOLD}  DEPLOYMENT SNAPSHOT${NC}  $(_deployment_progress)"
@@ -1088,7 +1289,7 @@ show_status() {
     if [ -n "${ts6}" ]; then
       echo -e "  ${mark6}  6. Runtime — Build & Deploy  ${BLUE}${ts6}${NC}"
     else
-      echo "  ${mark6}  6. Runtime — Build & Deploy"
+      echo -e "  ${mark6}  6. Runtime — Build & Deploy"
     fi
   fi
 
@@ -1108,6 +1309,8 @@ show_status() {
   local config_release
   config_release="$(get_state "config_release_id")"
   [ -n "${config_release}" ] && echo "  Config release: ${config_release}"
+  show_specialist_selection
+  show_routing_configuration
   echo ""
 }
 
@@ -1250,13 +1453,27 @@ EOF
   echo -e "  ${GREEN}▶${NC} ${BOLD} 9)${NC} Run complete deployment"
   echo -e "  ${GREEN}▶${NC} ${BOLD} r)${NC} Resume remaining stages only"
   echo ""
-  echo -e "  ${BOLD}TOOLS${NC}   10) Status   11) Reset local state   m) Model registry   0) Exit"
+  echo -e "  ${BOLD}SELECTION${NC}   s) Configure specialists   w) Configure workflow routing   k) Manage reusable packs"
+  echo -e "  ${BOLD}TOOLS${NC}       p) Preflight report   10) Status   11) Reset local state   m) Model registry   0) Exit"
   echo ""
   echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
   echo ""
 }
 
 dispatch() {
+  local preflight_scope
+  case "$1" in
+    p|P|preflight)
+      run_preflight all
+      return $?
+      ;;
+  esac
+
+  preflight_scope="$(preflight_scope_for_option "$1")"
+  if [ -n "${preflight_scope}" ]; then
+    run_preflight "${preflight_scope}" || return 1
+  fi
+
   case "$1" in
     1)  step_layers ;;
     2)  step_infra ;;
@@ -1285,6 +1502,9 @@ dispatch() {
     11) reset_state ;;
     r|R|resume) step_resume ;;
     m|M) show_models ;;
+    s|S) configure_specialists ;;
+    w|W) configure_routing ;;
+    k|K) manage_specialist_packs ;;
     0)  log_info "Exiting..."; exit 0 ;;
     *)  return 1 ;;
   esac
@@ -1295,7 +1515,7 @@ dispatch() {
 # ══════════════════════════════════════════════════════════════════════════
 _valid_option() {
   case "$1" in
-    0|1|2|3|4|5|6|7|8|9|10|11|r|R|resume|m|M) return 0 ;;
+    0|1|2|3|4|5|6|7|8|9|10|11|p|P|preflight|r|R|resume|m|M|s|S|w|W|k|K) return 0 ;;
     *) return 1 ;;
   esac
 }

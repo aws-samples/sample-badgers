@@ -35,7 +35,7 @@ the source-release and publication policy.
 ./deploy.sh headless 9
 
 # Direct Lambda specialist pack; no agent runtime or Gateway
-./deploy.sh specialists --pack tables-and-forms 9
+./deploy.sh specialists --pack tables-and-forms --specialist docx_processor 9
 ```
 
 `full.json` intentionally selects every specialist enabled by the existing
@@ -47,8 +47,9 @@ agent runtime, Gateway, Cognito machine identity, storage, model profiles, and
 the minimal DynamoDB operation ledger and private workflow runner. It omits
 ECS, VPC, UI image build, specialist wizard, session memory, X-Ray Transaction
 Search, and WebSocket handler registration. The initial Headless workflow is
-limited to the curated PDF/image capabilities; native DOCX/PPTX support is not
-implicitly enabled by the Full profile's specialist set.
+limited to the curated PDF/image capabilities by default. Native DOCX/PPTX
+processors can be selected explicitly; their container build and ECR
+requirements are derived automatically from that selection.
 
 Headless stages only the shared agent/prompt core and the selected
 specialists' schemas, manifests, and prompts before uploading configuration.
@@ -72,6 +73,22 @@ Specialist packs live under `specialist_packs/`. A pack is a named, ordered
 selection of existing specialists. The resolver validates that each selected
 specialist exists and is enabled in the current deployment configuration.
 
-`specialists.json` is user-selectable: omit `--pack` for Document Essentials
-or repeat `--pack` to compose a direct-use installation. The resolved pack
-selection is written to deployment state and cannot be changed in place.
+Every deployment has a persisted desired selection. Use `s` in the deployment
+menu to toggle packs and individual specialists with Space, press `a` to select
+all, `d` to deselect all, then press Enter to save. Use `k` to create, edit, or safely delete reusable packs. `--pack` and
+`--specialist` provide the same explicit selection for scripted runs. A changed
+selection keeps its deployment ID and reconciles the dependent configuration,
+Lambda, Gateway, and runtime stages on the next deploy.
+
+![BADGERS terminal specialist selection](../../.github/assets/badgers-cli-specialist-selection.png)
+
+> This sanitized capture uses synthetic local state. `a` selects all visible
+> choices; `d` deselects all. The picker does not create AWS resources.
+
+Every agent profile also has a persisted desired routing configuration. Use `w`
+to choose validated templates: the default PDF/image workflow, plus native
+DOCX and PPTX workflows when their processors are selected. The optional
+`./deploy.sh configure --ui` planner presents both desired-state records in one
+local review flow. It saves no AWS state and hands execution back to `deploy.sh`.
+
+![BADGERS local pack library](../../.github/assets/local-configuration-pack-library.png)

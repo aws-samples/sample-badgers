@@ -2,6 +2,13 @@
   "schema_version": 1,
   "specialists": {
     "pdf_to_images_converter": { "capabilities": ["source_conversion"] },
+    "native_pdf_processor": { "capabilities": ["native_pdf"] },
+    "document_intake_router": { "capabilities": ["document_intake"] },
+    "docx_processor": { "capabilities": ["docx_conversion"] },
+    "pptx_processor": { "capabilities": ["pptx_conversion"] },
+    "textract_ocr": { "capabilities": ["textract_ocr"] },
+    "docx_structure_specialist": { "capabilities": ["docx_structure"] },
+    "pptx_gestalt_specialist": { "capabilities": ["pptx_gestalt"] },
     "classify_pdf_content": { "capabilities": ["classification"] },
     "full_text_specialist": { "capabilities": ["full_text"] },
     "layout_specialist": { "capabilities": ["layout"] },

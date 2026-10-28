@@ -166,6 +166,20 @@ def test_specialists_profile_allows_an_explicit_pack_selection() -> None:
     assert resolved.capabilities["direct_invocation"] is True
 
 
+def test_direct_container_specialist_derives_ecr_support() -> None:
+    resolved = resolve_profile(
+        "specialists",
+        profiles_dir=PROFILES_DIR,
+        deployment_config_path=DEPLOYMENT_CONFIG,
+        direct_specialists=("docx_processor",),
+        selection_override=True,
+    )
+
+    assert resolved.specialists == ("docx_processor",)
+    assert resolved.direct_specialists == ("docx_processor",)
+    assert resolved.capabilities["container_images"] is True
+
+
 def test_direct_specialists_staging_omits_workflow_control_plane() -> None:
     profile = resolve_profile(
         "specialists",
@@ -213,6 +227,21 @@ def test_release_artifact_is_deterministic_and_has_a_manifest() -> None:
             Path(path).suffix.lower() in {".md", ".markdown"}
             for path in manifest["files"]
         )
+
+
+def test_full_release_stages_all_enabled_specialists() -> None:
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        release_id = build_release("full", Path(temporary_directory))
+
+        assert len(release_id) == 64
+        metadata = json.loads(
+            (
+                Path(temporary_directory)
+                / "workflow_metadata/specialist_capabilities.json"
+            ).read_text(encoding="utf-8")
+        )
+        assert "docx_processor" in metadata["specialists"]
+        assert "pptx_processor" in metadata["specialists"]
 
 
 def test_release_hash_changes_when_workflow_or_policy_changes(tmp_path: Path) -> None:

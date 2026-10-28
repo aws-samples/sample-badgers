@@ -7,10 +7,11 @@
 This document explains how Lambda specialists work in BADGERS—their anatomy, required layers, environment variables, and code patterns.
 
 The descriptions cover the Full specialist catalog. Headless and Specialists
-deploy only the explicit functions resolved from their profile packs. In
-particular, the native DOCX/PPTX intake path below is currently a Full
-capability; it is not included in the Headless starter workflow or the
-selectable Specialist packs. This branch is a private beta candidate; see the
+deploy only the explicit functions resolved from their profile packs. Native
+DOCX/PPTX processors are opt-in container specialists: select them directly or
+through a pack, then enable their matching agent workflow template where a
+workflow runner is present. They are not included in the Headless starter
+selection. This branch is a private beta candidate; see the
 [Release Guide](../../RELEASE_GUIDE.md) for release status.
 
 ## Choose a task

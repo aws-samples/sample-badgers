@@ -34,7 +34,23 @@ the menu.
 ./deploy.sh resume    # choose a deployment, then run only outstanding steps
 ./deploy.sh headless  # select Headless explicitly, then choose a deployment
 ./deploy.sh specialists --pack tables-and-forms 9
+./deploy.sh specialists --specialist docx_processor 9
+./deploy.sh configure --ui # loopback-only local configuration planner; no AWS actions
 ```
+
+### Local configuration planner
+
+Use `./deploy.sh configure --ui` to manage reusable packs, select specialists,
+and choose reviewed workflow-routing templates before a deployment. It starts a
+short-lived service on a random `127.0.0.1` port, opens a browser, and stores
+only desired state in `.deploy-state/{DEPLOYMENT_ID}.json`. It does not load
+AWS credentials, invoke the AWS CLI or CDK, run a shell command, or create
+AWS resources.
+
+The planner generates a reconciliation preview and a `deploy.sh … resume`
+handoff command. Run that normal CLI command to select the deployment identity
+and confirm the update; it repeats preflight and validates the desired state
+before it changes AWS. Stop the planner with `Ctrl-C`.
 
 **`DEPLOYMENT_ID` is unset on startup and never read from the environment.** The script
 scans `.deploy-state/` and offers every deployment it finds — complete and in progress —
@@ -46,8 +62,9 @@ product profiles: Full, Headless, and Specialists. The product wrappers
 (`badgers-full/deploy.sh`, `badgers-headless/deploy.sh`, and
 `badger-specialists/deploy.sh`) select the corresponding profile explicitly.
 Automated callers without a terminal retain the legacy Full default unless
-they pass a profile argument or set `BADGERS_PROFILE`. `--pack` is accepted
-only for Specialists. The future BADGERS Gateway MCP product has no deployment
+they pass a profile argument or set `BADGERS_PROFILE`. `--pack` and
+`--specialist` create an explicit, persisted selection for the chosen
+deployment ID; they may be used with any current product profile. The future BADGERS Gateway MCP product has no deployment
 profile or menu option until its implementation is complete.
 
 Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
@@ -64,6 +81,12 @@ product is not exposed by this candidate.
 **9 vs r** — both reach a complete deployment. Option 9 runs all eight steps and stops at
 each completed one to ask whether to re-run. Option `r` skips completed steps before calling
 them, so those prompts never fire, and starts at the first outstanding step.
+
+![BADGERS resume menu](../.github/assets/badgers-cli-resume.png)
+
+> This is a representative local fixture. It shows how the current menu
+> visualizes completed work and the remaining `r` path; it does not depict an
+> AWS account or a live deployment.
 
 Step 2 runs two Bedrock preflights before any stack is created, both driven by the model
 registry: `preflight_model_access` checks each Converse model's `us.*` geo profile or
@@ -104,7 +127,7 @@ Environment variables:
 
 | Variable                                         | Effect                                                                                                                                                                                                                                                                                                             |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. Required without a terminal: the UI's Deploy All button relies on it, because its output stream leaves stdin closed and a prompt would read EOF and skip the step.                                |
+| `BADGERS_ASSUME_YES`                             | `1` answers every confirmation with yes. Re-runs completed steps rather than skipping them — not a quiet resume. It is intended for controlled automation, not routine interactive use.                                |
 | `UI_PUBLIC_ACCESS`                               | `true`/`false` answers the step 8 network-exposure prompt without asking.                                                                                                                                                                                                                                          |
 | `BADGERS_SKIP_XRAY`                              | `1` omits the XRay stack regardless of the live state.                                                                                                                                                                                                                                                             |
 | `BADGERS_SKIP_MODEL_PREFLIGHT`                   | `1` skips Step 2's account-wide Bedrock profile/catalog and Converse invocation checks for that run. Use only for a known infrastructure-only update; Mantle models are already skipped automatically because they do not use inference profiles or Converse. |
@@ -268,10 +291,10 @@ takes the `!ERROR` path and is a hard stop.
 
 > [!IMPORTANT]
 > `BADGERS_ASSUME_YES=1` answers this prompt too (`_confirm` returns yes without reading
-> stdin), so **it deletes the conflicting delivery sources without asking.** That is the
-> intended behaviour for the UI's Deploy All button, but it means an unattended run
-> remediates silently. Use `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1` instead if the sources
-> must be preserved — the deploy will then fail on `AlreadyExists`.
+> stdin), so **it deletes the conflicting delivery sources without asking.** An unattended
+> invocation therefore remediates silently. Use
+> `BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1` instead if the sources must be preserved — the
+> deploy will then fail on `AlreadyExists`.
 >
 > An unattended invocation that sets neither will block on the prompt. The `!ERROR` path
 > stops the deploy regardless of `BADGERS_ASSUME_YES`, since it returns before prompting.

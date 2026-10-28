@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build and push container Lambda images to the badgers ECR repository
-# Usage: ./build_container_lambdas.sh <deployment_id>
+# Usage: ./build_container_lambdas.sh <deployment_id> [container-specialist ...]
 #
 # This script builds the image_enhancer, remediation_specialist, docx_processor, and pptx_processor containers
 # and pushes them to the shared badgers-<deployment_id> ECR repository.
@@ -8,11 +8,12 @@
 set -e
 
 DEPLOYMENT_ID="${1:-}"
+shift || true
 REGION="${AWS_REGION:-us-west-2}"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 if [ -z "$DEPLOYMENT_ID" ]; then
-    echo "Usage: $0 <deployment_id>"
+    echo "Usage: $0 <deployment_id> [container-specialist ...]"
     echo "Example: $0 07a6cffb"
     exit 1
 fi
@@ -26,8 +27,26 @@ echo "Building container Lambdas for ECR: ${ECR_URI}"
 echo "Logging into ECR..."
 aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
 
-# Container functions to build
-CONTAINERS=("image_enhancer" "remediation_specialist" "docx_processor" "pptx_processor")
+# Without explicit names retain the historical behavior of building every
+# image. deploy.sh passes the desired container specialists so a pack update
+# builds only what its Lambda stack can reference.
+SUPPORTED_CONTAINERS=("image_enhancer" "remediation_specialist" "docx_processor" "pptx_processor")
+if [ "$#" -gt 0 ]; then
+    CONTAINERS=("$@")
+    for CONTAINER in "${CONTAINERS[@]}"; do
+        valid=0
+        for SUPPORTED in "${SUPPORTED_CONTAINERS[@]}"; do
+            [ "${CONTAINER}" = "${SUPPORTED}" ] && valid=1 && break
+        done
+        if [ "${valid}" -ne 1 ]; then
+            echo "Error: unsupported container specialist '${CONTAINER}'."
+            echo "Supported: ${SUPPORTED_CONTAINERS[*]}"
+            exit 1
+        fi
+    done
+else
+    CONTAINERS=("${SUPPORTED_CONTAINERS[@]}")
+fi
 
 for CONTAINER in "${CONTAINERS[@]}"; do
     CONTAINER_DIR="./containers/${CONTAINER}"
@@ -129,7 +148,7 @@ done
 
 echo ""
 echo "=========================================="
-echo "All container Lambdas built and pushed!"
+echo "Selected container Lambdas built and pushed!"
 echo "ECR Repository: ${ECR_REPO}"
 echo "Images:"
 for CONTAINER in "${CONTAINERS[@]}"; do

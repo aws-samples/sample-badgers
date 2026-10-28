@@ -923,6 +923,31 @@ def start_headless_workflow_execution(
     )
 
 
+def configured_workflow_for_document(document_uri: str, fallback: str) -> str:
+    """Choose a deployment-configured workflow only when the caller omitted one."""
+
+    extension_types = {
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }
+    try:
+        mappings = json.loads(os.environ.get("ROUTING_WORKFLOWS_BY_TYPE_JSON", "{}"))
+    except json.JSONDecodeError:
+        return fallback
+    if not isinstance(mappings, dict):
+        return fallback
+    lower = document_uri.lower()
+    for suffix, content_type in extension_types.items():
+        if lower.endswith(suffix):
+            target = mappings.get(content_type)
+            return target if isinstance(target, str) and target else fallback
+    return fallback
+
+
 # =============================================================================
 # STREAMING AGENT INVOCATION
 # =============================================================================
@@ -1168,6 +1193,11 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
             "message": str(error),
         }
         return
+    workflow_id = request.workflow_id
+    if request.versioned and not request_payload.get("workflow_id"):
+        workflow_id = configured_workflow_for_document(
+            request.document_uri, request.workflow_id
+        )
 
     # Versioned Headless calls are asynchronous workflow submissions. The
     # Runtime authorizer has already authenticated the client before this
@@ -1200,7 +1230,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
                 operation_id=operation_id,
                 session_id=request.session_id,
                 owner_sub=caller.owner_sub,
-                workflow_id=request.workflow_id,
+                workflow_id=workflow_id,
                 routing_mode=request.routing_mode,
                 source_document_s3_uri=request.document_uri,
                 correlation_id=request.correlation_id,
@@ -1260,7 +1290,7 @@ async def invoke(payload: dict[str, Any], context) -> AsyncIterator[dict[str, An
             "stage": "accepted",
             "operation_id": operation_id,
             "session_id": request.session_id,
-            "workflow_id": request.workflow_id,
+            "workflow_id": workflow_id,
             "routing_mode": request.routing_mode,
             "config_release_id": created["config_release_id"],
             "plan_uri": created["plan_uri"],

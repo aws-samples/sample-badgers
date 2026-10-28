@@ -99,6 +99,7 @@ guides describe the contracts that keep those components consistent.
 | If you want to… | Start here |
 | --- | --- |
 | Select a product and deploy it | [Deployment reference](deployment/DEPLOYMENT_README.md) |
+| Plan packs, specialists, and workflow routing before deployment | [Local configuration planner](deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
 | Run the complete application and browser workbench | [BADGERS Full](badgers-full/README.md) |
 | Integrate a durable, authenticated document API | [BADGERS Headless](badgers-headless/README.md) |
 | Invoke analyzers directly from AWS code | [BADGERS Specialists](badger-specialists/README.md) |

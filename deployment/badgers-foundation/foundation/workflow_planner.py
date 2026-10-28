@@ -81,6 +81,7 @@ def validate_workflow_definition(workflow: Mapping[str, Any]) -> None:
         "workflow_id",
         "version",
         "display_name",
+        "execution_mode",
         "supported_routing_modes",
         "input_contract",
         "invariants",
@@ -99,6 +100,13 @@ def validate_workflow_definition(workflow: Mapping[str, Any]) -> None:
         raise WorkflowConfigurationError("Workflow 'schema_version' must equal 1")
     _require_string(workflow, "workflow_id", pattern=_WORKFLOW_RE)
     _require_string(workflow, "version")
+    if workflow.get("execution_mode", "page_images") not in {
+        "page_images",
+        "native_document",
+    }:
+        raise WorkflowConfigurationError(
+            "Workflow execution_mode must be 'page_images' or 'native_document'"
+        )
     routing_modes = _string_list(workflow.get("supported_routing_modes"), "supported_routing_modes")
     if set(routing_modes) - {"auto", "manual"}:
         raise WorkflowConfigurationError("Workflow has an unsupported routing mode")
@@ -556,6 +564,7 @@ def resolve_plan(
     selected: set[str] = set(invariant_capabilities)
     requested = tuple(requested_capabilities)
 
+    execution_mode = workflow.get("execution_mode", "page_images")
     if routing_mode == "manual":
         if requested and not workflow.get("manual_capability_selection_allowed", False):
             raise WorkflowPlanningError(
@@ -580,7 +589,7 @@ def resolve_plan(
                     + ", ".join(omitted)
                 )
             selected = set(requested)
-    elif routing_mode == "auto":
+    elif routing_mode == "auto" and execution_mode == "page_images":
         normalized_facts = _normalized_classifier_facts(classifier_facts)
         if not normalized_facts or not artifact_uris:
             raise WorkflowPlanningError(
@@ -599,7 +608,7 @@ def resolve_plan(
                 for fact_type, confidence in normalized_facts
             ):
                 selected.update(route["add_capabilities"])
-    else:
+    elif routing_mode != "auto":
         raise WorkflowPlanningError("Routing mode must be 'auto' or 'manual'")
 
     ordered_capabilities = _ordered_capabilities(allowed, selected)

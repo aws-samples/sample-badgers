@@ -3,6 +3,7 @@
 Separate runtime stack for WebSocket streaming support.
 """
 
+import json
 from typing import TYPE_CHECKING, Optional
 
 from aws_cdk import (
@@ -53,6 +54,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         image_tag: str = "websocket",
         websocket_enabled: bool = True,
         config_prefix: str = "",
+        routing_workflows_by_type: dict[str, str] | None = None,
         workflow_state_machine_arn: str | None = None,
         headless_jwt_discovery_url: str | None = None,
         headless_jwt_client_id: str | None = None,
@@ -78,6 +80,7 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         self.jobs_table = jobs_table
         self.websocket_enabled = websocket_enabled
         self.config_prefix = config_prefix.strip("/")
+        self.routing_workflows_by_type = routing_workflows_by_type or {}
         self.workflow_state_machine_arn = workflow_state_machine_arn
         self.headless_jwt_discovery_url = headless_jwt_discovery_url
         self.headless_jwt_client_id = headless_jwt_client_id
@@ -488,6 +491,10 @@ class AgentCoreRuntimeWebSocketStack(Stack):
             environment_variables["AGENTCORE_MEMORY_ID"] = self.memory_id
         if self.config_prefix:
             environment_variables["CONFIG_PREFIX"] = self.config_prefix
+        if self.routing_workflows_by_type:
+            environment_variables["ROUTING_WORKFLOWS_BY_TYPE_JSON"] = json.dumps(
+                self.routing_workflows_by_type, sort_keys=True
+            )
         if self.workflow_state_machine_arn:
             environment_variables["WORKFLOW_STATE_MACHINE_ARN"] = (
                 self.workflow_state_machine_arn

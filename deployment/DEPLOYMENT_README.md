@@ -1,10 +1,13 @@
-<sub>[← BADGERS home](../README.md) · [Choose a product](../README.md#choose-your-deployment-path) · [Release guide](../RELEASE_GUIDE.md) · 🔵 <strong>Deployment reference</strong> · [Runtime](runtime/RUNTIME_README.md) · [CDK stacks](stacks/STACKS_README.md)</sub>
+<sub>[← BADGERS home](../README.md) · [Choose a product](../README.md#choose-your-deployment-path) · [Tailor requirements](REQUIREMENTS_TAILORING.md) · [Release guide](../RELEASE_GUIDE.md) · 🔵 <strong>Deployment reference</strong> · [Runtime](runtime/RUNTIME_README.md) · [CDK stacks](stacks/STACKS_README.md)</sub>
 
 ---
 
 # 🚀 BADGERS Deployment Reference
 
 ![Deployment CLI](../.github/assets/07_sample-badgers-deployment-cli.png)
+
+> The CLI image is a sanitized local fixture of the real Headless menu. It uses
+> a synthetic deployment identity and makes no AWS calls.
 
 This is the technical reference for operating or extending a BADGERS
 deployment. For a first deployment, start with one of the three product guides:
@@ -31,6 +34,7 @@ explicitly noted.
 | Tear down a deployment | [Cleanup](#-cleanup) |
 | Diagnose a failed deployment | [Troubleshooting](#-troubleshooting) |
 | Extend BADGERS as a maintainer | [Manual Deployment](#-manual-deployment--full-product-maintainers) and [Custom Specialists](#-custom-specialists) |
+| Tailor BADGERS to gathered requirements | [Requirements tailoring guide](REQUIREMENTS_TAILORING.md) |
 
 New deployers should use the selected product guide first. Read the identity,
 service catalog, and manual deployment sections only when you need to operate
@@ -151,8 +155,8 @@ The entry point selects its product profile before asking for a deployment ID.
 Bare `./deploy.sh` presents the Full, Headless, and Specialists chooser in an
 interactive terminal. The three product wrappers select one explicitly.
 Non-interactive callers retain the legacy Full default unless they pass a
-profile argument or set `BADGERS_PROFILE`. It then runs preflight checks and
-presents only the steps supported by that profile. **`deploy.sh` does not read
+profile argument or set `BADGERS_PROFILE`. It presents only the steps supported
+by that profile. **`deploy.sh` does not read
 `DEPLOYMENT_ID` from the environment** — it unsets it and always asks, because
 a value left exported in your shell silently targets another deployment's
 stacks and state file.
@@ -161,6 +165,20 @@ The interactive display highlights the active product, summarizes what it includ
 groups deployment choices by lifecycle stage, and shows a green-complete/yellow-pending
 progress bar. It is an operator aid only; `.deploy-state/{DEPLOYMENT_ID}.json` remains
 the authoritative record of completion.
+
+### Configure packs and routing locally
+
+Before deploying, `./deploy.sh configure --ui` opens an optional local planner
+for specialist packs, specialist selection, and approved workflow-routing
+templates. It is intentionally separate from deployment: the planner binds
+only to `127.0.0.1`, saves desired state locally, and shows the CLI handoff
+command. It has no deployment endpoint and does not access AWS credentials.
+
+Use the returned `./deploy.sh <profile> resume` command to apply a reviewed
+change. The CLI remains the sole executor, re-runs preflight, validates the
+saved selection and routing, and asks for confirmation before AWS changes.
+
+![BADGERS local configuration planner](../.github/assets/local-configuration-planner.png)
 
 On start it scans `.deploy-state/` and offers what it finds:
 
@@ -188,11 +206,45 @@ steps. The profile determines the menu:
 | Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime; the runner requires the Step 3 SHA |
 | Specialists | 1 layers; 2 foundation; 3 immutable configuration release; 4 selected direct-invocation specialists |
 
-All profiles include **10** (status), **11** (reset local state without deleting
-AWS resources), **`m`** (model registry), and **0** (exit). You can also run one
-step directly — for example `./badgers-headless/deploy.sh 6` or
+All profiles include **`s`** (specialist selection: Space toggles, `a` selects
+all, `d` deselects all, and Enter saves), **`w`** (validated workflow-routing
+templates with the same bulk controls), **`k`** (reusable pack library), **`p`** (read-only preflight report),
+**10** (status), **11** (reset local state without deleting AWS resources),
+**`m`** (model registry), and **0** (exit). The saved desired selection is
+re-resolved each run, so manual pack JSON edits are detected; a change keeps
+the same deployment ID and marks its dependent configuration and service
+stages for reconciliation. Selecting a container specialist such as DOCX or
+PPTX automatically adds the ECR/image-build dependency. The routing menu can
+enable the standard PDF/image workflow and native DOCX/PPTX workflows when
+their required processors are selected. You can also run one step directly — for example `./badgers-headless/deploy.sh 6` or
 `./badgers-full/deploy.sh resume` — while deployment identity selection remains
 interactive.
+
+### Preflight report
+
+Run a complete, read-only readiness report before a deployment:
+
+```bash
+./badgers-full/deploy.sh preflight
+# or choose p from the deployment menu
+```
+
+The report evaluates the checks applicable to the selected profile, writes a
+machine-readable result to `.deploy-state/{DEPLOYMENT_ID}.preflight.json`, and
+labels checks that are intentionally **deferred** until an earlier deployment
+stage creates their prerequisite. It does not create roles, delete conflicting
+log-delivery sources, build images, or upload configuration.
+
+Every deploy action automatically runs its relevant preflight again. A failed
+check blocks the action; fix the reported condition and rerun the command.
+There is no “I fixed it” confirmation because the check itself is the source
+of truth. Full and resume runs receive the complete report first, then retain
+stage-local checks immediately before sensitive operations.
+
+![BADGERS preflight report](../.github/assets/badgers-cli-preflight.png)
+
+> The image is a representative local fixture. Actual checks and their status
+> are evaluated from the selected deployment, account, Region, and stage.
 
 ### Resume vs Full Deployment
 
@@ -396,7 +448,7 @@ cd ..
 | `build_foundation_layer.sh`     | `layer.zip`                | Core specialist framework, AWS SDK, Pillow | All Lambda specialists                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion  | `pdf_to_images_converter`                  |
 | `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for native PDF inspection and PDF manipulation | `native_pdf_processor` and non-container specialists needing PDF libs |
-| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor` |
+| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
 
@@ -411,10 +463,11 @@ cd ..
 ```
 
 This builds and pushes Docker images to ECR for `image_enhancer`,
-`remediation_specialist`, and `docx_processor`. The container build stages `foundation`
-and `config` from `layer.zip`; it also supports the older expanded `layer/python/` layout.
-The foundation-layer builder now stages in a temporary directory to avoid macOS Finder
-recreating `.DS_Store` during cleanup.
+`remediation_specialist`, `docx_processor`, and `pptx_processor`. The container
+build stages `foundation` and `config` from the repository-built `layer.zip`; it
+also supports the older expanded `layer/python/` layout. The foundation-layer
+builder now stages in a temporary directory to avoid macOS Finder recreating
+`.DS_Store` during cleanup.
 
 #### Automated Build
 
@@ -466,7 +519,7 @@ to `releases/<sha256>/`.
 
 ### 5️⃣ Container Images + Specialist Lambdas
 
-The Lambda stack references the three container images by tag, so they must be in ECR before
+The Lambda stack references the selected container images by tag, so they must be in ECR before
 it deploys. `build_container_lambdas.sh` takes the resource id (`{id}-{suffix}`).
 
 ```bash

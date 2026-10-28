@@ -2,7 +2,13 @@
 
 # 🧠 Foundation Lambda Layer
 
-The Foundation Layer is a reusable AWS Lambda layer containing the core framework, dependencies, and shared utilities for all specialist tools. It implements the "foundation + specialization" pattern where common functionality lives in the layer while specialist-specific logic remains in individual Lambda functions.
+The Foundation Layer is a repository-built AWS Lambda layer containing the
+core framework, dependencies, and shared utilities for all ZIP-based specialist
+tools. It implements the "foundation + specialization" pattern where common
+functionality lives in the layer while specialist-specific logic remains in
+individual Lambda functions. Pillow is packaged here from
+`lambdas/requirements.txt`; BADGERS does not attach a third-party public Pillow
+layer at runtime.
 
 ## Start with the right change
 
@@ -16,6 +22,11 @@ The Foundation Layer is a reusable AWS Lambda layer containing the core framewor
 Do not modify the foundation layer merely to add a specialist. A specialist
 normally owns its handler, manifest, schema, and prompts; shared behavior
 belongs here only when every relevant specialist needs the same contract.
+
+> [!IMPORTANT]
+> Rebuild `lambdas/layer.zip` after changing a foundation input or
+> `lambdas/requirements.txt`. Deployment checks its freshness and refuses to
+> publish a stale archive by default.
 
 ## 🏗️ Architecture
 

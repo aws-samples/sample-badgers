@@ -72,6 +72,11 @@ Git source release or customer version: source releases are immutable Git tags,
 while Step 3 creates the private S3 configuration SHA. The [Release
 Guide](../RELEASE_GUIDE.md#release-terminology) explains the distinction.
 
+Use `./deploy.sh configure --ui` before deployment when you want a visual,
+local-only way to select packs or specialists and choose supported workflow
+templates. The planner cannot deploy; it produces a reviewed CLI handoff, and
+the CLI re-runs preflight before applying changes to the same deployment ID.
+
 ## Go deeper
 
 | Topic | Guide |
@@ -81,4 +86,5 @@ Guide](../RELEASE_GUIDE.md#release-terminology) explains the distinction.
 | Understand the agent container and Gateway connection | [Runtime guide](../deployment/runtime/RUNTIME_README.md) |
 | Follow document intake, specialist execution, and results | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
 | See the Full capability definition | [Deployment profiles](../deployment/profiles/README.md) |
+| Plan packs, specialists, or document routing locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
 | Choose the correct source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

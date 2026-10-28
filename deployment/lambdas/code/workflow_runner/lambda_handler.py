@@ -22,9 +22,7 @@ logger = logging.getLogger()
 logger.setLevel(getattr(logging, os.environ.get("LOGGING_LEVEL", "INFO").upper()))
 
 _MAX_SOURCE_BYTES = int(os.environ.get("MAX_SOURCE_BYTES", str(200 * 1024 * 1024)))
-_ALLOWED_SOURCE_TYPES = frozenset(
-    {"application/pdf", "image/png", "image/jpeg"}
-)
+_DEFAULT_SOURCE_TYPES = frozenset({"application/pdf", "image/png", "image/jpeg"})
 
 
 class WorkflowRunnerError(RuntimeError):
@@ -114,18 +112,22 @@ def _require_operation_artifact(
         raise WorkflowRunnerError("Recorded artifact is not readable") from error
 
 
-def _expected_source_content_type(key: str, head: Mapping[str, Any]) -> str:
+def _expected_source_content_type(
+    key: str, head: Mapping[str, Any], accepted_types: set[str]
+) -> str:
     content_type = str(head.get("ContentType") or "").lower().split(";", 1)[0]
-    if content_type in _ALLOWED_SOURCE_TYPES:
+    if content_type in accepted_types:
         return content_type
     extension_types = {
         ".pdf": "application/pdf",
         ".png": "image/png",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }
     for suffix, inferred in extension_types.items():
-        if key.lower().endswith(suffix):
+        if key.lower().endswith(suffix) and inferred in accepted_types:
             return inferred
     raise WorkflowRunnerError("Source document type is not accepted by this workflow")
 
@@ -154,11 +156,25 @@ def _validate_source(event: Mapping[str, Any]) -> dict[str, Any]:
     content_length = int(head.get("ContentLength") or 0)
     if content_length <= 0 or content_length > _MAX_SOURCE_BYTES:
         raise WorkflowRunnerError("Source document size is outside workflow limits")
+    try:
+        workflow, _, _ = workflow_planner.load_release_workflow_catalog(
+            os.environ.get("CONFIG_BUCKET", ""),
+            str(record["workflow_id"]),
+            tuple(sorted(_specialist_functions())),
+        )
+        accepted_types = set(
+            workflow.get("input_contract", {}).get(
+                "accepted_source_types", _DEFAULT_SOURCE_TYPES
+            )
+        )
+    except (ValueError, KeyError, TypeError) as error:
+        raise WorkflowRunnerError(f"Could not load the pinned workflow: {error}") from error
     return _next_state(
         event,
-        source_content_type=_expected_source_content_type(key, head),
+        source_content_type=_expected_source_content_type(key, head, accepted_types),
         source_size_bytes=content_length,
         audit_mode=bool(event.get("audit_mode", False)),
+        execution_mode=workflow.get("execution_mode", "page_images"),
     )
 
 
@@ -321,6 +337,60 @@ def _plan(event: Mapping[str, Any]) -> dict[str, Any]:
     return _next_state(event, plan=plan)
 
 
+def _native_process(event: Mapping[str, Any]) -> dict[str, Any]:
+    """Run one declared native processor and retain its result privately."""
+
+    operation_id, owner_sub, record = _operation(event)
+    plan = event.get("plan")
+    if not isinstance(plan, dict):
+        raise WorkflowRunnerError("Native workflow has no resolved plan")
+    specialists = plan.get("resolved_specialists")
+    if not isinstance(specialists, list) or len(specialists) != 1:
+        raise WorkflowRunnerError("Native workflow must resolve exactly one processor")
+    specialist = specialists[0]
+    if specialist not in {"docx_processor", "pptx_processor", "native_pdf_processor"}:
+        raise WorkflowRunnerError("Native workflow resolved an unsupported processor")
+    operation_state.update_operation_stage(
+        operation_id, owner_sub=owner_sub, status="running", stage="native_document"
+    )
+    response = _response_body(
+        _invoke_specialist(
+            specialist,
+            {
+                "document_path": record["source_document_s3_uri"],
+                "session_id": operation_id,
+                "job_id": operation_id,
+                "doc_id": operation_id,
+                # PPTX uses explicit plan/render modes. The other native
+                # processors ignore this field, so every native processor gets
+                # the same bounded invocation contract.
+                "operation": "plan",
+            },
+        ),
+        specialist,
+    )
+    key = (
+        f"{operation_state.operation_prefix(owner_sub, operation_id)}/"
+        f"specialists/{specialist}/native-result.json"
+    )
+    try:
+        boto3.client("s3").put_object(
+            Bucket=os.environ.get("OUTPUT_BUCKET_NAME", ""),
+            Key=key,
+            Body=json.dumps(response, sort_keys=True).encode("utf-8"),
+            ContentType="application/json",
+        )
+    except Exception as error:
+        raise WorkflowRunnerError("Could not retain native processor result") from error
+    result_uri = f"s3://{os.environ.get('OUTPUT_BUCKET_NAME', '')}/{key}"
+    job_state.mark_complete(
+        operation_id,
+        job_state.subtask_id(specialist, str(record["source_document_s3_uri"])),
+        result_uri,
+    )
+    return _next_state(event, native_result_uri=result_uri)
+
+
 def _run_page_specialists(event: Mapping[str, Any]) -> dict[str, Any]:
     operation_id, owner_sub, _record = _operation(event)
     plan = event.get("plan")
@@ -442,6 +512,19 @@ def _finalize(event: Mapping[str, Any]) -> dict[str, Any]:
     operation_state.update_operation_stage(
         operation_id, owner_sub=owner_sub, status="finalizing", stage="write_completion_manifest"
     )
+    native_result_uri = str(event.get("native_result_uri") or "")
+    if native_result_uri:
+        _require_operation_artifact(
+            native_result_uri, operation_id=operation_id, owner_sub=owner_sub
+        )
+        result = operation_state.complete_operation(
+            operation_id=operation_id,
+            owner_sub=owner_sub,
+            deployment_id=os.environ.get("DEPLOYMENT_ID", ""),
+            summary="Native document processing completed; see the processor artifact.",
+        )
+        return _next_state(event, result=result)
+
     correlated_uris = [
         str(record["result_s3_key"])
         for record in job_state.get_job_records(operation_id)
@@ -494,6 +577,7 @@ _ACTIONS = {
     "convert": _convert,
     "classify": _classify,
     "plan": _plan,
+    "native_process": _native_process,
     "begin_specialist_work": _begin_specialist_work,
     "run_page_specialists": _run_page_specialists,
     "begin_correlation": _begin_correlation,

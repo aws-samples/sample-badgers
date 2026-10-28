@@ -7,9 +7,28 @@ chooses invariant steps, allowed capability tags, supported routing modes, and
 one routing policy. It must not contain a Lambda ARN, role ARN, URL, script, or
 customer-supplied executable code.
 
-In the private 6.0 candidate, `standard-document-analysis` is the implemented
-Headless workflow. It accepts PDF, PNG, and JPEG sources, supports `auto` and
-`manual` routing, and returns the bounded operation-result pointer contract.
+The deployment menu's **w) Configure workflow routing** selection, and the
+optional `./deploy.sh configure --ui` planner, write release-pinned workflow
+definitions from supported templates. Templates are deliberately fixed rather
+than arbitrary executable graphs:
+
+| Template | Input | Execution |
+| --- | --- | --- |
+| `standard-document-analysis` | PDF, PNG, JPEG | Page conversion, classification, approved page specialists, correlation |
+| `native-docx-analysis` | DOCX | Selected `docx_processor`, then a private result artifact |
+| `native-pptx-analysis` | PPTX | Selected `pptx_processor`, then a private result artifact |
+
+The native templates are available only after selecting their processor. In an
+agent product, an omitted workflow ID is routed from the configured source
+content type; an explicit workflow ID always wins. The Specialists product has
+no workflow runner and therefore has no routing template.
+
+![BADGERS terminal workflow routing](../../../.github/assets/badgers-cli-workflow-routing.png)
+
+> This sanitized capture uses synthetic local state. `a` enables every
+> currently compatible template; `d` clears the selection. An agent profile
+> still requires at least one template before it can be deployed.
+
 It is staged inside a deployment-private configuration release; it is not a
 published Git source release. See the repository
 [Release Guide](../../../RELEASE_GUIDE.md).

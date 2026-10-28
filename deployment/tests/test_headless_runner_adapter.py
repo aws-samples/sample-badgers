@@ -118,6 +118,48 @@ def test_versioned_headless_request_starts_runner_with_verified_client_identity(
     ]
 
 
+def test_omitted_workflow_uses_deployment_configured_docx_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created: dict[str, Any] = {}
+    monkeypatch.setenv("HEADLESS_AUTH_MODE", "cognito_jwt")
+    monkeypatch.setenv("HEADLESS_AUTHORIZED_CLIENT_ID", "abc123")
+    monkeypatch.setenv("DEPLOYMENT_ID", "headless-test")
+    monkeypatch.setenv(
+        "ROUTING_WORKFLOWS_BY_TYPE_JSON",
+        json.dumps(
+            {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                "native-docx-analysis"
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        runtime.operation_contract,
+        "new_operation_id",
+        lambda: "op_" + ("d" * 32),
+    )
+    monkeypatch.setattr(
+        runtime.operation_state,
+        "create_operation",
+        lambda **kwargs: created.update(kwargs)
+        or {
+            "config_release_id": "b" * 64,
+            "plan_uri": "s3://output/operations/headless-abc123/op/plan/plan.json",
+            "status_manifest_uri": "s3://output/operations/headless-abc123/op/status.json",
+        },
+    )
+    monkeypatch.setattr(runtime, "start_headless_workflow_execution", lambda **_k: None)
+    request = _request()
+    request["document_uri"] = (
+        "s3://badgers-source/tenants/headless-client-abc123/contracts/brief.docx"
+    )
+
+    asyncio.run(_collect(runtime.invoke(request, _context(_bearer_token("abc123")))))
+
+    assert created["workflow_id"] == "native-docx-analysis"
+
+
 def test_versioned_headless_request_rejects_missing_verified_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

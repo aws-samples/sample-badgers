@@ -82,12 +82,6 @@ class CustomSpecialistsStack(Stack):
         )
         self.kms_key = kms.Key.from_key_arn(self, "ImportedKmsKey", kms_key_arn)
         self.kms_key.grant_decrypt(self.gateway_role)
-        self.pillow_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "PillowLayer",
-            f"arn:aws:lambda:{Stack.of(self).region}:770693421928:layer:Klayers-p312-pillow:2",
-        )
-
         self.specialists = self._load_specialist_registry()
         if not self.specialists:
             logger.warning("No custom specialists found in registry")
@@ -236,7 +230,10 @@ class CustomSpecialistsStack(Stack):
             handler="lambda_handler.lambda_handler",
             code=lambda_.Code.from_asset(str(code_dir)),
             role=self.lambda_role,
-            layers=[self.foundation_layer, self.pillow_layer],
+            # Pillow is part of the repository-built foundation layer. Custom
+            # specialists therefore do not depend on a public third-party
+            # Lambda layer at runtime.
+            layers=[self.foundation_layer],
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
             description=description,
@@ -257,7 +254,7 @@ class CustomSpecialistsStack(Stack):
                         "id": "AwsSolutions-L1",
                         "reason": (
                             "Runtime is pinned to Python 3.12 to match the shared Lambda "
-                            "layers this function attaches (foundation and pillow), which "
+                            "foundation layer this function attaches, which "
                             "declare compatible_runtimes=[PYTHON_3_12] and ship "
                             "runtime-specific native artifacts. Bumping this function "
                             "alone would break layer compatibility -- the runtime and the "

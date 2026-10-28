@@ -72,19 +72,31 @@ def _copy_tree_if_present(
 
 
 def _stage_workflow_configuration(
-    source_root: Path, destination: Path, profile: ResolvedProfile
+    source_root: Path,
+    destination: Path,
+    profile: ResolvedProfile,
+    routing_configuration: dict[str, object] | None = None,
 ) -> None:
     """Validate and stage only the workflow metadata relevant to a runtime profile."""
 
-    try:
-        validate_release_configuration(source_root, profile.specialists)
-    except ValueError as error:
-        raise ConfigurationStagingError(
-            f"Workflow configuration is invalid for profile '{profile.name}': {error}"
-        ) from error
-
-    _copy_tree_if_present(source_root, "workflows", destination)
-    _copy_tree_if_present(source_root, "routing_policies", destination)
+    if routing_configuration is None:
+        _copy_tree_if_present(source_root, "workflows", destination)
+        _copy_tree_if_present(source_root, "routing_policies", destination)
+    else:
+        workflows = routing_configuration.get("workflows")
+        policies = routing_configuration.get("policies")
+        if not isinstance(workflows, dict) or not isinstance(policies, dict):
+            raise ConfigurationStagingError("Saved routing configuration is invalid.")
+        for directory, values in (("workflows", workflows), ("routing_policies", policies)):
+            target = destination / directory
+            target.mkdir(parents=True, exist_ok=True)
+            for identifier, value in values.items():
+                if not isinstance(identifier, str) or not isinstance(value, dict):
+                    raise ConfigurationStagingError("Saved routing configuration is invalid.")
+                (target / f"{identifier}.json").write_text(
+                    json.dumps(value, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
 
     metadata_path = source_root / "workflow_metadata" / "specialist_capabilities.json"
     try:
@@ -108,6 +120,12 @@ def _stage_workflow_configuration(
         + "\n",
         encoding="utf-8",
     )
+    try:
+        validate_release_configuration(destination, profile.specialists)
+    except ValueError as error:
+        raise ConfigurationStagingError(
+            f"Workflow configuration is invalid for profile '{profile.name}': {error}"
+        ) from error
 
 
 def stage_profile_config(
@@ -115,6 +133,7 @@ def stage_profile_config(
     destination: Path,
     *,
     source_root: Path = _DEFAULT_SOURCE,
+    routing_configuration: dict[str, object] | None = None,
 ) -> tuple[str, ...]:
     """Create a minimal, complete runtime configuration directory.
 
@@ -162,7 +181,12 @@ def stage_profile_config(
     if profile.capabilities.get("agent_runtime", False) or profile.capabilities.get(
         "workflow_runner", False
     ):
-        _stage_workflow_configuration(source_root, destination, profile)
+        _stage_workflow_configuration(
+            source_root,
+            destination,
+            profile,
+            routing_configuration=routing_configuration,
+        )
 
     return tuple(staged)
 
@@ -180,12 +204,23 @@ def main() -> int:
         "--pack",
         action="append",
         default=[],
-        help="Override a user-selectable profile's packs; repeat for multiple packs",
+        help="Select a pack; repeat to compose packs",
+    )
+    parser.add_argument(
+        "--specialist",
+        action="append",
+        default=[],
+        help="Select one specialist in addition to packs; repeat for multiple specialists",
     )
     args = parser.parse_args()
 
     try:
-        profile = resolve_profile(args.profile, specialist_packs=tuple(args.pack) or None)
+        profile = resolve_profile(
+            args.profile,
+            specialist_packs=tuple(args.pack) or None,
+            direct_specialists=tuple(args.specialist) or None,
+            selection_override=bool(args.pack or args.specialist),
+        )
         staged = stage_profile_config(profile, args.destination, source_root=args.source)
     except (ConfigurationStagingError, ValueError) as error:
         parser.error(str(error))

@@ -140,13 +140,6 @@ class LambdaSpecialistStack(Stack):
             "Specialist foundation layer with Strands and Bedrock client",
         )
 
-        # Pillow layer (external)
-        self.pillow_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "PillowLayer",
-            f"arn:aws:lambda:{Stack.of(self).region}:770693421928:layer:Klayers-p312-pillow:2",
-        )
-
         # Poppler layer for PDF conversion
         poppler_layer_path = Path("./lambdas/poppler-qpdf-layer.zip")
 
@@ -334,7 +327,10 @@ class LambdaSpecialistStack(Stack):
             environment["FONTCONFIG_CACHE"] = "/tmp/fontconfig-cache"  # nosec B108
 
         # Determine layers for this function
-        layers = [self.foundation_layer, self.pillow_layer]
+        # Pillow is packaged in the repository-built foundation layer. Keeping
+        # it there avoids a runtime dependency on a third-party public Lambda
+        # layer and ensures its version is governed by requirements.txt.
+        layers = [self.foundation_layer]
         if specialist_name == "pdf_to_images_converter":
             layers.append(self.poppler_layer)
 
@@ -385,7 +381,7 @@ class LambdaSpecialistStack(Stack):
                             "runtime-specific native artifacts (poppler binaries, "
                             "pymupdf/pikepdf/numpy wheels). Bumping this function "
                             "alone would break layer compatibility -- the runtime and "
-                            "all three layers must be rebuilt and revalidated "
+                            "all shared layers must be rebuilt and revalidated "
                             "together. Python 3.12 is a supported runtime and is not "
                             "deprecated. Deferred maintenance: revisit when the layers "
                             "are next rebuilt."

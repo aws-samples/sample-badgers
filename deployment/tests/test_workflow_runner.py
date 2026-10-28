@@ -38,6 +38,14 @@ class FakeS3:
         return self.response
 
 
+class FakeArtifactS3:
+    def __init__(self) -> None:
+        self.objects: list[dict[str, Any]] = []
+
+    def put_object(self, **kwargs: Any) -> None:
+        self.objects.append(kwargs)
+
+
 def _record(status: str = "running") -> dict[str, Any]:
     return {
         "operation_id": "op_" + ("a" * 32),
@@ -46,6 +54,7 @@ def _record(status: str = "running") -> dict[str, Any]:
         "source_document_s3_uri": (
             "s3://badgers-source/tenants/tenant-a/contracts/msa.pdf"
         ),
+        "workflow_id": "standard-document-analysis",
     }
 
 
@@ -66,6 +75,7 @@ def test_validate_stage_requires_tenant_scoped_source(
     stages: list[dict[str, str]] = []
     fake_s3 = FakeS3({"ContentLength": 1024, "ContentType": "application/pdf"})
     monkeypatch.setenv("SOURCE_BUCKET_NAME", "badgers-source")
+    monkeypatch.setenv("SPECIALIST_FUNCTIONS_JSON", "{}")
     monkeypatch.setattr(
         runner.operation_state, "get_operation", lambda *_a, **_k: _record()
     )
@@ -73,6 +83,19 @@ def test_validate_stage_requires_tenant_scoped_source(
         runner.operation_state,
         "update_operation_stage",
         lambda *_a, **kwargs: stages.append(kwargs) or {},
+    )
+    monkeypatch.setattr(
+        runner.workflow_planner,
+        "load_release_workflow_catalog",
+        lambda *_a, **_k: (
+            {
+                "input_contract": {
+                    "accepted_source_types": ["application/pdf"],
+                }
+            },
+            {},
+            {},
+        ),
     )
     monkeypatch.setattr(runner.boto3, "client", lambda service: fake_s3)
 
@@ -160,3 +183,105 @@ def test_runner_requires_readable_artifact_in_private_operation_prefix(
             operation_id=operation_id,
             owner_sub="tenant-a",
         )
+
+
+def test_native_processor_result_is_retained_in_the_private_operation_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id = "op_" + ("n" * 32)
+    record = _record()
+    record["operation_id"] = operation_id
+    record["workflow_id"] = "native-docx-analysis"
+    artifact_store = FakeArtifactS3()
+    completed: list[tuple[str, str, str]] = []
+    stages: list[dict[str, str]] = []
+    monkeypatch.setenv("OUTPUT_BUCKET_NAME", "badgers-output")
+    monkeypatch.setattr(
+        runner.operation_state, "get_operation", lambda *_a, **_k: record
+    )
+    monkeypatch.setattr(
+        runner.operation_state,
+        "update_operation_stage",
+        lambda *_a, **kwargs: stages.append(kwargs) or {},
+    )
+    monkeypatch.setattr(
+        runner,
+        "_invoke_specialist",
+        lambda *_a, **_k: {"body": '{"success": true, "result": "{}"}'},
+    )
+    monkeypatch.setattr(runner.boto3, "client", lambda _service: artifact_store)
+    monkeypatch.setattr(
+        runner.job_state,
+        "mark_complete",
+        lambda job_id, subtask, uri: completed.append((job_id, subtask, uri)),
+    )
+
+    result = runner._native_process(
+        {
+            "operation_id": operation_id,
+            "owner_sub": "tenant-a",
+            "plan": {"resolved_specialists": ["docx_processor"]},
+        }
+    )
+
+    expected_uri = (
+        f"s3://badgers-output/operations/tenant-a/{operation_id}/"
+        "specialists/docx_processor/native-result.json"
+    )
+    assert result["native_result_uri"] == expected_uri
+    assert completed == [
+        (
+            operation_id,
+            runner.job_state.subtask_id(
+                "docx_processor", _record()["source_document_s3_uri"]
+            ),
+            expected_uri,
+        )
+    ]
+    assert artifact_store.objects[0]["Key"].endswith(
+        "specialists/docx_processor/native-result.json"
+    )
+    assert stages[0]["stage"] == "native_document"
+
+
+def test_native_workflow_finalizes_without_a_correlation_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    operation_id = "op_" + ("q" * 32)
+    record = _record()
+    record["operation_id"] = operation_id
+    record["workflow_id"] = "native-docx-analysis"
+    verified: list[str] = []
+    monkeypatch.setenv("DEPLOYMENT_ID", "beta")
+    monkeypatch.setattr(
+        runner.operation_state, "get_operation", lambda *_a, **_k: record
+    )
+    monkeypatch.setattr(
+        runner.operation_state, "update_operation_stage", lambda *_a, **_k: {}
+    )
+    monkeypatch.setattr(
+        runner,
+        "_require_operation_artifact",
+        lambda uri, **_kwargs: verified.append(uri),
+    )
+    monkeypatch.setattr(
+        runner.operation_state,
+        "complete_operation",
+        lambda **kwargs: {"status": "completed", **kwargs},
+    )
+
+    uri = (
+        f"s3://badgers-output/operations/tenant-a/{operation_id}/"
+        "specialists/docx_processor/native-result.json"
+    )
+    result = runner._finalize(
+        {
+            "operation_id": operation_id,
+            "owner_sub": "tenant-a",
+            "native_result_uri": uri,
+        }
+    )
+
+    assert verified == [uri]
+    assert result["result"]["status"] == "completed"
+    assert result["result"]["summary"].startswith("Native document processing")

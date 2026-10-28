@@ -89,9 +89,18 @@ SPECIALIST_PACKS = tuple(
     for pack in os.environ.get("BADGERS_SPECIALIST_PACKS", "").split(",")
     if pack.strip()
 )
+DIRECT_SPECIALISTS = tuple(
+    specialist.strip()
+    for specialist in os.environ.get("BADGERS_DIRECT_SPECIALISTS", "").split(",")
+    if specialist.strip()
+)
+SELECTION_OVERRIDE = os.environ.get("BADGERS_SELECTION_OVERRIDE", "").lower() == "true"
 try:
     profile = resolve_profile(
-        PROFILE_NAME, specialist_packs=SPECIALIST_PACKS or None
+        PROFILE_NAME,
+        specialist_packs=SPECIALIST_PACKS or None,
+        direct_specialists=DIRECT_SPECIALISTS or None,
+        selection_override=SELECTION_OVERRIDE,
     )
 except ProfileResolutionError as error:
     raise SystemExit(f"Invalid BADGERS profile '{PROFILE_NAME}': {error}") from error
@@ -99,6 +108,20 @@ except ProfileResolutionError as error:
 CAPABILITIES = profile.capabilities
 CONFIG_RELEASE_ID = os.environ.get("BADGERS_CONFIG_RELEASE_ID", "").strip()
 CONFIG_PREFIX = f"releases/{CONFIG_RELEASE_ID}" if CONFIG_RELEASE_ID else ""
+ROUTING_WORKFLOWS_BY_TYPE: dict[str, str] = {}
+_routing_state = os.environ.get("BADGERS_ROUTING_STATE", "").strip()
+if _routing_state:
+    try:
+        _routing = json.loads(Path(_routing_state).read_text(encoding="utf-8")).get(
+            "desired_routing_configuration", {}
+        )
+        for workflow_id, workflow in _routing.get("workflows", {}).items():
+            for content_type in workflow.get("input_contract", {}).get(
+                "accepted_source_types", []
+            ):
+                ROUTING_WORKFLOWS_BY_TYPE[str(content_type)] = str(workflow_id)
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError) as error:
+        raise SystemExit(f"Could not load saved workflow routing configuration: {error}") from error
 UI_PUBLIC_ACCESS = os.environ.get("UI_PUBLIC_ACCESS", "false").lower() == "true"
 print(
     f"Deployment ID: {DEPLOYMENT_ID}   Stack suffix: {STACK_SUFFIX}   "
@@ -226,8 +249,10 @@ specialist_resource_prefix = (
     else f"badgers_{deployment_id.replace('-', '_')}"
 )
 
-# An ECR repository is assembled only by profiles that declare container image
-# support. The initial direct specialist packs are zip-based Lambdas.
+# An ECR repository is assembled when the resolved product or its selected
+# specialists require container images. profile_resolver derives this capability
+# from container-specialist selection, so direct DOCX/PPTX selections receive
+# the same supported ECR path as the Full product.
 ecr_stack = None
 if CAPABILITIES.get("container_images", False):
     ecr_stack = AgentCoreECRStack(
@@ -380,6 +405,7 @@ if CAPABILITIES.get("agent_runtime", False):
         image_tag=os.environ.get("RUNTIME_IMAGE_TAG") or "websocket",
         websocket_enabled=CAPABILITIES.get("websocket_transport", False),
         config_prefix=CONFIG_PREFIX,
+        routing_workflows_by_type=ROUTING_WORKFLOWS_BY_TYPE,
         workflow_state_machine_arn=(
             workflow_runner_stack.state_machine.state_machine_arn
             if workflow_runner_stack is not None

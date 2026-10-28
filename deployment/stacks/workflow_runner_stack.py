@@ -221,6 +221,17 @@ class WorkflowRunnerStack(Stack):
             self._cancel_choice("PlanningCancellation", cancelled, begin_specialist_work)
         )
 
+        native_process = self._task("ProcessNativeDocument", "native_process")
+        native_process.add_catch(failure, result_path="$.failure")
+        native_process.next(
+            self._cancel_choice("NativeDocumentCancellation", cancelled, finalize)
+        )
+        native_plan = self._task("ResolveNativePlan", "plan")
+        native_plan.add_catch(failure, result_path="$.failure")
+        native_plan.next(
+            self._cancel_choice("NativePlanningCancellation", cancelled, native_process)
+        )
+
         classify = self._task("Classify", "classify")
         classify.add_catch(failure, result_path="$.failure")
         classify.next(
@@ -233,7 +244,13 @@ class WorkflowRunnerStack(Stack):
 
         validate = self._task("ValidateSource", "validate")
         validate.add_catch(failure, result_path="$.failure")
-        validate.next(self._cancel_choice("ValidationCancellation", cancelled, convert))
+        execution_mode = sfn.Choice(self, "SelectWorkflowExecutionMode").when(
+            sfn.Condition.string_equals("$.execution_mode", "native_document"),
+            native_plan,
+        ).otherwise(convert)
+        validate.next(
+            self._cancel_choice("ValidationCancellation", cancelled, execution_mode)
+        )
 
         self.state_machine = sfn.StateMachine(
             self,

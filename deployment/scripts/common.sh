@@ -36,17 +36,34 @@ preflight_docker_cross_platform() {
     *)               host_normalized="${host_arch}" ;;
   esac
 
-  # If host matches target, no emulation needed
+  # Check if Docker is available at all
+  if ! command -v docker &>/dev/null; then
+    log_error "Docker not found in PATH. Install Docker Desktop or Docker Engine first."
+    return 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    log_error "Docker is installed but its daemon is unavailable. Start Docker, then re-run preflight."
+    return 1
+  fi
+
+  # If host matches target, no emulation needed once Docker itself is ready.
   if [[ "${host_normalized}" == "${target_arch}" ]]; then
-    log_info "Docker platform check: native ${target_arch} host — no emulation needed"
+    log_info "Docker platform check: Docker is ready on native ${target_arch}"
     return 0
   fi
 
   log_info "Docker platform check: host is ${host_normalized} (${host_arch}), target is linux/${target_arch}"
 
-  # Check if Docker is available at all
-  if ! command -v docker &>/dev/null; then
-    log_error "Docker not found in PATH. Install Docker Desktop or Docker Engine first."
+  # Test before attempting any repair. Report mode is strictly read-only: it can
+  # identify missing emulation, but must never install packages or register binfmt.
+  if docker run --rm --platform "linux/${target_arch}" public.ecr.aws/docker/library/alpine:3 true 2>/dev/null; then
+    log_success "${target_arch} emulation: OK (QEMU already registered)"
+    return 0
+  fi
+  if [ "${PREFLIGHT_READ_ONLY:-}" = "1" ]; then
+    log_error "${target_arch} container emulation is unavailable."
+    log_error "Run the deployment stage to use its guided setup, or configure Docker/QEMU first, then re-run preflight."
     return 1
   fi
 
@@ -65,7 +82,7 @@ preflight_docker_cross_platform() {
            log_error "Run manually: sudo apt-get install qemu-user-static"; return 1; }
   fi
 
-  # Test if target platform emulation works
+  # Test again after guided setup.
   if docker run --rm --platform "linux/${target_arch}" public.ecr.aws/docker/library/alpine:3 true 2>/dev/null; then
     log_success "${target_arch} emulation: OK (QEMU already registered)"
     return 0
@@ -95,9 +112,9 @@ NC='\033[0m'
 
 _ts() { date '+%Y-%m-%d %H:%M:%S'; }
 
-# Set BADGERS_ASSUME_YES=1 to answer every confirmation with yes. Required when running
-# without a tty: the UI's deploy route streams output with stdin closed, so an
-# interactive read would see EOF and the caller would silently skip the step.
+# Set BADGERS_ASSUME_YES=1 to answer every confirmation with yes. It is for
+# controlled non-interactive automation; the local configuration UI never
+# invokes deployment steps or confirmations.
 _confirm() {
     local prompt="${1:-Continue? (y/n): }"
     if [ "${BADGERS_ASSUME_YES:-}" = "1" ]; then
@@ -1115,6 +1132,15 @@ preflight_log_delivery() {
   log_warn "Log and trace delivery stops until the deploy finishes."
   echo ""
 
+  # A report must never repair its own failures.  In report mode, identify the
+  # conflict and require an explicit operator action; the deployment path keeps
+  # the existing guided remediation behavior.
+  if [ "${PREFLIGHT_READ_ONLY:-}" = "1" ]; then
+    log_error "Preflight is read-only and will not remove delivery sources."
+    log_error "Delete or migrate the listed sources deliberately, then re-run preflight."
+    return 1
+  fi
+
   _confirm "Delete these delivery sources and continue? (y/n): " || {
     log_error "Stopped. To keep them and skip this check (the deploy will then fail"
     log_error "on AlreadyExists):  BADGERS_SKIP_LOG_DELIVERY_PREFLIGHT=1 ./deploy.sh"
@@ -1474,6 +1500,13 @@ preflight_xray() {
     log_warn "To leave the slot free, deploy without tracing instead:"
     log_warn "      BADGERS_SKIP_XRAY=1 ./deploy.sh 2"
     echo ""
+    if [ "${PREFLIGHT_REPORT_MODE:-}" = "1" ]; then
+      log_warn "Preflight reports this as a warning. The deployment stage will ask for an explicit decision."
+      # Do not cache a proceed decision during a read-only report.  The stage
+      # must call this check again and present its confirmation.
+      unset BADGERS_SKIP_XRAY
+      return 2
+    fi
     _confirm "Continue and use the last slot? (y/n): " || {
       log_info "Aborted at your request. Nothing was deployed."
       return 1
@@ -1533,43 +1566,46 @@ _check_quota() {
 }
 
 preflight_service_quotas() {
-  log_info "Checking service quotas for deployment headroom..."
+  log_info "Checking service quotas for ${BADGERS_PROFILE:-selected} deployment headroom..."
   local failed=0
 
-  # VPCs (we create 1)
-  local vpc_count
-  vpc_count="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
-    --query 'length(Vpcs)' --output text 2>/dev/null || echo "0")"
-  _check_quota "vpc" "L-F678F1CE" "${vpc_count}" 1 "VPCs per Region" || ((failed++))
+  if [ "${UI_ENABLED:-0}" = "1" ]; then
+    # VPCs and Internet Gateways are Full-product UI resources.
+    local vpc_count igw_count
+    vpc_count="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
+      --query 'length(Vpcs)' --output text 2>/dev/null || echo "0")"
+    _check_quota "vpc" "L-F678F1CE" "${vpc_count}" 1 "VPCs per Region" || ((failed++))
 
-  # Internet Gateways (we create 1)
-  local igw_count
-  igw_count="$(aws ec2 describe-internet-gateways --region "${AWS_REGION}" \
-    --query 'length(InternetGateways)' --output text 2>/dev/null || echo "0")"
-  _check_quota "vpc" "L-A4707A72" "${igw_count}" 1 "Internet gateways per Region" || ((failed++))
+    igw_count="$(aws ec2 describe-internet-gateways --region "${AWS_REGION}" \
+      --query 'length(InternetGateways)' --output text 2>/dev/null || echo "0")"
+    _check_quota "vpc" "L-A4707A72" "${igw_count}" 1 "Internet gateways per Region" || ((failed++))
+  fi
 
   # S3 Buckets (we create 3: config, source, output)
   local bucket_count
   bucket_count="$(aws s3api list-buckets --query 'length(Buckets)' --output text 2>/dev/null || echo "0")"
   _check_quota "s3" "L-DC2B2D3D" "${bucket_count}" 3 "S3 buckets" || ((failed++))
 
-  # Cognito User Pools (we create 1)
-  local pool_count
-  pool_count="$(aws cognito-idp list-user-pools --max-results 60 --region "${AWS_REGION}" \
-    --query 'length(UserPools)' --output text 2>/dev/null || echo "0")"
-  _check_quota "cognito-idp" "L-F9A5A2F3" "${pool_count}" 1 "Cognito user pools" || ((failed++))
+  if [ "${COGNITO_ENABLED:-0}" = "1" ]; then
+    local pool_count
+    pool_count="$(aws cognito-idp list-user-pools --max-results 60 --region "${AWS_REGION}" \
+      --query 'length(UserPools)' --output text 2>/dev/null || echo "0")"
+    _check_quota "cognito-idp" "L-F9A5A2F3" "${pool_count}" 1 "Cognito user pools" || ((failed++))
+  fi
 
-  # DynamoDB Tables (we create 1: jobs)
-  local table_count
-  table_count="$(aws dynamodb list-tables --region "${AWS_REGION}" \
-    --query 'length(TableNames)' --output text 2>/dev/null || echo "0")"
-  _check_quota "dynamodb" "L-F98FE922" "${table_count}" 1 "DynamoDB tables" || ((failed++))
+  if [ "${OPERATION_LEDGER_ENABLED:-0}" = "1" ]; then
+    local table_count
+    table_count="$(aws dynamodb list-tables --region "${AWS_REGION}" \
+      --query 'length(TableNames)' --output text 2>/dev/null || echo "0")"
+    _check_quota "dynamodb" "L-F98FE922" "${table_count}" 1 "DynamoDB tables" || ((failed++))
+  fi
 
-  # ECR Repositories (we create 1)
-  local ecr_count
-  ecr_count="$(aws ecr describe-repositories --region "${AWS_REGION}" \
-    --query 'length(repositories)' --output text 2>/dev/null || echo "0")"
-  _check_quota "ecr" "L-CFEB8E8D" "${ecr_count}" 1 "ECR repositories" || ((failed++))
+  if [ "${ECR_ENABLED:-0}" = "1" ]; then
+    local ecr_count
+    ecr_count="$(aws ecr describe-repositories --region "${AWS_REGION}" \
+      --query 'length(repositories)' --output text 2>/dev/null || echo "0")"
+    _check_quota "ecr" "L-CFEB8E8D" "${ecr_count}" 1 "ECR repositories" || ((failed++))
+  fi
 
   # Lambda Functions (we create ~26 specialist functions)
   local lambda_count
@@ -1593,7 +1629,7 @@ preflight_service_quotas() {
     return 1
   fi
 
-  log_success "Service quotas OK — headroom confirmed for all resources"
+  log_success "Service quotas OK — headroom confirmed for applicable resources"
   return 0
 }
 
@@ -1811,6 +1847,12 @@ preflight_ecs_slr() {
     aws sts get-caller-identity \
       --query '{Account:Account,Arn:Arn}' --output text 2>&1 | sed 's/^/    /'
     log_error "  Region: ${AWS_REGION:-$(aws configure get region 2>/dev/null)}"
+    return 1
+  fi
+
+  if [ "${PREFLIGHT_READ_ONLY:-}" = "1" ]; then
+    log_error "ECS service-linked role is absent; preflight will not create it."
+    log_error "Create it deliberately, then re-run: aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com"
     return 1
   fi
 
