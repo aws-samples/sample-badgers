@@ -40,7 +40,13 @@ class ResolvedProfile:
 _DEFAULT_PROFILES_DIR = Path(__file__).parent / "profiles"
 _DEFAULT_DEPLOYMENT_CONFIG = Path(__file__).parent / "deployment_config.json"
 CONTAINER_SPECIALISTS = frozenset(
-    {"image_enhancer", "remediation_specialist", "docx_processor", "pptx_processor"}
+    {
+        "image_enhancer",
+        "remediation_specialist",
+        "docx_processor",
+        "pptx_processor",
+        "xlsx_processor",
+    }
 )
 
 
@@ -122,7 +128,29 @@ def _enabled_specialists(deployment_config: dict[str, Any]) -> set[str]:
     }
 
 
-def _load_pack(pack_name: str, profiles_dir: Path) -> list[str]:
+def _default_specialists(deployment_config: dict[str, Any]) -> set[str]:
+    """Return enabled catalog entries included by an ``enabled`` profile by default.
+
+    ``default_enabled: false`` keeps an otherwise supported specialist available
+    for explicit packs/direct selection without silently adding its deployment
+    dependencies to every Full installation.
+    """
+
+    specialists = deployment_config.get("specialists")
+    if not isinstance(specialists, dict):
+        raise ProfileResolutionError(
+            "deployment_config.json: 'specialists' must be an object"
+        )
+    return {
+        name
+        for name, specialist in specialists.items()
+        if isinstance(specialist, dict)
+        and specialist.get("enabled", True)
+        and specialist.get("default_enabled", True)
+    }
+
+
+def _load_pack(pack_name: str, profiles_dir: Path, profile_name: str) -> list[str]:
     pack_path = profiles_dir / "specialist_packs" / f"{pack_name}.json"
     pack = _load_json(pack_path)
     declared_name = _require_string(pack, "name", pack_path)
@@ -130,6 +158,22 @@ def _load_pack(pack_name: str, profiles_dir: Path) -> list[str]:
         raise ProfileResolutionError(
             f"{pack_path}: pack name '{declared_name}' does not match file name"
         )
+
+    supported_profiles = pack.get("supported_profiles")
+    if supported_profiles is not None:
+        if (
+            not isinstance(supported_profiles, list)
+            or not supported_profiles
+            or not all(isinstance(name, str) and name for name in supported_profiles)
+        ):
+            raise ProfileResolutionError(
+                f"{pack_path}: 'supported_profiles' must be a non-empty string array"
+            )
+        if profile_name not in supported_profiles:
+            raise ProfileResolutionError(
+                f"{pack_path}: pack '{pack_name}' is not available for the "
+                f"'{profile_name}' profile"
+            )
 
     specialists = pack.get("specialists")
     if not isinstance(specialists, list) or not specialists:
@@ -178,6 +222,7 @@ def resolve_profile(
     capabilities = _capabilities(profile, profile_path)
     deployment_config = _load_json(deployment_config_path)
     enabled = _enabled_specialists(deployment_config)
+    defaults = _default_specialists(deployment_config)
 
     specialist_selection = profile.get("specialist_selection")
     packs = profile.get("specialist_packs", [])
@@ -199,7 +244,7 @@ def resolve_profile(
         pack_names = _dedupe_names(specialist_packs or ())
         selected = []
         for pack_name in pack_names:
-            selected.extend(_load_pack(pack_name, profiles_dir))
+            selected.extend(_load_pack(pack_name, profiles_dir, profile_name))
         selected.extend(direct)
         selected = list(dict.fromkeys(selected))
         if not selected:
@@ -215,7 +260,7 @@ def resolve_profile(
             raise ProfileResolutionError(
                 f"{profile_path}: 'enabled' selection cannot also declare packs"
             )
-        selected = sorted(enabled)
+        selected = sorted(defaults)
         pack_names: tuple[str, ...] = ()
     elif specialist_selection == "packs":
         if not isinstance(packs, list) or not packs:
@@ -245,7 +290,7 @@ def resolve_profile(
             pack_names = tuple(packs)
         selected = []
         for pack_name in pack_names:
-            selected.extend(_load_pack(pack_name, profiles_dir))
+            selected.extend(_load_pack(pack_name, profiles_dir, profile_name))
         selected = list(dict.fromkeys(selected))
     else:
         raise ProfileResolutionError(

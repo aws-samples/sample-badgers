@@ -1,0 +1,41 @@
+[
+  {
+    "name": "process_xlsx_tool",
+    "description": "Inspect a macro-free Microsoft Excel .xlsx workbook natively and read-only. It preserves sheets, cells, formulas, formula references, tables, and visual-object evidence without calculating formulas, executing scripts/macros, refreshing connections, or resolving external links.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document_path": {
+          "type": "string",
+          "description": "S3 URI (s3://bucket/key) or absolute local path to a macro-free .xlsx source workbook."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Runtime session ID. A deterministic session-scoped artifact prefix is used when supplied."
+        },
+        "job_id": {
+          "type": "string",
+          "description": "Identifier of the active analysis run."
+        },
+        "doc_id": {
+          "type": "string",
+          "description": "Identifier of the source workbook."
+        }
+      },
+      "required": ["document_path"]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "description": "JSON summary containing the final canonical BADGERS XML content-tree URI, private workbook-analysis JSON URI, sheet count, warnings, and conditional embedded-raster Vision status. Native cells and formulas remain authoritative."
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether read-only XLSX inspection completed."
+        }
+      }
+    }
+  }
+]

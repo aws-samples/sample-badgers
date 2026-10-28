@@ -8,10 +8,11 @@ This document explains how Lambda specialists work in BADGERS—their anatomy, r
 
 The descriptions cover the Full specialist catalog. Headless and Specialists
 deploy only the explicit functions resolved from their profile packs. Native
-DOCX/PPTX processors are opt-in container specialists: select them directly or
-through a pack, then enable their matching agent workflow template where a
-workflow runner is present. They are not included in the Headless starter
-selection. This branch is a private beta candidate; see the
+DOCX/PPTX processors are opt-in container specialists. The optional XLSX
+processor performs native inspection and conditional embedded-raster Vision
+enrichment as one specialist. Select the `workbook-analysis` pack; Headless
+users additionally enable its matching durable workflow template. It is not
+included in the Headless starter selection. This branch is a private beta candidate; see the
 [Release Guide](../../RELEASE_GUIDE.md) for release status.
 
 ## Choose a task
@@ -19,7 +20,7 @@ selection. This branch is a private beta candidate; see the
 | I need to… | Start here |
 | --- | --- |
 | Call an existing specialist | [Input and output format](#-inputoutput-format) |
-| Understand native PDF, DOCX, PPTX, OCR, and visual routing | [Native intake and OCR fallback](#-native-pdf-intake-and-ocr-fallback) |
+| Understand native PDF, DOCX, PPTX, XLSX, OCR, and visual routing | [Native intake and OCR fallback](#-native-office-and-textract-ocr-routing) |
 | Understand a vision specialist's lifecycle | [Anatomy of a vision specialist](#-anatomy-of-a-vision-specialist) |
 | Trace a document job or partial result | [Job tracking](#-job-tracking) |
 | Resolve a localized reading uncertainty | [Region inspection specialist](#-region-inspection-specialist) |
@@ -34,7 +35,7 @@ BADGERS uses five types of Lambda functions:
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
 | 🔍 **Vision Specialists** | Analyze images using Bedrock vision models          | `full_text_specialist`, `table_specialist`, etc. |
-| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor` |
+| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
 | 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
 | 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist`, `pptx_gestalt_specialist` |
@@ -98,11 +99,19 @@ BADGERS uses five types of Lambda functions:
 | --------------- | -------- | -------------------------------------- |
 | `OUTPUT_BUCKET` | ✅        | S3 bucket for storing converted images |
 
-### DOCX and Textract OCR Routing
+### Native Office and Textract OCR Routing
 
 In Full's native-document flow, `route_document_input_tool` is the first tool
 for an uploaded document. A `.docx`
-or `.pptx` is sent to its native processor, which produces an ordered page/slide plan. Pages marked
+or `.pptx` is sent to its native processor, which produces an ordered page/slide plan.
+For a selected XLSX processor, `.xlsx` is sent to `xlsx_processor`, which reads bounded OOXML workbook
+structure, formulas, references, tables, and drawing inventory without opening
+Office, calculating formulas, running scripts/macros, refreshing connections,
+or following external links. The same processor conditionally analyzes supported
+pasted raster images with type-aware Gestalt prompting and merges additive
+evidence into canonical BADGERS XML. Native cells and formulas remain
+authoritative.
+Pages marked
 `native_docx` already have a canonical BADGERS page spine and do not create an image or
 invoke a model. The routing decision evaluates native fidelity separately from
 visual-semantic risk: a schema-valid, well-aligned text-only multi-column page remains

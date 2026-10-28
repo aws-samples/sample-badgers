@@ -113,11 +113,15 @@ deterministic plan is persisted privately before the runner invokes page
 specialists. Versioned requests submit to that runner and immediately receive
 durable operation identifiers and status pointers. The default
 `standard-document-analysis` workflow accepts PDF, PNG, and JPEG sources.
-A Headless deployment can additionally select `docx_processor` or
-`pptx_processor` and enable its matching native template; omitted workflow IDs
-then dispatch by the source content type, while an explicit workflow ID always
-wins. Native processors are opt-in because they require container image builds
-and appropriate workload testing. Gateway workflow MCP tools remain a later
+A Headless deployment can additionally select `docx_processor`,
+`pptx_processor`, or the `workbook-analysis` XLSX pack and enable its
+matching native template; omitted workflow IDs then dispatch by the source
+content type, while an explicit workflow ID always wins. The XLSX template
+requires `xlsx_processor`, which produces authoritative read-only OOXML evidence,
+conditionally adds bounded analysis of supported pasted raster images, and
+returns canonical BADGERS XML. Native
+processors are opt-in because they require container image builds and
+appropriate workload testing. Gateway workflow MCP tools remain a later
 implementation increment.
 
 ## Before you start
@@ -147,8 +151,10 @@ source release; see the [Release Guide](../RELEASE_GUIDE.md#release-terminology)
 
 For an explicit review surface, run `./deploy.sh configure --ui`. It edits only
 local desired state for one deployment ID: choose packs and direct specialists,
-then select compatible PDF/image or native DOCX/PPTX workflow templates. The
-normal CLI remains the only AWS executor.
+then select compatible PDF/image or native DOCX/PPTX/XLSX workflow templates.
+For XLSX, select **Workbook Analysis** and **Native XLSX workbook analysis**;
+the visual-enrichment Lambda is private to that workflow and cannot be invoked
+as a Gateway tool. The normal CLI remains the only AWS executor.
 
 ## Go deeper
 

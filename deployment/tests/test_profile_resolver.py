@@ -12,6 +12,7 @@ import pytest
 from deployment.config_stager import stage_profile_config
 from deployment.profile_resolver import ProfileResolutionError, resolve_profile
 from deployment.release_artifact import build_release
+from deployment.routing_configuration import _routing_payload
 
 
 DEPLOYMENT_DIR = Path(__file__).resolve().parents[1]
@@ -19,7 +20,7 @@ PROFILES_DIR = DEPLOYMENT_DIR / "profiles"
 DEPLOYMENT_CONFIG = DEPLOYMENT_DIR / "deployment_config.json"
 
 
-def test_full_profile_resolves_every_enabled_specialist() -> None:
+def test_full_profile_resolves_every_default_enabled_specialist() -> None:
     resolved = resolve_profile(
         "full",
         profiles_dir=PROFILES_DIR,
@@ -27,14 +28,14 @@ def test_full_profile_resolves_every_enabled_specialist() -> None:
     )
 
     config = json.loads(DEPLOYMENT_CONFIG.read_text(encoding="utf-8"))
-    enabled = {
+    default_enabled = {
         name
         for name, specialist in config["specialists"].items()
-        if specialist.get("enabled", True)
+        if specialist.get("enabled", True) and specialist.get("default_enabled", True)
     }
 
     assert resolved.display_name == "BADGERS Full"
-    assert set(resolved.specialists) == enabled
+    assert set(resolved.specialists) == default_enabled
     assert resolved.capabilities["ui"] is True
     assert resolved.capabilities["agent_runtime"] is True
 
@@ -178,6 +179,69 @@ def test_direct_container_specialist_derives_ecr_support() -> None:
     assert resolved.specialists == ("docx_processor",)
     assert resolved.direct_specialists == ("docx_processor",)
     assert resolved.capabilities["container_images"] is True
+
+
+def test_xlsx_pack_is_available_in_the_specialists_profile() -> None:
+    resolved = resolve_profile(
+        "specialists",
+        profiles_dir=PROFILES_DIR,
+        deployment_config_path=DEPLOYMENT_CONFIG,
+        specialist_packs=("workbook-analysis",),
+        selection_override=True,
+    )
+    assert resolved.specialists == ("xlsx_processor",)
+
+
+def test_xlsx_pack_selects_the_single_xlsx_processor() -> None:
+    resolved = resolve_profile(
+        "headless",
+        profiles_dir=PROFILES_DIR,
+        deployment_config_path=DEPLOYMENT_CONFIG,
+        specialist_packs=("workbook-analysis",),
+        selection_override=True,
+    )
+
+    assert resolved.specialists == ("xlsx_processor",)
+    assert resolved.capabilities["container_images"] is True
+
+
+def test_xlsx_pack_stages_its_single_container_contract() -> None:
+    profile = resolve_profile(
+        "headless",
+        profiles_dir=PROFILES_DIR,
+        deployment_config_path=DEPLOYMENT_CONFIG,
+        specialist_packs=("workbook-analysis",),
+        selection_override=True,
+    )
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        destination = Path(temporary_directory) / "staged"
+        stage_profile_config(
+            profile,
+            destination,
+            source_root=DEPLOYMENT_DIR / "s3_files",
+            routing_configuration=_routing_payload(
+                "headless",
+                ["native-xlsx-analysis"],
+                {"xlsx_processor"},
+            ),
+        )
+
+        assert (destination / "schemas/xlsx_processor.json").is_file()
+        assert (destination / "manifests/xlsx_processor.json").is_file()
+        assert (
+            destination / "prompts/xlsx_processor/xlsx_visual_gestalt.xml"
+        ).is_file()
+
+
+def test_full_profile_does_not_implicitly_add_opt_in_xlsx_processor() -> None:
+    resolved = resolve_profile(
+        "full",
+        profiles_dir=PROFILES_DIR,
+        deployment_config_path=DEPLOYMENT_CONFIG,
+    )
+
+    assert "xlsx_processor" not in resolved.specialists
 
 
 def test_direct_specialists_staging_omits_workflow_control_plane() -> None:

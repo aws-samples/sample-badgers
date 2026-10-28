@@ -44,6 +44,7 @@ CONTAINER_FUNCTIONS = [
     "remediation_specialist",
     "docx_processor",
     "pptx_processor",
+    "xlsx_processor",
 ]
 
 
@@ -455,6 +456,10 @@ class LambdaSpecialistStack(Stack):
             environment["VISION_MODEL"] = self.inference_profiles_stack.profile_arn(
                 "us.anthropic.claude-sonnet-4-6"
             )
+        if self.inference_profiles_stack and func_name == "xlsx_processor":
+            environment["XLSX_VISION_MODEL"] = self.inference_profiles_stack.profile_arn(
+                "us.anthropic.claude-sonnet-4-6"
+            )
 
         # DOCX rendering needs a writable LibreOffice profile and temporary PDF
         # artifacts. The handler confines both to request-scoped paths under
@@ -483,7 +488,7 @@ class LambdaSpecialistStack(Stack):
             memory_size=SPECIALIST_MEMORY_MB,
             ephemeral_storage_size=(
                 Size.gibibytes(4)
-                if func_name in {"docx_processor", "pptx_processor"}
+                if func_name in {"docx_processor", "pptx_processor", "xlsx_processor"}
                 else None
             ),
             description=description,

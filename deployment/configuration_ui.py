@@ -242,9 +242,9 @@ def plan(repo_root: Path, deployment_id: str, profile: str) -> dict[str, Any]:
     }
 
 
-def packs(repo_root: Path) -> list[dict[str, Any]]:
+def packs(repo_root: Path, profile: str | None = None) -> list[dict[str, Any]]:
     del repo_root
-    return specialist_selection.pack_definitions()
+    return specialist_selection.pack_definitions(profile)
 
 
 def catalog(repo_root: Path) -> list[dict[str, str | bool]]:
@@ -304,11 +304,11 @@ function row(label,sub,on,tag,attrs=''){return `<div class="row select ${on?'on'
 function render(){if(!state)return;let s=state.selection,route=state.routing;document.querySelector('#title-id').textContent=`${state.deployment_id} · ${state.profile}`;document.querySelector('#summary').textContent=route.error?'Routing needs attention':'Desired state ready for review';document.querySelector('#s-count').textContent=s.resolved_specialists.length;document.querySelector('#w-count').textContent=route.templates.length;document.querySelector('#resolved').textContent=`${s.resolved_specialists.length} specialists`;document.querySelector('#container').textContent=s.container_specialists.length?`Container builds: ${s.container_specialists.join(', ')}`:'ZIP Lambda selections only.';
 let packRows=packDefs.map(p=>row(p.display_name,p.description,s.packs.includes(p.name),{text:`${p.specialists.length} specialists`,kind:'purple'},`data-pack="${esc(p.name)}"`)).join('');let directRows=catalogEntries.map(x=>row(x.name.replaceAll('_',' '),x.category,s.direct_specialists.includes(x.name),{text:x.container?'container required':'ZIP Lambda',kind:x.container?'a':''},`data-specialist="${esc(x.name)}"`)).join('');document.querySelector('#specialist-list').innerHTML='<div class="cardhead"><h2>Packs</h2></div>'+packRows+'<div class="cardhead"><h2>Individual specialists</h2></div>'+directRows;
 document.querySelectorAll('#specialist-list .row').forEach(x=>x.onclick=()=>{x.classList.toggle('on');x.querySelector('.check').textContent=x.classList.contains('on')?'✓':''});
-let templates=[['standard-document-analysis','PDF / image analysis','PDF, PNG, JPEG → page conversion → classify → approved page specialists','PDF/image'],['native-docx-analysis','Native DOCX analysis','DOCX → native processor → private result artifact','DOCX'],['native-pptx-analysis','Native PPTX analysis','PPTX → native processor → private result artifact','PPTX']];document.querySelector('#routing-list').innerHTML=templates.map(t=>{let needed=t[0].includes('docx')?'docx_processor':t[0].includes('pptx')?'pptx_processor':'';let enabled=!needed||s.resolved_specialists.includes(needed);let active=route.templates.includes(t[0]);return row(t[1],t[2],active,{text:enabled?t[3]:'select processor first',kind:enabled?'g':'a'},`data-template="${t[0]}" data-enabled="${enabled}"`)}).join('');
+let templates=[['standard-document-analysis','PDF / image analysis','PDF, PNG, JPEG → page conversion → classify → approved page specialists','PDF/image',[],null],['native-docx-analysis','Native DOCX analysis','DOCX → native processor → private result artifact','DOCX',['docx_processor'],null],['native-pptx-analysis','Native PPTX analysis','PPTX → native processor → private result artifact','PPTX',['pptx_processor'],null],['native-xlsx-analysis','Native XLSX workbook analysis','XLSX → native workbook evidence → conditional pasted-image Vision enrichment → canonical BADGERS XML','XLSX',['xlsx_processor'],'headless']];document.querySelector('#routing-list').innerHTML=templates.map(t=>{let profileAvailable=!t[5]||s.profile===t[5];let enabled=profileAvailable&&t[4].every(name=>s.resolved_specialists.includes(name));let active=route.templates.includes(t[0]);let unavailable=!profileAvailable?'available in Headless only':t[0]==='native-xlsx-analysis'?'select the Workbook Analysis pack first':'select processor first';return row(t[1],t[2],active,{text:enabled?t[3]:unavailable,kind:enabled?'g':'a'},`data-template="${t[0]}" data-enabled="${enabled}"`)}).join('');
 document.querySelectorAll('#routing-list .row').forEach(x=>x.onclick=()=>{if(x.dataset.enabled==='false')return;x.classList.toggle('on');x.querySelector('.check').textContent=x.classList.contains('on')?'✓':''});let err=document.querySelector('#routing-error');err.textContent=route.error||'';err.classList.toggle('hidden',!route.error);renderPlan()}
 function renderPlan(){if(!state)return;api(`/api/plan?id=${encodeURIComponent(state.deployment_id)}&profile=${state.profile}`).then(p=>{document.querySelector('#plan-summary').textContent=`${p.required_stages.length} controlled stages are required before desired and applied state match.`;document.querySelector('#plan-list').innerHTML=p.required_stages.map((x,i)=>`<div class="row"><span class="pill purple">${i+1}</span><div class="copy"><b>${x}</b><small>${i===0?'Validated by a fresh preflight before AWS changes.':'Runs only if the reviewed configuration requires it.'}</small></div></div>`).join('');document.querySelector('#cli-command').textContent=p.cli_next_step;document.querySelector('#apply-note').textContent=p.apply_note}).catch(e=>toast(e.message))}
 async function load(){try{let data=await Promise.all([api(`/api/configuration?id=${encodeURIComponent(document.querySelector('#deployment').value)}&profile=${document.querySelector('#profile').value}`),loadPacks(),loadCatalog()]);state=data[0];render();toast('Local desired state loaded.')}catch(e){toast(e.message)}}
-async function loadPacks(){packDefs=await api('/api/packs');document.querySelector('#pack-list').innerHTML=packDefs.map(x=>`<div class="row"><div class="copy"><b>${esc(x.display_name)}</b><small>${x.specialists.length} members · version ${esc(x.version)} · ${esc(x.description)}</small></div><button class="btn" data-edit="${esc(x.name)}">Edit</button><button class="btn" data-delete="${esc(x.name)}">Delete</button></div>`).join('');document.querySelectorAll('[data-edit]').forEach(x=>x.onclick=()=>openPack(x.dataset.edit));document.querySelectorAll('[data-delete]').forEach(x=>x.onclick=()=>deletePack(x.dataset.delete))}
+async function loadPacks(){let profile=state?state.profile:document.querySelector('#profile').value;packDefs=await api(`/api/packs?profile=${encodeURIComponent(profile)}`);document.querySelector('#pack-list').innerHTML=packDefs.map(x=>`<div class="row"><div class="copy"><b>${esc(x.display_name)}</b><small>${x.specialists.length} members · version ${esc(x.version)} · ${esc(x.description)}</small></div><button class="btn" data-edit="${esc(x.name)}">Edit</button><button class="btn" data-delete="${esc(x.name)}">Delete</button></div>`).join('');document.querySelectorAll('[data-edit]').forEach(x=>x.onclick=()=>openPack(x.dataset.edit));document.querySelectorAll('[data-delete]').forEach(x=>x.onclick=()=>deletePack(x.dataset.delete))}
 async function loadCatalog(){catalogEntries=await api('/api/catalog')}
 document.querySelector('#load').onclick=load;document.querySelector('#save-selection').onclick=async()=>{if(!state)return toast('Load a deployment first.');try{let packs=[...document.querySelectorAll('[data-pack].on')].map(x=>x.dataset.pack),specialists=[...document.querySelectorAll('[data-specialist].on')].map(x=>x.dataset.specialist);state=await api('/api/selection',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,packs,specialists,expected_revision:state.state.specialist_revision})});render();toast('Specialist desired state saved; dependent stages are pending.')}catch(e){toast(e.message)}};
 document.querySelector('#save-routing').onclick=async()=>{if(!state)return toast('Load a deployment first.');try{let templates=[...document.querySelectorAll('[data-template].on')].map(x=>x.dataset.template);state=await api('/api/routing',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,templates,expected_revision:state.state.routing_revision})});render();toast('Routing desired state saved; release consumers are pending.')}catch(e){toast(e.message)}};
@@ -382,8 +382,10 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
 
     def _route(self, action: str, payload: dict[str, Any] | None = None) -> object:
         root = self.server.repo_root
+        query = parse_qs(urlparse(self.path).query)
+        requested_profile = str(query.get("profile", [""])[0]) or None
         if action == "packs":
-            return packs(root)
+            return packs(root, requested_profile)
         if action == "catalog":
             return catalog(root)
         if action == "save_pack":
@@ -394,7 +396,6 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
             return save_selection(root, payload or {})
         if action == "routing":
             return save_routing(root, payload or {})
-        query = parse_qs(urlparse(self.path).query)
         deployment_id = str(query.get("id", [""])[0])
         profile = str(query.get("profile", [""])[0])
         if action == "configuration":

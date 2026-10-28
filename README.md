@@ -37,7 +37,7 @@ capability boundary that matches how you plan to use BADGERS.
     <td width="33%" valign="top">
       <h3>🧭 BADGERS Full</h3>
       <p><strong>For:</strong> Teams running the complete application.</p>
-      <p>Deploy the agent, internal Gateway, enabled specialists, native PDF/DOCX/PPTX intake, browser UI, session memory, and operations tooling.</p>
+      <p>Deploy the agent, internal Gateway, default specialists, native PDF/DOCX/PPTX intake, browser UI, session memory, and operations tooling.</p>
       <p><a href="badgers-full/README.md"><strong>Deploy BADGERS Full →</strong></a></p>
     </td>
     <td width="33%" valign="top">
@@ -88,7 +88,7 @@ Document or application request
             └── Full and Headless add their applicable report or operation views
 ```
 
-The processing reference explains native PDF, DOCX, PPTX, OCR, visual fallback,
+The processing reference explains native PDF, DOCX, PPTX, opt-in XLSX, OCR, visual fallback,
 correlation, and region inspection in detail. The configuration and schema
 guides describe the contracts that keep those components consistent.
 

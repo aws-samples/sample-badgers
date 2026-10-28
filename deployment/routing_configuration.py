@@ -97,6 +97,47 @@ _TEMPLATES: dict[str, dict[str, Any]] = {
             "low_confidence": {"below": 0.0, "action": "fail", "capabilities": []},
         },
     },
+    "native-xlsx-analysis": {
+        "label": "Native XLSX workbook analysis",
+        "supported_profiles": {"headless"},
+        "required_specialists": {"xlsx_processor"},
+        "workflow": {
+            "schema_version": 1,
+            "workflow_id": "native-xlsx-analysis",
+            "version": "1.0.0",
+            "display_name": "Native XLSX Workbook Analysis",
+            "execution_mode": "native_document",
+            "supported_routing_modes": ["auto"],
+            "input_contract": {
+                "accepted_source_types": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "requires_document_uri": True,
+            },
+            "invariants": [
+                "validate_source",
+                "native_document",
+                "write_completion_manifest",
+            ],
+            "invariant_capabilities": {
+                "native_document": "xlsx_analysis",
+            },
+            "routing_policy_id": "native-xlsx-routing",
+            "allowed_capabilities": ["xlsx_analysis"],
+            "manual_capability_selection_allowed": False,
+            "result_contract": "badgers-operation-result/v1",
+        },
+        "policy": {
+            "schema_version": 1,
+            "policy_id": "native-xlsx-routing",
+            "policy_version": "1.0.0",
+            "default_workflow": "native-xlsx-analysis",
+            "limits": {"max_specialized_tools_per_page": 1, "max_pages": 500},
+            "required_capabilities": ["xlsx_analysis"],
+            "routes": [],
+            "low_confidence": {"below": 0.0, "action": "fail", "capabilities": []},
+        },
+    },
 }
 
 
@@ -150,6 +191,12 @@ def _routing_payload(profile: str, template_ids: list[str], selected: set[str]) 
     for template_id in template_ids:
         if template_id not in _TEMPLATES:
             raise RoutingConfigurationError(f"Unknown routing template: {template_id}")
+        supported_profiles = _TEMPLATES[template_id].get("supported_profiles")
+        if supported_profiles is not None and profile not in supported_profiles:
+            raise RoutingConfigurationError(
+                f"{_TEMPLATES[template_id]['label']} is available only for: "
+                + ", ".join(sorted(supported_profiles))
+            )
         missing = sorted(_TEMPLATES[template_id]["required_specialists"] - selected)
         if missing:
             raise RoutingConfigurationError(

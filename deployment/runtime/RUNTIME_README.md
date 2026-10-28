@@ -88,13 +88,13 @@ derives the operation owner from its `client_id`. A
 `badgers-agent-request/v1` request supplies a tenant-scoped source URI accepted
 by its selected workflow, an instruction, session ID, and `auto` or `manual`
 routing mode. The starter workflow accepts PDF, PNG, and JPEG. A deployment
-that explicitly selects the native DOCX or PPTX processor and matching template
+that explicitly selects the native DOCX, PPTX, or XLSX processor and matching template
 also accepts that source type. The runtime creates a durable operation and
 returns pointer metadata; it does not return native specialist artifacts inline.
 
 The default runner catalog contains the PDF/image starter workflow. Selecting
-`docx_processor` or `pptx_processor` and the matching reviewed workflow
-template adds native DOCX/PPTX support to that deployment. When a caller omits
+`docx_processor`, `pptx_processor`, or `xlsx_processor` and the matching reviewed
+workflow template adds native DOCX/PPTX/XLSX support to that deployment. When a caller omits
 `workflow_id`, the runtime consults the release-pinned MIME-type mapping; an
 explicit workflow ID always wins. External BADGERS Gateway MCP tools are not
 yet published.

@@ -236,7 +236,7 @@ def record_applied_selection(state_path: Path, *, config_release_id: str = "") -
     _write_json(state_path, state)
 
 
-def pack_definitions() -> list[dict[str, Any]]:
+def pack_definitions(profile_name: str | None = None) -> list[dict[str, Any]]:
     """Return validated pack definitions in a CLI-friendly shape."""
 
     catalog = _catalog()
@@ -250,6 +250,18 @@ def pack_definitions() -> list[dict[str, Any]]:
         unknown = sorted(set(members) - set(catalog))
         if unknown:
             raise SelectionError(f"{path}: unknown specialists: {', '.join(unknown)}")
+        supported_profiles = pack.get("supported_profiles")
+        if supported_profiles is not None:
+            if (
+                not isinstance(supported_profiles, list)
+                or not supported_profiles
+                or not all(isinstance(item, str) and item for item in supported_profiles)
+            ):
+                raise SelectionError(
+                    f"{path}: 'supported_profiles' must be a non-empty string array"
+                )
+            if profile_name is not None and profile_name not in supported_profiles:
+                continue
         definitions.append(
             {
                 "name": name,
@@ -257,6 +269,7 @@ def pack_definitions() -> list[dict[str, Any]]:
                 "description": pack.get("description", ""),
                 "version": pack.get("version", 1),
                 "specialists": members,
+                "supported_profiles": supported_profiles or [],
             }
         )
     return definitions
@@ -344,7 +357,7 @@ def _interactive_picker(
             "Use --pack and --specialist for scripted selection."
         )
     catalog = _catalog()
-    packs = pack_definitions()
+    packs = pack_definitions(profile_name)
     items = (
         [("pack", pack["name"], pack["display_name"], pack["description"]) for pack in packs]
         if include_packs

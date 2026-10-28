@@ -929,6 +929,7 @@ def configured_workflow_for_document(document_uri: str, fallback: str) -> str:
     extension_types = {
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ".pdf": "application/pdf",
         ".png": "image/png",
         ".jpg": "image/jpeg",

@@ -17,6 +17,7 @@ than arbitrary executable graphs:
 | `standard-document-analysis` | PDF, PNG, JPEG | Page conversion, classification, approved page specialists, correlation |
 | `native-docx-analysis` | DOCX | Selected `docx_processor`, then a private result artifact |
 | `native-pptx-analysis` | PPTX | Selected `pptx_processor`, then a private result artifact |
+| `native-xlsx-analysis` | XLSX | `xlsx_processor`, producing canonical BADGERS XML plus private native and conditional Vision evidence |
 
 The native templates are available only after selecting their processor. In an
 agent product, an omitted workflow ID is routed from the configured source

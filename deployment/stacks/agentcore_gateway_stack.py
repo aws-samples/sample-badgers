@@ -62,6 +62,7 @@ class AgentCoreGatewayStack(Stack):
         self.config_bucket = config_bucket
         self.specialist_function_name_prefix = specialist_function_name_prefix
         self.config_prefix = config_prefix.strip("/")
+        self.public_lambda_functions = dict(lambda_functions)
         # Stack names carry a per-deployment suffix, so the Cognito export names
         # cannot be hardcoded here.
         self.cognito_stack_name = cognito_stack_name
@@ -123,7 +124,7 @@ class AgentCoreGatewayStack(Stack):
         CfnOutput(
             self,
             "TargetCount",
-            value=str(len(self.lambda_functions)),
+            value=str(len(self.public_lambda_functions)),
             description="Number of Lambda targets added",
         )
 
@@ -364,7 +365,7 @@ class AgentCoreGatewayStack(Stack):
     def add_lambda_targets(self) -> None:
         """Add all Lambda functions as gateway targets."""
         # First, grant all invoke permissions to build up the role policy
-        for lambda_function in self.lambda_functions.values():
+        for lambda_function in self.public_lambda_functions.values():
             lambda_function.grant_invoke(self.gateway_role)
 
         # Collect all policy nodes (default + overflow policies) to add as dependencies
@@ -375,7 +376,7 @@ class AgentCoreGatewayStack(Stack):
             if child_id == "DefaultPolicy" or child_id.startswith("OverflowPolicy"):
                 policy_dependencies.append(child)
 
-        for specialist_name, lambda_function in self.lambda_functions.items():
+        for specialist_name, lambda_function in self.public_lambda_functions.items():
             # Create short target name by stripping analyze_ prefix and _tool suffix
             # This keeps MCP tool names shorter: ${target_name}__${tool_name}
             short_name = specialist_name

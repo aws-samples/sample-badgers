@@ -1,0 +1,17 @@
+<response_format>
+Return this JSON shape exactly:
+{
+  "object_id": "the requested object id",
+  "object_kind": "image",
+  "classification": "data_overlay | annotation | decorative | unknown",
+  "visual_summary": "brief factual description of visible pixels",
+  "visible_text": ["each legible visible text string"],
+  "relationship_to_covered_cells": "brief cautious spatial/contextual relationship",
+  "cell_visibility": "obscures | partially_obscures | does_not_obscure | unknown",
+  "semantic_replacement_suspected": false,
+  "confidence_percent": 0,
+  "confidence_grade": "A | B | C | D | F",
+  "requires_human_review": true
+}
+Confidence grade uses a school scale: A is 90–100, B is 80–89, C is 70–79, D is 60–69, and F is 0–59. Set requires_human_review true whenever the visual could obscure, replace, or materially reinterpret data. Do not repeat anchor coordinates as guesses: BADGERS supplies deterministic spatial coverage separately.
+</response_format>
