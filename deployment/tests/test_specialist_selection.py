@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import deployment.specialist_selection as specialist_selection
 from deployment.specialist_selection import (
+    SelectionError,
     load_or_create_desired,
     record_applied_selection,
     reconciliation,
+    save_pack,
 )
 
 
@@ -53,3 +58,15 @@ def test_reconciliation_tracks_additions_removals_and_applied_fingerprint(
     assert plan["in_sync"] is False
     assert plan["add"] == ["pptx_processor"]
     assert plan["remove"] == ["docx_processor"]
+
+
+def test_pack_name_validation_uses_an_explicit_ascii_pattern(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(specialist_selection, "PACKS_DIR", tmp_path)
+
+    saved = save_pack("review-pack-2", "test pack", ["full_text_specialist"])
+
+    assert saved.name == "review-pack-2.json"
+    with pytest.raises(SelectionError, match="lowercase letters"):
+        save_pack("Review pack", "test pack", ["full_text_specialist"])

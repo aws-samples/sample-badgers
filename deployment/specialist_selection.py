@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import termios
 import tty
@@ -39,6 +40,7 @@ DEPLOYMENT_DIR = Path(__file__).parent
 PROFILES_DIR = DEPLOYMENT_DIR / "profiles"
 PACKS_DIR = PROFILES_DIR / "specialist_packs"
 CATALOG_PATH = DEPLOYMENT_DIR / "deployment_config.json"
+_PACK_NAME = re.compile(r"[a-z0-9-]+")
 
 
 class SelectionError(ValueError):
@@ -278,7 +280,7 @@ def pack_definitions(profile_name: str | None = None) -> list[dict[str, Any]]:
 def save_pack(name: str, description: str, specialists: list[str], *, version: int = 1) -> Path:
     """Create or replace a named pack after validating its members."""
 
-    if not name or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in name):
+    if not _PACK_NAME.fullmatch(name):
         raise SelectionError("Pack names use lowercase letters, digits, and hyphens only.")
     if not specialists:
         raise SelectionError("A pack must contain at least one specialist.")
