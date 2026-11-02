@@ -4,6 +4,10 @@
 
 ### 6.0 beta candidate — private and untagged
 
+- **Bound AgentCore Runtime networking to the VPC.** Full and Headless now
+  place the runtime in private VPC subnets behind a dedicated runtime security
+  group, with AgentCore interface endpoints. The optional Full UI remains
+  internal by default; public UI access requires an explicit choice.
 - **Established the private 6.0 release candidate.** It combines the product
   profile foundation, authenticated Headless operation runner, and the native
   PDF/DOCX/PPTX work integrated from `dev`. It is not a customer release:

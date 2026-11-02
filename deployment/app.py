@@ -77,10 +77,9 @@ deployment_id = f"{DEPLOYMENT_ID}-{STACK_SUFFIX}"
 
 # ECS Express Mode derives the load balancer scheme from the subnets it is given:
 # public subnets produce an internet-facing ALB (and enable public IPs on the tasks),
-# while subnets without an internet gateway produce an internal one. Default is public,
-# because otherwise the UI's *.ecs.<region>.on.aws URL resolves but never answers.
-# Set UI_PUBLIC_ACCESS=true only when the deployment operator intentionally wants an
-# internet-facing UI.  Headless never creates the UI or VPC stacks.
+# while subnets without an internet gateway produce an internal one. Set
+# UI_PUBLIC_ACCESS=true only when the deployment operator intentionally wants an
+# internet-facing UI. AgentCore Runtime always uses private VPC subnets.
 PROFILE_NAME = os.environ.get("BADGERS_PROFILE") or app.node.try_get_context(
     "badgers_profile"
 ) or "full"
@@ -382,11 +381,23 @@ if CAPABILITIES.get("session_memory", False):
 
 # AgentCore Runtime WebSocket
 runtime_websocket_stack = None
+vpc_stack = None
+if CAPABILITIES.get("agent_runtime", False) or CAPABILITIES.get("ui", False):
+    vpc_stack = VpcStack(
+        app,
+        _sn("Vpc"),
+        deployment_id=deployment_id,
+        deployment_tags=deployment_tags,
+        env=env,
+        description="VPC for the BADGERS UI and private AgentCore runtime",
+    )
+
 if CAPABILITIES.get("agent_runtime", False):
     assert ecr_stack is not None
     assert gateway_stack is not None
     assert cognito_stack is not None
     assert dynamodb_stack is not None
+    assert vpc_stack is not None
     runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
         app,
         _sn("RuntimeWebSocket"),
@@ -398,6 +409,8 @@ if CAPABILITIES.get("agent_runtime", False):
         output_bucket_name=s3_stack.output_bucket.bucket_name,
         config_bucket_name=s3_stack.config_bucket.bucket_name,
         source_bucket_name=s3_stack.source_bucket.bucket_name,
+        vpc_private_subnet_ids=vpc_stack.private_subnet_ids,
+        vpc_runtime_security_group_id=vpc_stack.runtime_sg.security_group_id,
         memory_id=memory_stack.memory.attr_memory_id if memory_stack else None,
         s3_kms_key_arn=s3_stack.s3_kms_key.key_arn,
         inference_profiles_stack=inference_profiles_stack,
@@ -427,6 +440,7 @@ if CAPABILITIES.get("agent_runtime", False):
     runtime_websocket_stack.add_stack_dependency(ecr_stack)
     runtime_websocket_stack.add_stack_dependency(gateway_stack)
     runtime_websocket_stack.add_stack_dependency(cognito_stack)
+    runtime_websocket_stack.add_stack_dependency(vpc_stack)
     if memory_stack is not None:
         runtime_websocket_stack.add_stack_dependency(memory_stack)
     runtime_websocket_stack.add_stack_dependency(inference_profiles_stack)
@@ -470,14 +484,7 @@ if CAPABILITIES.get("ui", False):
     # --- UI infrastructure (ECS Express Gateway) ---
     # No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
     # service provisions and manages its own load balancer and HTTPS endpoint.
-    vpc_stack = VpcStack(
-        app,
-        _sn("Vpc"),
-        deployment_id=deployment_id,
-        deployment_tags=deployment_tags,
-        env=env,
-        description="VPC for the BADGERS UI ECS service",
-    )
+    assert vpc_stack is not None
 
     # Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
     ecs_stack = ECSStack(
@@ -521,7 +528,7 @@ if CAPABILITIES.get("ui", False):
     ecs_stack.add_stack_dependency(runtime_websocket_stack)
     ecs_stack.add_stack_dependency(inference_profiles_stack)
 else:
-    print("UI, VPC, and wizard stacks omitted by profile")
+    print("UI, ECS, VPC, and wizard stacks omitted by profile")
 
 # ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
 if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):

@@ -47,6 +47,8 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         output_bucket_name: str,
         config_bucket_name: str,
         source_bucket_name: str,
+        vpc_private_subnet_ids: list[str],
+        vpc_runtime_security_group_id: str,
         memory_id: Optional[str],
         s3_kms_key_arn: str,
         inference_profiles_stack: "InferenceProfilesStack",
@@ -72,6 +74,8 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         self.output_bucket_name = output_bucket_name
         self.config_bucket_name = config_bucket_name
         self.source_bucket_name = source_bucket_name
+        self.vpc_private_subnet_ids = tuple(vpc_private_subnet_ids)
+        self.vpc_runtime_security_group_id = vpc_runtime_security_group_id
         self.memory_id = memory_id
         self.s3_kms_key_arn = s3_kms_key_arn
         # The agent mints job_id on the first specialist tool call of a turn and
@@ -87,6 +91,10 @@ class AgentCoreRuntimeWebSocketStack(Stack):
         if bool(self.headless_jwt_discovery_url) != bool(self.headless_jwt_client_id):
             raise ValueError(
                 "Headless runtime JWT authentication requires both discovery URL and client ID"
+            )
+        if not self.vpc_private_subnet_ids or not self.vpc_runtime_security_group_id:
+            raise ValueError(
+                "AgentCore Runtime requires private subnets and a runtime security group"
             )
 
         # Apply common tags to all resources
@@ -540,7 +548,11 @@ class AgentCoreRuntimeWebSocketStack(Stack):
                 )
             ),
             network_configuration=agentcore.CfnRuntime.NetworkConfigurationProperty(
-                network_mode="PUBLIC"
+                network_mode="VPC",
+                network_mode_config=agentcore.CfnRuntime.VpcConfigProperty(
+                    subnets=list(self.vpc_private_subnet_ids),
+                    security_groups=[self.vpc_runtime_security_group_id],
+                ),
             ),
             protocol_configuration="HTTP",
             role_arn=self.agent_role.role_arn,

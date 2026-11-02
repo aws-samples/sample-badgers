@@ -77,6 +77,9 @@ When using the Bedrock AgentCore CLI Starter Toolkit:
 - Implement proper security group rules
 - Enable VPC Flow Logs for monitoring
 - Use TLS 1.2 or higher for all communications
+- BADGERS deploys its AgentCore Runtime in private VPC subnets with a dedicated
+  security group. The Full-product UI is internal by default; making it
+  internet-facing requires an explicit deployment choice.
 
 ## Vulnerability Disclosure Policy
 

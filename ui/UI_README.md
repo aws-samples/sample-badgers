@@ -117,6 +117,10 @@ manages its own load balancer and HTTPS endpoint. There is no ALB injecting iden
 headers, which is why identity is established at the application layer instead. See
 [CDK Stacks](../deployment/stacks/STACKS_README.md#ecs-ecs_stackpy).
 
+The UI is internal by default. Its public-access choice is separate from the
+AgentCore Runtime: the runtime always runs in private VPC subnets with its own
+security group.
+
 ## Architecture
 
 ```

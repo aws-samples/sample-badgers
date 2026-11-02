@@ -1,11 +1,13 @@
-"""VPC Stack for BADGERS UI infrastructure.
+"""VPC Stack for BADGERS UI and AgentCore Runtime infrastructure.
 
 Aligned with the media-contracts (MC) reference: public + private subnets for
-the ECS Express Gateway UI service, a dedicated security group for interface
-endpoints, and VPC endpoints so AWS API traffic stays off the NAT gateway.
+the ECS Express Gateway UI service and AgentCore Runtime, dedicated security
+groups for interface endpoints and the runtime, and VPC endpoints so AWS API
+traffic stays off the NAT gateway.
 
 Gateway endpoints (free, no hourly charge): S3, DynamoDB.
-Interface endpoints: Bedrock Runtime, SSM, Secrets Manager.
+Interface endpoints: Bedrock Runtime, AgentCore, AgentCore Gateway, SSM, and
+Secrets Manager.
 """
 
 from aws_cdk import (
@@ -68,7 +70,7 @@ class VpcStack(Stack):
         )
 
         # ── Security groups ────────────────────────────────────────
-        # Interface endpoint SG — accepts HTTPS from the UI task SG.
+        # Interface endpoint SG — accepts HTTPS only from BADGERS workloads.
         self.endpoint_sg = ec2.SecurityGroup(
             self,
             "EndpointSG",
@@ -88,10 +90,27 @@ class VpcStack(Stack):
             allow_all_outbound=True,
         )
 
+        # AgentCore Runtime ENIs live in private subnets. They need outbound
+        # access to their AWS dependencies, but accept no direct inbound traffic.
+        # AgentCore owns delivery of authenticated invocations to the runtime.
+        self.runtime_sg = ec2.SecurityGroup(
+            self,
+            "RuntimeSG",
+            vpc=self.vpc,
+            security_group_name=f"badgers-runtime-sg-{deployment_id}",
+            description="Security group for the private BADGERS AgentCore runtime",
+            allow_all_outbound=True,
+        )
+
         self.endpoint_sg.add_ingress_rule(
             peer=ec2.Peer.security_group_id(self.ui_task_sg.security_group_id),
             connection=ec2.Port.tcp(443),
             description="HTTPS from the UI task to VPC interface endpoints",
+        )
+        self.endpoint_sg.add_ingress_rule(
+            peer=ec2.Peer.security_group_id(self.runtime_sg.security_group_id),
+            connection=ec2.Port.tcp(443),
+            description="HTTPS from the AgentCore runtime to VPC interface endpoints",
         )
 
         # ── VPC Endpoints — keep AWS API traffic off NAT ───────────
@@ -115,6 +134,26 @@ class VpcStack(Stack):
         )
         Tags.of(self.bedrock_endpoint).add(
             "Name", f"badgers-bedrock-endpoint-{deployment_id}"
+        )
+
+        self.agentcore_endpoint = self.vpc.add_interface_endpoint(
+            "AgentCoreEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENTCORE,
+            private_dns_enabled=True,
+            security_groups=[self.endpoint_sg],
+        )
+        Tags.of(self.agentcore_endpoint).add(
+            "Name", f"badgers-agentcore-endpoint-{deployment_id}"
+        )
+
+        self.agentcore_gateway_endpoint = self.vpc.add_interface_endpoint(
+            "AgentCoreGatewayEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENTCORE_GATEWAY,
+            private_dns_enabled=True,
+            security_groups=[self.endpoint_sg],
+        )
+        Tags.of(self.agentcore_gateway_endpoint).add(
+            "Name", f"badgers-agentcore-gateway-endpoint-{deployment_id}"
         )
 
         ssm_endpoint = self.vpc.add_interface_endpoint(
@@ -153,7 +192,7 @@ class VpcStack(Stack):
         ]
 
         self._apply_resource_tags(
-            self.vpc, "ui-vpc", "VPC for the BADGERS UI ECS service"
+            self.vpc, "badgers-vpc", "VPC for the BADGERS UI and AgentCore runtime"
         )
 
         # ── Outputs ────────────────────────────────────────────────
@@ -170,6 +209,13 @@ class VpcStack(Stack):
             value=self.ui_task_sg.security_group_id,
             description="Security group ID for the UI ECS task",
             export_name=f"{Stack.of(self).stack_name}-UITaskSecurityGroupId",
+        )
+        CfnOutput(
+            self,
+            "RuntimeSecurityGroupId",
+            value=self.runtime_sg.security_group_id,
+            description="Security group ID for the private AgentCore runtime",
+            export_name=f"{Stack.of(self).stack_name}-RuntimeSecurityGroupId",
         )
         CfnOutput(
             self,
@@ -191,8 +237,8 @@ class VpcStack(Stack):
             # The interface-endpoint security group's ingress CIDR is an intrinsic
             # (the VPC's CidrBlock attribute), which cdk-nag cannot resolve at
             # synth time, so EC23 raises a validation failure rather than a real
-            # finding. Ingress is restricted to the VPC CIDR and to the UI task
-            # security group on port 443 only.
+            # finding. Ingress is restricted to the UI task and AgentCore runtime
+            # security groups on port 443 only.
             NagSuppressions.add_resource_suppressions(
                 self.endpoint_sg,
                 [
@@ -200,8 +246,8 @@ class VpcStack(Stack):
                         "id": "CdkNagValidationFailure",
                         "reason": (
                             "EC23 cannot validate an ingress rule whose CIDR is the "
-                            "VPC CidrBlock intrinsic. Ingress is scoped to the VPC CIDR "
-                            "and the UI task security group on TCP 443."
+                            "VPC CidrBlock intrinsic. Ingress is scoped to the UI task "
+                            "and AgentCore runtime security groups on TCP 443."
                         ),
                     },
                 ],

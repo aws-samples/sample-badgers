@@ -9,6 +9,14 @@ Headless disables WebSockets and accepts authenticated versioned agent requests
 that submit to the private durable workflow runner. This branch is a private,
 untagged 6.0 candidate; see the [Release Guide](../../RELEASE_GUIDE.md).
 
+## Network boundary
+
+The Runtime stack requires the BADGERS VPC. It deploys the AgentCore Runtime in
+VPC mode in the stack's private subnets and attaches a dedicated runtime
+security group. The VPC provides the AgentCore interface endpoints used by the
+runtime; no public runtime network mode is used. The optional Full-product UI
+has a separate, explicit public-access choice and remains internal by default.
+
 ## Choose the runtime mode
 
 | Mode | Reader goal | Start here |

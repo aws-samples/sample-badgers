@@ -27,7 +27,7 @@ branch is an untagged private beta candidate; see the
 | Memory             | `agentcore_memory_stack.py`            | Session persistence (90-day TTL)                           |
 | Runtime WebSocket  | `agentcore_runtime_websocket_stack.py` | Strands agent container with WebSocket streaming           |
 | Workflow Runner    | `workflow_runner_stack.py`             | Private Step Functions runner for Headless operations      |
-| VPC                | `vpc_stack.py`                         | Public/private subnets and VPC endpoints for the UI        |
+| VPC                | `vpc_stack.py`                         | Private runtime subnets, optional UI subnets, and VPC endpoints |
 | ECS                | `ecs_stack.py`                         | Unified UI on an ECS Express Gateway service               |
 | Custom Specialists | `custom_specialists_stack.py`          | *(Optional)* Wizard-created specialists                    |
 
@@ -45,8 +45,9 @@ rather than resolving another deployment's. See
 ## Dependency Graph
 
 Arrows point from a Full-product stack to the stacks it depends on. Headless
-omits Memory, VPC, ECS, X-Ray, UI, and custom specialists; it adds Workflow
-Runner between Lambda and Runtime. Specialists stops after Lambda.
+omits Memory, ECS, X-Ray, UI, and custom specialists; it retains VPC so its
+AgentCore Runtime runs in private subnets, and it adds Workflow Runner between
+Lambda and Runtime. Specialists stops after Lambda.
 
 ```
         S3   Cognito   DynamoDB   ECR   Inference Profiles   X-Ray   Memory   VPC
@@ -71,9 +72,11 @@ Runner between Lambda and Runtime. Specialists stops after Lambda.
  Custom Specialists (optional, via CloudFormation exports — no explicit dependency)
 ```
 
-The UI tier (VPC, ECS) sits at the end because `ecs_stack.py` needs the Runtime ARN
-and Gateway ID to inject as container config, and re-points the Cognito UI client's
-callback URLs at the service endpoint once it exists.
+The VPC is created before Runtime because the runtime receives its private
+subnets and dedicated security group from it. The UI tier (ECS) sits at the end
+because `ecs_stack.py` needs the Runtime ARN and Gateway ID to inject as
+container config, and re-points the Cognito UI client's callback URLs at the
+service endpoint once it exists.
 
 ## Stack Details
 
@@ -195,16 +198,21 @@ but transport is profile-specific:
   it mints a `job_id`
 - Full enables WebSocket streaming; Headless disables it and enables validated
   Cognito JWT agent requests plus the private workflow-runner ARN
+- The runtime uses VPC mode, private subnets, and the VPC stack's dedicated
+  runtime security group
 
 ### VPC (`vpc_stack.py`)
-Network for the UI ECS service:
+Network boundary for the AgentCore Runtime and optional UI:
 - Public and private subnets across 2 AZs, 1 NAT gateway (cost-optimised; raise for HA)
 - VPC Flow Logs enabled
 - Gateway endpoints (no hourly charge): S3, DynamoDB
-- Interface endpoints: Bedrock Runtime, SSM, Secrets Manager — keeps AWS API traffic
-  off the NAT gateway
-- Two security groups: one for the UI task, one for the interface endpoints accepting
-  HTTPS from it
+- Interface endpoints: Bedrock Runtime, AgentCore Runtime, AgentCore Gateway,
+  SSM, and Secrets Manager — keeps AWS API traffic off the NAT gateway
+- Three security groups: one for the UI task, one for the AgentCore Runtime,
+  and one for interface endpoints accepting HTTPS from the UI and runtime
+- The runtime is placed only in private subnets. The optional UI is also
+  internal by default and uses public subnets only when public access is
+  explicitly selected during deployment.
 
 ### ECS (`ecs_stack.py`)
 The unified UI, running as an ECS Express Gateway service:

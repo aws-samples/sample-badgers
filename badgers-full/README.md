@@ -27,7 +27,7 @@ command later and choose **`r`** to resume unfinished work.
 - Shared prompt/configuration release, model profiles, S3 storage, IAM, Cognito,
   DynamoDB operation ledger, and ECR
 - Session memory and X-Ray Transaction Search when available
-- VPC, ECS service, and the browser UI
+- VPC-bound AgentCore Runtime, ECS service, and the browser UI
 - The UI specialist wizard for creating and managing custom specialists
 
 ## Before you start
@@ -37,8 +37,9 @@ AWS identity allowed to provision the listed services and invoke the required
 Bedrock models. The deployment menu validates your local tools, AWS account,
 region, model access, and CDK readiness before resource creation.
 
-The UI is internal by default. If you explicitly choose public access during
-deployment, that load-balancer topology is fixed for the life of the VPC.
+The AgentCore Runtime runs in private VPC subnets. The UI is internal by
+default. If you explicitly choose public access during deployment, that
+load-balancer topology is fixed for the life of the VPC.
 
 ## After deployment
 

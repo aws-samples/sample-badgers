@@ -21,7 +21,7 @@ run to continue only unfinished steps.
 
 ## What gets deployed
 
-- AgentCore Runtime and MCP Gateway
+- VPC-bound AgentCore Runtime and MCP Gateway
 - Cognito machine identity, S3 storage, IAM, model profiles, and the minimum
   DynamoDB operation ledger
 - Shared agent prompt core and curated specialist packs
@@ -29,14 +29,15 @@ run to continue only unfinished steps.
 
 ## What is intentionally omitted
 
-- Browser UI, ECS service, VPC, and UI image build
+- Browser UI, ECS service, and UI image build
 - Session memory, UI specialist wizard, and X-Ray Transaction Search
 - WebSocket handler registration
 
 WebSockets are not required for Headless. Invoke the AgentCore runtime through
 its normal request interface from your application or service. Versioned
 Headless requests authenticate, create durable operations, and submit to the
-private runner. Headless retains the repository's existing AgentCore Gateway
+private runner. Its AgentCore Runtime is deployed into private VPC subnets.
+Headless retains the repository's existing AgentCore Gateway
 for runtime-to-specialist calls; it is not the future customer-facing BADGERS
 Gateway MCP product, and its credentials must not be distributed as an external
 specialist-tool integration.
