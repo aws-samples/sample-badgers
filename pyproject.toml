@@ -38,7 +38,7 @@ dependencies = [
     "opencv-python>=4.13.0.92",
     "pdf2image",
     "pikepdf>=10.0.2",
-    "pillow>=12.3.0",
+    "pillow>=13.0.0",
     "pymupdf>=1.26.6",
     "strands-agents[otel]",
     # ── Transitive floors. Not imported directly -- pydantic arrives via mcp,
