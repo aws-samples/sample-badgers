@@ -11,7 +11,7 @@
 - **Established the private 6.0 release candidate.** It combines the product
   profile foundation, authenticated Headless operation runner, and the native
   PDF/DOCX/PPTX work integrated from `dev`. It is not a customer release:
-  `v5.0.2` remains the current production tag, no `v6.0.0-beta.*` tag exists,
+  `v5.0.2` remains the current release tag, no `v6.0.0-beta.*` tag exists,
   and the candidate branch is not published.
 - **Documented the release contract.** Source tags, per-deployment
   content-addressed configuration releases, and deployment identities now have
