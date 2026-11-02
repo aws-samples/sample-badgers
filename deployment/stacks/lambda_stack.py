@@ -358,6 +358,7 @@ class LambdaSpecialistStack(Stack):
             layers=layers,
             timeout=Duration.seconds(900),
             memory_size=SPECIALIST_MEMORY_MB,
+            reserved_concurrent_executions=5,
             description=description,
             environment=environment,
         )
@@ -491,6 +492,7 @@ class LambdaSpecialistStack(Stack):
                 if func_name in {"docx_processor", "pptx_processor", "xlsx_processor"}
                 else None
             ),
+            reserved_concurrent_executions=5,
             description=description,
             environment=environment,
         )
