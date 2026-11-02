@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import sys
-from xml.etree import ElementTree as ET
 from pathlib import Path
 
 import pytest
+from defusedxml import ElementTree as ET
 
 
 PROCESSOR_DIRECTORY = (
