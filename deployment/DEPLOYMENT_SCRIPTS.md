@@ -41,11 +41,19 @@ the menu.
 ### Local configuration planner
 
 Use `./deploy.sh configure --ui` to manage reusable packs, select specialists,
-and choose reviewed workflow-routing templates before a deployment. It starts a
-short-lived service on a random `127.0.0.1` port, opens a browser, and stores
-only desired state in `.deploy-state/{DEPLOYMENT_ID}.json`. It does not load
-AWS credentials, invoke the AWS CLI or CDK, run a shell command, or create
-AWS resources.
+choose reviewed workflow-routing templates, and save an optional observability
+posture before a deployment. The observability screen offers **links** (no new
+resources), **baseline** (dashboard and operational alarms), or **enhanced**
+(baseline plus business-health checks), with an optional SNS topic or
+EventBridge bus ARN for notification handoff. Its footprint is a local
+candidate estimate only: the future observability CLI deployer must inspect
+live account inventory, service quotas, and destination permissions before it
+creates AWS resources.
+
+The planner starts a short-lived service on a random `127.0.0.1` port, opens a
+browser, and stores only desired state in `.deploy-state/{DEPLOYMENT_ID}.json`.
+It does not load AWS credentials, invoke the AWS CLI or CDK, run a shell
+command, or create AWS resources.
 
 The planner generates a reconciliation preview and a `deploy.sh … resume`
 handoff command. Run that normal CLI command to select the deployment identity
@@ -77,6 +85,11 @@ the SHA-pinned workflow/routing/configuration artifact the durable runner uses.
 The initial Headless workflow accepts PDF, PNG, and JPEG inputs. Its
 customer-facing Agent API is authenticated; the separate BADGERS Gateway MCP
 product is not exposed by this candidate.
+
+Both Full and Headless create the VPC before Step 6, so the AgentCore Runtime
+can run in private subnets with its dedicated security group. The optional Full
+UI is internal by default; the menu requires an explicit `y` or
+`UI_PUBLIC_ACCESS=true` to request an internet-facing UI.
 
 **9 vs r** — both reach a complete deployment. Option 9 runs all eight steps and stops at
 each completed one to ask whether to re-run. Option `r` skips completed steps before calling

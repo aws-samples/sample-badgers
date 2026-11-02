@@ -1,0 +1,2258 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive, product-oriented overview of BADGERS.">
+  <title>BADGERS — Product overview</title>
+  <style>
+    :root {
+      --ink: #142133;
+      --ink-soft: #465970;
+      --muted: #6f8093;
+      --line: #dce5ee;
+      --canvas: #f6f8fb;
+      --surface: #fff;
+      --blue: #1867d7;
+      --blue-soft: #eaf2ff;
+      --teal: #087f70;
+      --teal-soft: #e5f7f2;
+      --orange: #b65f09;
+      --orange-soft: #fff2e3;
+      --violet: #6943b8;
+      --violet-soft: #f0ebff;
+      --shadow: 0 12px 32px rgba(29, 50, 76, .09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    a {
+      color: var(--blue);
+    }
+
+    code {
+      padding: .1em .35em;
+      border-radius: 5px;
+      background: #edf1f5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .9em;
+    }
+
+    .shell {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid rgba(220, 229, 238, .9);
+      background: rgba(255, 255, 255, .9);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--ink);
+      font-weight: 790;
+      letter-spacing: -.025em;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 29px;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 16px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 17px;
+      font-size: 13px;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      font-weight: 670;
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      color: var(--blue);
+    }
+
+    .hero {
+      overflow: hidden;
+      padding: 78px 0 60px;
+      border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(circle at 87% 4%, #dceaff 0, transparent 25%),
+        radial-gradient(circle at 75% 70%, #e5f8f3 0, transparent 20%),
+        var(--surface);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.35fr .8fr;
+      align-items: center;
+      gap: 48px;
+    }
+
+    .eyebrow,
+    .section-kicker {
+      margin: 0 0 13px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 790px;
+      margin-bottom: 19px;
+      font-size: clamp(2.55rem, 5.3vw, 4.6rem);
+      line-height: 1.01;
+      letter-spacing: -.06em;
+    }
+
+    h2 {
+      margin-bottom: 9px;
+      font-size: clamp(1.7rem, 3vw, 2.45rem);
+      line-height: 1.12;
+      letter-spacing: -.043em;
+    }
+
+    h3 {
+      margin-bottom: 7px;
+      font-size: 1.02rem;
+      letter-spacing: -.014em;
+    }
+
+    .lede {
+      max-width: 720px;
+      margin-bottom: 0;
+      color: var(--ink-soft);
+      font-size: 1.18rem;
+    }
+
+    .hero-card {
+      padding: 23px;
+      border: 1px solid #cbdcf4;
+      border-radius: 19px;
+      background: rgba(255, 255, 255, .79);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .hero-card-value {
+      margin: 7px 0 5px;
+      color: var(--blue);
+      font-size: 2.25rem;
+      font-weight: 810;
+      letter-spacing: -.05em;
+    }
+
+    .hero-card p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 14px;
+    }
+
+    .hero-mini-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .hero-mini-list span {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+
+    .hero-mini-list b {
+      color: var(--teal);
+    }
+
+    main {
+      padding: 60px 0 88px;
+    }
+
+    .section {
+      margin-top: 78px;
+      scroll-margin-top: 85px;
+    }
+
+    .section:first-child {
+      margin-top: 0;
+    }
+
+    .section-heading {
+      max-width: 760px;
+      margin-bottom: 28px;
+    }
+
+    .section-heading p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 2px 6px rgba(33, 52, 79, .025);
+    }
+
+    .card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-bottom: 13px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 790;
+      letter-spacing: .02em;
+    }
+
+    .blue {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .teal {
+      color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .orange {
+      color: var(--orange);
+      background: var(--orange-soft);
+    }
+
+    .violet {
+      color: var(--violet);
+      background: var(--violet-soft);
+    }
+
+    .chooser {
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 22px;
+    }
+
+    .question-stack {
+      padding: 8px;
+      height: fit-content;
+      border: 1px solid var(--line);
+      border-radius: 17px;
+      background: var(--surface);
+      position: sticky;
+      top: 84px;
+    }
+
+    .choice {
+      display: flex;
+      width: 100%;
+      gap: 13px;
+      padding: 14px;
+      border: 0;
+      border-radius: 11px;
+      color: var(--ink);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+
+    .choice:hover {
+      background: #f4f7fb;
+    }
+
+    .choice.active {
+      background: var(--blue-soft);
+    }
+
+    .choice-icon {
+      display: grid;
+      flex: 0 0 30px;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border: 1px solid #cadbf6;
+      border-radius: 50%;
+      color: var(--blue);
+      background: #fff;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .choice.active .choice-icon {
+      border-color: var(--blue);
+      color: #fff;
+      background: var(--blue);
+    }
+
+    .choice strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .choice small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .recommendation {
+      min-height: 407px;
+      padding: 32px;
+      border: 1px solid #cadbf7;
+      border-radius: 19px;
+      background: linear-gradient(145deg, #fff, #f1f6ff);
+      box-shadow: var(--shadow);
+    }
+
+    .recommendation-kicker {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 790;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .recommendation h3 {
+      margin: 8px 0 10px;
+      font-size: 1.7rem;
+      letter-spacing: -.035em;
+    }
+
+    .recommendation>p {
+      max-width: 680px;
+      color: var(--ink-soft);
+    }
+
+    .fit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .fit-item {
+      padding: 12px 13px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, .75);
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+
+    .fit-item b {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--ink);
+      font-size: 12px;
+    }
+
+    .recommendation-note {
+      margin-top: 18px;
+      padding: 11px 13px;
+      border-left: 3px solid var(--teal);
+      border-radius: 0 9px 9px 0;
+      background: #f1faf7;
+      color: #315e53;
+      font-size: 13px;
+    }
+
+    .journey {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .journey-step {
+      position: relative;
+      min-height: 215px;
+      padding: 19px 17px;
+      border: 0;
+      border-radius: 12px;
+      color: var(--ink);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .journey-step:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: -5px;
+      width: 10px;
+      height: 10px;
+      border-top: 2px solid #afbdcd;
+      border-right: 2px solid #afbdcd;
+      content: "";
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .journey-step:hover {
+      background: #f5f8fc;
+    }
+
+    .journey-step.active {
+      color: #114f9e;
+      background: var(--blue-soft);
+    }
+
+    .journey-step.active::after {
+      border-color: var(--blue);
+    }
+
+    .journey-num {
+      display: grid;
+      place-items: center;
+      width: 27px;
+      height: 27px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      color: var(--blue);
+      background: #fff;
+      border: 1px solid #c9daf5;
+      font-size: 12px;
+      font-weight: 790;
+    }
+
+    .journey-step.active .journey-num {
+      color: #fff;
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .journey-step strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .journey-step span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.36;
+    }
+
+    .journey-detail {
+      display: grid;
+      grid-template-columns: .8fr 1.2fr;
+      gap: 20px;
+      margin-top: 16px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 4px 16px rgba(33, 52, 79, .04);
+    }
+
+    .journey-detail h3 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    .journey-detail p {
+      margin-bottom: 0;
+      color: var(--ink-soft);
+    }
+
+    .detail-points {
+      display: grid;
+      gap: 8px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .detail-points li {
+      padding: 10px 12px;
+      border-radius: 9px;
+      color: #40556c;
+      background: #f5f8fb;
+      font-size: 13px;
+    }
+
+    .detail-points b {
+      color: var(--ink);
+    }
+
+    .tab-shell {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .tab-list {
+      display: flex;
+      gap: 4px;
+      padding: 9px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .tab {
+      padding: 9px 14px;
+      border: 0;
+      border-radius: 9px;
+      color: var(--muted);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .tab-panel {
+      display: none;
+      padding: 29px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .tab-panel>p {
+      max-width: 785px;
+      color: var(--muted);
+    }
+
+    .capability-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 13px;
+      margin-top: 21px;
+    }
+
+    .capability {
+      min-height: 133px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+    }
+
+    .capability b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .capability span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .yes {
+      color: var(--teal);
+    }
+
+    .no {
+      color: #8b99a8;
+    }
+
+    .deep-shell {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+
+    .deep-menu {
+      display: flex;
+      gap: 5px;
+      padding: 9px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .deep-tab {
+      padding: 9px 14px;
+      border: 0;
+      border-radius: 9px;
+      color: var(--muted);
+      background: transparent;
+      font-size: 14px;
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .deep-tab.active {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .deep-panel {
+      display: none;
+      padding: 30px;
+    }
+
+    .deep-panel.active {
+      display: block;
+    }
+
+    .deep-panel>p {
+      max-width: 830px;
+      color: var(--ink-soft);
+    }
+
+    .boundary-note {
+      margin: 19px 0 22px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--orange);
+      border-radius: 0 10px 10px 0;
+      color: #71542e;
+      background: var(--orange-soft);
+      font-size: 13px;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 23px 0;
+    }
+
+    .pipeline-node {
+      position: relative;
+      min-height: 137px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fff;
+    }
+
+    .pipeline-node:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: -7px;
+      z-index: 1;
+      width: 12px;
+      height: 12px;
+      border-top: 2px solid #aebccc;
+      border-right: 2px solid #aebccc;
+      content: "";
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    .pipeline-node b {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--blue);
+      font-size: 12px;
+    }
+
+    .pipeline-node span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.36;
+    }
+
+    .pdf-flow {
+      grid-template-columns: .9fr 1.1fr .95fr 1.35fr;
+      align-items: stretch;
+    }
+
+    .pdf-flow .pipeline-node {
+      border-width: 1px;
+      box-shadow: 0 4px 12px rgba(33, 52, 79, .04);
+    }
+
+    .pdf-flow .pipeline-node b {
+      color: inherit;
+    }
+
+    .pdf-flow .inspect {
+      border-color: #b7d3fb;
+      color: #1358b5;
+      background: #eaf3ff;
+    }
+
+    .pdf-flow .route {
+      border-color: #d5c4ff;
+      color: #6642b4;
+      background: #f1ebff;
+    }
+
+    .pdf-flow .ocr-gate {
+      border-color: #f4d29c;
+      color: #9a5603;
+      background: #fff3df;
+    }
+
+    .pdf-flow .pipeline-node::after {
+      border-color: currentColor;
+    }
+
+    .route-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 9px;
+    }
+
+    .route-options span {
+      padding: 3px 5px;
+      border-radius: 5px;
+      color: inherit;
+      background: rgba(255, 255, 255, .72);
+      font-size: 10px;
+      font-weight: 760;
+      line-height: 1.1;
+    }
+
+    .pdf-outcomes {
+      position: relative;
+      display: grid;
+      gap: 9px;
+    }
+
+    .pdf-outcomes::before {
+      position: absolute;
+      top: 50%;
+      left: -14px;
+      width: 14px;
+      height: 1px;
+      background: #9eb0c5;
+      content: "";
+    }
+
+    .pdf-outcomes::after {
+      position: absolute;
+      top: 25%;
+      bottom: 25%;
+      left: -2px;
+      width: 1px;
+      background: #9eb0c5;
+      content: "";
+    }
+
+    .pdf-outcome {
+      min-height: 0;
+      padding: 12px 14px;
+    }
+
+    .pdf-outcome::after {
+      display: none;
+    }
+
+    .pdf-outcome b {
+      margin-bottom: 3px;
+    }
+
+    .pdf-outcome.ocr-pass {
+      border-color: #9adfc8;
+      color: #08745b;
+      background: #e6f8f0;
+    }
+
+    .pdf-outcome.vision-path {
+      border-color: #a9d4e8;
+      color: #126d93;
+      background: #e8f7fd;
+    }
+
+    .deep-grid {
+      display: grid;
+      grid-template-columns: .72fr 1.28fr;
+      gap: 18px;
+      margin-top: 22px;
+    }
+
+    .deep-aside {
+      padding: 19px;
+      border: 1px solid #d3e1f8;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #f7faff, #eef5ff);
+    }
+
+    .deep-aside h3 {
+      margin-bottom: 9px;
+      color: #174c8e;
+    }
+
+    .deep-aside p,
+    .deep-aside li {
+      color: #466078;
+      font-size: 13px;
+    }
+
+    .deep-aside ul {
+      margin: 12px 0 0;
+      padding-left: 19px;
+    }
+
+    .deep-aside li+li {
+      margin-top: 7px;
+    }
+
+    .xml-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .xml-card {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #172536;
+    }
+
+    .xml-card header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 13px;
+      color: #e4edf7;
+      background: #22364c;
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .xml-card header span {
+      color: #a8c5e9;
+      font-weight: 550;
+    }
+
+    .xml-card pre {
+      max-height: 350px;
+      margin: 0;
+      overflow: auto;
+      padding: 15px;
+      color: #dcecff;
+      font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre;
+    }
+
+    .xml-card code {
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+      background: transparent;
+      font: inherit;
+    }
+
+    .xml-punctuation {
+      color: #91b6dc;
+    }
+
+    .xml-tag {
+      color: #79dec8;
+    }
+
+    .xml-attribute {
+      color: #afd0ff;
+    }
+
+    .xml-equals {
+      color: #91b6dc;
+    }
+
+    .xml-value {
+      color: #ffd487;
+    }
+
+    .xml-caption {
+      margin: -2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .comparison>div {
+      padding: 13px;
+      border-radius: 11px;
+      font-size: 13px;
+    }
+
+    .comparison .limited {
+      color: #755527;
+      background: #fff7e9;
+    }
+
+    .comparison .richer {
+      color: #275b52;
+      background: #ecfaf5;
+    }
+
+    .comparison b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 12px;
+    }
+
+    .map {
+      display: grid;
+      grid-template-columns: .9fr 1.25fr;
+      gap: 20px;
+    }
+
+    .use-case-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      align-content: start;
+    }
+
+    .use-case {
+      min-height: 108px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: var(--ink);
+      background: var(--surface);
+      text-align: left;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .use-case:hover {
+      border-color: #bbd1f5;
+      transform: translateY(-1px);
+    }
+
+    .use-case.active {
+      border-color: #9abcf0;
+      background: var(--blue-soft);
+      box-shadow: 0 6px 18px rgba(24, 103, 215, .08);
+    }
+
+    .use-case i {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 19px;
+      font-style: normal;
+    }
+
+    .use-case span {
+      display: block;
+      font-size: 13px;
+      font-weight: 770;
+      line-height: 1.25;
+    }
+
+    .use-answer {
+      min-height: 336px;
+      padding: 27px;
+      border: 1px solid #cadbf7;
+      border-radius: 17px;
+      background: linear-gradient(145deg, #fff, #f2f7ff);
+      box-shadow: var(--shadow);
+    }
+
+    .use-answer-kicker {
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 790;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .use-answer h3 {
+      margin: 9px 0 10px;
+      font-size: 1.43rem;
+    }
+
+    .use-answer p {
+      color: var(--ink-soft);
+    }
+
+    .answer-rows {
+      display: grid;
+      gap: 9px;
+      margin-top: 18px;
+    }
+
+    .answer-row {
+      padding: 11px 13px;
+      border-radius: 10px;
+      color: #40546d;
+      background: rgba(255, 255, 255, .78);
+      font-size: 13px;
+    }
+
+    .answer-row b {
+      color: var(--ink);
+    }
+
+    .proof {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 19px;
+    }
+
+    .checklist {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border-bottom: 1px solid #edf1f5;
+      cursor: pointer;
+    }
+
+    .check:last-child {
+      border-bottom: 0;
+    }
+
+    .check input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--blue);
+    }
+
+    .check span {
+      font-size: 14px;
+    }
+
+    .progress-card {
+      padding: 25px;
+      border-radius: 16px;
+      color: #fff;
+      background: linear-gradient(145deg, #1769df, #12498f);
+    }
+
+    .progress-card h3 {
+      font-size: 1.38rem;
+    }
+
+    .progress-card p {
+      color: #dceaff;
+      font-size: 14px;
+    }
+
+    .progress-track {
+      height: 9px;
+      margin: 20px 0 9px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, .25);
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: #fff;
+      transition: width .25s ease;
+    }
+
+    .progress-note {
+      color: #dceaff;
+      font-size: 13px;
+    }
+
+    .reset {
+      margin-top: 17px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255, 255, 255, .45);
+      border-radius: 8px;
+      color: #fff;
+      background: transparent;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .boundary {
+      padding: 25px;
+      border: 1px solid #f0d7a7;
+      border-radius: 16px;
+      background: #fffaf0;
+    }
+
+    .boundary h2 {
+      color: #7d4900;
+    }
+
+    .boundary p,
+    .boundary li {
+      color: #765d35;
+    }
+
+    .boundary ul {
+      margin-bottom: 0;
+      padding-left: 20px;
+    }
+
+    .back-to-top {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 10;
+      padding: 10px 13px;
+      border: 1px solid #c9daf8;
+      border-radius: 999px;
+      color: var(--blue);
+      background: rgba(255, 255, 255, .95);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .back-to-top:hover {
+      background: var(--blue-soft);
+    }
+
+    footer {
+      padding: 28px 0 50px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legal-footer p {
+      margin: 9px 0;
+    }
+
+    .legal-footer strong {
+      color: var(--ink);
+    }
+
+    @media (max-width: 860px) {
+
+      .hero-grid,
+      .chooser,
+      .map,
+      .proof,
+      .journey-detail {
+        grid-template-columns: 1fr;
+        gap: 22px;
+      }
+
+      .question-stack {
+        position: static;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .choice {
+        padding: 10px;
+      }
+
+      .choice small {
+        display: none;
+      }
+
+      .journey {
+        grid-template-columns: 1fr;
+      }
+
+      .journey-step {
+        min-height: auto;
+        padding: 14px 16px 14px 58px;
+      }
+
+      .journey-step:not(:last-child)::after {
+        top: auto;
+        right: auto;
+        bottom: -5px;
+        left: 27px;
+        transform: rotate(135deg);
+      }
+
+      .journey-num {
+        position: absolute;
+        top: 13px;
+        left: 17px;
+        margin: 0;
+      }
+
+      .capability-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .pdf-flow {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .pdf-outcomes {
+        grid-column: span 2;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .pdf-outcomes::before,
+      .pdf-outcomes::after {
+        display: none;
+      }
+
+      .pipeline-node:nth-child(2)::after {
+        top: auto;
+        right: auto;
+        bottom: -7px;
+        left: 50%;
+        transform: translateX(-50%) rotate(135deg);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .shell {
+        width: min(100% - 28px, 1180px);
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        padding: 56px 0 45px;
+      }
+
+      .cards,
+      .capability-grid,
+      .fit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .use-case-list {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .question-stack {
+        grid-template-columns: 1fr;
+      }
+
+      .tab-list {
+        overflow-x: auto;
+      }
+
+      .tab {
+        white-space: nowrap;
+      }
+
+      .deep-menu {
+        overflow-x: auto;
+      }
+
+      .deep-tab {
+        white-space: nowrap;
+      }
+
+      .recommendation,
+      .use-answer,
+      .tab-panel {
+        padding: 23px;
+      }
+
+      .deep-panel {
+        padding: 23px;
+      }
+
+      .pipeline,
+      .deep-grid,
+      .comparison {
+        grid-template-columns: 1fr;
+      }
+
+      .pdf-flow,
+      .pdf-outcomes {
+        grid-template-columns: 1fr;
+      }
+
+      .pdf-outcomes {
+        grid-column: auto;
+      }
+
+      .pipeline-node:not(:last-child)::after {
+        top: auto;
+        right: auto;
+        bottom: -7px;
+        left: 50%;
+        transform: translateX(-50%) rotate(135deg);
+      }
+
+      .back-to-top {
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="shell nav">
+      <a class="brand" href="../index.html"><span class="brand-mark">🦡</span> BADGERS <span>· Business</span></a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="../index.html">Audience</a>
+        <a href="#overview">Value</a>
+        <a href="#choose">Choose a product</a>
+        <a href="#journey">Journey</a>
+        <a href="#deep-dives">Deep dives</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#use-cases">Use cases</a>
+        <a href="#readiness">Readiness</a>
+        <a href="../developer/index.html">Developer view</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" id="top">
+    <div class="shell hero-grid">
+      <div>
+        <p class="eyebrow">Product overview</p>
+        <h1>Make complex documents usable, reviewable, and ready for action.</h1>
+        <p class="lede">From historical manuscripts, maps, and annotated scans to invoices, Word documents, and
+          PowerPoint decks, BADGERS preserves the parts of a document that plain text extraction loses: hierarchy,
+          layout, tables, figures, handwriting, reading order, and the evidence behind a result.</p>
+      </div>
+      <aside class="hero-card">
+        <div class="hero-card-label">One platform, three product boundaries</div>
+        <div class="hero-card-value">Full · Headless · Specialists</div>
+        <p>Choose the experience your team needs without changing the underlying document intelligence, specialist
+          definitions, or release process.</p>
+        <div class="hero-mini-list">
+          <span><b>●</b> Human workbench and reports</span>
+          <span><b>●</b> Durable application integration</span>
+          <span><b>●</b> Direct AWS-native tools</span>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <main class="shell">
+    <section class="section" id="overview">
+      <div class="section-heading">
+        <p class="section-kicker">The value proposition</p>
+        <h2>Not just text extraction: a traceable document understanding workflow.</h2>
+        <p>BADGERS combines specialist analysis with structured artifacts so teams can work with the document’s content
+          and verify how an answer was reached.</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <span class="tag blue">Understand</span>
+          <h3>Keep document structure in view</h3>
+          <p>Use native and visual intake paths to retain page context, layout, tables, figures, forms, handwriting, and
+            relationships—not an undifferentiated text stream. That matters for line-item invoices, Word tables, and
+            business slide decks.</p>
+        </article>
+        <article class="card">
+          <span class="tag teal">Route</span>
+          <h3>Apply the right kind of analysis</h3>
+          <p>An agent or your application routes approved capabilities to focused specialists, with classifier-led
+            policies available for the standard workflow—for example, adding table analysis to a confidently
+            table-dominant invoice page.</p>
+        </article>
+        <article class="card">
+          <span class="tag orange">Review</span>
+          <h3>Retain evidence with the outcome</h3>
+          <p>Structured results, specialist artifacts, configuration releases, and operation state are kept together to
+            support review and reproducibility—useful when a business user needs to validate extracted totals, clauses,
+            or slide relationships.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="choose">
+      <div class="section-heading">
+        <p class="section-kicker">Start with your operating model</p>
+        <h2>Which BADGERS product fits your team?</h2>
+        <p>Select the statement closest to your goal. The recommendation explains the appropriate product boundary; it
+          is not a deployment action.</p>
+      </div>
+      <div class="chooser">
+        <div class="question-stack" id="product-choices" role="tablist" aria-label="Product selection questions"></div>
+        <article class="recommendation" id="recommendation" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <section class="section" id="journey">
+      <div class="section-heading">
+        <p class="section-kicker">What happens to a document</p>
+        <h2>A clear path from source document to reviewable result.</h2>
+        <p>Explore the journey to see the product-level job of each stage and the evidence it leaves behind.</p>
+      </div>
+      <div class="journey" id="journey-steps" role="tablist" aria-label="Document journey"></div>
+      <article class="journey-detail" id="journey-detail" aria-live="polite"></article>
+    </section>
+
+    <section class="section" id="deep-dives">
+      <div class="section-heading">
+        <p class="section-kicker">Deep dives</p>
+        <h2>Follow the processing path for a PDF, Word document, or email workflow.</h2>
+        <p>These examples show the decision points and actual BADGERS XML output shapes. Business values are synthetic,
+          but the element structure and routing behavior are based on the repository’s PDF, OCR, DOCX, and correlation
+          implementations.</p>
+      </div>
+      <div class="deep-shell">
+        <div class="deep-menu" role="tablist" aria-label="Document-processing deep dives">
+          <button class="deep-tab active" type="button" data-deep-tab="pdf" role="tab" aria-selected="true">PDF: OCR and
+            vision</button>
+          <button class="deep-tab" type="button" data-deep-tab="docx" role="tab" aria-selected="false">Word: native
+            DOCX</button>
+          <button class="deep-tab" type="button" data-deep-tab="email" role="tab" aria-selected="false">Email:
+            integration pipeline</button>
+        </div>
+
+        <article class="deep-panel active" id="pdf">
+          <span class="tag blue">PDF examples: invoices, reports, and archive scans</span>
+          <h3>Use native PDF evidence first; apply OCR or vision only to the pages that need it.</h3>
+          <p>The native PDF processor inspects each page’s text, coordinates, image/vector objects, and tagged
+            structure. It creates an explainable page plan: a digitally readable page can remain
+            <code>native_pdf</code>; an image-only page tries OCR; a page with usable text plus visual meaning becomes
+            <code>hybrid</code>; and a page that needs visual interpretation follows the vision workflow.</p>
+          <div class="pipeline pdf-flow" aria-label="PDF inspect, route, and OCR quality-gate flow">
+            <div class="pipeline-node inspect"><b>1 · Inspect</b><span>Read native text, coordinates, tagged structure,
+                images, and vector objects before rasterizing.</span></div>
+            <div class="pipeline-node route"><b>2 · Route a page</b><span>Select the least-expensive path that preserves
+                the page evidence.</span>
+              <div class="route-options"><span>native PDF</span><span>OCR</span><span>hybrid</span><span>vision</span>
+              </div>
+            </div>
+            <div class="pipeline-node ocr-gate"><b>3 · OCR quality gate</b><span>Does the OCR have sufficient readable
+                text, meaningful tokens, confidence, and character quality?</span></div>
+            <div class="pdf-outcomes" aria-label="OCR gate outcomes">
+              <div class="pipeline-node pdf-outcome ocr-pass"><b>Pass · Canonical OCR</b><span>Keep the schema-valid OCR
+                  content tree and its page image.</span></div>
+              <div class="pipeline-node pdf-outcome vision-path"><b>Escalate · Vision + correlation</b><span>Retain OCR
+                  as evidence, then analyze the same page image for richer structure.</span></div>
+            </div>
+          </div>
+          <div class="boundary-note"><strong>What “better OCR” means here:</strong> BADGERS does not assume vision is
+            always more accurate than OCR. It rejects clearly unusable OCR—such as low-confidence, sparse, or
+            symbol-dominated output—and lets the vision path create a richer, correlated document structure from the
+            same page image. Accepted OCR remains a canonical page spine rather than triggering extra vision work by
+            default.</div>
+          <div class="deep-grid">
+            <aside class="deep-aside">
+              <h3>What changes in the output?</h3>
+              <div class="comparison">
+                <div class="limited"><b>Accepted OCR page</b>Produces a deliberately narrow, line-level content tree. It
+                  is efficient for a readable scanned page, but it does not infer table cells or visual relationships.
+                </div>
+                <div class="richer"><b>Vision-correlated page</b>Can retain a table’s header, rows, cells, reading
+                  order, and contributions from multiple specialists, including a flag for human review.</div>
+              </div>
+              <ul>
+                <li>OCR quality checks include readable text, meaningful token count, mean line confidence, and
+                  readable-character ratio.</li>
+                <li>For a table-dominant page, the configured policy can add table analysis when classification
+                  confidence meets its threshold.</li>
+                <li>Both routes leave an artifact trail; the right choice depends on the page evidence.</li>
+              </ul>
+            </aside>
+            <div class="xml-stack">
+              <div class="xml-card">
+                <header>Accepted OCR page XML <span>line-level canonical spine</span></header>
+                <pre><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;unified_document xmlns="https://github.com/aws-samples/sample-badgers/schemas/content-tree"
+  session_id="invoice-10482" page="1" schema_version="2.0"&gt;
+  &lt;metadata&gt;
+    &lt;source_image&gt;s3://private-source/invoices/inv-10482-page-1.png&lt;/source_image&gt;
+    &lt;specialists_executed&gt;
+      &lt;specialist name="textract_ocr"
+        s3_uri="s3://private-output/ocr/page-001.xml"/&gt;
+    &lt;/specialists_executed&gt;
+  &lt;/metadata&gt;
+  &lt;content_tree&gt;
+    &lt;sect id="textract-page-1"&gt;
+      &lt;element id="textract-page-1-line-1" tag="P" page="1" order="1" placement="Block"&gt;
+        &lt;text&gt;Invoice INV-10482&lt;/text&gt;
+      &lt;/element&gt;
+      &lt;element id="textract-page-1-line-2" tag="P" page="1" order="2" placement="Block"&gt;
+        &lt;text&gt;Item Qty Unit Price Amount&lt;/text&gt;
+      &lt;/element&gt;
+      &lt;element id="textract-page-1-line-3" tag="P" page="1" order="3" placement="Block"&gt;
+        &lt;text&gt;Monitor 2 399.00 798.00&lt;/text&gt;
+      &lt;/element&gt;
+    &lt;/sect&gt;
+  &lt;/content_tree&gt;
+  &lt;summary&gt;Textract OCR extracted 3 readable line(s) with mean line confidence 98.33.&lt;/summary&gt;
+&lt;/unified_document&gt;</code></pre>
+              </div>
+              <div class="xml-card">
+                <header>Vision-correlated page XML <span>table structure + review signal</span></header>
+                <pre><code>&lt;unified_document session_id="invoice-10482" page="1" schema_version="2.0"&gt;
+  &lt;metadata&gt;
+    &lt;source_image&gt;s3://private-source/invoices/inv-10482-page-1.png&lt;/source_image&gt;
+    &lt;specialists_executed&gt;
+      &lt;specialist name="full_text" s3_uri="s3://private-output/full-text/page-001.xml"/&gt;
+      &lt;specialist name="elements" s3_uri="s3://private-output/elements/page-001.xml"/&gt;
+      &lt;specialist name="table" s3_uri="s3://private-output/tables/page-001.xml"/&gt;
+    &lt;/specialists_executed&gt;
+  &lt;/metadata&gt;
+  &lt;content_tree&gt;
+    &lt;sect id="sect_root"&gt;
+      &lt;element id="invoice-title" tag="H1" order="1" page="1"&gt;&lt;text&gt;Invoice INV-10482&lt;/text&gt;&lt;/element&gt;
+      &lt;element id="invoice-lines" tag="Table" order="2" page="1"&gt;
+        &lt;children&gt;
+          &lt;element id="line-head" tag="THead"&gt;&lt;children&gt;&lt;element id="line-head-row" tag="TR"&gt;&lt;children&gt;
+            &lt;element id="h-item" tag="TH" scope="Column"&gt;&lt;text&gt;Item&lt;/text&gt;&lt;/element&gt;
+            &lt;element id="h-qty" tag="TH" scope="Column"&gt;&lt;text&gt;Qty&lt;/text&gt;&lt;/element&gt;
+            &lt;element id="h-amount" tag="TH" scope="Column"&gt;&lt;text&gt;Amount&lt;/text&gt;&lt;/element&gt;
+          &lt;/children&gt;&lt;/element&gt;&lt;/children&gt;&lt;/element&gt;
+          &lt;element id="line-1" tag="TR"&gt;&lt;children&gt;
+            &lt;element id="line-1-item" tag="TD"&gt;&lt;text&gt;Monitor&lt;/text&gt;&lt;/element&gt;
+            &lt;element id="line-1-qty" tag="TD"&gt;&lt;text&gt;2&lt;/text&gt;&lt;/element&gt;
+            &lt;element id="line-1-amount" tag="TD"&gt;&lt;text&gt;798.00&lt;/text&gt;&lt;/element&gt;
+          &lt;/children&gt;&lt;/element&gt;
+        &lt;/children&gt;
+        &lt;enrichments&gt;&lt;human_review_flag&gt;Tax total requires confirmation.&lt;/human_review_flag&gt;&lt;/enrichments&gt;
+      &lt;/element&gt;
+    &lt;/sect&gt;
+  &lt;/content_tree&gt;
+&lt;/unified_document&gt;</code></pre>
+              </div>
+              <p class="xml-caption">The first structure follows the repository’s OCR XML builder; the second follows
+                its correlated content-tree format. The invoice values are illustrative.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="deep-panel" id="docx">
+          <span class="tag teal">Word policy example</span>
+          <h3>Keep the Word document’s native structure—and add visual evidence only when it earns its place.</h3>
+          <p>The DOCX processor reads Word OOXML, builds a canonical content-tree XML page, and creates an adaptive page
+            plan. A simple native page stays <code>native_docx</code>; a page needing text recovery may use
+            <code>textract_ocr</code>; and a page with visual-semantic risk may use <code>hybrid</code> or
+            <code>vision_ai</code>. Native structure remains the base for a hybrid result.</p>
+          <div class="pipeline" aria-label="DOCX process">
+            <div class="pipeline-node"><b>1 · Read OOXML</b><span>Inspect headings, paragraphs, tables, lists, drawings,
+                and their native relationships.</span></div>
+            <div class="pipeline-node"><b>2 · Build a page plan</b><span>Produce a schema-valid native XML spine and
+                route each page independently.</span></div>
+            <div class="pipeline-node"><b>3 · Selective escalation</b><span>Render only the individual pages that need
+                OCR or visual interpretation.</span></div>
+            <div class="pipeline-node"><b>4 · Preserve provenance</b><span>For a hybrid page, the native DOCX spine
+                remains structural base while vision adds enrichments.</span></div>
+          </div>
+          <div class="boundary-note"><strong>Why native first matters:</strong> a Word document already carries reliable
+            structure that a rendered-image OCR pass can flatten. BADGERS can preserve headings and table cells from
+            OOXML, then focus vision on the pages or regions where a visual fact—such as a diagram, drawing, scan, or
+            ambiguous layout—needs interpretation.</div>
+          <div class="deep-grid">
+            <aside class="deep-aside">
+              <h3>Example: procurement policy</h3>
+              <div class="comparison">
+                <div class="limited"><b>Flattened document text</b>“Approval level Amount VP Finance…” may contain the
+                  words, but not the explicit header-to-cell relationships or source block identity.</div>
+                <div class="richer"><b>Native + visual structure</b>Retains a real <code>Table</code> with header and
+                  data cells, then attaches a visual relationship or evidence note when an embedded diagram needs it.
+                </div>
+              </div>
+              <ul>
+                <li>Text-only multi-column content or alignment uncertainty alone does not automatically require vision.
+                </li>
+                <li>OCR is a first-pass option for selected rendered DOCX pages; low-quality OCR can still escalate to
+                  vision.</li>
+                <li>The page plan records the route, reasons, fidelity, validation state, and native output URI.</li>
+              </ul>
+            </aside>
+            <div class="xml-stack">
+              <div class="xml-card">
+                <header>Native DOCX XML <span>real heading and table hierarchy</span></header>
+                <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;unified_document xmlns="https://github.com/aws-samples/sample-badgers/schemas/content-tree"
+  session_id="policy-review-18" page="3" schema_version="2.0"&gt;
+  &lt;metadata&gt;
+    &lt;source_image&gt;native:docx&lt;/source_image&gt;
+    &lt;specialists_executed&gt;
+      &lt;specialist name="docx_processor" s3_uri="native:docx_processor"/&gt;
+    &lt;/specialists_executed&gt;
+  &lt;/metadata&gt;
+  &lt;content_tree&gt;
+    &lt;sect id="docx-page-3"&gt;
+      &lt;element id="word/document.xml:block-12" tag="H2" page="3" order="1" placement="Block"&gt;
+        &lt;text&gt;Approval thresholds&lt;/text&gt;
+      &lt;/element&gt;
+      &lt;element id="word/document.xml:block-13" tag="Table" page="3" order="2" placement="Block"&gt;
+        &lt;children&gt;
+          &lt;element id="word/document.xml:block-13:row-1" tag="TR" page="3" order="1" placement="Block"&gt;
+            &lt;children&gt;
+              &lt;element id="word/document.xml:block-13:row-1:cell-1" tag="TH" scope="Column"&gt;&lt;text&gt;Amount&lt;/text&gt;&lt;/element&gt;
+              &lt;element id="word/document.xml:block-13:row-1:cell-2" tag="TH" scope="Column"&gt;&lt;text&gt;Approver&lt;/text&gt;&lt;/element&gt;
+            &lt;/children&gt;
+          &lt;/element&gt;
+          &lt;element id="word/document.xml:block-13:row-2" tag="TR" page="3" order="2" placement="Block"&gt;
+            &lt;children&gt;
+              &lt;element id="word/document.xml:block-13:row-2:cell-1" tag="TD"&gt;&lt;text&gt;Over $50,000&lt;/text&gt;&lt;/element&gt;
+              &lt;element id="word/document.xml:block-13:row-2:cell-2" tag="TD"&gt;&lt;text&gt;VP Finance&lt;/text&gt;&lt;/element&gt;
+            &lt;/children&gt;
+          &lt;/element&gt;
+        &lt;/children&gt;
+      &lt;/element&gt;
+    &lt;/sect&gt;
+  &lt;/content_tree&gt;
+&lt;/unified_document&gt;</code></pre>
+              </div>
+              <div class="xml-card">
+                <header>Hybrid page enrichment <span>vision adds context; it does not replace DOCX</span></header>
+                <pre><code>&lt;element id="word/document.xml:block-14" tag="Figure" page="3" order="3" placement="Block"&gt;
+  &lt;alt_text&gt;Approval escalation diagram&lt;/alt_text&gt;
+  &lt;caption&gt;Figure 2. Escalation path for exceptions.&lt;/caption&gt;
+  &lt;enrichments&gt;
+    &lt;cross_reference target="word/document.xml:block-13" type="anchored_to"&gt;
+      &lt;relationship&gt;anchored_to&lt;/relationship&gt;
+      &lt;evidence&gt;Diagram appears directly below the approval-threshold table.&lt;/evidence&gt;
+    &lt;/cross_reference&gt;
+  &lt;/enrichments&gt;
+&lt;/element&gt;</code></pre>
+              </div>
+              <p class="xml-caption">The native XML matches the DOCX builder’s element, table, and provenance model; the
+                enrichment uses its documented cross-reference structure. Values are illustrative.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="deep-panel" id="email">
+          <span class="tag violet">Email and attachment example</span>
+          <h3>Use an application-owned email adapter, then analyze each supported document with a clear trail back to
+            the case.</h3>
+          <p>Raw email formats are not a named native BADGERS intake type. A mail, case, or CRM application owns message
+            parsing, authorization, and retention. It can extract approved attachments or produce an approved
+            representation of message content, store those documents in its private source prefix, and invoke the
+            appropriate BADGERS product per artifact.</p>
+          <div class="pipeline" aria-label="Email integration process">
+            <div class="pipeline-node"><b>1 · Receive safely</b><span>The owning application reads message metadata and
+                enforces its email security, retention, and authorization controls.</span></div>
+            <div class="pipeline-node"><b>2 · Prepare artifacts</b><span>Identify supported attachments or create an
+                approved PDF/image representation of relevant message content.</span></div>
+            <div class="pipeline-node"><b>3 · Submit per artifact</b><span>Store each approved source privately, then
+                send a Headless request or use Full/Specialists as the experience requires.</span></div>
+            <div class="pipeline-node"><b>4 · Rejoin results</b><span>The application maps its case/email IDs to the
+                returned operation and private artifact pointers for its users.</span></div>
+          </div>
+          <div class="boundary-note"><strong>Boundary to keep explicit:</strong> the email-to-document mapping shown
+            below is application-owned, not a BADGERS API response. BADGERS analyzes the supported artifact and returns
+            its own private results. The application remains responsible for safe mail handling, attachment screening,
+            authorization, and showing the result in context.</div>
+          <div class="deep-grid">
+            <aside class="deep-aside">
+              <h3>Example: supplier onboarding email</h3>
+              <div class="comparison">
+                <div class="limited"><b>Mailbox-only view</b>Leaves the case owner to open multiple attachments and
+                  manually connect an invoice, a signed policy DOCX, and a presentation.</div>
+                <div class="richer"><b>Document-aware workflow</b>Creates one case-to-artifact map and attaches
+                  structured, reviewable analysis results to each document without treating raw email as an unbounded
+                  model input.</div>
+              </div>
+              <ul>
+                <li>Use a caller correlation ID to associate an approved request with the application’s case or email
+                  record.</li>
+                <li>The Headless request requires a private S3 document URI, session ID, and instruction.</li>
+                <li>The terminal result is a bounded pointer manifest; detailed artifacts remain private in S3.</li>
+              </ul>
+            </aside>
+            <div class="xml-stack">
+              <div class="xml-card">
+                <header>Application-owned artifact map <span>illustrative integration record, not BADGERS output</span>
+                </header>
+                <pre><code>&lt;email_case case_id="case-8841" message_id="mail-71a3"&gt;
+  &lt;subject&gt;Supplier onboarding documents&lt;/subject&gt;
+  &lt;artifact id="att-1" source_type="attachment" filename="invoice-10482.pdf"
+    s3_uri="s3://private-source/tenants/acme/mail-71a3/invoice-10482.pdf"
+    badgers_operation_id="op_7f4c…"/&gt;
+  &lt;artifact id="att-2" source_type="attachment" filename="vendor-policy.docx"
+    s3_uri="s3://private-source/tenants/acme/mail-71a3/vendor-policy.docx"
+    badgers_operation_id="op_42ab…"/&gt;
+  &lt;artifact id="body-1" source_type="approved-rendering" filename="message-body.pdf"
+    s3_uri="s3://private-source/tenants/acme/mail-71a3/message-body.pdf"
+    badgers_operation_id="op_a812…"/&gt;
+&lt;/email_case&gt;</code></pre>
+              </div>
+              <div class="xml-card">
+                <header>BADGERS XML for the invoice attachment <span>same per-document evidence model</span></header>
+                <pre><code>&lt;unified_document session_id="case-8841" page="1" schema_version="2.0"&gt;
+  &lt;metadata&gt;
+    &lt;source_image&gt;s3://private-source/tenants/acme/mail-71a3/invoice-10482-page-1.png&lt;/source_image&gt;
+    &lt;specialists_executed&gt;
+      &lt;specialist name="full_text" s3_uri="s3://private-output/full-text/page-001.xml"/&gt;
+      &lt;specialist name="elements" s3_uri="s3://private-output/elements/page-001.xml"/&gt;
+      &lt;specialist name="table" s3_uri="s3://private-output/tables/page-001.xml"/&gt;
+    &lt;/specialists_executed&gt;
+  &lt;/metadata&gt;
+  &lt;content_tree&gt;
+    &lt;sect id="sect_root"&gt;
+      &lt;element id="invoice-number" tag="H1" order="1" page="1"&gt;&lt;text&gt;Invoice INV-10482&lt;/text&gt;&lt;/element&gt;
+      &lt;element id="invoice-total" tag="P" order="2" page="1"&gt;
+        &lt;text&gt;Total due: USD 4,218.72&lt;/text&gt;
+        &lt;enrichments&gt;&lt;source_context&gt;Attachment att-1 in case-8841&lt;/source_context&gt;&lt;/enrichments&gt;
+      &lt;/element&gt;
+    &lt;/sect&gt;
+  &lt;/content_tree&gt;
+&lt;/unified_document&gt;</code></pre>
+              </div>
+              <p class="xml-caption">The first XML document is deliberately labeled application-owned. The second shows
+                the repository’s correlated BADGERS XML shape for a supported PDF attachment; IDs and business values
+                are synthetic.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="capabilities">
+      <div class="section-heading">
+        <p class="section-kicker">Same foundation, different boundaries</p>
+        <h2>Choose only the surrounding experience you need.</h2>
+        <p>All three products share specialist packs, configuration releases, artifact storage, IAM, and model-inference
+          foundations. Their difference is the operating surface around that core.</p>
+      </div>
+      <div class="tab-shell">
+        <div class="tab-list" role="tablist" aria-label="BADGERS products">
+          <button class="tab active" type="button" data-tab="full" role="tab" aria-selected="true">BADGERS Full</button>
+          <button class="tab" type="button" data-tab="headless" role="tab" aria-selected="false">BADGERS
+            Headless</button>
+          <button class="tab" type="button" data-tab="specialists" role="tab" aria-selected="false">BADGERS
+            Specialists</button>
+        </div>
+        <div class="tab-panel active" id="full">
+          <span class="tag blue">Complete application</span>
+          <h3>For teams operating the complete BADGERS experience.</h3>
+          <p>Full adds the browser workbench, document testing, report viewing, session memory, progress events,
+            operations tooling, and specialist administration around the agent and specialist foundation. Its AgentCore
+            Runtime is VPC-bound, while the UI is internal by default.</p>
+          <div class="capability-grid">
+            <div class="capability"><b class="yes">✓ Browser UI and reports</b><span>Test documents, review page-level
+                output, inspect retained artifacts, and use the operations console.</span></div>
+            <div class="capability"><b class="yes">✓ Agent and Gateway</b><span>Agent-led specialist orchestration with
+                native PDF, DOCX, PPTX, and supported-image intake.</span></div>
+            <div class="capability"><b class="yes">✓ Collaboration tools</b><span>Session memory, progress events,
+                tracing, and the specialist-creation workflow are included.</span></div>
+          </div>
+        </div>
+        <div class="tab-panel" id="headless">
+          <span class="tag teal">Application integration</span>
+          <h3>For teams that supply their own user experience or workflow.</h3>
+          <p>Headless retains authenticated agent orchestration, curated specialist packs, a durable private runner,
+            machine identity, and a minimal operation ledger—without the browser application infrastructure. Its
+            VPC-bound runtime uses private subnets. Its default workflow is PDF/image oriented; native DOCX and PPTX
+            templates are selected explicitly.</p>
+          <div class="capability-grid">
+            <div class="capability"><b class="yes">✓ Versioned request boundary</b><span>Authenticated
+                <code>badgers-agent-request/v1</code> requests use a private S3 document URI and an instruction.</span>
+            </div>
+            <div class="capability"><b class="yes">✓ Durable result pointers</b><span>Callers receive operation IDs and
+                private status/result manifests; native artifacts remain private in S3.</span></div>
+            <div class="capability"><b class="no">— No browser UI</b><span>No ECS UI service, UI identity, report
+                viewer, session memory, or WebSocket handler registration.</span></div>
+          </div>
+        </div>
+        <div class="tab-panel" id="specialists">
+          <span class="tag violet">Direct tools</span>
+          <h3>For AWS-native code that invokes analyzers directly.</h3>
+          <p>Specialists is the smallest product boundary: selected specialist Lambda packs plus their shared
+            configuration and artifact foundations, called directly through AWS IAM.</p>
+          <div class="capability-grid">
+            <div class="capability"><b class="yes">✓ Composable packs</b><span>Start with Document Essentials, add
+                Tables and Forms, or explicitly select additional specialists.</span></div>
+            <div class="capability"><b class="yes">✓ Direct invocation</b><span>Your application invokes deployed Lambda
+                functions through IAM and consumes the retained result artifacts.</span></div>
+            <div class="capability"><b class="no">— No orchestration layer</b><span>No agent, Gateway, user identity,
+                UI, session memory, or durable operation ledger.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="use-cases">
+      <div class="section-heading">
+        <p class="section-kicker">Translate needs into a starting point</p>
+        <h2>Business and archival document problems, mapped to a product conversation.</h2>
+        <p>Choose a scenario to see the primary value, a sensible product starting point, and the question a team should
+          answer next.</p>
+      </div>
+      <div class="map">
+        <div class="use-case-list" id="use-case-list" role="tablist" aria-label="Use case scenarios"></div>
+        <article class="use-answer" id="use-answer" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <section class="section" id="readiness">
+      <div class="section-heading">
+        <p class="section-kicker">Product decision readiness</p>
+        <h2>Use this checklist to frame a responsible next conversation.</h2>
+        <p>This local checklist is saved only in this browser. It helps distinguish an interesting demonstration from a
+          well-scoped product decision.</p>
+      </div>
+      <div class="proof">
+        <div class="checklist" id="checklist">
+          <label class="check"><input type="checkbox" data-key="documents"><span>We have representative documents and a
+              clear description of the decisions or work they support.</span></label>
+          <label class="check"><input type="checkbox" data-key="users"><span>We know whether people need a browser
+              workbench, an application API, or direct AWS-native tools.</span></label>
+          <label class="check"><input type="checkbox" data-key="quality"><span>We have defined what “good” looks like
+              for structure, extraction, interpretation, and review.</span></label>
+          <label class="check"><input type="checkbox" data-key="security"><span>We have identified the data owner,
+              access boundary, retention expectations, and required approvals.</span></label>
+          <label class="check"><input type="checkbox" data-key="operations"><span>We know who will own deployment,
+              monitoring, updates, and the review of exceptions.</span></label>
+          <label class="check"><input type="checkbox" data-key="release"><span>We have selected an approved immutable
+              source release and understand configuration-release pinning.</span></label>
+        </div>
+        <aside class="progress-card">
+          <h3 id="progress-title">0 of 6 questions framed</h3>
+          <p>Completion is not an approval. It means the team has enough context to select a product boundary and plan a
+            focused evaluation.</p>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="progress-note" id="progress-note">Start with the documents and the people or systems that will use
+            the result.</div>
+          <button class="reset" id="reset" type="button">Reset this browser checklist</button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section boundary">
+      <h2>Important product boundary</h2>
+      <p>This overview describes the repository snapshot it was created from. It is intentionally a product orientation,
+        not deployment guidance or a service commitment.</p>
+      <ul>
+        <li>This site does not select a deployment source release. Consult the repository’s current release guide before
+          choosing an approved immutable source tag.</li>
+        <li>Product selection does not authorize deployment, publishing endpoints, sharing credentials, or processing
+          sensitive documents.</li>
+        <li>Architecture, availability, commercial terms, supported services, and release status must be verified for
+          the target account and approved source release at execution time.</li>
+        <li>Before production use, the accountable team must apply its own security, privacy, compliance,
+          availability, incident-response, and change-management practices. The <a
+            href="../developer/index.html#production-readiness">developer production-readiness considerations</a>
+          identify the decisions that still need an owner.</li>
+      </ul>
+    </section>
+  </main>
+
+  <a class="back-to-top" href="#top" aria-label="Back to top">↑ Back to top</a>
+
+  <footer class="shell">
+    <strong>Source basis</strong><br>
+    This public documentation overview is synthesized from the BADGERS product, profile, workflow, contract, and UI
+    documentation. All examples are illustrative and sanitized.
+    <p><strong>© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</strong></p>
+    <p>Licensed under the <a href="../LICENSE">Apache License, Version 2.0</a>.</p>
+    <p><strong>Notices.</strong> Customers are responsible for making their own independent assessment of the
+      information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current
+      product offerings and practices, which are subject to change without notice, and (c) does not create any
+      commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are
+      provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS
+      responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part
+      of, nor does it modify, any agreement between AWS and its customers.</p>
+  </footer>
+
+  <script>
+    const productChoices = [
+      {
+        icon: "1",
+        label: "Our team needs a complete document workspace.",
+        detail: "People need to upload and test documents, follow agent activity, inspect reports and page evidence, and administer the deployed product.",
+        kicker: "Recommended starting point",
+        title: "BADGERS Full",
+        description: "Full is the application product. It gives document-facing teams a browser workbench plus reporting and operational surfaces, while preserving the agent and specialist foundation underneath.",
+        fits: [
+          ["Primary users", "Analysts, reviewers, operators, and specialist authors."],
+          ["Experience", "Browser UI, Cognito identity, chat/testing, reports, observability, and admin tooling."],
+          ["Core workflow", "Upload or select a document, submit an instruction, observe processing, then review page-level results."],
+          ["Consider first", "Who needs access, which roles they need, and whether a complete UI is in scope."]
+        ],
+        note: "Use this when the product itself—not just its document-analysis capability—needs to be operated by people."
+      },
+      {
+        icon: "2",
+        label: "We want BADGERS inside our own product or workflow.",
+        detail: "Our application owns the user experience; it needs an authenticated, durable way to submit documents and follow their processing.",
+        kicker: "Recommended starting point",
+        title: "BADGERS Headless",
+        description: "Headless is the application-integration product. It retains agent orchestration and curated document packs but leaves the browser application infrastructure out of the deployment.",
+        fits: [
+          ["Primary users", "Application and workflow developers."],
+          ["Experience", "A versioned, authenticated request contract and private operation/result pointers."],
+          ["Core workflow", "Store a source document in the approved private prefix, submit an instruction, retain the operation ID, and read the eventual private result manifest."],
+          ["Consider first", "Who owns the user experience, token/credential handling, and operation-status presentation."]
+        ],
+        note: "Use this when BADGERS is a capability inside a broader product rather than the UI your users will work in."
+      },
+      {
+        icon: "3",
+        label: "Our AWS code only needs selected analyzers.",
+        detail: "We want Lambda-level document tools with the least surrounding platform, and our callers already have an AWS IAM boundary.",
+        kicker: "Recommended starting point",
+        title: "BADGERS Specialists",
+        description: "Specialists is the direct-invocation product. It packages selected document analyzers with shared configuration and artifact foundations, but does not provide an agent, API, or user interface.",
+        fits: [
+          ["Primary users", "Backend engineers building AWS-native workflows."],
+          ["Experience", "Direct Lambda invocation authorized through AWS IAM."],
+          ["Core workflow", "Select a pack or specialist, invoke it with approved input, then consume the retained result artifact."],
+          ["Consider first", "Where your application will provide orchestration, authentication, status, and any external API boundary."]
+        ],
+        note: "Use this when you want focused tools, already own the orchestration, and do not need a ready-made product surface."
+      }
+    ];
+
+    const choiceContainer = document.getElementById("product-choices");
+    const recommendation = document.getElementById("recommendation");
+    function selectProduct(index) {
+      const item = productChoices[index];
+      choiceContainer.querySelectorAll(".choice").forEach((button, buttonIndex) => {
+        const active = buttonIndex === index;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active);
+      });
+      recommendation.innerHTML = `
+        <div class="recommendation-kicker">${item.kicker}</div>
+        <h3>${item.title}</h3>
+        <p>${item.description}</p>
+        <div class="fit-grid">${item.fits.map(([title, copy]) => `<div class="fit-item"><b>${title}</b>${copy}</div>`).join("")}</div>
+        <div class="recommendation-note"><strong>Why this fit:</strong> ${item.note}</div>`;
+    }
+    choiceContainer.innerHTML = productChoices.map((item, index) => `
+      <button class="choice${index === 0 ? " active" : ""}" type="button" role="tab" aria-selected="${index === 0}">
+        <span class="choice-icon">${item.icon}</span>
+        <span><strong>${item.label}</strong><small>${item.detail}</small></span>
+      </button>`).join("");
+    choiceContainer.querySelectorAll(".choice").forEach((button, index) => button.addEventListener("click", () => selectProduct(index)));
+    selectProduct(0);
+
+    const journeyItems = [
+      {
+        title: "Bring in the source",
+        short: "Start with a document and a clear instruction.",
+        copy: "A document enters through the experience appropriate to the chosen product: the Full UI, the Headless request boundary, or an application calling a direct specialist. Full supports native DOCX and PPTX intake alongside PDF and supported images. The default Headless workflow accepts PDF, PNG, and JPEG; native DOCX and PPTX templates are opt-in. Email is an integration scenario, not a named native source type: an integrating system should extract the message content and submit supported attachments or a rendered, approved document form.",
+        points: [["Product question", "Which source types and intake experience matter: invoices, email attachments, DOCX policy files, or PPTX decks?"], ["Evidence retained", "Source and operation context are linked to the work."], ["Why it matters", "A clear source boundary keeps the workflow scoped and reviewable."]]
+      },
+      {
+        title: "Understand the pages",
+        short: "Preserve structure before reducing it to text.",
+        copy: "BADGERS can use native and visual paths to establish the page material available for analysis. The goal is to retain the signals that carry meaning in real documents: spatial structure, visual elements, handwriting, and reading order.",
+        points: [["Product question", "Which visual or structural facts must remain available for verification?"], ["Evidence retained", "Page-level material and specialist artifacts support later review."], ["Why it matters", "The page is often the evidence; plain text alone may lose the intent."]]
+      },
+      {
+        title: "Classify and route",
+        short: "Choose analysis based on what the document contains.",
+        copy: "The standard workflow includes classification and supports auto or approved manual capability selection. Its default routing policy can add table analysis to confidently table-dominant pages, while required workflow capabilities remain in place.",
+        points: [["Product question", "Should routing be policy-led, user-directed, or owned by the calling application?"], ["Evidence retained", "Workflow, route, classifier, and configuration-release references."], ["Why it matters", "Focused specialists avoid treating every page as the same kind of content."]]
+      },
+      {
+        title: "Create structured artifacts",
+        short: "Specialists produce work that can be inspected.",
+        copy: "Core document capabilities include source conversion, classification, full text, elements, tables, and correlation. Optional specialists add focused analysis such as charts, handwriting, scientific content, diagrams, metadata, or page regions where enabled.",
+        points: [["Product question", "Which capability packs match the document problem—not just a generic extraction task?"], ["Evidence retained", "Individual specialist outputs and correlated document artifacts."], ["Why it matters", "The output carries structured context and provenance alongside the answer."]]
+      },
+      {
+        title: "Review and act",
+        short: "Use the result in the right product surface.",
+        copy: "Full provides human-facing reports and page evidence. Headless provides a durable operation and a bounded private result pointer manifest. Specialists returns direct tool results and retained artifact locations for your application to handle.",
+        points: [["Product question", "Who needs to review the result, and where will they do it?"], ["Evidence retained", "Completion details, result pointers, artifacts, and configuration release IDs."], ["Why it matters", "The product boundary should match the people or systems that make the next decision."]]
+      }
+    ];
+
+    const journeySteps = document.getElementById("journey-steps");
+    const journeyDetail = document.getElementById("journey-detail");
+    function showJourney(index) {
+      const item = journeyItems[index];
+      journeySteps.querySelectorAll(".journey-step").forEach((button, buttonIndex) => {
+        const active = buttonIndex === index;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active);
+      });
+      journeyDetail.innerHTML = `
+        <div><p class="section-kicker">Stage ${index + 1} of ${journeyItems.length}</p><h3>${item.title}</h3></div>
+        <div><p>${item.copy}</p><ul class="detail-points">${item.points.map(([label, value]) => `<li><b>${label}:</b> ${value}</li>`).join("")}</ul></div>`;
+    }
+    journeySteps.innerHTML = journeyItems.map((item, index) => `
+      <button class="journey-step${index === 0 ? " active" : ""}" type="button" data-stage="${index}" role="tab" aria-selected="${index === 0}">
+        <span class="journey-num">${index + 1}</span><strong>${item.title}</strong><span>${item.short}</span>
+      </button>`).join("");
+    journeySteps.querySelectorAll(".journey-step").forEach(button => button.addEventListener("click", () => showJourney(Number(button.dataset.stage))));
+    showJourney(0);
+
+    const tabs = [...document.querySelectorAll(".tab")];
+    tabs.forEach(tab => tab.addEventListener("click", () => {
+      tabs.forEach(item => {
+        const active = item === tab;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-selected", active);
+        document.getElementById(item.dataset.tab).classList.toggle("active", active);
+      });
+    }));
+
+    const deepTabs = [...document.querySelectorAll(".deep-tab")];
+    deepTabs.forEach(tab => tab.addEventListener("click", () => {
+      deepTabs.forEach(item => {
+        const active = item === tab;
+        item.classList.toggle("active", active);
+        item.setAttribute("aria-selected", active);
+        document.getElementById(item.dataset.deepTab).classList.toggle("active", active);
+      });
+    }));
+
+    function escapeHtml(value) {
+      return value.replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function highlightXml(codeElement) {
+      const source = escapeHtml(codeElement.textContent);
+      codeElement.innerHTML = source.replace(
+        /(&lt;\/?)([\w:-]+)([\s\S]*?)(\/?&gt;)/g,
+        (_, open, tagName, attributes, close) => {
+          const highlightedAttributes = attributes.replace(
+            /([\w:-]+)(=)(&quot;.*?&quot;)/g,
+            '<span class="xml-attribute">$1</span><span class="xml-equals">$2</span><span class="xml-value">$3</span>'
+          );
+          return `<span class="xml-punctuation">${open}</span><span class="xml-tag">${tagName}</span>${highlightedAttributes}<span class="xml-punctuation">${close}</span>`;
+        }
+      );
+    }
+
+    document.querySelectorAll(".xml-card code").forEach(highlightXml);
+
+    const useCases = [
+      {
+        icon: "🧾",
+        label: "Invoice and receipt processing",
+        title: "Capture line items and totals without losing the document that proves them.",
+        value: "Invoices combine business fields with layout: supplier details, dates, currencies, totals, tax, line-item tables, stamps, and sometimes handwritten corrections. Document Essentials provides the core document analysis; Tables and Forms is the natural additional pack when table extraction is required. The standard policy can add table analysis to a confidently table-dominant page.",
+        product: "Headless for accounts-payable or expense workflows; Full when finance users need a ready-made evidence and report surface; Specialists for an AWS-native batch pipeline.",
+        question: "Which values need to be extracted, what confidence or exception rule applies, and must an approver verify them against the original page?",
+        output: "<code>invoice_number: INV-10482</code><br><code>supplier: Northstar Office Supply</code><br><code>total_due: USD 4,218.72</code><br><code>line_items: 12 · review_flag: tax total differs</code>",
+        advantage: "A plain OCR export may read every number but lose the row, column, and subtotal relationship. BADGERS can retain the line-item table structure and flag that the extracted tax does not reconcile to the page total for human review."
+      },
+      {
+        icon: "✉",
+        label: "Email and attachment triage",
+        title: "Use BADGERS to understand the documents around an email workflow.",
+        value: "A case-management, service, procurement, or compliance application can use Headless to submit approved PDF/image attachments and selected native DOCX or PPTX content to BADGERS. The repository does not identify raw email formats such as .eml as a native intake type, so an integration should safely extract the relevant message content and supply supported attachments or an approved rendered document form.",
+        product: "Headless when your mail, case, or CRM application owns the inbox and user experience; Full for a human review queue after documents are prepared for supported intake.",
+        question: "What is the trusted email-to-document conversion boundary, and what data, attachments, and retention rules may cross it?",
+        output: "<code>case: supplier onboarding</code><br><code>attachments: 3 supported documents</code><br><code>detected: invoice, signed DOCX, slide deck</code><br><code>next_action: route invoice for approval</code>",
+        advantage: "Instead of handing a downstream team an email body plus opaque attachments, an integration can turn each supported attachment into a classified, traceable document result. The application keeps the email/case context while BADGERS preserves the evidence inside each document."
+      },
+      {
+        icon: "W",
+        label: "Word documents, policies, and proposals",
+        title: "Read DOCX natively, then use visual analysis only where the page needs it.",
+        value: "The native DOCX processor inspects Word OOXML structure and creates an adaptive page plan. Simple pages can remain native; pages needing visual interpretation or OCR can be routed to those paths. That lets teams analyze headings, paragraphs, tables, and relationships without rendering every Word page as an image by default.",
+        product: "Full for business users reviewing policy or proposal analysis; Headless or Specialists when an existing document-management application owns the experience.",
+        question: "Do users need structural extraction only, or do they also need to verify visual layout, scans, embedded content, or exceptions?",
+        output: "<code>document_type: procurement policy</code><br><code>sections: 18 · tables: 4</code><br><code>key_clause: approvals required above $50K</code><br><code>page_12: visual review requested</code>",
+        advantage: "Rather than flattening a Word file into paragraphs, the native path keeps the hierarchy and table context that give a policy rule its meaning. A page with visual risk can be singled out for review instead of treating every page as a scan."
+      },
+      {
+        icon: "▣",
+        label: "PowerPoint decks and board materials",
+        title: "Preserve slide objects and relationships instead of flattening every deck into text.",
+        value: "The native PPTX processor plans a deck from its OOXML slide objects and selectively renders only slides that require visual interpretation. The PPTX Gestalt specialist can add evidence-backed spatial and structural relationship enrichment while preserving the native slide spine as canonical.",
+        product: "Full for analysts reviewing decks and reports; Headless when presentation analysis is part of an existing knowledge, diligence, or workflow product.",
+        question: "Which slide-level facts matter: speaker-ready summaries, decision points, tables, diagrams, cross-slide themes, or visual relationships?",
+        output: "<code>deck: Q4 operating review</code><br><code>slides: 26 · charts: 9 · tables: 4</code><br><code>decision: approve regional hiring plan</code><br><code>slide_17: diagram relationship retained</code>",
+        advantage: "Text extraction can list every label on a slide but not show which metric belongs to which region or which arrow connects two decisions. BADGERS retains native slide objects and can add relationship evidence where visual interpretation is needed."
+      },
+      {
+        icon: "📄",
+        label: "Contracts and complex records",
+        title: "Make the source document easier to understand—and easier to challenge.",
+        value: "Use document structure, page evidence, and specialist artifacts to support a reviewer who needs more than extracted strings. The Full workbench is a natural starting point when people need to inspect and discuss the result; Headless fits when that experience belongs in an existing case-management product.",
+        product: "Full for a ready-made reviewer workspace; Headless when review lives in your existing application.",
+        question: "What must the reviewer be able to see, compare, annotate, or approve before acting?",
+        output: "<code>document: master services agreement</code><br><code>clauses: renewal, termination, liability</code><br><code>renewal_notice: 60 days</code><br><code>review: page evidence available for each finding</code>",
+        advantage: "A clause summary is more useful when the reviewer can trace it back to the source page and surrounding structure. BADGERS keeps specialist artifacts and page-level evidence available alongside the extracted obligation."
+      },
+      {
+        icon: "🏛",
+        label: "Historical documents and archival collections",
+        title: "Preserve the document as historical evidence, not just a source of text.",
+        value: "Historical material often combines faded print, manuscript notes, stamps, marginalia, forms, uneven paper, and older layouts. BADGERS’ visual and layout-aware paths support a record that distinguishes the layers of a page and retains source evidence for later interpretation or transcription review.",
+        product: "Full for archivists and researchers who need page-level review; Headless for a collection, repository, or digitization application; Specialists for a controlled preservation pipeline.",
+        question: "Which source details—marginal notes, stamps, reading order, handwriting, tables, or damage—must remain visible and reviewable in the collection record?",
+        output: "<code>collection: 1908 port records</code><br><code>page: 12 · document_type: annotated</code><br><code>printed_text: 14 blocks · marginalia: 3 regions</code><br><code>review_flag: faded annotation retained as uncertainty</code>",
+        advantage: "A text-only pass can blend a pencil note into the printed form or discard it as noise. BADGERS can retain the distinct page regions and flag an uncertain reading without silently inventing or omitting part of the historical record."
+      },
+      {
+        icon: "✍",
+        label: "Handwriting, annotations, and marginalia",
+        title: "Surface handwritten content alongside the printed or typed document it modifies.",
+        value: "Handwritten corrections, signatures, inline notes, and margin comments often change the business or historical meaning of a page. Where the appropriate specialist is selected, BADGERS can analyze handwriting as a distinct visual concern and retain uncertainty for a human reviewer.",
+        product: "Full for reviewers comparing the writing against the source page; Headless or Specialists when handwriting findings belong in an existing workflow.",
+        question: "Which handwriting is material to the decision, and what should happen when a date, name, number, or notation cannot be read confidently?",
+        output: "<code>content: annotated letter</code><br><code>handwritten_regions: 6</code><br><code>reading: “approved 18 May” · confidence: medium</code><br><code>review_flag: surname needs human confirmation</code>",
+        advantage: "Instead of hiding ambiguity inside a single transcription string, BADGERS can retain the uncertain region, alternative reading, and confidence context so a reviewer knows exactly where to look."
+      },
+      {
+        icon: "🗺",
+        label: "Maps, diagrams, and visual source materials",
+        title: "Keep labels, legends, spatial relationships, and visual meaning in the analysis.",
+        value: "Maps, process diagrams, plans, and illustrated records carry meaning in placement, lines, color, symbols, and relationships. BADGERS can use specialized visual analysis when enabled, while retaining the surrounding page structure and source artifacts for review.",
+        product: "Full for visual investigation and report review; Headless for collection, intelligence, research, or workflow products; Specialists for focused AWS-native analysis.",
+        question: "Which visual relationships must be preserved: labels to regions, a legend to symbols, a process arrow to a decision, or a figure to its caption?",
+        output: "<code>content: annotated survey map</code><br><code>labels: 24 · legend_entries: 5</code><br><code>regions: 3 colored boundaries</code><br><code>relationship: label “Parcel B” grounded to blue region</code>",
+        advantage: "Plain extraction can recover place names while losing which boundary, symbol, or route each one describes. A visual path can preserve evidence-backed spatial relationships rather than returning a disconnected word list."
+      },
+      {
+        icon: "⚙",
+        label: "Add document intelligence to an existing application",
+        title: "Integrate a durable analysis capability without adopting a second UI.",
+        value: "Headless accepts a versioned, authenticated request with a private S3 document URI and produces a durable operation plus private result pointers. It gives the calling application a stable integration boundary while retaining agent-led orchestration.",
+        product: "Headless.",
+        question: "How will your application submit work, present status, authorize users, and consume private artifacts?",
+        output: "<code>operation_id: op_…</code><br><code>status: completed</code><br><code>workflow: standard-document-analysis</code><br><code>result: private manifest + specialist artifacts</code>",
+        advantage: "The integration receives more than an inline text blob: a durable operation and bounded private result manifest link the application to specialist and correlated artifacts. That makes a result reviewable after asynchronous work completes."
+      },
+      {
+        icon: "λ",
+        label: "Build an AWS-native specialist pipeline",
+        title: "Use selected analyzers directly and own the orchestration yourself.",
+        value: "Specialists deploys selected Lambda packs and their shared foundation. Your AWS principals invoke specialist functions directly; you supply any workflow, API, user experience, and exception management around them.",
+        product: "Specialists.",
+        question: "Which individual capabilities are needed, and where does your application manage sequencing and authorization?",
+        output: "<code>invoked: table_specialist</code><br><code>page: 1</code><br><code>artifact: private S3 result URI</code><br><code>caller: authorized AWS principal</code>",
+        advantage: "A team can call the precise analyzer it needs and retain the produced artifact, rather than forcing every workflow through a generic text extractor. Its own application controls sequencing while the specialist supplies structured document evidence."
+      },
+      {
+        icon: "🔎",
+        label: "Evaluate or author specialist behavior",
+        title: "Give experts a place to test, observe, and evolve document intelligence.",
+        value: "Full includes a testing workbench, evaluations, observability, reports, and a specialist wizard. It is the product surface designed for teams iterating on behavior as well as running document analysis.",
+        product: "Full.",
+        question: "Who will validate specialist output and own the change process for prompts, schemas, manifests, and release pinning?",
+        output: "<code>evaluation_set: 40 mixed documents</code><br><code>accuracy review: 38 accepted</code><br><code>open findings: 1 table, 1 handwriting case</code><br><code>release: configuration SHA pinned</code>",
+        advantage: "The team can tie an observed extraction weakness—such as a difficult table layout or handwritten annotation—to the configuration release that produced it. That makes improvement and regression review more disciplined than comparing unversioned text outputs."
+      }
+    ];
+
+    const useCaseList = document.getElementById("use-case-list");
+    const useAnswer = document.getElementById("use-answer");
+    function selectUseCase(index) {
+      const item = useCases[index];
+      useCaseList.querySelectorAll(".use-case").forEach((button, buttonIndex) => {
+        const active = buttonIndex === index;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active);
+      });
+      useAnswer.innerHTML = `
+        <div class="use-answer-kicker">Scenario ${index + 1} of ${useCases.length}</div>
+        <h3>${item.title}</h3>
+        <p>${item.value}</p>
+        <div class="answer-rows">
+          <div class="answer-row"><b>Product starting point:</b> ${item.product}</div>
+          <div class="answer-row"><b>Illustrative sample output:</b><br>${item.output}</div>
+          <div class="answer-row"><b>Extraction advantage:</b> ${item.advantage}</div>
+          <div class="answer-row"><b>Frame next:</b> ${item.question}</div>
+        </div>`;
+    }
+    useCaseList.innerHTML = useCases.map((item, index) => `
+      <button class="use-case${index === 0 ? " active" : ""}" type="button" role="tab" aria-selected="${index === 0}">
+        <i>${item.icon}</i><span>${item.label}</span>
+      </button>`).join("");
+    useCaseList.querySelectorAll(".use-case").forEach((button, index) => button.addEventListener("click", () => selectUseCase(index)));
+    selectUseCase(0);
+
+    const checks = [...document.querySelectorAll("#checklist input")];
+    const fill = document.getElementById("progress-fill");
+    const title = document.getElementById("progress-title");
+    const note = document.getElementById("progress-note");
+    const storageKey = "badgers-product-overview-readiness";
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    checks.forEach(check => check.checked = Boolean(saved[check.dataset.key]));
+    function updateProgress() {
+      const complete = checks.filter(check => check.checked).length;
+      const percent = complete / checks.length * 100;
+      fill.style.width = `${percent}%`;
+      title.textContent = `${complete} of ${checks.length} questions framed`;
+      note.textContent = complete === checks.length
+        ? "Context is framed. Bring the accountable technical, product, and security owners into the next decision."
+        : `${checks.length - complete} question${checks.length - complete === 1 ? "" : "s"} still needs a clear answer.`;
+      localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(checks.map(check => [check.dataset.key, check.checked]))));
+    }
+    checks.forEach(check => check.addEventListener("change", updateProgress));
+    document.getElementById("reset").addEventListener("click", () => { checks.forEach(check => check.checked = false); updateProgress(); });
+    updateProgress();
+  </script>
+</body>
+
+</html>

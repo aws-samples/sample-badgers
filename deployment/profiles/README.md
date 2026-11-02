@@ -11,7 +11,7 @@ resource creation.
 | Profile | Best for | Includes | Definition |
 | --- | --- | --- | --- |
 | Full | Operating the complete BADGERS application | Agent, Gateway, all enabled specialists, UI, session memory, and operations tooling | [`full.json`](full.json) |
-| Headless | Integrating BADGERS into your own application or workflow | Authenticated agent API, curated PDF/image packs, durable runner, and operation state | [`headless.json`](headless.json) |
+| Headless | Integrating BADGERS into your own application or workflow | Authenticated agent API, private VPC runtime, curated PDF/image packs, durable runner, and operation state | [`headless.json`](headless.json) |
 | Specialists | Calling document analyzers directly from AWS code | Selected direct-invocation Lambda packs and their shared foundation | [`specialists.json`](specialists.json) |
 
 Use this reference to inspect or change profile definitions. To deploy a
@@ -48,10 +48,11 @@ durable workflow.
 
 `headless.json` selects curated specialist packs and is wired into the
 deployment engine. Headless synthesizes and deploys its selected specialists,
-agent runtime, Gateway, Cognito machine identity, storage, model profiles, and
-the minimal DynamoDB operation ledger and private workflow runner. It omits
-ECS, VPC, UI image build, specialist wizard, session memory, X-Ray Transaction
-Search, and WebSocket handler registration. The initial Headless workflow is
+agent runtime, Gateway, Cognito machine identity, storage, model profiles, the
+private VPC runtime network, the minimal DynamoDB operation ledger, and private
+workflow runner. It omits ECS, UI image build, specialist wizard, session
+memory, X-Ray Transaction Search, and WebSocket handler registration. The
+initial Headless workflow is
 limited to the curated PDF/image capabilities by default. Native DOCX/PPTX/XLSX
 processors can be selected explicitly; their container build and ECR
 requirements are derived automatically from that selection.
@@ -94,7 +95,11 @@ Every agent profile also has a persisted desired routing configuration. Use `w`
 to choose validated templates: the default PDF/image workflow, plus native
 DOCX and PPTX workflows when their processors are selected and the
 Headless XLSX workflow when the Workbook Analysis pack is selected. The optional
-`./deploy.sh configure --ui` planner presents both desired-state records in one
-local review flow. It saves no AWS state and hands execution back to `deploy.sh`.
+`./deploy.sh configure --ui` planner presents both desired-state records and
+an optional observability posture in one local review flow. The observability
+screen records links, baseline, or enhanced monitoring plus an optional SNS or
+EventBridge handoff, but its resource count is a local estimate only. It saves
+no AWS state and hands execution back to `deploy.sh`; the future observability
+deployer must run account and quota preflight before it creates alarms.
 
 ![BADGERS local pack library](../../.github/assets/local-configuration-pack-library.png)

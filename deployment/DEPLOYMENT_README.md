@@ -72,7 +72,7 @@ SHA-pinned workflows.
 | [Amazon DynamoDB](https://aws.amazon.com/dynamodb/)                   | Job and subtask state tracking                      |
 | [Amazon Cognito](https://aws.amazon.com/cognito/)                     | OIDC/PKCE for the UI, OAuth 2.0 M2M for the Gateway |
 | [Amazon ECS](https://aws.amazon.com/ecs/)                             | UI hosting on an Express Gateway service            |
-| [Amazon VPC](https://aws.amazon.com/vpc/)                             | Private networking and VPC endpoints for the UI     |
+| [Amazon VPC](https://aws.amazon.com/vpc/)                             | Private networking and VPC endpoints for AgentCore Runtime and the UI |
 | [Amazon ECR](https://aws.amazon.com/ecr/)                             | Container image registry                            |
 | [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/)        | Credential storage                                  |
 | [AWS SSM Parameter Store](https://aws.amazon.com/systems-manager/)    | Configuration parameters                            |
@@ -96,6 +96,26 @@ uv --version         # uv package manager
 
 > [!WARNING]
 > **Academic/Research Deployments:** If your users process documents with sensitive, inflammatory, or offensive content (common in academic research), you must configure the operating environment before use. Edit `s3_files/agent_config/agent_operating_environment_config.json` and sync to S3. Without this, the model may refuse to extract or omit sensitive content. See [S3 Files → Operating Environment Configuration](s3_files/S3_FILES_README.md#%EF%B8%8F-operating-environment-configuration) for details. For production deployments, we recommend moving this value to AWS Secrets Manager for added security.
+
+## Production readiness decisions
+
+BADGERS provides deployment patterns and configurable building blocks. It does
+not certify a workload for production or replace your organization’s security,
+privacy, compliance, availability, incident-response, or change-management
+processes. Treat the following as decisions to make with the accountable
+owners before deploying a production workload:
+
+| Decision | Decide with | BADGERS starting point |
+| --- | --- | --- |
+| Release and change control | Release owner, approver, and rollback process | Pin an approved immutable source tag and record the Step 3 configuration release. Validate changes with tests and profile-aware CDK synthesis before approval. |
+| Data and access boundary | Data classification, tenant isolation, retention, residency, audit, and least-privilege authorization | Keep source and result artifacts private; use the documented authenticated Headless path or IAM-scoped direct specialist invocation; keep the Full UI internal unless explicitly approved. |
+| AI and untrusted content | Intended use, review requirements, prompt-injection handling, and behavior for research/red-team material | Set the operating environment for the workload, use deterministic approved workflows, evaluate representative documents, and define confidence, review, and failure behavior outside the model. |
+| Operations and resilience | SLOs, alert destinations, on-call/incident ownership, capacity, cost, recovery, and change windows | Use CloudWatch/X-Ray signals and the local observability planner as a starting point. Configure and test the organization’s own alarms, event routing, runbooks, and recovery processes. |
+| Account readiness | Service quotas, model access, regional policy, dependencies, and approval gates | Let CLI preflight verify supported runtime prerequisites. Add account-specific quota checks before introducing optional monitoring or new integration capacity. |
+
+These are ideas and starting controls, not a universal checklist. Follow your
+organization’s applicable best practices and obtain the approvals required for
+the data, region, users, and integrations in scope.
 
 ## 🏷️ Stack and Resource Naming
 
@@ -169,10 +189,18 @@ the authoritative record of completion.
 ### Configure packs and routing locally
 
 Before deploying, `./deploy.sh configure --ui` opens an optional local planner
-for specialist packs, specialist selection, and approved workflow-routing
-templates. It is intentionally separate from deployment: the planner binds
-only to `127.0.0.1`, saves desired state locally, and shows the CLI handoff
-command. It has no deployment endpoint and does not access AWS credentials.
+for specialist packs, specialist selection, approved workflow-routing
+templates, and an optional observability plan. Observability can be recorded as
+**links** (stock console links only), **baseline** (dashboard and operational
+alarms), or **enhanced** (baseline plus business-health checks), with an SNS
+topic or EventBridge event bus ARN as an optional notification handoff.
+
+It is intentionally separate from deployment: the planner binds only to
+`127.0.0.1`, saves desired state locally, and shows the CLI handoff command.
+The resource count displayed for observability is an estimate, not an AWS
+query; a future observability deploy command must preflight live account
+inventory, CloudWatch quotas, and destination permissions. The planner has no
+deployment endpoint and does not access AWS credentials.
 
 Use the returned `./deploy.sh <profile> resume` command to apply a reviewed
 change. The CLI remains the sole executor, re-runs preflight, validates the
@@ -311,8 +339,8 @@ can contain the tool without producing inspection artifacts for every report.
 | `BADGERS-XRay-{id}-{suffix}`              | X-Ray Transaction Search (account-level singleton, often skipped) |
 | `BADGERS-Gateway-{id}-{suffix}`           | AgentCore MCP Gateway with Lambda targets                         |
 | `BADGERS-Memory-{id}-{suffix}`            | AgentCore Memory for session persistence                          |
-| `BADGERS-RuntimeWebSocket-{id}-{suffix}`  | AgentCore Runtime (Strands agent with WebSocket)                  |
-| `BADGERS-Vpc-{id}-{suffix}`               | VPC with public/private subnets, NAT, flow logs, VPC endpoints    |
+| `BADGERS-RuntimeWebSocket-{id}-{suffix}`  | VPC-bound AgentCore Runtime (Strands agent with WebSocket)        |
+| `BADGERS-Vpc-{id}-{suffix}`               | Private runtime subnets, optional UI subnets, NAT, flow logs, and VPC endpoints |
 | `BADGERS-ECS-{id}-{suffix}`               | Unified UI on an ECS Express Gateway service                      |
 | `BADGERS-CustomSpecialists-{id}-{suffix}` | Custom specialists (optional, wizard-created)                     |
 
@@ -339,12 +367,15 @@ Set `BADGERS_SKIP_XRAY=1` to skip tracing regardless. This matters because
 dependencies — so deploying the Runtime or ECS stack with the decision unresolved would
 quietly pull XRay back in.
 
-### UI Stacks
+### Runtime and UI network boundary
 
-The UI runs on `BADGERS-Vpc-{id}-{suffix}` + `BADGERS-ECS-{id}-{suffix}`. The ECS Express
-Gateway service provisions and manages its own load balancer and HTTPS endpoint, so **no
-hosted zone, domain, or ACM certificate is required** — there is nothing to configure
-before deploying it.
+The AgentCore Runtime always runs in VPC mode in the VPC stack's private
+subnets, using its dedicated security group and AgentCore interface endpoints.
+The optional UI runs on `BADGERS-Vpc-{id}-{suffix}` +
+`BADGERS-ECS-{id}-{suffix}`. The ECS Express Gateway service provisions and
+manages its own load balancer and HTTPS endpoint, so **no hosted zone, domain,
+or ACM certificate is required** — there is nothing to configure before
+deploying it.
 
 Cognito values must be baked into the Vite bundle at build time, so ordering matters.
 `deploy.sh` steps 7 and 8 handle it:
@@ -364,7 +395,7 @@ UI network exposure — fixed for the life of this VPC.
     y) Public    internet-facing load balancer; tasks get public IPs.
     n) Internal  internal load balancer; reachable only from inside the VPC.
 
-Make the UI publicly accessible? (y/n) [y]:
+Make the UI publicly accessible? (y/n) [n]:
 ```
 
 ECS Express Mode derives the load balancer scheme from the subnets it is given: public
@@ -375,7 +406,8 @@ destroy the ECS and VPC stacks and redeploy. Answer `n` and the public
 `https://<id>.ecs.<region>.on.aws` URL will resolve but never respond.
 
 The prompt is asked up front for options 9 and 12 so the rest of the run is unattended.
-`UI_PUBLIC_ACCESS=true|false` in the environment is honoured without prompting.
+Pressing Enter selects the private, internal UI. `UI_PUBLIC_ACCESS=true|false`
+in the environment is honoured without prompting.
 
 #### Why step 8 forces a rollout
 

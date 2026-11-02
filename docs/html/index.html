@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BADGERS product and developer experience overview.">
+  <title>BADGERS — Choose your path</title>
+  <style>
+    :root {
+      --ink: #142133;
+      --muted: #66788c;
+      --line: #dbe5ef;
+      --blue: #1769dc;
+      --blue-soft: #eaf2ff;
+      --teal: #087f70;
+      --teal-soft: #e4f7f1;
+      --canvas: #f6f8fb;
+      --surface: #fff;
+      --shadow: 0 16px 40px rgba(26, 51, 78, .11);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background: radial-gradient(circle at 84% 8%, #dceaff 0, transparent 24%), radial-gradient(circle at 12% 88%, #e0f6ef 0, transparent 24%), var(--canvas);
+      font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .shell {
+      width: min(1060px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 26px 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--ink);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      text-decoration: none;
+    }
+
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      border-radius: 10px;
+      color: white;
+    }
+
+    main {
+      display: grid;
+      min-height: calc(100vh - 150px);
+      place-items: center;
+      padding: 36px 0 58px;
+    }
+
+    .intro {
+      max-width: 760px;
+      text-align: center;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 17px;
+      font-size: clamp(2.6rem, 6vw, 5.1rem);
+      line-height: 1;
+      letter-spacing: -.065em;
+    }
+
+    .lede {
+      margin: 0 auto;
+      max-width: 650px;
+      color: #465a71;
+      font-size: 1.17rem;
+    }
+
+    .question {
+      margin: 46px 0 18px;
+      font-size: 1.2rem;
+      font-weight: 770;
+      letter-spacing: -.02em;
+    }
+
+    .roles {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      text-align: left;
+    }
+
+    .role {
+      position: relative;
+      min-height: 310px;
+      padding: 28px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 21px;
+      color: var(--ink);
+      background: var(--surface);
+      box-shadow: 0 3px 8px rgba(35, 55, 80, .03);
+      text-decoration: none;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+
+    .role:hover,
+    .role:focus-visible {
+      border-color: #a7c5f1;
+      box-shadow: var(--shadow);
+      outline: none;
+      transform: translateY(-4px);
+    }
+
+    .role.developer:hover,
+    .role.developer:focus-visible {
+      border-color: #9bd8ca;
+    }
+
+    .role::after {
+      position: absolute;
+      right: -30px;
+      bottom: -48px;
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      content: "";
+      opacity: .72;
+    }
+
+    .role.business::after {
+      background: var(--blue-soft);
+    }
+
+    .role.developer::after {
+      background: var(--teal-soft);
+    }
+
+    .icon {
+      display: grid;
+      place-items: center;
+      width: 45px;
+      height: 45px;
+      margin-bottom: 22px;
+      border-radius: 14px;
+      font-size: 22px;
+    }
+
+    .business .icon {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .developer .icon {
+      color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .role h2 {
+      margin: 0 0 7px;
+      font-size: 1.55rem;
+      letter-spacing: -.035em;
+    }
+
+    .role p {
+      max-width: 390px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .role ul {
+      position: relative;
+      z-index: 1;
+      margin: 18px 0 25px;
+      padding: 0;
+      list-style: none;
+      color: #43566c;
+      font-size: 14px;
+    }
+
+    .role li {
+      margin: 7px 0;
+    }
+
+    .role li::before {
+      margin-right: 8px;
+      content: "→";
+    }
+
+    .cta {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 780;
+    }
+
+    .business .cta {
+      color: var(--blue);
+    }
+
+    .developer .cta {
+      color: var(--teal);
+    }
+
+    .note {
+      margin: 24px auto 0;
+      max-width: 690px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    footer {
+      padding: 23px 0 32px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .legal-footer {
+      max-width: 940px;
+      padding-top: 8px;
+      text-align: left;
+    }
+
+    .legal-footer p {
+      margin: 9px 0;
+    }
+
+    .legal-footer strong {
+      color: var(--ink);
+    }
+
+    @media (max-width: 650px) {
+      .shell {
+        width: min(100% - 28px, 1060px);
+      }
+
+      header {
+        padding-top: 18px;
+      }
+
+      main {
+        display: block;
+        padding-top: 45px;
+      }
+
+      .roles {
+        grid-template-columns: 1fr;
+      }
+
+      .role {
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="shell">
+    <a class="brand" href="index.html"><span class="mark">🦡</span> BADGERS</a>
+  </header>
+  <main class="shell">
+    <div class="intro">
+      <p class="eyebrow">Broad Agentic Document Generative Extraction &amp; Recognition System</p>
+      <h1>Make documents understandable in the way your role needs.</h1>
+      <p class="lede">BADGERS brings structured, reviewable document analysis to historical records, handwriting, maps,
+        invoices, reports, Word documents, and PowerPoint decks.</p>
+      <p class="question">What is your role?</p>
+      <div class="roles">
+        <a class="role business" href="business/index.html" data-role="business">
+          <span class="icon">✦</span>
+          <h2>Business</h2>
+          <p>Understand the product value, use cases, document journey, and the evidence behind a result.</p>
+          <ul>
+            <li>Choose the right BADGERS product</li>
+            <li>Explore business and archival scenarios</li>
+            <li>See sample outputs and extraction advantages</li>
+          </ul>
+          <span class="cta">Explore the product overview <span>→</span></span>
+        </a>
+        <a class="role developer" href="developer/index.html" data-role="developer">
+          <span class="icon">⌘</span>
+          <h2>Developer</h2>
+          <p>Choose an integration boundary, trace the technical flow, and understand how to build with BADGERS.</p>
+          <ul>
+            <li>Compare Full, Headless, and Specialists</li>
+            <li>Follow inputs, routing, and result artifacts</li>
+            <li>Plan configuration, testing, and release pinning</li>
+          </ul>
+          <span class="cta">Explore the developer experience <span>→</span></span>
+        </a>
+      </div>
+      <p class="note">This public site uses illustrative, sanitized examples. It does not contain credentials,
+        deployment state, customer data, or live service endpoints. BADGERS agent runtimes are VPC-bound; the optional
+        Full UI is private by default. <a href="developer/index.html#production-readiness">Review production-readiness
+          considerations</a> before treating an evaluated workload as production-ready.</p>
+    </div>
+  </main>
+  <footer class="shell legal-footer">
+    <p><strong>© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</strong></p>
+    <p>Licensed under the <a href="LICENSE">Apache License, Version 2.0</a>.</p>
+    <p><strong>Notices.</strong> Customers are responsible for making their own independent assessment of the
+      information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current
+      product offerings and practices, which are subject to change without notice, and (c) does not create any
+      commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are
+      provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS
+      responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part
+      of, nor does it modify, any agreement between AWS and its customers.</p>
+  </footer>
+  <script>
+    document.querySelectorAll("[data-role]").forEach(link => {
+      link.addEventListener("click", () => localStorage.setItem("badgers-site-role", link.dataset.role));
+    });
+  </script>
+</body>
+
+</html>

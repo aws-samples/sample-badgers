@@ -92,6 +92,10 @@ The processing reference explains native PDF, DOCX, PPTX, opt-in XLSX, OCR, visu
 correlation, and region inspection in detail. The configuration and schema
 guides describe the contracts that keep those components consistent.
 
+Both agent products deploy the AgentCore Runtime in VPC mode, using private
+subnets and a dedicated runtime security group. The optional Full-product UI is
+also private by default; public UI access is an explicit deployment choice.
+
 ---
 
 ## Explore in the depth you need
@@ -109,6 +113,7 @@ guides describe the contracts that keep those components consistent.
 | Author prompts and specialist manifests | [Prompting system](deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) |
 | Consume BADGERS structural output | [Schema and vocabulary](schemas/VOCABULARY.md) |
 | Understand source tags and private configuration releases | [Release guide](RELEASE_GUIDE.md) |
+| Prepare an evaluated workload for production | [Production readiness decisions](deployment/DEPLOYMENT_README.md#production-readiness-decisions) |
 
 ---
 
@@ -134,6 +139,30 @@ deployment administration.
   one deployment. It is not a customer version or a source-release tag.
 - The [deployment profiles](deployment/profiles/README.md) document exactly
   which capabilities each product selects.
+
+---
+
+## Production readiness decisions
+
+BADGERS is guidance and a starting architecture, not a production certification
+or a substitute for your organization’s security, privacy, compliance,
+availability, incident-response, and change-management practices. Before
+moving an evaluated workload into production, make and document decisions for:
+
+- the approved immutable source/configuration release and the team that owns
+  changes and rollback;
+- document classification, tenant isolation, authorization, retention,
+  residency, and audit requirements;
+- the intended AI use, prompt-injection and untrusted-content handling,
+  evaluation corpus, confidence thresholds, and human-review/failure paths;
+- network exposure and identity boundaries for the UI, Headless API, direct
+  specialist invocation, and any downstream system;
+- SLOs, alert routing, on-call ownership, incident runbooks, quotas, capacity,
+  cost controls, and recovery objectives.
+
+Use the [deployment production-readiness guide](deployment/DEPLOYMENT_README.md#production-readiness-decisions)
+to connect those decisions to the available product profiles and deployment
+controls.
 
 ---
 
