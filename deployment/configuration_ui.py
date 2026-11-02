@@ -24,8 +24,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 try:
-    from . import routing_configuration, specialist_selection
+    from . import observability_configuration, routing_configuration, specialist_selection
 except ImportError:
+    import observability_configuration
     import routing_configuration
     import specialist_selection
 
@@ -104,6 +105,7 @@ def _ensure_deployment(repo_root: Path, deployment_id: str, profile: str) -> Pat
     else:
         _write_json(path, _initial_state(deployment_id, profile))
     specialist_selection.load_or_create_desired(path, profile)
+    observability_configuration.load_or_create_desired(path, profile)
     try:
         routing_configuration.ensure(path, profile)
     except routing_configuration.RoutingConfigurationError:
@@ -155,15 +157,19 @@ def configuration(repo_root: Path, deployment_id: str, profile: str) -> dict[str
     except routing_configuration.RoutingConfigurationError as error:
         state = _read_json(path)
         routing = {**_routing_summary(state), "error": str(error)}
+    observability = observability_configuration.summary(path, profile, desired)
+    state = _read_json(path)
     return {
         "deployment_id": deployment_id,
         "profile": profile,
         "selection": desired,
         "selection_plan": selection_plan,
         "routing": routing,
+        "observability": observability,
         "state": {
             "specialist_revision": state.get("specialist_selection_revision", 0),
             "routing_revision": state.get("routing_configuration_revision", 0),
+            "observability_revision": state.get("observability_configuration_revision", 0),
         },
     }
 
@@ -209,6 +215,31 @@ def save_routing(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return {**configuration(repo_root, deployment_id, profile), "changed": changed}
 
 
+def save_observability(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist a local monitoring choice without making an AWS call."""
+
+    deployment_id = str(payload.get("deployment_id") or "")
+    profile = str(payload.get("profile") or "")
+    path = _ensure_deployment(repo_root, deployment_id, profile)
+    state = _read_json(path)
+    expected = payload.get("expected_revision")
+    if expected is not None and expected != state.get("observability_configuration_revision", 0):
+        raise UIError(
+            "Observability configuration changed in another session; reload before saving."
+        )
+    try:
+        _, changed = observability_configuration.save(
+            path,
+            profile,
+            mode=str(payload.get("mode") or ""),
+            notification_kind=str(payload.get("notification_kind") or ""),
+            notification_target=str(payload.get("notification_target") or ""),
+        )
+    except observability_configuration.ObservabilityConfigurationError as error:
+        raise UIError(str(error)) from error
+    return {**configuration(repo_root, deployment_id, profile), "changed": changed}
+
+
 def plan(repo_root: Path, deployment_id: str, profile: str) -> dict[str, Any]:
     current = configuration(repo_root, deployment_id, profile)
     routing = current["routing"]
@@ -234,6 +265,11 @@ def plan(repo_root: Path, deployment_id: str, profile: str) -> dict[str, Any]:
         **current,
         "routing_changed": routing_changed,
         "required_stages": stages,
+        "observability_handoff": (
+            "Observability is saved as a separate local add-on plan. Its future CLI "
+            "deployer must check live account inventory, quotas, and notification "
+            "permissions before it creates monitoring resources."
+        ),
         "cli_next_step": f"./deploy.sh {profile} resume",
         "apply_note": (
             "Run the CLI command, select this deployment ID, and confirm there. "
@@ -319,6 +355,37 @@ async function deletePack(name){let confirmation=prompt(`Deleting "${name}" only
 document.querySelector('#new-pack').onclick=()=>openPack();document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>document.querySelector('#pack-modal').classList.remove('on'));document.querySelector('#save-pack').onclick=async()=>{try{await api('/api/packs',{method:'POST',body:JSON.stringify({name:document.querySelector('#pack-name').value,description:document.querySelector('#pack-description').value,specialists:document.querySelector('#pack-members').value.split(',').map(x=>x.trim()).filter(Boolean)})});document.querySelector('#pack-modal').classList.remove('on');editingPack=null;await loadPacks();if(state)render();toast('Pack saved; it is not deployed until selected.')}catch(e){toast(e.message)}};document.querySelector('#copy').onclick=()=>navigator.clipboard.writeText(document.querySelector('#cli-command').textContent).then(()=>toast('CLI command copied.'));if(['overview','specialists','routing','packs','review'].includes(requestedView))switchTo(requestedView);Promise.all([loadPacks(),loadCatalog()]).catch(e=>toast(e.message));
 </script></body></html>"""
 
+_OBSERVABILITY_SECTION = r"""
+<section id="observability" class="view"><p class="ey">Optional monitoring add-on</p><div class="head"><div><h1>Observability plan</h1><p class="sub">Choose a monitoring posture and a handoff destination. This browser saves only local desired state; it does not inspect an AWS account or create alarms.</p></div><button class="btn primary" id="save-observability">Save observability plan</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Monitoring posture</h2><p>Start with stock console links, then opt into a candidate baseline or enhanced plan.</p></div><div class="pad"><div class="field"><label for="observability-mode">Mode</label><select id="observability-mode"><option value="links">Links only — no new monitoring resources</option><option value="baseline">Baseline — dashboard and operational alarms</option><option value="enhanced">Enhanced — baseline plus business-health checks</option></select></div><div class="field"><label for="notification-kind">Notification handoff</label><select id="notification-kind"><option value="none">None — console links and alarms only</option><option value="sns">Amazon SNS topic ARN</option><option value="eventbridge">Amazon EventBridge event bus ARN</option></select></div><div class="field" id="notification-target-field"><label for="notification-target">Destination ARN</label><input id="notification-target" autocomplete="off" spellcheck="false" placeholder="arn:aws:sns:region:account:topic"></div></div><div class="detail"><h3>Quota gate stays in the CLI</h3><p>Before a future observability deploy, the CLI must check live dashboard and alarm counts, service quotas, and destination permissions. This local estimate is intentionally not an AWS preflight.</p></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">Candidate footprint</p><h2 id="observability-title">Load a deployment</h2><p id="observability-note">A local estimate will appear here.</p><div class="stats"><div class="stat"><b id="observability-alarms">—</b><small>standard alarms</small></div><div class="stat"><b id="observability-dashboards">—</b><small>dashboards</small></div></div></div><div class="detail"><h3>Included coverage</h3><p id="observability-coverage">Load a deployment first.</p></div><div class="detail"><h3>Local planning only</h3><p id="observability-status">No AWS inventory, credentials, SDK calls, shell commands, or deployments are available here.</p></div></aside></div></section>
+"""
+
+_OBSERVABILITY_SCRIPT = r"""
+function renderObservabilityReview(plan){if(!state||!state.observability)return;let o=state.observability,r=o.candidate_plan.resources,host=document.querySelector('#plan-list');let review=document.querySelector('#observability-review');if(!review){review=document.createElement('div');review.id='observability-review';review.className='detail';host.parentElement.appendChild(review)}let notification=o.notification.kind==='none'?'No notification handoff':`${o.notification.kind.toUpperCase()} handoff selected`;review.innerHTML=`<h3>Observability add-on — ${esc(o.mode)}</h3><p>${r.cloudwatch_dashboards} dashboard, ${r.standard_alarms} standard alarms, ${r.composite_alarms} composite alarms. ${esc(notification)}. ${esc(plan.observability_handoff)}</p>`;}
+function renderObservability(){if(!state||!state.observability)return;let o=state.observability,p=o.candidate_plan,r=p.resources;document.querySelector('#observability-mode').value=o.mode;document.querySelector('#notification-kind').value=o.notification.kind;document.querySelector('#notification-target').value=o.notification.target||'';let disabled=o.notification.kind==='none';document.querySelector('#notification-target-field').classList.toggle('hidden',disabled);document.querySelector('#notification-target').disabled=disabled;document.querySelector('#observability-title').textContent=`${o.mode[0].toUpperCase()+o.mode.slice(1)} monitoring`;document.querySelector('#observability-note').textContent=p.note;document.querySelector('#observability-alarms').textContent=r.standard_alarms;document.querySelector('#observability-dashboards').textContent=r.cloudwatch_dashboards;document.querySelector('#observability-coverage').textContent=p.coverage.join(' · ');document.querySelector('#observability-status').textContent=`Local desired-state revision ${o.revision}. ${o.in_sync?'Applied state matches.':'No observability deployment has been recorded.'}`;}
+function updateNotificationTarget(){let disabled=document.querySelector('#notification-kind').value==='none';document.querySelector('#notification-target-field').classList.toggle('hidden',disabled);document.querySelector('#notification-target').disabled=disabled;if(disabled)document.querySelector('#notification-target').value='';}
+document.querySelector('#notification-kind').onchange=updateNotificationTarget;
+document.querySelector('#save-observability').onclick=async()=>{if(!state)return toast('Load a deployment first.');try{let mode=document.querySelector('#observability-mode').value,notification_kind=document.querySelector('#notification-kind').value,notification_target=document.querySelector('#notification-target').value;state=await api('/api/observability',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,mode,notification_kind,notification_target,expected_revision:state.state.observability_revision})});render();toast('Observability plan saved locally. AWS quota checks remain a CLI preflight.')}catch(e){toast(e.message)}};
+"""
+
+_HTML = (
+    _HTML.replace(
+        '<button class="nav" data-v="review">Review &amp; publish</button>',
+        '<button class="nav" data-v="observability">Observability</button>'
+        '<button class="nav" data-v="review">Review &amp; publish</button>',
+    )
+    .replace("</main></div><div id=\"pack-modal\"", _OBSERVABILITY_SECTION + "</main></div><div id=\"pack-modal\"")
+    .replace("renderPlan()}", "renderPlan();renderObservability()}")
+    .replace(
+        "document.querySelector('#apply-note').textContent=p.apply_note",
+        "document.querySelector('#apply-note').textContent=p.apply_note;renderObservabilityReview(p)",
+    )
+    .replace(
+        "['overview','specialists','routing','packs','review']",
+        "['overview','specialists','routing','packs','observability','review']",
+    )
+    .replace("</script></body></html>", _OBSERVABILITY_SCRIPT + "\n</script></body></html>")
+)
+
 
 class ConfigurationServer(ThreadingHTTPServer):
     """A private loopback server carrying its per-process browser capability."""
@@ -396,6 +463,8 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
             return save_selection(root, payload or {})
         if action == "routing":
             return save_routing(root, payload or {})
+        if action == "observability":
+            return save_observability(root, payload or {})
         deployment_id = str(query.get("id", [""])[0])
         profile = str(query.get("profile", [""])[0])
         if action == "configuration":
@@ -432,7 +501,12 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self._route("plan"))
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
-        except (UIError, specialist_selection.SelectionError, routing_configuration.RoutingConfigurationError) as error:
+        except (
+            UIError,
+            observability_configuration.ObservabilityConfigurationError,
+            specialist_selection.SelectionError,
+            routing_configuration.RoutingConfigurationError,
+        ) as error:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
 
     def do_POST(self) -> None:  # noqa: N802
@@ -444,6 +518,7 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
             routes = {
                 "/api/selection": "selection",
                 "/api/routing": "routing",
+                "/api/observability": "observability",
                 "/api/packs": "save_pack",
                 "/api/packs/delete": "delete_pack",
             }
@@ -452,7 +527,12 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
                 return
             self._json(HTTPStatus.OK, self._route(action, payload))
-        except (UIError, specialist_selection.SelectionError, routing_configuration.RoutingConfigurationError) as error:
+        except (
+            UIError,
+            observability_configuration.ObservabilityConfigurationError,
+            specialist_selection.SelectionError,
+            routing_configuration.RoutingConfigurationError,
+        ) as error:
             self._json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
 
 
