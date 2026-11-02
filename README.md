@@ -16,7 +16,7 @@
 > [!CAUTION]
 > **Private beta candidate.** This untagged `release/6.0.0-beta` branch is not
 > a customer release and must not be used as a deployment pin. The current
-> current release is [`v5.0.2`](RELEASE_GUIDE.md#current-release-status).
+> release is [`v5.0.2`](RELEASE_GUIDE.md#current-release-status).
 > See the [Release Guide](RELEASE_GUIDE.md) and [Changelog](CHANGELOG.md)
 > before choosing a branch or release tag.
 
