@@ -16,7 +16,7 @@
 > [!CAUTION]
 > **Private beta candidate.** This untagged `release/6.0.0-beta` branch is not
 > a customer release and must not be used as a deployment pin. The current
-> production release is [`v5.0.2`](RELEASE_GUIDE.md#current-release-status).
+> current release is [`v5.0.2`](RELEASE_GUIDE.md#current-release-status).
 > See the [Release Guide](RELEASE_GUIDE.md) and [Changelog](CHANGELOG.md)
 > before choosing a branch or release tag.
 
@@ -133,7 +133,7 @@ deployment administration.
 ## Release and project information
 
 - Use immutable Git tags for reproducible customer deployments. `v5.0.2` is
-  the current production release; the 6.0 beta candidate is private and
+  the current release; the 6.0 beta candidate is private and
   untagged.
 - Deployment Step 3 creates a separate, immutable S3 configuration release for
   one deployment. It is not a customer version or a source-release tag.
