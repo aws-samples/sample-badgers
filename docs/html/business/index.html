@@ -431,7 +431,7 @@
     .journey {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 0;
+      column-gap: 36px;
       padding: 9px;
       border: 1px solid var(--line);
       border-radius: 18px;
@@ -453,13 +453,26 @@
     .journey-step:not(:last-child)::after {
       position: absolute;
       top: 50%;
-      right: -5px;
+      right: -25px;
+      z-index: 2;
       width: 10px;
       height: 10px;
       border-top: 2px solid #afbdcd;
       border-right: 2px solid #afbdcd;
       content: "";
       transform: translateY(-50%) rotate(45deg);
+    }
+
+    .journey-step:not(:last-child)::before {
+      position: absolute;
+      top: 50%;
+      right: -25px;
+      z-index: 1;
+      width: 17px;
+      height: 2px;
+      background: #afbdcd;
+      content: "";
+      transform: translateY(-50%);
     }
 
     .journey-step:hover {
@@ -473,6 +486,10 @@
 
     .journey-step.active::after {
       border-color: var(--blue);
+    }
+
+    .journey-step.active::before {
+      background: var(--blue);
     }
 
     .journey-num {
@@ -1287,6 +1304,7 @@
 
       .journey {
         grid-template-columns: 1fr;
+        row-gap: 20px;
       }
 
       .journey-step {
@@ -1297,9 +1315,19 @@
       .journey-step:not(:last-child)::after {
         top: auto;
         right: auto;
-        bottom: -5px;
+        bottom: -17px;
         left: 27px;
         transform: rotate(135deg);
+      }
+
+      .journey-step:not(:last-child)::before {
+        top: auto;
+        right: auto;
+        bottom: -17px;
+        left: 27px;
+        width: 2px;
+        height: 12px;
+        transform: none;
       }
 
       .journey-num {
