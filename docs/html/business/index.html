@@ -637,26 +637,70 @@
 
     .deep-menu {
       display: flex;
+      align-items: center;
       gap: 5px;
       padding: 9px;
       border-bottom: 1px solid var(--line);
       background: #fbfcfe;
     }
 
+    .deep-menu-label {
+      flex: 0 0 auto;
+      margin: 0 7px 0 3px;
+      color: #61758b;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
     .deep-tab {
-      padding: 9px 14px;
-      border: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 12px;
+      border: 1px solid #d7e1ec;
       border-radius: 9px;
       color: var(--muted);
-      background: transparent;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(33, 52, 79, .04);
       font-size: 14px;
       font-weight: 720;
       cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+
+    .deep-tab::after {
+      color: #7d90a5;
+      content: "›";
+      font-size: 18px;
+      font-weight: 500;
+      line-height: .7;
+    }
+
+    .deep-tab:hover {
+      border-color: #a9c7f3;
+      background: #f5f9ff;
+      box-shadow: 0 2px 6px rgba(33, 89, 164, .12);
+      transform: translateY(-1px);
+    }
+
+    .deep-tab:focus-visible {
+      outline: 3px solid rgba(37, 111, 220, .3);
+      outline-offset: 2px;
     }
 
     .deep-tab.active {
+      border-color: #9fc1f7;
       color: var(--blue);
       background: var(--blue-soft);
+    }
+
+    .deep-tab.active::after {
+      color: currentColor;
+      content: "✓";
+      font-size: 13px;
+      font-weight: 800;
     }
 
     .deep-panel {
@@ -686,7 +730,8 @@
     .pipeline {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+      column-gap: 42px;
+      row-gap: 30px;
       margin: 23px 0;
     }
 
@@ -702,14 +747,31 @@
     .pipeline-node:not(:last-child)::after {
       position: absolute;
       top: 50%;
-      right: -7px;
-      z-index: 1;
-      width: 12px;
-      height: 12px;
+      right: -29px;
+      z-index: 2;
+      width: 10px;
+      height: 10px;
       border-top: 2px solid #aebccc;
       border-right: 2px solid #aebccc;
       content: "";
       transform: translateY(-50%) rotate(45deg);
+    }
+
+    .pipeline-node:not(:last-child)::before {
+      position: absolute;
+      top: 50%;
+      right: -29px;
+      z-index: 1;
+      width: 20px;
+      height: 2px;
+      background: #aebccc;
+      content: "";
+      transform: translateY(-50%);
+    }
+
+    .pdf-outcomes .pipeline-node::before,
+    .pdf-outcomes .pipeline-node::after {
+      display: none;
     }
 
     .pipeline-node b {
@@ -1272,9 +1334,19 @@
       .pipeline-node:nth-child(2)::after {
         top: auto;
         right: auto;
-        bottom: -7px;
+        bottom: -29px;
         left: 50%;
         transform: translateX(-50%) rotate(135deg);
+      }
+
+      .pipeline-node:nth-child(2)::before {
+        top: auto;
+        right: auto;
+        bottom: -29px;
+        left: 50%;
+        width: 2px;
+        height: 20px;
+        transform: translateX(-50%);
       }
     }
 
@@ -1317,6 +1389,10 @@
         overflow-x: auto;
       }
 
+      .deep-menu-label {
+        display: none;
+      }
+
       .deep-tab {
         white-space: nowrap;
       }
@@ -1349,9 +1425,19 @@
       .pipeline-node:not(:last-child)::after {
         top: auto;
         right: auto;
-        bottom: -7px;
+        bottom: -29px;
         left: 50%;
         transform: translateX(-50%) rotate(135deg);
+      }
+
+      .pipeline-node:not(:last-child)::before {
+        top: auto;
+        right: auto;
+        bottom: -29px;
+        left: 50%;
+        width: 2px;
+        height: 20px;
+        transform: translateX(-50%);
       }
 
       .back-to-top {
@@ -1472,12 +1558,13 @@
       </div>
       <div class="deep-shell">
         <div class="deep-menu" role="tablist" aria-label="Document-processing deep dives">
-          <button class="deep-tab active" type="button" data-deep-tab="pdf" role="tab" aria-selected="true">PDF: OCR and
-            vision</button>
-          <button class="deep-tab" type="button" data-deep-tab="docx" role="tab" aria-selected="false">Word: native
-            DOCX</button>
-          <button class="deep-tab" type="button" data-deep-tab="email" role="tab" aria-selected="false">Email:
-            integration pipeline</button>
+          <p class="deep-menu-label">Choose a path</p>
+          <button class="deep-tab active" type="button" data-deep-tab="pdf" role="tab" aria-controls="pdf"
+            aria-selected="true" title="View the PDF OCR and vision path">PDF: OCR and vision</button>
+          <button class="deep-tab" type="button" data-deep-tab="docx" role="tab" aria-controls="docx"
+            aria-selected="false" title="View the native Word document path">Word: native DOCX</button>
+          <button class="deep-tab" type="button" data-deep-tab="email" role="tab" aria-controls="email"
+            aria-selected="false" title="View the email integration path">Email: integration pipeline</button>
         </div>
 
         <article class="deep-panel active" id="pdf">
