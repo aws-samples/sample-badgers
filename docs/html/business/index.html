@@ -224,6 +224,30 @@
       color: var(--teal);
     }
 
+    .repository-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 16px;
+      padding: 8px 10px;
+      border: 1px solid #c9daf5;
+      border-radius: 9px;
+      color: var(--blue);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 760;
+      text-decoration: none;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+
+    .repository-link:hover,
+    .repository-link:focus-visible {
+      border-color: #91b8ed;
+      background: var(--blue-soft);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
     main {
       padding: 60px 0 88px;
     }
@@ -1513,6 +1537,8 @@
           <span><b>●</b> Durable application integration</span>
           <span><b>●</b> Direct AWS-native tools</span>
         </div>
+        <a class="repository-link" href="https://github.com/aws-samples/sample-badgers" target="_blank"
+          rel="noopener noreferrer">View BADGERS on GitHub <span aria-hidden="true">↗</span></a>
       </aside>
     </div>
   </section>
@@ -2030,6 +2056,8 @@
     <strong>Source basis</strong><br>
     This public documentation overview is synthesized from the BADGERS product, profile, workflow, contract, and UI
     documentation. All examples are illustrative and sanitized.
+    <p><a href="https://github.com/aws-samples/sample-badgers" target="_blank" rel="noopener noreferrer">View the
+        BADGERS source repository on GitHub ↗</a></p>
     <p><strong>© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</strong></p>
     <p>Licensed under the <a href="../LICENSE">Apache License, Version 2.0</a>.</p>
     <p><strong>Notices.</strong> Customers are responsible for making their own independent assessment of the

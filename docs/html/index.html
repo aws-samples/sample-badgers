@@ -95,6 +95,30 @@
       font-size: 1.17rem;
     }
 
+    .repository-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 21px;
+      padding: 8px 11px;
+      border: 1px solid #c8daf5;
+      border-radius: 9px;
+      color: var(--blue);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 760;
+      text-decoration: none;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+
+    .repository-link:hover,
+    .repository-link:focus-visible {
+      border-color: #8fb7ee;
+      background: var(--blue-soft);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
     .question {
       margin: 46px 0 18px;
       font-size: 1.2rem;
@@ -288,6 +312,8 @@
       <h1>Make documents understandable in the way your role needs.</h1>
       <p class="lede">BADGERS brings structured, reviewable document analysis to historical records, handwriting, maps,
         invoices, reports, Word documents, and PowerPoint decks.</p>
+      <a class="repository-link" href="https://github.com/aws-samples/sample-badgers" target="_blank"
+        rel="noopener noreferrer">View BADGERS on GitHub <span aria-hidden="true">↗</span></a>
       <p class="question">What is your role?</p>
       <div class="roles">
         <a class="role business" href="business/index.html" data-role="business">
