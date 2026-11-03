@@ -352,7 +352,7 @@
     .flow {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 0;
+      column-gap: 36px;
       padding: 9px;
       border: 1px solid var(--line);
       border-radius: 18px;
@@ -374,13 +374,26 @@
     .flow-step:not(:last-child)::after {
       position: absolute;
       top: 50%;
-      right: -5px;
+      right: -25px;
+      z-index: 2;
       width: 10px;
       height: 10px;
       border-top: 2px solid #b2c0cf;
       border-right: 2px solid #b2c0cf;
       content: "";
       transform: translateY(-50%) rotate(45deg);
+    }
+
+    .flow-step:not(:last-child)::before {
+      position: absolute;
+      top: 50%;
+      right: -25px;
+      z-index: 1;
+      width: 17px;
+      height: 2px;
+      background: #b2c0cf;
+      content: "";
+      transform: translateY(-50%);
     }
 
     .flow-step:hover {
@@ -394,6 +407,10 @@
 
     .flow-step.active::after {
       border-color: var(--teal);
+    }
+
+    .flow-step.active::before {
+      background: var(--teal);
     }
 
     .number {
@@ -595,6 +612,7 @@
 
       .flow {
         grid-template-columns: 1fr;
+        row-gap: 20px;
       }
 
       .flow-step {
@@ -612,9 +630,19 @@
       .flow-step:not(:last-child)::after {
         top: auto;
         right: auto;
-        bottom: -5px;
+        bottom: -17px;
         left: 27px;
         transform: rotate(135deg);
+      }
+
+      .flow-step:not(:last-child)::before {
+        top: auto;
+        right: auto;
+        bottom: -17px;
+        left: 27px;
+        width: 2px;
+        height: 12px;
+        transform: none;
       }
     }
 
