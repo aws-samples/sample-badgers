@@ -11,13 +11,19 @@ echo "🐳 Building and Pushing WebSocket Runtime Container"
 echo "===================================================="
 echo ""
 
+# Resolve one region before any AWS command. This honours AWS_REGION and the
+# selected profile through the common deployment flow; `aws configure get
+# region` alone bypassed an explicitly selected region and could return empty.
+ensure_region
+REGION="${AWS_REGION}"
+
 # Get AWS account and region
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region || echo "us-west-2")
 
 # Get repository name from CloudFormation stack output
 REPOSITORY_NAME=$(aws cloudformation describe-stacks \
     --stack-name "$(_sn ECR)" \
+    --region "$REGION" \
     --query "Stacks[0].Outputs[?OutputKey=='RepositoryName'].OutputValue" \
     --output text 2>/dev/null)
 

@@ -40,12 +40,6 @@ handle_error() { log_error "$1"; exit 1; }
 export TYPEGUARD_DISABLE=1
 export PYTHONWARNINGS="ignore::UserWarning:aws_cdk"
 
-if command -v uv &> /dev/null; then
-    _CDK_CMD="uv run cdk"
-else
-    _CDK_CMD="cdk"
-fi
-
 # ── Collect specialists ──────────────────────────────────────────────
 
 LAMBDAS_DIR="$SCRIPT_DIR/lambdas/code"
@@ -222,13 +216,13 @@ deploy_specialist() {
     if [ -f "$SCRIPT_DIR/.venv/bin/activate" ]; then
         source "$SCRIPT_DIR/.venv/bin/activate"
     fi
-    $_CDK_CMD deploy "$(_sn Lambda)" $_CDK_CONTEXT --require-approval never --exclusively \
+    run_cdk deploy "$(_sn Lambda)" $_CDK_CONTEXT --require-approval never --exclusively \
         || handle_error "Deploy Lambda stack"
     log_success "Lambda stack deployed"
 
     # Step 3: Deploy Gateway stack
     log_info "Step 3/4: Deploying Gateway stack (wires target)..."
-    $_CDK_CMD deploy "$(_sn Gateway)" $_CDK_CONTEXT --require-approval never --exclusively \
+    run_cdk deploy "$(_sn Gateway)" $_CDK_CONTEXT --require-approval never --exclusively \
         || handle_error "Deploy Gateway stack"
     log_success "Gateway stack deployed"
 

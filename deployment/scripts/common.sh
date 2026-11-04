@@ -17,8 +17,10 @@
 
 # ── Docker cross-platform build check ─────────────────────────────────────────
 # Ensures QEMU binfmt is registered when building for a different architecture
-# than the host. On WSL/Linux, also ensures qemu-user-static is installed
-# (provides the actual interpreter binaries on the host filesystem).
+# than the host. On WSL/Linux, it attempts the distribution package first when
+# present, then falls back to Docker's binfmt installer. Amazon Linux 2023 does
+# not provide the Debian package name, so a package-install failure must not
+# prevent the Docker fallback.
 # Accepts a target platform argument:
 #   preflight_docker_cross_platform arm64   (for runtime image)
 #   preflight_docker_cross_platform amd64   (for UI image)
@@ -67,19 +69,32 @@ preflight_docker_cross_platform() {
     return 1
   fi
 
-  # On WSL/Linux: ensure qemu-user-static is installed (provides the interpreter
-  # binaries that binfmt_misc points to). Without this, binfmt registers but
-  # execution fails with "No such file or directory" for /bin/sh.
-  if [[ "$(uname -s)" == "Linux" ]] && ! command -v qemu-aarch64-static &>/dev/null && [[ "${target_arch}" == "arm64" ]]; then
-    log_warn "qemu-user-static not found — installing (provides /usr/bin/qemu-aarch64-static)..."
-    sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static \
-      || { log_error "Failed to install qemu-user-static."; \
-           log_error "Run manually: sudo apt-get install qemu-user-static"; return 1; }
-  elif [[ "$(uname -s)" == "Linux" ]] && ! command -v qemu-x86_64-static &>/dev/null && [[ "${target_arch}" == "amd64" ]]; then
-    log_warn "qemu-user-static not found — installing (provides /usr/bin/qemu-x86_64-static)..."
-    sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static \
-      || { log_error "Failed to install qemu-user-static."; \
-           log_error "Run manually: sudo apt-get install qemu-user-static"; return 1; }
+  # On Linux, try the distribution package when available. Its package name is
+  # not universal (notably on Amazon Linux 2023), so continue to the Docker
+  # binfmt fallback if it is unavailable or fails to install.
+  local qemu_binary
+  case "${target_arch}" in
+    arm64) qemu_binary="qemu-aarch64-static" ;;
+    amd64) qemu_binary="qemu-x86_64-static" ;;
+    *) qemu_binary="" ;;
+  esac
+  if [[ "$(uname -s)" == "Linux" ]] && [ -n "${qemu_binary}" ] \
+      && ! command -v "${qemu_binary}" &>/dev/null; then
+    if command -v apt-get &>/dev/null; then
+      log_warn "${qemu_binary} not found — attempting to install qemu-user-static..."
+      sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static \
+        || log_warn "qemu-user-static could not be installed with apt; trying Docker binfmt."
+    elif command -v dnf &>/dev/null; then
+      log_warn "${qemu_binary} not found — attempting to install qemu-user-static..."
+      sudo dnf install -y -q qemu-user-static \
+        || log_warn "qemu-user-static is unavailable through dnf; trying Docker binfmt."
+    elif command -v yum &>/dev/null; then
+      log_warn "${qemu_binary} not found — attempting to install qemu-user-static..."
+      sudo yum install -y -q qemu-user-static \
+        || log_warn "qemu-user-static is unavailable through yum; trying Docker binfmt."
+    else
+      log_warn "No supported package manager found; trying Docker binfmt."
+    fi
   fi
 
   # Test again after guided setup.
@@ -91,14 +106,17 @@ preflight_docker_cross_platform() {
   # Not registered — attempt auto-install
   log_warn "${target_arch} emulation not available — registering QEMU binfmt handlers..."
   if docker run --privileged --rm tonistiigi/binfmt --install "${target_arch}"; then
-    log_success "QEMU ${target_arch} emulation registered successfully."
-    return 0
+    if docker run --rm --platform "linux/${target_arch}" public.ecr.aws/docker/library/alpine:3 true 2>/dev/null; then
+      log_success "QEMU ${target_arch} emulation registered successfully."
+      return 0
+    fi
+    log_error "QEMU binfmt registration completed, but linux/${target_arch} containers still cannot run."
   else
     log_error "Failed to register QEMU binfmt for ${target_arch}."
-    log_error "Try manually: docker run --privileged --rm tonistiigi/binfmt --install ${target_arch}"
-    log_error "On Docker Desktop: ensure 'Use Rosetta / QEMU' is enabled in Settings → General."
-    return 1
   fi
+  log_error "Try manually: docker run --privileged --rm tonistiigi/binfmt --install ${target_arch}"
+  log_error "On Docker Desktop: ensure 'Use Rosetta / QEMU' is enabled in Settings → General."
+  return 1
 }
 
 # ── Colors ──
@@ -1197,9 +1215,29 @@ export_cdk_env() {
   export BADGERS_CONFIG_RELEASE_ID="$(get_state "config_release_id")"
 }
 
+# Windows installs the CDK CLI as cdk.cmd. `uv run cdk` does not resolve that
+# shim under Git Bash, so select the executable by shell platform everywhere
+# deployment scripts invoke CDK.
+cdk_executable() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) printf '%s\n' "cdk.cmd" ;;
+    *)                  printf '%s\n' "cdk" ;;
+  esac
+}
+
+run_cdk() {
+  local executable
+  executable="$(cdk_executable)"
+  if command -v uv &>/dev/null; then
+    uv run "${executable}" "$@"
+  else
+    "${executable}" "$@"
+  fi
+}
+
 cdk_deploy() {
   (unset VIRTUAL_ENV; cd "${DEPLOYMENT_DIR}" \
-    && uv run cdk deploy --app "python app.py" --require-approval never "$@")
+    && run_cdk deploy --app "python app.py" --require-approval never "$@")
 }
 
 cdk_destroy() {
@@ -1209,7 +1247,7 @@ cdk_destroy() {
   # did: a teardown of an old deployment aborted on the traceback before any DeleteStack
   # was issued, with all twelve stacks left standing.
   (unset VIRTUAL_ENV; cd "${DEPLOYMENT_DIR}" \
-    && BADGERS_ALLOW_STALE_LAYER=1 uv run cdk destroy --app "python app.py" --force "$@")
+    && BADGERS_ALLOW_STALE_LAYER=1 run_cdk destroy --app "python app.py" --force "$@")
 }
 
 # ── X-Ray Transaction Search preflight ─────────────────────────────────────
@@ -1570,8 +1608,9 @@ preflight_service_quotas() {
   local failed=0
 
   if [ "${UI_ENABLED:-0}" = "1" ]; then
-    # VPCs and Internet Gateways are Full-product UI resources.
-    local vpc_count igw_count
+    # VPCs, Internet Gateways, and one NAT gateway's Elastic IP are Full-product
+    # UI resources.
+    local vpc_count igw_count eip_count
     vpc_count="$(aws ec2 describe-vpcs --region "${AWS_REGION}" \
       --query 'length(Vpcs)' --output text 2>/dev/null || echo "0")"
     _check_quota "vpc" "L-F678F1CE" "${vpc_count}" 1 "VPCs per Region" || ((failed++))
@@ -1579,6 +1618,10 @@ preflight_service_quotas() {
     igw_count="$(aws ec2 describe-internet-gateways --region "${AWS_REGION}" \
       --query 'length(InternetGateways)' --output text 2>/dev/null || echo "0")"
     _check_quota "vpc" "L-A4707A72" "${igw_count}" 1 "Internet gateways per Region" || ((failed++))
+
+    eip_count="$(aws ec2 describe-addresses --region "${AWS_REGION}" \
+      --query 'length(Addresses)' --output text 2>/dev/null || echo "0")"
+    _check_quota "ec2" "L-0263D0A3" "${eip_count}" 1 "EC2-VPC Elastic IP addresses per Region" || ((failed++))
   fi
 
   # S3 Buckets (we create 3: config, source, output)
@@ -1689,7 +1732,7 @@ preflight_model_access() {
   while read -r model_id base_id transport; do
     [ -z "${model_id}" ] && continue
     if [ "${transport}" = "mantle" ]; then
-      echo "    ✓ ${model_id}  (mantle transport; no inference profile to check)"
+      echo "    ✓ ${model_id}  (mantle transport; inference-profile check is not applicable)"
       continue
     fi
 
@@ -1770,7 +1813,7 @@ preflight_model_invocation() {
   while read -r model_id _base transport; do
     [ -z "${model_id}" ] && continue
     if [ "${transport}" = "mantle" ]; then
-      echo "    ✓ ${model_id}  (mantle transport; Converse preflight not applicable)"
+      echo "    ! ${model_id}  (mantle transport; not invocation-tested because it does not use Converse)"
       continue
     fi
     local response rc=0
@@ -1783,7 +1826,7 @@ preflight_model_invocation() {
       --region "${AWS_REGION}" \
       --messages "${messages}" \
       --inference-config "${inference_config}" \
-      --output json 2>&1)" || rc=$?
+      --query 'stopReason' --output text 2>&1)" || rc=$?
 
     # Judge by exit code, not by grepping for a handful of exception names. The previous
     # version swallowed the exit code with `|| true` and then looked for four specific

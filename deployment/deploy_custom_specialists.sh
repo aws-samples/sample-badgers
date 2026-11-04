@@ -40,13 +40,6 @@ echo "  Custom Specialists Deployment"
 echo "=========================================="
 echo ""
 
-# Check for uv
-if command -v uv &> /dev/null; then
-    _CDK_CMD="uv run cdk"
-else
-    _CDK_CMD="cdk"
-fi
-
 # Get deployment ID from existing stack
 log_info "Getting deployment ID from existing stacks..."
 DEPLOYMENT_ID=$(aws cloudformation describe-stacks \
@@ -88,7 +81,7 @@ fi
 
 # Deploy custom specialists stack (exclusively - don't update dependencies)
 log_info "Deploying custom specialists stack..."
-$_CDK_CMD deploy "$(_sn CustomSpecialists)" $_CDK_CONTEXT --require-approval never --exclusively || handle_error "Deploy custom specialists stack"
+run_cdk deploy "$(_sn CustomSpecialists)" $_CDK_CONTEXT --require-approval never --exclusively || handle_error "Deploy custom specialists stack"
 
 echo ""
 echo "=========================================="

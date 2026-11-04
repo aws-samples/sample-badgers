@@ -459,13 +459,15 @@ class ECSStack(Stack):
         # ── Cognito callback URL update (AwsCustomResource) ────────
         # The Express service endpoint is not known at synth time, so the UI
         # client's callback/logout URLs are re-pointed after the service exists.
-        service_endpoint = self.express_service.attr_endpoint
+        # `Endpoint` is already an HTTPS URL. Prefixing it produces
+        # https://https://... in both Cognito and the deployment hand-off.
+        service_url = self.express_service.attr_endpoint
 
         cognito_update_params = {
             "UserPoolId": cognito_user_pool_id,
             "ClientId": cognito_ui_client_id,
-            "CallbackURLs": [f"https://{service_endpoint}/callback"],
-            "LogoutURLs": [f"https://{service_endpoint}/"],
+            "CallbackURLs": [f"{service_url}/callback"],
+            "LogoutURLs": [f"{service_url}/"],
             # Re-specify existing client settings so they are preserved
             "AllowedOAuthFlows": ["code"],
             "AllowedOAuthScopes": ["openid", "email", "profile"],
@@ -531,14 +533,14 @@ class ECSStack(Stack):
         CfnOutput(
             self,
             "ServiceEndpoint",
-            value=self.express_service.attr_endpoint,
+            value=service_url,
             description="Public endpoint for the BADGERS UI",
             export_name=f"{self.stack_name}-ServiceEndpoint",
         )
         CfnOutput(
             self,
             "ServiceUrl",
-            value=f"https://{self.express_service.attr_endpoint}",
+            value=service_url,
             description="BADGERS UI URL",
         )
         CfnOutput(
