@@ -5,10 +5,20 @@
 ### Release management
 
 - **Documented the release contract.** Customers should deploy immutable
-  `v*` release tags, with `v5.0.2` as the current stable release. `main` is
+  `v*` release tags, with `v5.0.3` as the current stable release. `main` is
   the stable source line and `dev` is the integration line. The next major
   architecture remains unpublished until an explicit `v6.0.0-beta.*` preview
   tag is released.
+
+## [5.0.3] - 2026-11-04
+
+### Fixed
+
+- **Removed the unused PDF-processing layer from v5 deployments.** No v5
+  Lambda attached the layer, but `deploy.sh` built it and CDK attempted to
+  create it whenever its ZIP existed. A newer transitive PyMuPDF dependency
+  set could exceed Lambda's uncompressed layer limit and roll back deployment.
+  v5.0.3 no longer builds or deploys that unused artifact.
 
 ### Added
 

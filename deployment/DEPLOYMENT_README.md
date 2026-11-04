@@ -317,7 +317,6 @@ All layer build scripts must be run from the `deployment/lambdas` directory.
 cd lambdas
 ./build_foundation_layer.sh      # Core framework, boto3, pillow
 ./build_poppler_qdf_layer.sh         # PDF rendering (pdftoppm, pdfinfo)
-./build_pdf_processing_layer.sh  # pikepdf, pymupdf for PDF/A tagging
 cd ..
 ```
 
@@ -327,10 +326,14 @@ cd ..
 | ------------------------------- | -------------------------- | ------------------------------------------ | ------------------------------------------ |
 | `build_foundation_layer.sh`     | `layer.zip`                | Core specialist framework, AWS SDK, Pillow | All Lambda specialists                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion  | `pdf_to_images_converter`                  |
-| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for PDF manipulation      | Non-container specialists needing PDF libs |
 | `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
+>
+> **v5.0.3:** The former PDF-processing layer is no longer built or deployed.
+> It was not attached to any v5 Lambda, but CDK still tried to create it. A
+> newer transitive PyMuPDF dependency set could exceed Lambda's uncompressed
+> layer limit and block an otherwise valid deployment.
 
 #### Container Lambda Build
 
@@ -451,7 +454,6 @@ deployment/
 │   ├── build_foundation_layer.sh    # Core framework layer
 │   ├── build_poppler_qdf_layer.sh       # PDF rendering layer
 │   ├── build_enhancement_layer.sh   # Image enhancement layer (UNUSED - retained for reference)
-│   ├── build_pdf_processing_layer.sh # PDF manipulation layer
 │   ├── build_container_lambdas.sh   # Container image builder
 │   ├── deploy_foundation_layer.sh   # Manual layer deployment
 │   ├── deploy_poppler_layer.sh      # Manual layer deployment
@@ -903,10 +905,6 @@ rm -rf poppler_build/ poppler-qpdf-layer.zip
 # Enhancement layer — no longer deployed, runs in container Lambda
 # rm -rf enhancement_build/ enhancement-layer.zip
 # ./build_enhancement_layer.sh
-
-# PDF processing layer
-rm -rf pdf_processing_build/ pdf-processing-layer.zip
-./build_pdf_processing_layer.sh
 ```
 
 ### Container Image Not Found

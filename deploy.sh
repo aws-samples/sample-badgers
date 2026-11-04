@@ -83,10 +83,6 @@ step_layers() {
   (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_foundation_layer.sh) \
     || { log_error "Foundation layer build failed."; return 1; }
 
-  log_info "Building PDF processing layer..."
-  (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_pdf_processing_layer.sh) \
-    || { log_error "PDF processing layer build failed."; return 1; }
-
   if [ -f "${DEPLOYMENT_DIR}/lambdas/build_poppler_qdf_layer.sh" ]; then
     log_info "Building Poppler/qpdf layer..."
     (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_poppler_qdf_layer.sh)
