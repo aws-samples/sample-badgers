@@ -43,6 +43,7 @@ CONTAINER_SPECIALISTS = frozenset(
     {
         "image_enhancer",
         "remediation_specialist",
+        "native_pdf_processor",
         "docx_processor",
         "pptx_processor",
         "xlsx_processor",

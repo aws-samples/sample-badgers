@@ -2,8 +2,8 @@
 # Build and push container Lambda images to the badgers ECR repository
 # Usage: ./build_container_lambdas.sh <deployment_id> [container-specialist ...]
 #
-# This script builds the image_enhancer, remediation_specialist, docx_processor,
-# pptx_processor and xlsx_processor containers
+# This script builds the image_enhancer, remediation_specialist, native_pdf_processor,
+# docx_processor, pptx_processor and xlsx_processor containers
 # and pushes them to the shared badgers-<deployment_id> ECR repository.
 
 set -e
@@ -34,6 +34,7 @@ aws ecr get-login-password --region ${REGION} | docker login --username AWS --pa
 SUPPORTED_CONTAINERS=(
     "image_enhancer"
     "remediation_specialist"
+    "native_pdf_processor"
     "docx_processor"
     "pptx_processor"
     "xlsx_processor"

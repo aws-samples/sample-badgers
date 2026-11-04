@@ -42,6 +42,7 @@ SPECIALIST_MEMORY_MB = 6144
 CONTAINER_FUNCTIONS = [
     "image_enhancer",
     "remediation_specialist",
+    "native_pdf_processor",
     "docx_processor",
     "pptx_processor",
     "xlsx_processor",
@@ -170,33 +171,6 @@ class LambdaSpecialistStack(Stack):
         # agentic enhancer Lambda (image_enhancer) which bundles its own deps.
         # The build_enhancement_layer.sh script is retained on disk but not deployed.
         self.enhancement_layer = None
-
-        # PDF processing layer for PDF manipulation/accessibility (pymupdf, pikepdf)
-        pdf_processing_layer_path = Path("./lambdas/pdf-processing-layer.zip")
-
-        if pdf_processing_layer_path.exists():
-            self.pdf_processing_layer = lambda_.LayerVersion(
-                self,
-                "PdfProcessingLayer",
-                code=lambda_.Code.from_asset(str(pdf_processing_layer_path)),
-                compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
-                description="PDF processing for accessibility tagging (pymupdf, pikepdf)",
-                layer_version_name=f"{self.layer_name_prefix}pdf-processing",
-            )
-
-            # Apply resource-specific tags to pdf processing layer
-            self._apply_resource_tags(
-                self.pdf_processing_layer,
-                "lambda-pdf-processing-layer",
-                "PDF processing layer for accessibility tagging",
-            )
-        else:
-            self.pdf_processing_layer = None
-            logging.getLogger(__name__).warning(
-                "PDF processing layer not found at %s. "
-                "Run: cd lambdas && ./build_pdf_processing_layer.sh",
-                pdf_processing_layer_path,
-            )
 
     @staticmethod
     def _assert_layer_not_stale(layer_path: Path) -> None:
@@ -335,14 +309,6 @@ class LambdaSpecialistStack(Stack):
         if specialist_name == "pdf_to_images_converter":
             layers.append(self.poppler_layer)
 
-        # Attach PDF processing layer to functions that need PDF manipulation
-        # NOTE: Container functions (remediation_specialist) are built via
-        # _create_ecr_container_function and never reach this code path.
-        # They bundle their own deps in the Docker image.
-        pdf_processing_functions = ["native_pdf_processor"]
-        if self.pdf_processing_layer and specialist_name in pdf_processing_functions:
-            layers.append(self.pdf_processing_layer)
-
         # Enhancement layer removed — runs in container Lambda instead.
         # See lambdas/containers/image_enhancer/
 
@@ -398,9 +364,9 @@ class LambdaSpecialistStack(Stack):
         """Create container-based Lambda functions from pre-built ECR images.
 
         Images must be pre-built and pushed to the shared ECR repository with
-        function-specific tags (e.g., image_enhancer, remediation_specialist).
+        function-specific tags (e.g., image_enhancer, native_pdf_processor).
 
-        Run: cd lambdas && ./build_container_lambdas.sh <ecr_repo_uri>
+        Run: cd lambdas && ./build_container_lambdas.sh <deployment_id>
         """
         logger = logging.getLogger(__name__)
 

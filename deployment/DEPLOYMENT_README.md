@@ -470,7 +470,6 @@ All layer build scripts must be run from the `deployment/lambdas` directory.
 cd lambdas
 ./build_foundation_layer.sh      # Core framework, boto3, pillow
 ./build_poppler_qdf_layer.sh         # PDF rendering (pdftoppm, pdfinfo)
-./build_pdf_processing_layer.sh  # pikepdf, pymupdf for PDF/A tagging
 cd ..
 ```
 
@@ -480,8 +479,7 @@ cd ..
 | ------------------------------- | -------------------------- | ------------------------------------------ | ------------------------------------------ |
 | `build_foundation_layer.sh`     | `layer.zip`                | Core specialist framework, AWS SDK, Pillow | All Lambda specialists                     |
 | `build_poppler_qdf_layer.sh`    | `poppler-qpdf-layer.zip`   | Poppler binaries for PDF→image conversion  | `pdf_to_images_converter`                  |
-| `build_pdf_processing_layer.sh` | `pdf-processing-layer.zip` | pikepdf, pymupdf for native PDF inspection and PDF manipulation | `native_pdf_processor` and non-container specialists needing PDF libs |
-| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
+| `build_container_lambdas.sh`    | ECR images                 | Container images for complex specialists   | `image_enhancer`, `remediation_specialist`, `native_pdf_processor`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
 
 > **Note:** `build_enhancement_layer.sh` is retained on disk but no longer deployed. Image enhancement runs in the container-based `image_enhancer` Lambda which bundles its own dependencies.
 
@@ -496,7 +494,8 @@ cd ..
 ```
 
 This builds and pushes Docker images to ECR for `image_enhancer`,
-`remediation_specialist`, `docx_processor`, `pptx_processor`, and `xlsx_processor`. The container
+`remediation_specialist`, `native_pdf_processor`, `docx_processor`, `pptx_processor`, and
+`xlsx_processor`. The container
 build stages `foundation` and `config` from the repository-built `layer.zip`; it
 also supports the older expanded `layer/python/` layout. The foundation-layer
 builder now stages in a temporary directory to avoid macOS Finder recreating
@@ -528,7 +527,7 @@ Same set and order as `deploy.sh` step 2. `IAM` imports the DynamoDB table and t
 buckets, `Lambda` imports ECR and the inference profiles, so the order below is not
 optional. Interactive Step 2 checks profile/catalog availability and a minimal Converse
 request for every active non-Mantle model. Mantle models such as Gemma 4 31B are reported
-but skipped by those checks: their OpenAI-compatible `bedrock-mantle` endpoint has neither
+as not invocation-tested: their OpenAI-compatible `bedrock-mantle` endpoint has neither
 an inference profile nor a Converse API. The manual path skips these checks entirely; if a
 Converse model is not reachable from your account you find out from a specialist's
 `AccessDeniedException` instead.
@@ -619,12 +618,11 @@ deployment/
 │   ├── build_foundation_layer.sh    # Core framework layer
 │   ├── build_poppler_qdf_layer.sh       # PDF rendering layer
 │   ├── build_enhancement_layer.sh   # Image enhancement layer (UNUSED - retained for reference)
-│   ├── build_pdf_processing_layer.sh # PDF manipulation layer
 │   ├── build_container_lambdas.sh   # Container image builder
 │   ├── deploy_foundation_layer.sh   # Manual layer deployment
 │   ├── deploy_poppler_layer.sh      # Manual layer deployment
 │   ├── containers/           # 🐳 Container Lambda Dockerfiles
-│   └── code/                 # ⚡ 25 specialist/utility functions (+2 containers); deployment_config.json picks which deploy
+│   └── code/                 # ⚡ ZIP-based specialist and utility functions; deployment_config.json picks which deploy
 ├── runtime/                  # 🐳 AgentCore container
 │   ├── Dockerfile.websocket
 │   ├── build_and_push_websocket.sh
@@ -1071,11 +1069,12 @@ rm -rf poppler_build/ poppler-qpdf-layer.zip
 # Enhancement layer — no longer deployed, runs in container Lambda
 # rm -rf enhancement_build/ enhancement-layer.zip
 # ./build_enhancement_layer.sh
-
-# PDF processing layer
-rm -rf pdf_processing_build/ pdf-processing-layer.zip
-./build_pdf_processing_layer.sh
 ```
+
+`native_pdf_processor` is built as a Lambda container alongside the other selected
+container specialists. Its PyMuPDF requirement has a supported lower bound rather than
+an upper-version cap, so routine dependency security updates are not constrained by the
+Lambda ZIP-and-layer size limit.
 
 ### Container Image Not Found
 

@@ -118,6 +118,13 @@
 
 ### Fixed
 
+- **Removed the native-PDF ZIP-layer ceiling without constraining security
+  updates.** `native_pdf_processor` now follows the existing Lambda container
+  path and packages `PyMuPDF>=1.26.6` in its image. The obsolete PDF-processing
+  layer and its upper-version workaround are gone; a fresh image build can
+  consume supported PyMuPDF updates without exceeding Lambda's combined
+  ZIP-and-layer package limit.
+
 - **Removed the KLayers runtime dependency.** Standard and custom specialist
   Lambdas now use Pillow from BADGERS' repository-built foundation layer rather
   than a third-party public Lambda layer. The existing stale-layer guard

@@ -167,17 +167,18 @@ def test_specialists_profile_allows_an_explicit_pack_selection() -> None:
     assert resolved.capabilities["direct_invocation"] is True
 
 
-def test_direct_container_specialist_derives_ecr_support() -> None:
+@pytest.mark.parametrize("specialist", ("docx_processor", "native_pdf_processor"))
+def test_direct_container_specialist_derives_ecr_support(specialist: str) -> None:
     resolved = resolve_profile(
         "specialists",
         profiles_dir=PROFILES_DIR,
         deployment_config_path=DEPLOYMENT_CONFIG,
-        direct_specialists=("docx_processor",),
+        direct_specialists=(specialist,),
         selection_override=True,
     )
 
-    assert resolved.specialists == ("docx_processor",)
-    assert resolved.direct_specialists == ("docx_processor",)
+    assert resolved.specialists == (specialist,)
+    assert resolved.direct_specialists == (specialist,)
     assert resolved.capabilities["container_images"] is True
 
 

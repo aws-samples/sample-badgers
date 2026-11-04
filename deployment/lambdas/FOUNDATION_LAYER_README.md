@@ -240,8 +240,9 @@ Declared in `lambdas/requirements.txt` with floors; the versions below are what 
 
 > **Note:** The container Lambdas do not attach the Foundation Layer — they bundle their
 > own dependencies in their Docker images. `image_enhancer` uses the full foundation
-> framework; `remediation_specialist` is otherwise self-contained (pikepdf, pymupdf, etc.)
-> but both import `foundation.job_state` to record their subtask state, so
+> framework; the other container specialists, including `native_pdf_processor`, bundle
+> their processor-specific dependencies but import `foundation.job_state` to record their
+> subtask state, so
 > `build_container_lambdas.sh` copies the `foundation/` module into each build context.
 
 ## 🛠️ Build and Deploy

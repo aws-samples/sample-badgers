@@ -35,7 +35,7 @@ BADGERS uses five types of Lambda functions:
 | Type                     | Purpose                                             | Example                                          |
 | ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
 | 🔍 **Vision Specialists** | Analyze images using Bedrock vision models          | `full_text_specialist`, `table_specialist`, etc. |
-| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
+| 🐳 **Container Lambdas**  | Processing requiring large deps or custom pipelines | `image_enhancer`, `remediation_specialist`, `native_pdf_processor`, `docx_processor`, `pptx_processor`, `xlsx_processor` |
 | 🔧 **Native-first intake** | Inspect source structure and selectively prepare fallback pages | `document_intake_router`, `native_pdf_processor`, `pdf_to_images_converter`, `textract_ocr` |
 | 🔗 **Correlators**        | Correlate outputs across specialists per page       | `correlation_specialist`                         |
 | 🧭 **Native Structure Analysts** | Interpret source-format structure and optional layout without pixels | `docx_structure_specialist`, `pptx_gestalt_specialist` |
@@ -50,12 +50,12 @@ BADGERS uses five types of Lambda functions:
 | ---------------------- | ---------------------------------------------------------- |
 | 🧠 **Foundation Layer** | Core framework, boto3, Pillow, pdf2image, shared utilities |
 
-### PDF Intake Layers
+### PDF Intake Packaging
 
-| Layer                    | Purpose                                                               |
+| Component                | Purpose                                                               |
 | ------------------------ | --------------------------------------------------------------------- |
 | 📄 **Poppler Layer**     | `pdf2image` requires Poppler binaries for selected-page rasterization |
-| 📄 **PDF Processing Layer** | PyMuPDF/pikepdf for native PDF text/object inspection                 |
+| 🐳 **Native PDF Container** | `native_pdf_processor` packages PyMuPDF in its Lambda image, allowing supported dependency security updates without a ZIP-layer size cap |
 
 ---
 
@@ -424,9 +424,10 @@ as error cards without a crop.
 
 ## 📄 Native PDF Intake and OCR Fallback
 
-`native_pdf_processor` is the required first tool for PDF uploads. It writes a
-schema-compatible native BADGERS spine when the PDF’s selectable text and order
-are trustworthy, and returns a page plan:
+`native_pdf_processor` is the required first tool for PDF uploads. It runs as a
+Lambda container so its supported PyMuPDF dependency can receive security updates
+without a ZIP-layer size cap. It writes a schema-compatible native BADGERS spine when
+the PDF’s selectable text and order are trustworthy, and returns a page plan:
 
 - `native_pdf` → retain the native spine, no rendering or visual calls
 - `textract_ocr` → render only that page, then accept Textract only if its quality gate passes
