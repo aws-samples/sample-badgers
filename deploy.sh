@@ -31,6 +31,11 @@ source "${SCRIPT_DIR}/deployment/scripts/preflight.sh"
 
 trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; exit 1' ERR
 
+launch_configuration_ui() {
+  log_info "Opening the local configuration planner. Press Ctrl-C there to return to this menu."
+  python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
+}
+
 # Configuration UI is deliberately a local planning surface. It starts a
 # loopback-only server which can edit and validate desired state, but cannot
 # deploy or access AWS credentials. The regular CLI remains the executor.
@@ -61,6 +66,9 @@ show_product_chooser() {
 ╚══════════════════════════════════════════════════════════════════╝
 EOF
   echo -e "${NC}"
+  echo -e "  ${BLUE}${BOLD}C  CONFIGURATION PLANNER${NC}"
+  echo -e "     Local UI for specialists, workflow routing, and deployment planning"
+  echo ""
   echo -e "  ${CYAN}${BOLD}1  FULL EXPERIENCE${NC}"
   echo -e "     Agent API  •  internal gateway  •  all specialists  •  browser UI"
   echo ""
@@ -104,17 +112,21 @@ esac
 if [ -z "${BADGERS_PROFILE}" ]; then
   if [ -t 0 ]; then
     show_product_chooser
-    read -r -p "Product (1-4, or q to quit) [1]: " profile_choice
+    read -r -p "Product (1-4), c for planner, or q to quit [1]: " profile_choice
     case "${profile_choice:-1}" in
       1|full) BADGERS_PROFILE="full" ;;
       2|headless) BADGERS_PROFILE="headless" ;;
       3|specialists) BADGERS_PROFILE="specialists" ;;
+      c|C|configure)
+        launch_configuration_ui
+        exit $?
+        ;;
       4|q|Q)
         log_info "Exiting without selecting a product."
         exit 0
         ;;
       *)
-        log_error "Invalid product choice. Select 1–4, or q."
+        log_error "Invalid product choice. Select 1–4, c, or q."
         exit 1
         ;;
     esac
@@ -1453,7 +1465,8 @@ EOF
   echo -e "  ${GREEN}▶${NC} ${BOLD} r)${NC} Resume remaining stages only"
   echo ""
   echo -e "  ${BOLD}SELECTION${NC}   s) Configure specialists   w) Configure workflow routing   k) Manage reusable packs"
-  echo -e "  ${BOLD}TOOLS${NC}       p) Preflight report   10) Status   11) Reset local state   m) Model registry   0) Exit"
+  echo -e "  ${BOLD}TOOLS${NC}       c) Open configuration planner (local UI)   p) Preflight report   10) Status"
+  echo -e "               11) Reset local state   m) Model registry   0) Exit"
   echo ""
   echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
   echo ""
@@ -1501,6 +1514,7 @@ dispatch() {
     11) reset_state ;;
     r|R|resume) step_resume ;;
     m|M) show_models ;;
+    c|C|configure) launch_configuration_ui ;;
     s|S) configure_specialists ;;
     w|W) configure_routing ;;
     k|K) manage_specialist_packs ;;
@@ -1514,7 +1528,7 @@ dispatch() {
 # ══════════════════════════════════════════════════════════════════════════
 _valid_option() {
   case "$1" in
-    0|1|2|3|4|5|6|7|8|9|10|11|p|P|preflight|r|R|resume|m|M|s|S|w|W|k|K) return 0 ;;
+    0|1|2|3|4|5|6|7|8|9|10|11|p|P|preflight|r|R|resume|m|M|c|C|configure|s|S|w|W|k|K) return 0 ;;
     *) return 1 ;;
   esac
 }

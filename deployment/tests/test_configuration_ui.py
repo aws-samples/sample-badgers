@@ -13,6 +13,8 @@ from deployment.configuration_ui import (
     ConfigurationServer,
     UIError,
     configuration,
+    configurations,
+    delete_configuration,
     plan,
     save_observability,
 )
@@ -40,10 +42,71 @@ def test_plan_is_a_cli_handoff_not_a_deployment_action(tmp_path: Path) -> None:
     assert "publish configuration" in result["required_stages"]
 
 
+def test_delete_configuration_requires_exact_confirmation(tmp_path: Path) -> None:
+    configuration(tmp_path, "beta", "headless")
+    state_path = tmp_path / ".deploy-state/beta.json"
+
+    try:
+        delete_configuration(tmp_path, {"deployment_id": "beta", "confirmation": "wrong"})
+    except UIError as error:
+        assert "exact deployment ID" in str(error)
+    else:
+        raise AssertionError("Deleting without exact confirmation must fail.")
+    assert state_path.is_file()
+
+    assert delete_configuration(tmp_path, {"deployment_id": "beta", "confirmation": "beta"}) == {
+        "deleted": "beta"
+    }
+    assert not state_path.exists()
+
+
+def test_configurations_lists_valid_local_deployment_records(tmp_path: Path) -> None:
+    configuration(tmp_path, "beta", "headless")
+    configuration(tmp_path, "demo", "specialists")
+    (tmp_path / ".deploy-state" / "invalid.json").write_text("not json", encoding="utf-8")
+
+    result = configurations(tmp_path)
+
+    assert [(item["deployment_id"], item["profile"]) for item in result] == [
+        ("beta", "headless"),
+        ("demo", "specialists"),
+    ]
+    assert all(item["started_at"] for item in result)
+
+
 def test_local_planner_offers_xlsx_as_one_processor_workflow() -> None:
     assert "native-xlsx-analysis" in _HTML
     assert "XLSX',['xlsx_processor'],'headless" in _HTML
     assert "Workbook Analysis pack first" in _HTML
+
+
+def test_specialist_bulk_selection_is_independent_and_reactive() -> None:
+    assert 'id="select-all-packs"' in _HTML
+    assert 'id="select-all-direct-specialists"' in _HTML
+    assert 'id="select-all-specialists"' not in _HTML
+    assert "syncSpecialistSectionToggles" in _HTML
+    assert "control.indeterminate=selected>0&&selected<rows.length" in _HTML
+    assert ".selection-section + .selection-section .selection-head{margin-top:22px" in _HTML
+    assert "--cg:#addfc4" in _HTML
+    assert ".on .check{border-color:var(--cg-border);background:var(--cg)}" in _HTML
+    assert ".row:not(.on) .check,.selection-toggle input:not(:checked):not(:indeterminate)" in _HTML
+    assert ".selection-toggle input:checked{border-color:var(--cg-border);background-color:var(--cg)" in _HTML
+    assert 'id="delete-configuration"' in _HTML
+    assert "/api/configuration/delete" in _HTML
+    assert "Open a configuration from Deployment details" in _HTML
+
+
+def test_configuration_ui_starts_with_a_welcome_screen_and_tutorial() -> None:
+    assert '<section id="welcome" class="view on">' in _HTML
+    assert '>Open or create configuration</button>' in _HTML
+    assert 'data-to="tutorial">See the tutorial</button>' in _HTML
+    assert 'id="tutorial"' in _HTML
+    assert 'data-v="tutorial">How it works</button>' in _HTML
+    assert 'data-v="overview">1. Deployment details</button>' in _HTML
+    assert 'id="active-config">No configuration loaded</span>' in _HTML
+    assert "/api/configurations" in _HTML
+    assert "<b>Choose a configuration</b>" in _HTML
+    assert "<b>1. Choose</b>" not in _HTML
 
 
 def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path: Path) -> None:

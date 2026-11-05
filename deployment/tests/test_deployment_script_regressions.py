@@ -67,3 +67,11 @@ def test_ecs_endpoint_is_not_prefixed_with_a_second_scheme() -> None:
     assert 'LogoutURLs": [f"{service_url}/"]' in ecs_stack
     assert 'value=f"https://{self.express_service.attr_endpoint}"' not in ecs_stack
     assert 'echo "  │  https://${endpoint}"' not in deploy_script
+
+
+def test_deployment_menu_offers_the_local_configuration_planner() -> None:
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+
+    assert 'C  CONFIGURATION PLANNER' in deploy_script
+    assert 'c|C|configure)' in deploy_script
+    assert 'python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"' in deploy_script
