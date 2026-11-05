@@ -6,7 +6,7 @@
 
 ---
 
-# 🦡 BADGERS v5.0.2 as of October 2026
+# 🦡 BADGERS v5.0.3 as of November 2026
 
 **Broad Agentic Document Generative Extraction & Recognition System**
 
@@ -15,14 +15,14 @@ BADGERS transforms document processing through vision-enabled AI and deep layout
 ## Release channels
 
 For a reproducible production deployment, use an immutable release tag rather
-than following a branch. `v5.0.2` is the current stable release. `main` is the
+than following a branch. `v5.0.3` is the current stable release. `main` is the
 stable source line, while `dev` is the shared integration line and can contain
 work that has not yet been released.
 
 The next major platform architecture is in development but has not been
 published as a preview release. Its eventual preview milestones will be tagged
 as `v6.0.0-beta.*`; until a tag exists, customers should continue to pin
-production deployments to `v5.0.2`. See the [Changelog](CHANGELOG.md) for
+production deployments to `v5.0.3`. See the [Changelog](CHANGELOG.md) for
 release milestones and compatibility notes.
 
 ## 🤔 Why BADGERS?
