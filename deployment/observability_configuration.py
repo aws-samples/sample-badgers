@@ -1,9 +1,4 @@
-"""Persisted, local-only observability planning for one BADGERS deployment.
-
-This module deliberately has no AWS SDK or shell dependency.  It records the
-operator's desired monitoring posture so the configuration planner can show a
-candidate resource and quota plan before a separate AWS-backed deployer exists.
-"""
+"""Persisted observability choices for one BADGERS deployment."""
 
 from __future__ import annotations
 
@@ -156,6 +151,33 @@ def save(
     return desired, changed
 
 
+def load_from_state(state_path: Path, profile: str) -> dict[str, Any]:
+    """Read a validated existing choice without changing local deployment state."""
+
+    state = _read(state_path)
+    saved = state.get("desired_observability_configuration")
+    if not isinstance(saved, dict):
+        return _payload(profile, "links", "none", "")
+    notification = saved.get("notification")
+    if not isinstance(notification, dict):
+        return _payload(profile, "links", "none", "")
+    return _payload(
+        profile,
+        str(saved.get("mode", "")),
+        str(notification.get("kind", "")),
+        str(notification.get("target", "")),
+    )
+
+
+def record_applied(state_path: Path, profile: str) -> None:
+    """Record that the saved observability selection has been deployed."""
+
+    state = _read(state_path)
+    state["applied_observability_configuration"] = load_from_state(state_path, profile)
+    state["observability_configuration_applied_at"] = _timestamp()
+    _write(state_path, state)
+
+
 def candidate_plan(
     desired: dict[str, Any], selection: dict[str, Any]
 ) -> dict[str, Any]:
@@ -165,16 +187,16 @@ def candidate_plan(
     capabilities = selection.get("capabilities", {})
     specialists = selection.get("resolved_specialists", [])
     components: list[str] = []
-    if capabilities.get("agent_runtime"):
-        components.append("AgentCore Runtime invocation errors and latency")
-    if capabilities.get("gateway"):
-        components.append("Gateway errors and throttles")
     if specialists:
-        components.append(f"{len(specialists)} selected specialist(s): errors and throttles")
+        components.append(
+            f"{len(specialists)} selected specialist(s): aggregated Lambda errors and throttles"
+        )
     if capabilities.get("workflow_runner"):
-        components.append("Workflow and Lambda failures")
-    if capabilities.get("ui"):
-        components.append("UI service health")
+        components.append("Workflow failures and timeouts")
+        if mode == "enhanced":
+            components.append("Workflow execution latency")
+    if capabilities.get("agent_runtime") or capabilities.get("gateway") or capabilities.get("ui"):
+        components.append("Existing CloudWatch logs and traces for diagnosis")
     if not components:
         components.append("Selected deployment components")
 
@@ -182,22 +204,18 @@ def candidate_plan(
         "cloudwatch_dashboards": 0,
         "standard_alarms": 0,
         "composite_alarms": 0,
-        "event_destinations": 0,
-        "scheduled_health_checks": 0,
+        "notification_routes": 0,
     }
     if mode != "links":
         resources["cloudwatch_dashboards"] = 1
-        resources["standard_alarms"] = len(specialists) * 2
-        resources["standard_alarms"] += int(bool(capabilities.get("agent_runtime"))) * 2
-        resources["standard_alarms"] += int(bool(capabilities.get("gateway"))) * 2
+        # The deployed baseline deliberately aggregates specialist Lambda signals:
+        # POC operators need actionable alarms, not one pager per function.
+        resources["standard_alarms"] = 2
         resources["standard_alarms"] += int(bool(capabilities.get("workflow_runner"))) * 2
-        resources["standard_alarms"] += int(bool(capabilities.get("ui")))
-        resources["composite_alarms"] = 1 + int(bool(specialists))
         if desired["notification"]["kind"] != "none":
-            resources["event_destinations"] = 1
+            resources["notification_routes"] = 1
         if mode == "enhanced":
-            resources["scheduled_health_checks"] = 1
-            resources["composite_alarms"] += 1
+            resources["standard_alarms"] += 1
 
     return {
         "mode": mode,
@@ -211,15 +229,17 @@ def candidate_plan(
         if mode != "links"
         else [],
         "note": (
-            "Links mode creates no monitoring resources."
+            "No added CloudWatch resources: this mode creates no monitoring resources."
             if mode == "links"
-            else "This is a local candidate plan. AWS inventory, quotas, and destination "
-            "permissions must be checked by the CLI before deployment."
+            else "The CLI deploys this dashboard and these alarms after validating the "
+            "selected configuration. Notification handoff remains optional."
         ),
     }
 
 
 def summary(state_path: Path, profile: str, selection: dict[str, Any]) -> dict[str, Any]:
+    """Return the selected posture, deployment status, and expected footprint."""
+
     desired, _ = load_or_create_desired(state_path, profile)
     state = _read(state_path)
     applied = state.get("applied_observability_configuration")
@@ -230,3 +250,31 @@ def summary(state_path: Path, profile: str, selection: dict[str, Any]) -> dict[s
         and applied.get("fingerprint") == desired.get("fingerprint"),
         "candidate_plan": candidate_plan(desired, selection),
     }
+
+
+def _command(args: Any) -> int:
+    path = Path(args.state).resolve()
+    if args.command == "ensure":
+        _, changed = load_or_create_desired(path, args.profile)
+        if args.lines:
+            print(f"changed\t{str(changed).lower()}")
+        return 0
+    if args.command == "record-applied":
+        record_applied(path, args.profile)
+        return 0
+    raise AssertionError(f"Unsupported command: {args.command}")
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("ensure", "record-applied"))
+    parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--profile", choices=sorted(_PROFILES), required=True)
+    parser.add_argument("--lines", action="store_true")
+    return _command(parser.parse_args())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

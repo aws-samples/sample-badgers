@@ -8,6 +8,8 @@ import warnings
 from pathlib import Path
 
 import aws_cdk as cdk
+import observability_configuration
+import tag_configuration
 from profile_resolver import ProfileResolutionError, resolve_profile
 from stacks import (
     S3Stack,
@@ -25,6 +27,7 @@ from stacks import (
     DynamoDBStack,
     ECSStack,
     WorkflowRunnerStack,
+    ObservabilityStack,
 )
 
 warnings.filterwarnings("ignore", module="typeguard")
@@ -143,20 +146,43 @@ def _sn(name: str) -> str:
     return f"{STACK_PREFIX}-{name}-{DEPLOYMENT_ID}-{STACK_SUFFIX}"
 
 
-# Deployment tags - customize these for your deployment
-# These tags are applied to all resources across all stacks
-# resource_name and resource_description are set per-resource in each stack
-deployment_tags = {
-    "application_name": "badgers",
-    "application_description": "BADGERS - Broad Agentic Document Generative Extraction and Recognition System",
-    "environment": "dev",
-    "owner": "your-team",
-    "cost_center": "your-cost-center",
-    "project_code": "your-project-code",
-    "cdk_stack_prefix": STACK_PREFIX,
-    "team": "your-team",
-    "team_contact_email": "team@company.com",
-}
+_tag_state = os.environ.get("BADGERS_TAG_STATE", "").strip()
+if _tag_state:
+    try:
+        _desired_tags = tag_configuration.load_from_state(Path(_tag_state), PROFILE_NAME)
+    except tag_configuration.TagConfigurationError as error:
+        raise SystemExit(f"Could not load deployment tag configuration: {error}") from error
+    deployment_tags = tag_configuration.effective_tags(
+        _desired_tags,
+        deployment_id=DEPLOYMENT_ID,
+        profile=PROFILE_NAME,
+        stack_suffix=STACK_SUFFIX,
+    )
+else:
+    # Direct CDK callers cannot access the planner's local state. Apply only
+    # truthful identity tags rather than placeholder ownership/cost metadata.
+    # deploy.sh always provides the selected per-deployment customer tags.
+    deployment_tags = {
+        "deployment_id": DEPLOYMENT_ID,
+        "product_profile": PROFILE_NAME,
+        "stack_suffix": STACK_SUFFIX,
+        "managed_by": "cdk",
+    }
+deployment_tags["cdk_stack_prefix"] = STACK_PREFIX
+
+_observability_state = os.environ.get("BADGERS_OBSERVABILITY_STATE", "").strip()
+if _observability_state:
+    try:
+        observability = observability_configuration.load_from_state(
+            Path(_observability_state), PROFILE_NAME
+        )
+    except observability_configuration.ObservabilityConfigurationError as error:
+        raise SystemExit(f"Could not load observability configuration: {error}") from error
+else:
+    observability = {
+        "mode": "links",
+        "notification": {"kind": "none", "target": ""},
+    }
 
 # S3 buckets for configs and outputs
 s3_stack = S3Stack(
@@ -291,7 +317,8 @@ if dynamodb_stack is not None:
 # authenticated operations to this State Machine.
 workflow_runner_stack = None
 if CAPABILITIES.get("workflow_runner", False):
-    assert dynamodb_stack is not None
+    if dynamodb_stack is None:
+        raise SystemExit("workflow_runner requires the DynamoDB operation ledger.")
     if not CONFIG_PREFIX:
         raise SystemExit(
             "BADGERS_CONFIG_RELEASE_ID is required when workflow_runner is enabled"
@@ -348,7 +375,8 @@ else:
 # AgentCore Gateway with Lambda targets
 gateway_stack = None
 if CAPABILITIES.get("gateway", False):
-    assert cognito_stack is not None
+    if cognito_stack is None:
+        raise SystemExit("gateway requires the Cognito authentication stack.")
     gateway_stack = AgentCoreGatewayStack(
         app,
         _sn("Gateway"),
@@ -393,11 +421,16 @@ if CAPABILITIES.get("agent_runtime", False) or CAPABILITIES.get("ui", False):
     )
 
 if CAPABILITIES.get("agent_runtime", False):
-    assert ecr_stack is not None
-    assert gateway_stack is not None
-    assert cognito_stack is not None
-    assert dynamodb_stack is not None
-    assert vpc_stack is not None
+    if (
+        ecr_stack is None
+        or gateway_stack is None
+        or cognito_stack is None
+        or dynamodb_stack is None
+        or vpc_stack is None
+    ):
+        raise SystemExit(
+            "agent_runtime requires ECR, Gateway, Cognito, DynamoDB, and VPC stacks."
+        )
     runtime_websocket_stack = AgentCoreRuntimeWebSocketStack(
         app,
         _sn("RuntimeWebSocket"),
@@ -484,7 +517,8 @@ if CAPABILITIES.get("ui", False):
     # --- UI infrastructure (ECS Express Gateway) ---
     # No hosted zone, domain, or ACM certificate required: the ECS Express Gateway
     # service provisions and manages its own load balancer and HTTPS endpoint.
-    assert vpc_stack is not None
+    if vpc_stack is None:
+        raise SystemExit("ui requires the VPC stack.")
 
     # Unified UI on ECS Express Gateway, authenticated via Cognito OIDC/PKCE
     ecs_stack = ECSStack(
@@ -529,6 +563,28 @@ if CAPABILITIES.get("ui", False):
     ecs_stack.add_stack_dependency(inference_profiles_stack)
 else:
     print("UI, ECS, VPC, and wizard stacks omitted by profile")
+
+# This stack always exists, including the no-added-CloudWatch-resources option.
+# Switching a deployment from Baseline/Enhanced back to that option removes its monitoring resources
+# with the next normal deploy rather than requiring a separate destroy command.
+observability_stack = ObservabilityStack(
+    app,
+    _sn("Observability"),
+    deployment_id=deployment_id,
+    deployment_tags=deployment_tags,
+    mode=str(observability["mode"]),
+    notification_kind=str(observability["notification"]["kind"]),
+    notification_target=str(observability["notification"]["target"]),
+    specialist_functions=lambda_stack.functions,
+    workflow_state_machine=(
+        workflow_runner_stack.state_machine if workflow_runner_stack is not None else None
+    ),
+    env=env,
+    description="CloudWatch observability for BADGERS",
+)
+observability_stack.add_stack_dependency(lambda_stack)
+if workflow_runner_stack is not None:
+    observability_stack.add_stack_dependency(workflow_runner_stack)
 
 # ── cdk-nag (opt-in via CDK_NAG=1 env var) ─────────────────────────────────
 if os.environ.get("CDK_NAG", "").strip() in ("1", "true", "yes"):

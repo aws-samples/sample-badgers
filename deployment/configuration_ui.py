@@ -24,11 +24,17 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 try:
-    from . import observability_configuration, routing_configuration, specialist_selection
+    from . import (
+        observability_configuration,
+        routing_configuration,
+        specialist_selection,
+        tag_configuration,
+    )
 except ImportError:
     import observability_configuration
     import routing_configuration
     import specialist_selection
+    import tag_configuration
 
 
 _DEPLOYMENT_ID = re.compile(r"^[a-z][a-z0-9-]{0,15}$")
@@ -44,6 +50,7 @@ _STAGE_KEYS = (
     "runtime_deployed",
     "ui_image_pushed",
     "ecs_deployed",
+    "observability_deployed",
 )
 
 
@@ -106,6 +113,7 @@ def _ensure_deployment(repo_root: Path, deployment_id: str, profile: str) -> Pat
         _write_json(path, _initial_state(deployment_id, profile))
     specialist_selection.load_or_create_desired(path, profile)
     observability_configuration.load_or_create_desired(path, profile)
+    tag_configuration.load_or_create_desired(path, profile)
     try:
         routing_configuration.ensure(path, profile)
     except routing_configuration.RoutingConfigurationError:
@@ -166,10 +174,12 @@ def configuration(repo_root: Path, deployment_id: str, profile: str) -> dict[str
         "selection_plan": selection_plan,
         "routing": routing,
         "observability": observability,
+        "tags": tag_configuration.load_from_state(path, profile),
         "state": {
             "specialist_revision": state.get("specialist_selection_revision", 0),
             "routing_revision": state.get("routing_configuration_revision", 0),
             "observability_revision": state.get("observability_configuration_revision", 0),
+            "tag_revision": state.get("tag_configuration_revision", 0),
         },
     }
 
@@ -258,7 +268,7 @@ def save_routing(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def save_observability(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
-    """Persist a local monitoring choice without making an AWS call."""
+    """Persist the monitoring choice that deploy.sh will apply."""
 
     deployment_id = str(payload.get("deployment_id") or "")
     profile = str(payload.get("profile") or "")
@@ -279,6 +289,34 @@ def save_observability(repo_root: Path, payload: dict[str, Any]) -> dict[str, An
         )
     except observability_configuration.ObservabilityConfigurationError as error:
         raise UIError(str(error)) from error
+    if changed:
+        state = _read_json(path)
+        state["observability_deployed"] = False
+        state.pop("observability_deployed_at", None)
+        _write_json(path, state)
+    return {**configuration(repo_root, deployment_id, profile), "changed": changed}
+
+
+def save_tags(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist customer tags and require enabled stacks to reconcile them."""
+
+    deployment_id = str(payload.get("deployment_id") or "")
+    profile = str(payload.get("profile") or "")
+    path = _ensure_deployment(repo_root, deployment_id, profile)
+    state = _read_json(path)
+    expected = payload.get("expected_revision")
+    if expected is not None and expected != state.get("tag_configuration_revision", 0):
+        raise UIError("Tag configuration changed in another session; reload before saving.")
+    try:
+        _, changed = tag_configuration.save(path, profile, tags=payload.get("tags", {}))
+    except tag_configuration.TagConfigurationError as error:
+        raise UIError(str(error)) from error
+    if changed:
+        _invalidate_consumers(path, infrastructure=True)
+        state = _read_json(path)
+        state["observability_deployed"] = False
+        state.pop("observability_deployed_at", None)
+        _write_json(path, state)
     return {**configuration(repo_root, deployment_id, profile), "changed": changed}
 
 
@@ -290,6 +328,8 @@ def plan(repo_root: Path, deployment_id: str, profile: str) -> dict[str, Any]:
     selection_plan = current["selection_plan"]
     state = _read_json(_state_path(repo_root, deployment_id))
     applied_routing = state.get("applied_routing_configuration")
+    applied_observability = state.get("applied_observability_configuration")
+    applied_tags = state.get("applied_tag_configuration")
     routing_changed = not (
         isinstance(applied_routing, dict)
         and applied_routing.get("fingerprint") == routing.get("fingerprint")
@@ -303,14 +343,28 @@ def plan(repo_root: Path, deployment_id: str, profile: str) -> dict[str, Any]:
             for stage in ("reconcile Gateway targets", "redeploy Runtime with the new configuration release")
             if stage not in stages
         )
+    observability_changed = not (
+        isinstance(applied_observability, dict)
+        and applied_observability.get("fingerprint")
+        == current["observability"].get("fingerprint")
+    )
+    tags_changed = not (
+        isinstance(applied_tags, dict)
+        and applied_tags.get("fingerprint") == current["tags"].get("fingerprint")
+    )
+    if tags_changed:
+        stages.insert(0, "reconcile deployment tags across enabled stacks")
+    if observability_changed:
+        stages.append("deploy selected observability posture")
     return {
         **current,
         "routing_changed": routing_changed,
+        "observability_changed": observability_changed,
+        "tags_changed": tags_changed,
         "required_stages": stages,
         "observability_handoff": (
-            "Observability is saved as a separate local add-on plan. Its future CLI "
-            "deployer must check live account inventory, quotas, and notification "
-            "permissions before it creates monitoring resources."
+            "The CLI deploys the selected observability posture. CloudWatch alarms are "
+            "visible by default; an SNS or EventBridge handoff is optional."
         ),
         "cli_next_step": f"./deploy.sh {profile} resume",
         "apply_note": (
@@ -368,7 +422,7 @@ _HTML = r"""<!doctype html>
 <section id="specialists" class="view"><p class="ey">Capabilities</p><div class="head"><div><h1>Specialist selection</h1><p class="sub">Select packs plus explicit specialists. Any container requirement is automatically added to the reconciliation plan.</p></div><div><button class="btn" id="select-all-specialists">Select all</button> <button class="btn" id="deselect-all-specialists">Deselect all</button> <button class="btn primary" id="save-selection">Save selection</button></div></div><div class="grid"><div class="card"><div class="cardhead"><h2>Available selections</h2><p>Use the same desired-state model as the CLI picker.</p></div><div id="specialist-list"></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">Resolved</p><h2 id="resolved">— specialists</h2><p id="container">Select a deployment first.</p></div><div class="detail"><h3>Dependency check</h3><p>Removing a specialist needed by a workflow makes routing invalid until it is updated. Nothing is silently removed in AWS.</p></div></aside></div></section>
 <section id="routing" class="view"><p class="ey">Approved execution templates</p><div class="head"><div><h1>Workflow routing</h1><p class="sub">A pack makes specialists available; a template explicitly determines execution order and source-type routing.</p></div><div><button class="btn" id="select-all-routing">Select available</button> <button class="btn" id="deselect-all-routing">Deselect all</button> <button class="btn primary" id="save-routing">Save routing</button></div></div><div class="grid"><div class="card"><div class="cardhead"><h2>Workflow templates</h2><p>Native templates become available only when their processor is selected.</p></div><div id="routing-list"></div><div id="routing-error" class="warn hidden"></div></div><aside class="card"><div class="detail"><h3>Automatic dispatch</h3><p>An omitted workflow ID is selected by configured source type. An explicit request workflow ID always wins.</p></div><div class="detail"><h3>Guarded customization</h3><p>Templates are validated and release-pinned. Arbitrary graph editing is intentionally excluded.</p></div></aside></div></section>
 <section id="packs" class="view"><p class="ey">Reusable definitions</p><div class="head"><div><h1>Pack library</h1><p class="sub">Packs are reusable selection presets. Editing one does not deploy it; the next configuration load surfaces its impact.</p></div><button class="btn primary" id="new-pack">Create pack</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Pack definitions</h2><p>A pack in use cannot be deleted until dependent deployments are migrated.</p></div><div id="pack-list"></div></div><aside class="card"><div class="detail"><h3>Order is not execution</h3><p>Pack membership is a composition convenience. Workflow templates define run order and artifact contracts.</p></div></aside></div></section>
-<section id="review" class="view"><p class="ey">Reconciliation preview</p><div class="head"><div><h1>Review before the CLI applies</h1><p class="sub">The configuration service creates this local plan. The CLI re-validates it and runs preflight before any AWS mutation.</p></div><button class="btn soft" data-to="routing">Back to routing</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Required update path</h2><p id="plan-summary">Load a deployment to calculate the plan.</p></div><div id="plan-list"></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">CLI executor</p><h2>Ready when you are</h2><p>The browser does not invoke deployment commands.</p><div class="code" id="cli-command">./deploy.sh headless resume</div><button class="btn" id="copy">Copy CLI command</button></div><div class="detail"><h3>Apply safely</h3><p id="apply-note">The CLI will ask you to select the deployment and confirm after fresh preflight.</p></div></aside></div></section>
+<section id="review" class="view"><p class="ey">Reconciliation preview</p><div class="head"><div><h1>Review before the CLI applies</h1><p class="sub">The configuration service creates this local plan. The CLI re-validates it and runs preflight before any AWS mutation.</p></div><button class="btn soft" data-to="routing">Back to routing</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Required update path</h2><p id="plan-summary">Open a configuration to calculate the plan.</p></div><div id="plan-list"></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">CLI executor</p><h2>Ready when you are</h2><p>The browser does not invoke deployment commands.</p><div class="code" id="cli-command">Open a configuration to create the CLI handoff.</div><button class="btn" id="copy">Copy CLI command</button></div><div class="detail"><h3>Return to your terminal</h3><p id="return-to-terminal">Your choices are saved locally. Copy the command, return to the terminal that opened this planner, then run it there. The CLI performs preflight and asks for confirmation.</p></div><div class="detail"><h3>Apply safely</h3><p id="apply-note">The CLI will ask you to select the deployment and confirm after fresh preflight.</p></div></aside></div></section>
 </main></div><div id="pack-modal" class="modal"><div class="dialog"><div class="head"><div><p class="ey">Pack library</p><h2>Create or update pack</h2></div><button class="btn" data-close>Close</button></div><div class="field"><label>Name</label><input id="pack-name" placeholder="accessibility-review"></div><div class="field"><label>Description</label><input id="pack-description" placeholder="Short description"></div><div class="field"><label>Members (comma-separated specialist IDs)</label><input id="pack-members" placeholder="full_text_specialist, layout_specialist"></div><button class="btn primary" id="save-pack">Save pack</button></div></div><div id="toast" class="toast"></div>
 <script>
 const token=new URLSearchParams(location.search).get('token');let state=null,catalogEntries=[],packDefs=[],editingPack=null;
@@ -384,8 +438,8 @@ let packRows=packDefs.map(p=>row(p.display_name,p.description,s.packs.includes(p
 document.querySelectorAll('#specialist-list .row').forEach(x=>x.onclick=()=>{x.classList.toggle('on');x.querySelector('.check').textContent=x.classList.contains('on')?'✓':''});
 let templates=[['standard-document-analysis','PDF / image analysis','PDF, PNG, JPEG → page conversion → classify → approved page specialists','PDF/image',[],null],['native-docx-analysis','Native DOCX analysis','DOCX → native processor → private result artifact','DOCX',['docx_processor'],null],['native-pptx-analysis','Native PPTX analysis','PPTX → native processor → private result artifact','PPTX',['pptx_processor'],null],['native-xlsx-analysis','Native XLSX workbook analysis','XLSX → native workbook evidence → conditional pasted-image Vision enrichment → canonical BADGERS XML','XLSX',['xlsx_processor'],'headless']];document.querySelector('#routing-list').innerHTML=templates.map(t=>{let profileAvailable=!t[5]||s.profile===t[5];let enabled=profileAvailable&&t[4].every(name=>s.resolved_specialists.includes(name));let active=route.templates.includes(t[0]);let unavailable=!profileAvailable?'available in Headless only':t[0]==='native-xlsx-analysis'?'select the Workbook Analysis pack first':'select processor first';return row(t[1],t[2],active,{text:enabled?t[3]:unavailable,kind:enabled?'g':'a'},`data-template="${t[0]}" data-enabled="${enabled}"`)}).join('');
 document.querySelectorAll('#routing-list .row').forEach(x=>x.onclick=()=>{if(x.dataset.enabled==='false')return;x.classList.toggle('on');x.querySelector('.check').textContent=x.classList.contains('on')?'✓':''});let err=document.querySelector('#routing-error');err.textContent=route.error||'';err.classList.toggle('hidden',!route.error);renderPlan()}
-function renderPlan(){if(!state)return;api(`/api/plan?id=${encodeURIComponent(state.deployment_id)}&profile=${state.profile}`).then(p=>{document.querySelector('#plan-summary').textContent=`${p.required_stages.length} controlled stages are required before desired and applied state match.`;document.querySelector('#plan-list').innerHTML=p.required_stages.map((x,i)=>`<div class="row"><span class="pill purple">${i+1}</span><div class="copy"><b>${x}</b><small>${i===0?'Validated by a fresh preflight before AWS changes.':'Runs only if the reviewed configuration requires it.'}</small></div></div>`).join('');document.querySelector('#cli-command').textContent=p.cli_next_step;document.querySelector('#apply-note').textContent=p.apply_note}).catch(e=>toast(e.message))}
-async function load(){try{let data=await Promise.all([api(`/api/configuration?id=${encodeURIComponent(document.querySelector('#deployment').value)}&profile=${document.querySelector('#profile').value}`),loadPacks(),loadCatalog()]);state=data[0];render();toast('Local desired state loaded.')}catch(e){toast(e.message)}}
+function renderPlan(){if(!state)return;api(`/api/plan?id=${encodeURIComponent(state.deployment_id)}&profile=${state.profile}`).then(p=>{document.querySelector('#plan-summary').textContent=`${p.required_stages.length} controlled stages are required before desired and applied state match.`;document.querySelector('#plan-list').innerHTML=p.required_stages.map((x,i)=>`<div class="row"><span class="pill purple">${i+1}</span><div class="copy"><b>${x}</b><small>${i===0?'Validated by a fresh preflight before AWS changes.':'Runs only if the reviewed configuration requires it.'}</small></div></div>`).join('');document.querySelector('#cli-command').textContent=p.cli_next_step;document.querySelector('#return-to-terminal').textContent=`Your choices for "${state.deployment_id}" are saved locally. Copy the command, return to the terminal that opened this planner, then run it there and select "${state.deployment_id}" when prompted.`;document.querySelector('#apply-note').textContent=`${p.apply_note} Select "${state.deployment_id}" when prompted.`}).catch(e=>toast(e.message))}
+async function load(){let deploymentId=document.querySelector('#deployment').value.trim(),profile=document.querySelector('#profile').value;if(!deploymentId)return toast('Enter a deployment ID to open or create local configuration.');if(!profile)return toast('Choose a product profile first.');try{let data=await Promise.all([api(`/api/configuration?id=${encodeURIComponent(deploymentId)}&profile=${profile}`),loadPacks(),loadCatalog()]);state=data[0];render();toast('Local desired state loaded.')}catch(e){toast(e.message)}}
 async function loadPacks(){let profile=state?state.profile:document.querySelector('#profile').value;packDefs=await api(`/api/packs?profile=${encodeURIComponent(profile)}`);document.querySelector('#pack-list').innerHTML=packDefs.map(x=>`<div class="row"><div class="copy"><b>${esc(x.display_name)}</b><small>${x.specialists.length} members · version ${esc(x.version)} · ${esc(x.description)}</small></div><button class="btn" data-edit="${esc(x.name)}">Edit</button><button class="btn" data-delete="${esc(x.name)}">Delete</button></div>`).join('');document.querySelectorAll('[data-edit]').forEach(x=>x.onclick=()=>openPack(x.dataset.edit));document.querySelectorAll('[data-delete]').forEach(x=>x.onclick=()=>deletePack(x.dataset.delete))}
 async function loadCatalog(){catalogEntries=await api('/api/catalog')}
 document.querySelector('#load').onclick=load;document.querySelector('#save-selection').onclick=async()=>{if(!state)return toast('Load a deployment first.');try{let packs=[...document.querySelectorAll('[data-pack].on')].map(x=>x.dataset.pack),specialists=[...document.querySelectorAll('[data-specialist].on')].map(x=>x.dataset.specialist);state=await api('/api/selection',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,packs,specialists,expected_revision:state.state.specialist_revision})});render();toast('Specialist desired state saved; dependent stages are pending.')}catch(e){toast(e.message)}};
@@ -397,29 +451,42 @@ async function deletePack(name){let confirmation=prompt(`Deleting "${name}" only
 document.querySelector('#new-pack').onclick=()=>openPack();document.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>document.querySelector('#pack-modal').classList.remove('on'));document.querySelector('#save-pack').onclick=async()=>{try{await api('/api/packs',{method:'POST',body:JSON.stringify({name:document.querySelector('#pack-name').value,description:document.querySelector('#pack-description').value,specialists:document.querySelector('#pack-members').value.split(',').map(x=>x.trim()).filter(Boolean)})});document.querySelector('#pack-modal').classList.remove('on');editingPack=null;await loadPacks();if(state)render();toast('Pack saved; it is not deployed until selected.')}catch(e){toast(e.message)}};document.querySelector('#copy').onclick=()=>navigator.clipboard.writeText(document.querySelector('#cli-command').textContent).then(()=>toast('CLI command copied.'));if(['overview','specialists','routing','packs','review'].includes(requestedView))switchTo(requestedView);Promise.all([loadPacks(),loadCatalog()]).catch(e=>toast(e.message));
 </script></body></html>"""
 
+_TAGS_SECTION = r"""
+<section id="tags" class="view"><p class="ey">Deployment metadata</p><div class="head"><div><h1>Resource tags</h1><p class="sub">Add only the POC ownership, cost-allocation, and organization-required tags that apply to this deployment. Stable identity tags are added automatically.</p></div><div><button class="btn" id="add-tag">Add custom tag</button> <button class="btn primary" id="save-tags">Save tags</button></div></div><div class="grid"><div class="card"><div class="cardhead"><h2>Customer-configured tags</h2><p>New configurations begin empty; these values are deployed to taggable resources in every enabled BADGERS stack.</p></div><div class="pad"><div id="tag-list"></div></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">Added automatically</p><h2>Deployment identity</h2><p id="tag-identity">Open a configuration first.</p></div><div class="detail"><h3>Deployment impact</h3><p>Saving changed tags marks every enabled stack for reconciliation on the next CLI deployment. Review that handoff before applying it.</p></div><div class="detail"><h3>Tag rules</h3><p>Keys must be unique and may not use the reserved <code>aws:</code> prefix. Keep document and session identifiers out of tags.</p></div></aside></div></section>
+"""
+
 _OBSERVABILITY_SECTION = r"""
-<section id="observability" class="view"><p class="ey">Optional monitoring add-on</p><div class="head"><div><h1>Observability plan</h1><p class="sub">Choose a monitoring posture and a handoff destination. This browser saves only local desired state; it does not inspect an AWS account or create alarms.</p></div><button class="btn primary" id="save-observability">Save observability plan</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Monitoring posture</h2><p>Start with stock console links, then opt into a candidate baseline or enhanced plan.</p></div><div class="pad"><div class="field"><label for="observability-mode">Mode</label><select id="observability-mode"><option value="links">Links only — no new monitoring resources</option><option value="baseline">Baseline — dashboard and operational alarms</option><option value="enhanced">Enhanced — baseline plus business-health checks</option></select></div><div class="field"><label for="notification-kind">Notification handoff</label><select id="notification-kind"><option value="none">None — console links and alarms only</option><option value="sns">Amazon SNS topic ARN</option><option value="eventbridge">Amazon EventBridge event bus ARN</option></select></div><div class="field" id="notification-target-field"><label for="notification-target">Destination ARN</label><input id="notification-target" autocomplete="off" spellcheck="false" placeholder="arn:aws:sns:region:account:topic"></div></div><div class="detail"><h3>Quota gate stays in the CLI</h3><p>Before a future observability deploy, the CLI must check live dashboard and alarm counts, service quotas, and destination permissions. This local estimate is intentionally not an AWS preflight.</p></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">Candidate footprint</p><h2 id="observability-title">Load a deployment</h2><p id="observability-note">A local estimate will appear here.</p><div class="stats"><div class="stat"><b id="observability-alarms">—</b><small>standard alarms</small></div><div class="stat"><b id="observability-dashboards">—</b><small>dashboards</small></div></div></div><div class="detail"><h3>Included coverage</h3><p id="observability-coverage">Load a deployment first.</p></div><div class="detail"><h3>Local planning only</h3><p id="observability-status">No AWS inventory, credentials, SDK calls, shell commands, or deployments are available here.</p></div></aside></div></section>
+<section id="observability" class="view"><p class="ey">Deployment monitoring</p><div class="head"><div><h1>Observability</h1><p class="sub">Choose what the CLI should deploy for this configuration. CloudWatch alarms remain visible without a notification destination.</p></div><button class="btn primary" id="save-observability">Save observability choice</button></div><div class="grid"><div class="card"><div class="cardhead"><h2>Monitoring posture</h2><p>Choose no added CloudWatch resources, Baseline coverage, or Enhanced workflow latency coverage.</p></div><div class="pad"><div class="field"><label for="observability-mode">Mode</label><select id="observability-mode"><option value="links">No added CloudWatch resources — no dashboard or alarms</option><option value="baseline">Baseline — dashboard and operational alarms</option><option value="enhanced">Enhanced — baseline plus workflow latency</option></select><p id="observability-mode-help" class="field-help">Enhanced is available for Full and Headless because it monitors workflow execution time.</p></div><div class="field"><label for="notification-kind">Notification handoff</label><select id="notification-kind"><option value="none">None — CloudWatch alarms only</option><option value="sns">Amazon SNS topic ARN</option><option value="eventbridge">Amazon EventBridge event bus ARN</option></select></div><div class="field" id="notification-target-field"><label for="notification-target">Destination ARN</label><input id="notification-target" autocomplete="off" spellcheck="false" placeholder="arn:aws:sns:region:account:topic"></div></div><div class="detail"><h3>Applied by the CLI</h3><p>The next CLI deployment validates this saved choice and deploys or removes the matching CloudWatch resources. This browser never accesses AWS.</p></div></div><aside class="card"><div class="side"><p class="ey" style="color:#ddd6ff">Deployment footprint</p><h2 id="observability-title">Open a configuration</h2><p id="observability-note">A local estimate will appear here.</p><div class="stats"><div class="stat"><b id="observability-alarms">—</b><small>CloudWatch alarms</small></div><div class="stat"><b id="observability-dashboards">—</b><small>dashboards</small></div></div></div><div class="detail"><h3>Included coverage</h3><p id="observability-coverage">Open a configuration first.</p></div><div class="detail"><h3>Deployment status</h3><p id="observability-status">No observability deployment has been recorded.</p></div></aside></div></section>
 """
 
 _ONBOARDING_SECTIONS = r"""
-<section id="welcome" class="view on"><div class="welcome"><p class="ey">Welcome to BADGERS</p><h1>Plan a deployment with confidence.</h1><p class="sub">This local planner prepares configuration for the deployment CLI. Open an existing local configuration or create one, choose capabilities and routing, then review the handoff. It never creates, changes, or deletes AWS resources.</p><div class="welcome-actions"><button class="btn primary" data-to="overview">Open or create configuration</button><button class="btn soft" data-to="tutorial">See the tutorial</button></div><div class="welcome-steps"><div class="welcome-step"><b>Choose a configuration</b><span>Open a saved deployment configuration or create one with a new ID and profile.</span></div><div class="welcome-step"><b>Set up capabilities</b><span>Select specialist packs, routing templates, and optional monitoring.</span></div><div class="welcome-step"><b>Review the handoff</b><span>Inspect the planned changes, then hand off to the CLI for preflight and deployment.</span></div></div></div></section>
-<section id="tutorial" class="view"><p class="ey">How it works</p><div class="head"><div><h1>Configuration planner tutorial</h1><p class="sub">Use this screen to prepare a reviewed desired state. The CLI remains the only path that can make AWS changes.</p></div><button class="btn soft" data-to="welcome">Back to welcome</button></div><div class="tutorial-list"><div class="row"><span class="pill purple">1</span><div class="copy"><b>Start on Overview</b><small>Enter a lowercase deployment ID, choose Full, Headless, or Specialists, and click Load configuration.</small></div></div><div class="row"><span class="pill purple">2</span><div class="copy"><b>Choose capabilities</b><small>In Specialists, select packs or individual specialists. The planner flags container requirements automatically.</small></div></div><div class="row"><span class="pill purple">3</span><div class="copy"><b>Set workflow routing</b><small>Enable templates whose processors are selected. Invalid dependencies are shown before anything reaches the CLI.</small></div></div><div class="row"><span class="pill purple">4</span><div class="copy"><b>Optionally plan observability</b><small>Choose a local monitoring posture and notification handoff. AWS quota and permission checks happen later in CLI preflight.</small></div></div><div class="row"><span class="pill purple">5</span><div class="copy"><b>Review and deploy through the CLI</b><small>Review the required stages, copy the proposed command, and run it when you are ready.</small></div></div></div><div class="welcome-actions"><button class="btn primary" data-to="overview">Begin configuration</button></div></section>
+<section id="welcome" class="view on"><div class="welcome"><p class="ey">Welcome to BADGERS</p><h1>Plan a deployment with confidence.</h1><p class="sub">This local planner saves and validates deployment choices before the CLI deploys them. It never creates, changes, or deletes AWS resources.</p><div class="configuration-paths"><button class="configuration-path" data-config-intent="existing"><span class="path-kicker">Existing configuration</span><b>Use an existing local configuration</b><span>Open a deployment configuration already saved on this machine, validate it, and review its CLI handoff.</span></button><button class="configuration-path featured" data-config-intent="guided"><span class="path-kicker">Guided setup</span><b>I’d prefer a visual guide to configuring my deployment</b><span>Follow the walkthrough to choose a product profile, specialists, routing, tags, and optional monitoring.</span></button></div><div class="welcome-actions"><button class="btn soft" data-to="tutorial">Preview the visual guide</button></div><div class="return-reminder"><b>After configuration, return to your terminal.</b><span>Use Review &amp; CLI handoff to copy the next command. Then return to the terminal that opened this planner and run it there; the CLI performs preflight and asks for confirmation before AWS changes.</span></div></div></section>
+<section id="tutorial" class="view"><p class="ey">How it works</p><div class="head"><div><h1>Configuration planner tutorial</h1><p class="sub">Use this screen to prepare a reviewed desired state. The CLI remains the only path that can make AWS changes.</p></div><button class="btn soft" data-to="welcome">Back to welcome</button></div><div class="tutorial-list"><div class="row"><span class="pill purple">1</span><div class="copy"><b>Open or create a configuration</b><small>Open a saved configuration, or enter a lowercase deployment ID, choose Full, Headless, or Specialists, and create local desired state.</small></div></div><div class="row"><span class="pill purple">2</span><div class="copy"><b>Choose capabilities</b><small>In Specialists, select packs or individual specialists. The planner flags container requirements automatically.</small></div></div><div class="row"><span class="pill purple">3</span><div class="copy"><b>Set workflow routing</b><small>Enable templates whose processors are selected. Invalid dependencies are shown before anything reaches the CLI.</small></div></div><div class="row"><span class="pill purple">4</span><div class="copy"><b>Set deployment tags</b><small>Add the ownership, cost-allocation, or organization-required tags your POC requires.</small></div></div><div class="row"><span class="pill purple">5</span><div class="copy"><b>Choose observability</b><small>Baseline and Enhanced are deployed by the CLI; notification handoff remains optional.</small></div></div><div class="row"><span class="pill purple">6</span><div class="copy"><b>Return to your terminal to deploy</b><small>Open Review &amp; CLI handoff, copy the command, then return to the terminal that opened this planner. The CLI re-validates the configuration, runs preflight, and asks for confirmation.</small></div></div></div><div class="welcome-actions"><button class="btn primary" data-config-intent="guided">Begin guided configuration</button></div></section>
 """
 
 _OBSERVABILITY_SCRIPT = r"""
-function renderObservabilityReview(plan){if(!state||!state.observability)return;let o=state.observability,r=o.candidate_plan.resources,host=document.querySelector('#plan-list');let review=document.querySelector('#observability-review');if(!review){review=document.createElement('div');review.id='observability-review';review.className='detail';host.parentElement.appendChild(review)}let notification=o.notification.kind==='none'?'No notification handoff':`${o.notification.kind.toUpperCase()} handoff selected`;review.innerHTML=`<h3>Observability add-on — ${esc(o.mode)}</h3><p>${r.cloudwatch_dashboards} dashboard, ${r.standard_alarms} standard alarms, ${r.composite_alarms} composite alarms. ${esc(notification)}. ${esc(plan.observability_handoff)}</p>`;}
-function renderObservability(){if(!state||!state.observability)return;let o=state.observability,p=o.candidate_plan,r=p.resources;document.querySelector('#observability-mode').value=o.mode;document.querySelector('#notification-kind').value=o.notification.kind;document.querySelector('#notification-target').value=o.notification.target||'';let disabled=o.notification.kind==='none';document.querySelector('#notification-target-field').classList.toggle('hidden',disabled);document.querySelector('#notification-target').disabled=disabled;document.querySelector('#observability-title').textContent=`${o.mode[0].toUpperCase()+o.mode.slice(1)} monitoring`;document.querySelector('#observability-note').textContent=p.note;document.querySelector('#observability-alarms').textContent=r.standard_alarms;document.querySelector('#observability-dashboards').textContent=r.cloudwatch_dashboards;document.querySelector('#observability-coverage').textContent=p.coverage.join(' · ');document.querySelector('#observability-status').textContent=`Local desired-state revision ${o.revision}. ${o.in_sync?'Applied state matches.':'No observability deployment has been recorded.'}`;}
+function renderObservabilityReview(plan){if(!state||!state.observability)return;let o=state.observability,r=o.candidate_plan.resources,host=document.querySelector('#plan-list');let review=document.querySelector('#observability-review');if(!review){review=document.createElement('div');review.id='observability-review';review.className='detail';host.parentElement.appendChild(review)}let notification=o.notification.kind==='none'?'No notification handoff':`${o.notification.kind.toUpperCase()} handoff selected`;review.innerHTML=`<h3>Observability add-on — ${esc(o.mode)}</h3><p>${r.cloudwatch_dashboards} dashboard, ${r.standard_alarms} CloudWatch alarms, ${r.composite_alarms} composite alarms. ${esc(notification)}. ${esc(plan.observability_handoff)}</p>`;}
+function renderObservability(){if(!state||!state.observability)return;let o=state.observability,p=o.candidate_plan,r=p.resources,enhanced=document.querySelector('#observability-mode option[value="enhanced"]'),enhancedAvailable=state.profile!=='specialists';enhanced.disabled=!enhancedAvailable;enhanced.textContent=enhancedAvailable?'Enhanced — baseline plus workflow latency':'Enhanced — requires Full or Headless';document.querySelector('#observability-mode-help').textContent=enhancedAvailable?'Enhanced is available because this profile has workflow execution-time signals.':'Enhanced is unavailable for Specialists because that profile has no workflow execution-time signal.';document.querySelector('#observability-mode').value=o.mode;document.querySelector('#notification-kind').value=o.notification.kind;document.querySelector('#notification-target').value=o.notification.target||'';let disabled=o.notification.kind==='none';document.querySelector('#notification-target-field').classList.toggle('hidden',disabled);document.querySelector('#notification-target').disabled=disabled;document.querySelector('#observability-title').textContent=o.mode==='links'?'No added CloudWatch resources':`${o.mode[0].toUpperCase()+o.mode.slice(1)} monitoring`;document.querySelector('#observability-note').textContent=p.note;document.querySelector('#observability-alarms').textContent=r.standard_alarms;document.querySelector('#observability-dashboards').textContent=r.cloudwatch_dashboards;document.querySelector('#observability-coverage').textContent=p.coverage.join(' · ');document.querySelector('#observability-status').textContent=`Local desired-state revision ${o.revision}. ${o.in_sync?'Applied state matches.':'No observability deployment has been recorded.'}`;}
 function updateNotificationTarget(){let disabled=document.querySelector('#notification-kind').value==='none';document.querySelector('#notification-target-field').classList.toggle('hidden',disabled);document.querySelector('#notification-target').disabled=disabled;if(disabled)document.querySelector('#notification-target').value='';}
 document.querySelector('#notification-kind').onchange=updateNotificationTarget;
-document.querySelector('#save-observability').onclick=async()=>{if(!state)return toast('Load a deployment first.');try{let mode=document.querySelector('#observability-mode').value,notification_kind=document.querySelector('#notification-kind').value,notification_target=document.querySelector('#notification-target').value;state=await api('/api/observability',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,mode,notification_kind,notification_target,expected_revision:state.state.observability_revision})});render();toast('Observability plan saved locally. AWS quota checks remain a CLI preflight.')}catch(e){toast(e.message)}};
+document.querySelector('#save-observability').onclick=async()=>{if(!state)return toast('Open a configuration first.');try{let mode=document.querySelector('#observability-mode').value,notification_kind=document.querySelector('#notification-kind').value,notification_target=document.querySelector('#notification-target').value;state=await api('/api/observability',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,mode,notification_kind,notification_target,expected_revision:state.state.observability_revision})});render();toast('Observability choice saved. The next CLI run will deploy it.')}catch(e){toast(e.message)}};
+"""
+
+_TAGS_SCRIPT = r"""
+function tagRow(key='',value=''){return `<div class="tag-row"><input data-tag-key value="${esc(key)}" aria-label="Tag key" placeholder="tag key"><input data-tag-value value="${esc(value)}" aria-label="Tag value" placeholder="tag value"><button class="btn danger" data-remove-tag>Remove</button></div>`}
+function renderTags(){if(!state||!state.tags)return;let host=document.querySelector('#tag-list');host.innerHTML=Object.entries(state.tags.tags||{}).map(([key,value])=>tagRow(key,value)).join('')||'<div class="empty">No tags configured yet.</div>';host.querySelectorAll('[data-remove-tag]').forEach(button=>button.onclick=()=>{button.parentElement.remove();if(!host.children.length)host.innerHTML='<div class="empty">No tags configured yet.</div>'});document.querySelector('#tag-identity').textContent=`deployment_id: ${state.deployment_id} · profile: ${state.profile} · managed_by: cdk`;}
+function addTag(){if(!state)return toast('Open a configuration first.');let host=document.querySelector('#tag-list');if(host.querySelector('.empty'))host.innerHTML='';host.insertAdjacentHTML('beforeend',tagRow());host.querySelector('[data-tag-key]:last-of-type')?.focus();}
+function collectedTags(){let tags={};for(let row of document.querySelectorAll('#tag-list .tag-row')){let key=row.querySelector('[data-tag-key]').value.trim(),value=row.querySelector('[data-tag-value]').value.trim();if(!key&&!value)continue;if(!key||!value)throw Error('Every custom tag needs both a key and a value.');if(Object.hasOwn(tags,key))throw Error(`Duplicate tag key: ${key}`);tags[key]=value;}return tags;}
+document.querySelector('#add-tag').onclick=addTag;
+document.querySelector('#save-tags').onclick=async()=>{if(!state)return toast('Open a configuration first.');try{state=await api('/api/tags',{method:'POST',body:JSON.stringify({deployment_id:state.deployment_id,profile:state.profile,tags:collectedTags(),expected_revision:state.state.tag_revision})});render();toast('Deployment tags saved. The next CLI run redeploys enabled stacks to reconcile them.')}catch(e){toast(e.message)}};
 """
 
 _SPECIALIST_SELECTION_CSS = r"""
-.selection-section + .selection-section .selection-head{margin-top:22px;border-top:1px solid var(--l)}.selection-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.selection-toggle{display:inline-flex;align-items:center;gap:7px;color:#4d5566;font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap}.row.select:hover{background:#f6fcf8}.row.on{background:#f3fbf6}.row:not(.on) .check,.selection-toggle input:not(:checked):not(:indeterminate){border-color:#b8bfcc;background-color:#fff;background-image:none}.selection-toggle input{appearance:none;width:16px;height:16px;margin:0;border:1px solid #b8bfcc;border-radius:4px;background:#fff;cursor:pointer}.selection-toggle input:checked{border-color:var(--cg-border);background-color:var(--cg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E")}.selection-toggle input:indeterminate{border-color:var(--cg-border);background-color:var(--cg);background-image:linear-gradient(white,white);background-repeat:no-repeat;background-position:center;background-size:8px 2px}.btn.danger{border-color:#b14444;color:#8e3030}.btn.danger:hover{background:#fff1f1}.empty{padding:22px 18px;color:var(--m);font-size:12px}.head>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.welcome{max-width:780px;margin:36px auto}.welcome .sub{max-width:680px;font-size:15px}.welcome-actions{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}.welcome-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.welcome-step{padding:16px;border:1px solid var(--l);border-radius:10px;background:#fff;box-shadow:0 7px 23px #252b3b0b}.welcome-step b,.welcome-step span{display:block}.welcome-step b{margin-bottom:5px}.welcome-step span{color:var(--m);font-size:12px}.tutorial-list{overflow:hidden;border:1px solid var(--l);border-radius:11px;background:#fff;box-shadow:0 7px 23px #252b3b0b}.tutorial-list .row:last-child{border-bottom:0}@media(max-width:760px){.head{flex-direction:column}.head>div:last-child{justify-content:flex-start}.welcome{margin:8px auto}.welcome-steps{grid-template-columns:1fr}}
+.selection-section + .selection-section .selection-head{margin-top:22px;border-top:1px solid var(--l)}.selection-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.selection-toggle{display:inline-flex;align-items:center;gap:7px;color:#4d5566;font-size:12px;font-weight:750;cursor:pointer;white-space:nowrap}.row.select:hover{background:#f6fcf8}.row.on{background:#f3fbf6}.row:not(.on) .check,.selection-toggle input:not(:checked):not(:indeterminate){border-color:#b8bfcc;background-color:#fff;background-image:none}.selection-toggle input{appearance:none;width:16px;height:16px;margin:0;border:1px solid #b8bfcc;border-radius:4px;background:#fff;cursor:pointer}.selection-toggle input:checked{border-color:var(--cg-border);background-color:var(--cg);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8 3 3 7-7' fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'/%3E%3C/svg%3E")}.selection-toggle input:indeterminate{border-color:var(--cg-border);background-color:var(--cg);background-image:linear-gradient(white,white);background-repeat:no-repeat;background-position:center;background-size:8px 2px}.btn.danger{border-color:#b14444;color:#8e3030}.btn.danger:hover{background:#fff1f1}.empty{padding:22px 18px;color:var(--m);font-size:12px}.head>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.welcome{max-width:780px;margin:36px auto}.welcome .sub{max-width:680px;font-size:15px}.welcome-actions{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0}.configuration-paths{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0}.configuration-path{appearance:none;text-align:left;padding:18px;border:1px solid var(--l);border-radius:11px;background:#fff;box-shadow:0 7px 23px #252b3b0b;cursor:pointer;color:var(--i)}.configuration-path:hover{border-color:#bcb0f4;background:#fbfaff}.configuration-path.featured{border-color:#bcb0f4;background:#faf9ff}.configuration-path>*{display:block}.configuration-path b{margin:7px 0;font-size:15px;line-height:1.3}.configuration-path>span:last-child{color:var(--m);font-size:12px;line-height:1.5}.path-kicker{color:var(--v);font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.return-reminder{display:flex;gap:10px;align-items:flex-start;padding:13px 15px;border:1px solid #cde7da;border-radius:9px;background:#f4fbf7;color:#315f4b;font-size:12px}.return-reminder b{white-space:nowrap}.return-reminder span{line-height:1.5}.tutorial-list{overflow:hidden;border:1px solid var(--l);border-radius:11px;background:#fff;box-shadow:0 7px 23px #252b3b0b}.tutorial-list .row:last-child{border-bottom:0}@media(max-width:760px){.head{flex-direction:column}.head>div:last-child{justify-content:flex-start}.welcome{margin:8px auto}.configuration-paths{grid-template-columns:1fr}.return-reminder{display:block}.return-reminder b{display:block;margin-bottom:4px}}
 """
 
 _INFORMATION_ARCHITECTURE_CSS = r"""
-.bar-meta{display:flex;align-items:center;gap:12px}.bar-meta #active-config{font-size:12px;font-weight:700;color:#fff}.bar-meta small{color:#d3cdef}.nav-group{margin:20px 11px 5px;color:var(--m);font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.saved-configurations{margin-top:22px;border-top:1px solid var(--l);padding-top:14px}.saved-configurations h3{margin:0 0 8px;font-size:12px}.saved-configuration{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid #eff1f5}.saved-configuration:first-of-type{border-top:0}.row-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}@media(max-width:760px){.bar-meta #active-config{display:none}.saved-configuration{align-items:flex-start;flex-direction:column}.row-actions{justify-content:flex-start}.bar-meta{gap:0}}
+.bar-meta{display:flex;align-items:center;gap:12px}.bar-meta #active-config{font-size:12px;font-weight:700;color:#fff}.bar-meta small{color:#d3cdef}.nav-group{margin:20px 11px 5px;color:var(--m);font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}.saved-configurations{margin-top:22px;border-top:1px solid var(--l);padding-top:14px}.saved-configurations h3{margin:0 0 8px;font-size:12px}.saved-configuration{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-top:1px solid #eff1f5}.saved-configuration:first-of-type{border-top:0}.row-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}.tag-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(180px,2fr) auto;gap:8px;margin:8px 0}.tag-row input{width:100%;padding:9px;border:1px solid #cbd2df;border-radius:6px}.field-help{margin:5px 0 0;color:var(--m);font-size:11px}@media(max-width:760px){.bar-meta #active-config{display:none}.saved-configuration{align-items:flex-start;flex-direction:column}.row-actions{justify-content:flex-start}.bar-meta{gap:0}.tag-row{grid-template-columns:1fr}}
 """
 
 _SPECIALIST_SELECTION_SCRIPT = r"""
@@ -433,19 +500,21 @@ function renderSpecialistSelections(packRows,directRows){let host=document.query
 _CONFIGURATION_INDEX_SCRIPT = r"""
 const profileName=profile=>({full:'Full experience',headless:'Headless agent',specialists:'Specialists only'}[profile]||profile);
 let savedConfigurations=[];
-function resetLoadedConfiguration(){state=null;document.querySelector('#active-config').textContent='No configuration loaded';document.querySelector('#title-id').textContent='Not loaded';document.querySelector('#summary').textContent='Open or create a configuration to begin.';document.querySelector('#s-count').textContent='—';document.querySelector('#w-count').textContent='—';document.querySelector('#resolved').textContent='— specialists';document.querySelector('#container').textContent='Open a configuration first.';document.querySelector('#specialist-list').innerHTML='<div class="empty">Open a configuration from Deployment details to choose specialists.</div>';document.querySelector('#routing-list').innerHTML='<div class="empty">Open a configuration from Deployment details to choose workflow templates.</div>';document.querySelector('#routing-error').classList.add('hidden');document.querySelector('#plan-summary').textContent='Open a configuration to calculate the plan.';document.querySelector('#plan-list').innerHTML='';document.querySelector('#cli-command').textContent=`./deploy.sh ${document.querySelector('#profile').value} resume`;document.querySelector('#apply-note').textContent='The CLI will ask you to select the deployment and confirm after fresh preflight.';document.querySelector('#observability-title').textContent='Open a configuration';document.querySelector('#observability-note').textContent='A local estimate will appear here.';document.querySelector('#observability-alarms').textContent='—';document.querySelector('#observability-dashboards').textContent='—';document.querySelector('#observability-coverage').textContent='Open a configuration first.';document.querySelector('#observability-status').textContent='No AWS inventory, credentials, SDK calls, shell commands, or deployments are available here.';document.querySelector('#observability-review')?.remove()}
+function resetLoadedConfiguration(){state=null;document.querySelector('#active-config').textContent='No configuration loaded';document.querySelector('#title-id').textContent='Not loaded';document.querySelector('#summary').textContent='Open or create a configuration to begin.';document.querySelector('#s-count').textContent='—';document.querySelector('#w-count').textContent='—';document.querySelector('#resolved').textContent='— specialists';document.querySelector('#container').textContent='Open a configuration first.';document.querySelector('#specialist-list').innerHTML='<div class="empty">Open a configuration from Deployment details to choose specialists.</div>';document.querySelector('#routing-list').innerHTML='<div class="empty">Open a configuration from Deployment details to choose workflow templates.</div>';document.querySelector('#routing-error').classList.add('hidden');document.querySelector('#plan-summary').textContent='Open a configuration to calculate the plan.';document.querySelector('#plan-list').innerHTML='';document.querySelector('#cli-command').textContent='Open a configuration to create the CLI handoff.';document.querySelector('#return-to-terminal').textContent='Your choices are saved locally. Copy the command, return to the terminal that opened this planner, then run it there. The CLI performs preflight and asks for confirmation.';document.querySelector('#apply-note').textContent='The CLI will ask you to select the deployment and confirm after fresh preflight.';document.querySelector('#observability-title').textContent='Open a configuration';document.querySelector('#observability-note').textContent='A local estimate will appear here.';document.querySelector('#observability-alarms').textContent='—';document.querySelector('#observability-dashboards').textContent='—';document.querySelector('#observability-coverage').textContent='Open a configuration first.';document.querySelector('#observability-status').textContent='No AWS inventory, credentials, SDK calls, shell commands, or deployments are available here.';document.querySelector('#observability-review')?.remove()}
 function renderConfigurationList(){let host=document.querySelector('#configuration-list');if(!savedConfigurations.length){host.innerHTML='<div class="empty">No saved local configurations yet. Enter a new ID above to create one.</div>';return}host.innerHTML=savedConfigurations.map(item=>`<div class="saved-configuration"><div class="copy"><b>${esc(item.deployment_id)}</b><small>${esc(profileName(item.profile))} · local configuration</small></div><div class="row-actions"><button class="btn" data-open-configuration="${esc(item.deployment_id)}">Open</button><button class="btn danger" data-remove-configuration="${esc(item.deployment_id)}">Remove</button></div></div>`).join('');host.querySelectorAll('[data-open-configuration]').forEach(button=>button.onclick=()=>openSavedConfiguration(button.dataset.openConfiguration));host.querySelectorAll('[data-remove-configuration]').forEach(button=>button.onclick=()=>removeSavedConfiguration(button.dataset.removeConfiguration))}
 async function loadConfigurations(){try{savedConfigurations=await api('/api/configurations');renderConfigurationList()}catch(e){toast(e.message)}}
 async function openSavedConfiguration(deploymentId){let item=savedConfigurations.find(config=>config.deployment_id===deploymentId);if(!item)return;document.querySelector('#deployment').value=item.deployment_id;document.querySelector('#profile').value=item.profile;await load();switchTo('overview')}
 async function removeSavedConfiguration(deploymentId){let confirmation=prompt(`Removing "${deploymentId}" deletes only its local configuration. AWS resources are not deleted. Type the exact deployment ID to continue.`);if(confirmation===null)return;try{await api('/api/configuration/delete',{method:'POST',body:JSON.stringify({deployment_id:deploymentId,confirmation})});if(state?.deployment_id===deploymentId){document.querySelector('#deployment').value='';resetLoadedConfiguration()}await loadConfigurations();toast('Local configuration removed.')}catch(e){toast(e.message)}}
+function beginConfiguration(intent){switchTo('overview');window.setTimeout(()=>{let target=intent==='existing'?document.querySelector('#configuration-list'):document.querySelector('#deployment');target.scrollIntoView({behavior:'smooth',block:'center'});if(intent==='guided'){target.focus();toast('Start with a deployment ID and product profile. Your choices are saved locally.')}else{toast('Choose Open beside a saved local configuration.')}},0)}
 document.querySelector('#delete-configuration').onclick=()=>{let deploymentId=state?.deployment_id||document.querySelector('#deployment').value;if(!deploymentId)return toast('Enter a deployment ID first.');removeSavedConfiguration(deploymentId)};
+document.querySelectorAll('[data-config-intent]').forEach(button=>button.onclick=()=>beginConfiguration(button.dataset.configIntent));
 loadConfigurations();
 """
 
 _HTML = (
     _HTML.replace(
         '<button class="nav on" data-v="overview">Overview</button><button class="nav" data-v="specialists">Specialists</button><button class="nav" data-v="routing">Workflow routing</button><button class="nav" data-v="packs">Pack library</button><button class="nav" data-v="review">Review &amp; publish</button>',
-        '<button class="nav" data-v="overview">1. Deployment details</button><button class="nav" data-v="specialists">2. Specialists</button><button class="nav" data-v="routing">3. Workflow routing</button><button class="nav" data-v="observability">4. Observability <span>(optional)</span></button><button class="nav" data-v="review">5. Review &amp; CLI handoff</button><p class="nav-group">Manage</p><button class="nav" data-v="packs">Pack library</button><button class="nav" data-v="tutorial">How it works</button>',
+        '<button class="nav" data-v="overview">1. Deployment details</button><button class="nav" data-v="specialists">2. Specialists</button><button class="nav" data-v="routing">3. Workflow routing</button><button class="nav" data-v="tags">4. Resource tags</button><button class="nav" data-v="observability">5. Observability <span>(optional)</span></button><button class="nav" data-v="review">6. Review &amp; CLI handoff</button><p class="nav-group">Manage</p><button class="nav" data-v="packs">Pack library</button><button class="nav" data-v="tutorial">How it works</button>',
     )
     .replace(
         '<main>\n<section id="overview" class="view on">',
@@ -469,11 +538,15 @@ _HTML = (
     )
     .replace(
         '<label>Deployment ID</label><input id="deployment" value="beta">',
-        '<label for="deployment">Deployment ID</label><input id="deployment" value="beta" maxlength="16" pattern="[a-z][a-z0-9-]{0,15}" autocomplete="off" spellcheck="false">',
+        '<label for="deployment">Deployment ID</label><input id="deployment" maxlength="16" pattern="[a-z][a-z0-9-]{0,15}" placeholder="e.g. poc-demo" autocomplete="off" spellcheck="false">',
     )
     .replace(
         '<label>Product profile</label><select id="profile">',
         '<label for="profile">Product profile</label><select id="profile">',
+    )
+    .replace(
+        '<select id="profile"><option value="headless">Headless agent</option><option value="full">Full experience</option><option value="specialists">Specialists only</option></select>',
+        '<select id="profile"><option value="" selected disabled>Select a product profile</option><option value="full">Full experience — recommended POC start</option><option value="headless">Headless agent</option><option value="specialists">Specialists only</option></select>',
     )
     .replace(
         '<div id="specialist-list"></div>',
@@ -485,7 +558,7 @@ _HTML = (
     )
     .replace(
         '<button class="btn primary" id="load">Load configuration</button>',
-        '<button class="btn primary" id="load">Open configuration</button> <button class="btn danger" id="delete-configuration">Remove local configuration</button><div class="saved-configurations"><h3>Saved local configurations</h3><div id="configuration-list" class="empty">Loading saved local configurations…</div></div>',
+        '<button class="btn primary" id="load">Open or create local configuration</button> <button class="btn danger" id="delete-configuration">Remove local configuration</button><div class="saved-configurations"><h3>Saved local configurations</h3><div id="configuration-list" class="empty">Loading saved local configurations…</div></div>',
     )
     .replace(
         '<div><button class="btn" id="select-all-specialists">Select all</button> <button class="btn" id="deselect-all-specialists">Deselect all</button> <button class="btn primary" id="save-selection">Save selection</button></div>',
@@ -516,11 +589,11 @@ _HTML = (
         '<button class="nav" data-v="observability">Observability</button>'
         '<button class="nav" data-v="review">Review &amp; publish</button>',
     )
-    .replace("</main></div><div id=\"pack-modal\"", _OBSERVABILITY_SECTION + "</main></div><div id=\"pack-modal\"")
-    .replace("renderPlan()}", "renderPlan();renderObservability()}")
+    .replace("</main></div><div id=\"pack-modal\"", _TAGS_SECTION + _OBSERVABILITY_SECTION + "</main></div><div id=\"pack-modal\"")
+    .replace("renderPlan()}", "renderPlan();renderTags();renderObservability()}")
     .replace(
-        "document.querySelector('#apply-note').textContent=p.apply_note",
-        "document.querySelector('#apply-note').textContent=p.apply_note;renderObservabilityReview(p)",
+        "document.querySelector('#apply-note').textContent=`${p.apply_note} Select \"${state.deployment_id}\" when prompted.`",
+        "document.querySelector('#apply-note').textContent=`${p.apply_note} Select \"${state.deployment_id}\" when prompted.`;renderObservabilityReview(p)",
     )
     .replace(
         "function render(){if(!state)return;let s=state.selection,route=state.routing;",
@@ -528,11 +601,12 @@ _HTML = (
     )
     .replace(
         "['overview','specialists','routing','packs','review']",
-        "['welcome','tutorial','overview','specialists','routing','packs','observability','review']",
+        "['welcome','tutorial','overview','specialists','routing','packs','tags','observability','review']",
     )
     .replace("</style>", _SPECIALIST_SELECTION_CSS + _INFORMATION_ARCHITECTURE_CSS + "\n</style>")
     .replace("</script></body></html>", _SPECIALIST_SELECTION_SCRIPT + "\n</script></body></html>")
     .replace("</script></body></html>", _OBSERVABILITY_SCRIPT + "\n</script></body></html>")
+    .replace("</script></body></html>", _TAGS_SCRIPT + "\n</script></body></html>")
     .replace("</script></body></html>", _CONFIGURATION_INDEX_SCRIPT + "\n</script></body></html>")
 )
 
@@ -617,6 +691,8 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
             return save_routing(root, payload or {})
         if action == "observability":
             return save_observability(root, payload or {})
+        if action == "tags":
+            return save_tags(root, payload or {})
         if action == "delete_configuration":
             return delete_configuration(root, payload or {})
         deployment_id = str(query.get("id", [""])[0])
@@ -660,6 +736,7 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
         except (
             UIError,
             observability_configuration.ObservabilityConfigurationError,
+            tag_configuration.TagConfigurationError,
             specialist_selection.SelectionError,
             routing_configuration.RoutingConfigurationError,
         ) as error:
@@ -675,6 +752,7 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
                 "/api/selection": "selection",
                 "/api/routing": "routing",
                 "/api/observability": "observability",
+                "/api/tags": "tags",
                 "/api/packs": "save_pack",
                 "/api/packs/delete": "delete_pack",
                 "/api/configuration/delete": "delete_configuration",
@@ -687,6 +765,7 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
         except (
             UIError,
             observability_configuration.ObservabilityConfigurationError,
+            tag_configuration.TagConfigurationError,
             specialist_selection.SelectionError,
             routing_configuration.RoutingConfigurationError,
         ) as error:

@@ -241,6 +241,7 @@ init_state() {
   "runtime_deployed": false,
   "ui_image_pushed": false,
   "ecs_deployed": false,
+  "observability_deployed": false,
   "gateway_url": ""
 }
 EOF
@@ -1213,6 +1214,8 @@ export_cdk_env() {
   # build without every caller having to set it.
   export RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
   export BADGERS_CONFIG_RELEASE_ID="$(get_state "config_release_id")"
+  export BADGERS_TAG_STATE="$(state_file)"
+  export BADGERS_OBSERVABILITY_STATE="$(state_file)"
 }
 
 # Windows installs the CDK CLI as cdk.cmd. `uv run cdk` does not resolve that

@@ -15,6 +15,7 @@ from .vpc_stack import VpcStack
 from .dynamodb_stack import DynamoDBStack
 from .ecs_stack import ECSStack
 from .workflow_runner_stack import WorkflowRunnerStack
+from .observability_stack import ObservabilityStack
 
 __all__ = [
     "S3Stack",
@@ -32,4 +33,5 @@ __all__ = [
     "DynamoDBStack",
     "ECSStack",
     "WorkflowRunnerStack",
+    "ObservabilityStack",
 ]

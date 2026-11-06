@@ -17,6 +17,7 @@ from deployment.configuration_ui import (
     delete_configuration,
     plan,
     save_observability,
+    save_tags,
 )
 
 
@@ -30,6 +31,7 @@ def test_configuration_creates_local_desired_state_with_private_permissions(
     assert result["routing"]["templates"] == ["standard-document-analysis"]
     assert result["observability"]["mode"] == "links"
     assert result["observability"]["candidate_plan"]["resources"]["standard_alarms"] == 0
+    assert result["tags"]["tags"] == {}
     assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
 
 
@@ -38,8 +40,9 @@ def test_plan_is_a_cli_handoff_not_a_deployment_action(tmp_path: Path) -> None:
 
     assert result["cli_next_step"] == "./deploy.sh headless resume"
     assert "CLI re-runs preflight" in result["apply_note"]
-    assert "separate local add-on plan" in result["observability_handoff"]
+    assert "CLI deploys the selected observability posture" in result["observability_handoff"]
     assert "publish configuration" in result["required_stages"]
+    assert "deploy selected observability posture" in result["required_stages"]
 
 
 def test_delete_configuration_requires_exact_confirmation(tmp_path: Path) -> None:
@@ -98,15 +101,33 @@ def test_specialist_bulk_selection_is_independent_and_reactive() -> None:
 
 def test_configuration_ui_starts_with_a_welcome_screen_and_tutorial() -> None:
     assert '<section id="welcome" class="view on">' in _HTML
-    assert '>Open or create configuration</button>' in _HTML
-    assert 'data-to="tutorial">See the tutorial</button>' in _HTML
+    assert "Use an existing local configuration" in _HTML
+    assert "I’d prefer a visual guide to configuring my deployment" in _HTML
+    assert 'data-config-intent="existing"' in _HTML
+    assert 'data-config-intent="guided"' in _HTML
+    assert 'data-to="tutorial">Preview the visual guide</button>' in _HTML
     assert 'id="tutorial"' in _HTML
     assert 'data-v="tutorial">How it works</button>' in _HTML
     assert 'data-v="overview">1. Deployment details</button>' in _HTML
+    assert 'data-v="tags">4. Resource tags</button>' in _HTML
+    assert 'data-v="observability">5. Observability' in _HTML
     assert 'id="active-config">No configuration loaded</span>' in _HTML
     assert "/api/configurations" in _HTML
-    assert "<b>Choose a configuration</b>" in _HTML
-    assert "<b>1. Choose</b>" not in _HTML
+    assert "<b>Open or create a configuration</b>" in _HTML
+    assert "<b>1. Open" not in _HTML
+
+
+def test_configuration_ui_requires_an_explicit_profile_and_clear_cli_handoff() -> None:
+    assert 'placeholder="e.g. poc-demo"' in _HTML
+    assert 'Select a product profile' in _HTML
+    assert 'Full experience — recommended POC start' in _HTML
+    assert "Choose a product profile first." in _HTML
+    assert 'Select "${state.deployment_id}" when prompted.' in _HTML
+    assert "Saving changed tags marks every enabled stack for reconciliation" in _HTML
+    assert "New configurations begin empty" in _HTML
+    assert 'id="return-to-terminal"' in _HTML
+    assert "return to the terminal that opened this planner" in _HTML
+    assert "function beginConfiguration(intent)" in _HTML
 
 
 def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path: Path) -> None:
@@ -127,7 +148,7 @@ def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path
     assert observability["mode"] == "baseline"
     assert observability["notification"]["kind"] == "sns"
     assert observability["candidate_plan"]["resources"]["cloudwatch_dashboards"] == 1
-    assert observability["candidate_plan"]["resources"]["event_destinations"] == 1
+    assert observability["candidate_plan"]["resources"]["notification_routes"] == 1
 
     try:
         save_observability(
@@ -147,12 +168,58 @@ def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path
         raise AssertionError("Links mode must not allow a notification handoff.")
 
 
-def test_observability_screen_is_explicit_about_local_quota_planning() -> None:
+def test_observability_screen_explains_cli_deployment_and_optional_handoff() -> None:
     assert 'data-v="observability"' in _HTML
-    assert "Quota gate stays in the CLI" in _HTML
+    assert "Applied by the CLI" in _HTML
+    assert "CloudWatch alarms remain visible without a notification destination" in _HTML
     assert "/api/observability" in _HTML
     assert "Observability add-on" in _HTML
     assert "no aws inventory" in _HTML.lower()
+    assert "No added CloudWatch resources — no dashboard or alarms" in _HTML
+    assert "Enhanced — requires Full or Headless" in _HTML
+    assert "Enhanced is unavailable for Specialists" in _HTML
+
+
+def test_tags_are_saved_per_deployment_and_require_reconciliation(tmp_path: Path) -> None:
+    initial = configuration(tmp_path, "beta", "headless")
+    result = save_tags(
+        tmp_path,
+        {
+            "deployment_id": "beta",
+            "profile": "headless",
+            "tags": {
+                "environment": "poc",
+                "owner": "customer-team",
+                "customer:program": "claims",
+            },
+            "expected_revision": initial["state"]["tag_revision"],
+        },
+    )
+
+    assert result["tags"]["tags"] == {
+        "customer:program": "claims",
+        "environment": "poc",
+        "owner": "customer-team",
+    }
+    assert plan(tmp_path, "beta", "headless")["tags_changed"]
+    assert "reconcile deployment tags across enabled stacks" in plan(
+        tmp_path, "beta", "headless"
+    )["required_stages"]
+
+    try:
+        save_tags(
+            tmp_path,
+            {
+                "deployment_id": "beta",
+                "profile": "headless",
+                "tags": {"aws:reserved": "no"},
+                "expected_revision": result["state"]["tag_revision"],
+            },
+        )
+    except UIError as error:
+        assert "reserved by AWS" in str(error)
+    else:
+        raise AssertionError("AWS-reserved tag keys must be rejected.")
 
 
 def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path) -> None:

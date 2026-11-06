@@ -20,9 +20,9 @@ set -euo pipefail
 # This script is fully resumable — re-run after a failure to continue where you
 # left off. All operations are idempotent (safe to run multiple times).
 #
-# Stack names are BADGERS-{Name}-{suffix}. The suffix is generated once per
-# DEPLOYMENT_ID and persisted in .deploy-state/{DEPLOYMENT_ID}.json, so several
-# deployments can coexist in one account and region.
+# Stack names are BADGERS-{Name}-{DEPLOYMENT_ID}-{suffix}. The suffix is generated
+# once per deployment ID and persisted in .deploy-state/{DEPLOYMENT_ID}.json, so
+# several deployments can coexist in one account and region.
 # ───────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -311,6 +311,7 @@ PY
     invalidate_state "gateway_complete"
     invalidate_state "runtime_image_pushed"
     invalidate_state "runtime_deployed"
+    invalidate_state "observability_deployed"
     log_warn "Specialist selection changed for deployment '${DEPLOYMENT_ID}'."
     log_info "The same deployment ID will reconcile infrastructure, configuration, Lambdas, and enabled consumers."
   fi
@@ -352,6 +353,77 @@ load_routing_configuration || {
   log_error "Use menu option w to choose compatible workflow templates before deploying."
 }
 
+TAG_CONFIGURATION_CHANGED=0
+load_tag_configuration() {
+  local output_file kind value
+  output_file="$(mktemp "${TMPDIR:-/tmp}/badgers-tag-configuration.XXXXXX")" || return 1
+  if ! python3 "${SCRIPT_DIR}/deployment/tag_configuration.py" ensure \
+      --state "$(state_file)" --profile "${BADGERS_PROFILE}" --lines >"${output_file}"; then
+    sed 's/^/  /' "${output_file}" >&2
+    rm -f "${output_file}"
+    return 1
+  fi
+  TAG_CONFIGURATION_CHANGED=0
+  while IFS=$'\t' read -r kind value; do
+    [ "${kind}" = "changed" ] && [ "${value}" = "true" ] && TAG_CONFIGURATION_CHANGED=1
+  done <"${output_file}"
+  rm -f "${output_file}"
+  export BADGERS_TAG_STATE="$(state_file)"
+  if [ "${TAG_CONFIGURATION_CHANGED}" = "1" ]; then
+    invalidate_state "infra_complete"
+    invalidate_state "s3_files_uploaded"
+    invalidate_state "specialists_complete"
+    invalidate_state "gateway_complete"
+    invalidate_state "runtime_image_pushed"
+    invalidate_state "runtime_deployed"
+    invalidate_state "ecs_deployed"
+    invalidate_state "observability_deployed"
+    log_warn "Deployment tags changed for '${DEPLOYMENT_ID}'."
+    log_info "Enabled stacks will be redeployed so their taggable resources reconcile."
+  fi
+}
+
+load_tag_configuration || {
+  log_error "Saved deployment tags are invalid. Open the configuration planner to correct them."
+  exit 1
+}
+
+OBSERVABILITY_CONFIGURATION_CHANGED=0
+OBSERVABILITY_MODE="links"
+load_observability_configuration() {
+  local output_file kind value
+  output_file="$(mktemp "${TMPDIR:-/tmp}/badgers-observability-configuration.XXXXXX")" || return 1
+  if ! python3 "${SCRIPT_DIR}/deployment/observability_configuration.py" ensure \
+      --state "$(state_file)" --profile "${BADGERS_PROFILE}" --lines >"${output_file}"; then
+    sed 's/^/  /' "${output_file}" >&2
+    rm -f "${output_file}"
+    return 1
+  fi
+  OBSERVABILITY_CONFIGURATION_CHANGED=0
+  while IFS=$'\t' read -r kind value; do
+    [ "${kind}" = "changed" ] && [ "${value}" = "true" ] && OBSERVABILITY_CONFIGURATION_CHANGED=1
+  done <"${output_file}"
+  rm -f "${output_file}"
+  export BADGERS_OBSERVABILITY_STATE="$(state_file)"
+  OBSERVABILITY_MODE="$(python3 - "$(state_file)" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as file:
+    state = json.load(file)
+print(state["desired_observability_configuration"]["mode"])
+PY
+)"
+  if [ "${OBSERVABILITY_CONFIGURATION_CHANGED}" = "1" ]; then
+    invalidate_state "observability_deployed"
+  fi
+}
+
+load_observability_configuration || {
+  log_error "Saved observability choice is invalid. Open the configuration planner to correct it."
+  exit 1
+}
+
 # Headless retains CloudWatch application logs but intentionally omits optional
 # X-Ray Transaction Search.  This avoids account-level quota consumption for an
 # API-only deployment and makes the profile's infrastructure boundary explicit.
@@ -383,6 +455,16 @@ record_applied_specialist_selection() {
     --config-release-id "${config_release_id}" >/dev/null \
     || { log_error "Could not record the applied routing configuration."; return 1; }
   log_success "Specialist selection and routing reconciled with deployment state."
+}
+
+record_applied_observability_configuration() {
+  python3 "${SCRIPT_DIR}/deployment/observability_configuration.py" record-applied \
+    --state "$(state_file)" --profile "${BADGERS_PROFILE}" >/dev/null \
+    || { log_error "Could not record the applied observability configuration."; return 1; }
+  python3 "${SCRIPT_DIR}/deployment/tag_configuration.py" record-applied \
+    --state "$(state_file)" --profile "${BADGERS_PROFILE}" >/dev/null \
+    || { log_error "Could not record the applied tag configuration."; return 1; }
+  log_success "Observability and deployment tags reconciled with deployment state."
 }
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1070,6 +1152,28 @@ step_ui_deploy() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════
+# FINAL STEP: Observability
+# ══════════════════════════════════════════════════════════════════════════
+step_observability() {
+  log_step "Observability — Deploy Selected Posture"
+
+  if check_completed "observability_deployed"; then
+    [ "${DEPLOY_RESUME_MODE:-}" = "1" ] && return 0
+    log_warn "Already complete. Re-running reconciles the selected monitoring posture."
+    _confirm || return 0
+  fi
+
+  export_cdk_env
+  log_info "Deploying ${OBSERVABILITY_MODE} observability for ${DEPLOYMENT_ID}..."
+  cdk_deploy "$(_sn Observability)" || {
+    log_error "Observability deploy failed."
+    return 1
+  }
+  mark_complete "observability_deployed"
+  record_applied_observability_configuration
+}
+
+# ══════════════════════════════════════════════════════════════════════════
 # Resume — run only the steps this deployment still needs
 # ══════════════════════════════════════════════════════════════════════════
 ALL_STEPS=(step_layers step_infra step_upload step_specialists step_gateway step_runtime)
@@ -1079,6 +1183,7 @@ fi
 if [ "${UI_ENABLED}" = "1" ]; then
   ALL_STEPS+=(step_ui_build step_ui_deploy)
 fi
+ALL_STEPS+=(step_observability)
 
 # Run every step in order, skipping completed ones silently (resume mode).
 run_remaining() {
@@ -1153,6 +1258,7 @@ _deployment_progress() {
   [ "${GATEWAY_ENABLED}" = "1" ] && steps+=(gateway_complete)
   [ "${RUNTIME_ENABLED}" = "1" ] && steps+=(runtime)
   [ "${UI_ENABLED}" = "1" ] && steps+=(ui_image_pushed ecs_deployed)
+  steps+=(observability_deployed)
 
   local completed=0 step total filled empty bar_done bar_todo
   total="${#steps[@]}"
@@ -1312,6 +1418,7 @@ show_status() {
   else
     echo -e "  ${BLUE}↳ Specialists intentionally omit the agent runtime, gateway, UI, and operation ledger.${NC}"
   fi
+  _step_line "observability_deployed" "Final. Observability"
   echo ""
 
   local gateway_url
@@ -1429,7 +1536,7 @@ EOF
   echo -e "  ${BLUE}──────────────────────────────────────────────────────────────────${NC}"
   echo -e "  ${BOLD}Deployment${NC} ${DEPLOYMENT_ID}  ${BOLD}Region${NC} ${AWS_REGION}  ${BOLD}Account${NC} ${ACCOUNT_ID}"
   echo -e "  ${BOLD}Stack suffix${NC} ${STACK_SUFFIX}  ${BOLD}Resource ID${NC} $(resource_id)"
-  echo -e "  ${BLUE}${STACK_PREFIX}-{Name}-${STACK_SUFFIX}${NC}"
+  echo -e "  ${BLUE}${STACK_PREFIX}-{Name}-${DEPLOYMENT_ID}-${STACK_SUFFIX}${NC}"
   echo ""
 
   show_status
@@ -1459,6 +1566,14 @@ EOF
     _menu_step_line 7 ui_image_pushed "Browser UI Image" "build and push"
     _menu_step_line 8 ecs_deployed "Browser UI Service" "ECS deployment → submenu"
   fi
+  local observability_icon
+  if _menu_step_complete "observability_deployed"; then
+    observability_icon="${GREEN}●${NC}"
+  else
+    observability_icon="${YELLOW}○${NC}"
+  fi
+  printf "  %b     %-29s ${BLUE}%s${NC}\n" \
+    "${observability_icon}" "Final observability" "runs with 9 or r"
   echo ""
   echo -e "  ${GREEN}${BOLD}LAUNCH${NC}"
   echo -e "  ${GREEN}▶${NC} ${BOLD} 9)${NC} Run complete deployment"
@@ -1466,7 +1581,7 @@ EOF
   echo ""
   echo -e "  ${BOLD}SELECTION${NC}   s) Configure specialists   w) Configure workflow routing   k) Manage reusable packs"
   echo -e "  ${BOLD}TOOLS${NC}       c) Open configuration planner (local UI)   p) Preflight report   10) Status"
-  echo -e "               11) Reset local state   m) Model registry   0) Exit"
+  echo -e "               11) Reset local state (does not delete AWS)   m) Model registry   0) Exit"
   echo ""
   echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
   echo ""
