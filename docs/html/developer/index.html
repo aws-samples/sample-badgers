@@ -913,9 +913,11 @@
         <li><strong>AI behavior:</strong> document intended use, untrusted-content and prompt-injection handling,
           evaluation against representative documents, confidence thresholds, and human-review/failure paths.
           Research and red-team material may need a deliberately scoped operating environment.</li>
-        <li><strong>Operations:</strong> establish SLOs, alert routing, on-call ownership, incident runbooks, quota
-          and capacity review, cost controls, and recovery objectives. The observability plan is a starting point,
-          not a replacement for those decisions.</li>
+        <li><strong>Operations:</strong> choose the deployment's CloudWatch posture. Baseline supplies a dashboard
+          and visible Lambda health alarms without requiring an endpoint; Full and Headless also include workflow
+          failure and timeout alarms, while Enhanced adds workflow latency. Attach SNS or EventBridge only when your
+          organization is ready to own alert routing. Define and test the SLOs, on-call ownership, incident runbooks,
+          quota and capacity review, cost controls, and recovery objectives that turn those signals into operations.</li>
         <li><strong>Change assurance:</strong> validate the selected profile and integrations in the target account,
           including regional policy, service quotas, dependencies, and required approvals.</li>
       </ul>

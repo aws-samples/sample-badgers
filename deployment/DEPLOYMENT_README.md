@@ -110,7 +110,7 @@ owners before deploying a production workload:
 | Release and change control | Release owner, approver, and rollback process | Pin an approved immutable source tag and record the Step 3 configuration release. Validate changes with tests and profile-aware CDK synthesis before approval. |
 | Data and access boundary | Data classification, tenant isolation, retention, residency, audit, and least-privilege authorization | Keep source and result artifacts private; use the documented authenticated Headless path or IAM-scoped direct specialist invocation; keep the Full UI internal unless explicitly approved. |
 | AI and untrusted content | Intended use, review requirements, prompt-injection handling, and behavior for research/red-team material | Set the operating environment for the workload, use deterministic approved workflows, evaluate representative documents, and define confidence, review, and failure behavior outside the model. |
-| Operations and resilience | SLOs, alert destinations, on-call/incident ownership, capacity, cost, recovery, and change windows | Use CloudWatch/X-Ray signals and the local observability planner as a starting point. Configure and test the organization’s own alarms, event routing, runbooks, and recovery processes. |
+| Operations and resilience | SLOs, alert destinations, on-call/incident ownership, capacity, cost, recovery, and change windows | Select the CloudWatch posture in the local planner. Baseline alarms are visible without an endpoint; optionally add SNS or EventBridge routing, then document and test the organization’s own escalation, runbooks, and recovery processes. |
 | Account readiness | Service quotas, model access, regional policy, dependencies, and approval gates | Let CLI preflight verify supported runtime prerequisites. Add account-specific quota checks before introducing optional monitoring or new integration capacity. |
 
 These are ideas and starting controls, not a universal checklist. Follow your
@@ -186,25 +186,36 @@ groups deployment choices by lifecycle stage, and shows a green-complete/yellow-
 progress bar. It is an operator aid only; `.deploy-state/{DEPLOYMENT_ID}.json` remains
 the authoritative record of completion.
 
-### Configure packs and routing locally
+### Configure a deployment locally
 
 Before deploying, `./deploy.sh configure --ui` opens an optional local planner
 for specialist packs, specialist selection, approved workflow-routing
-templates, and an optional observability plan. Observability can be recorded as
-**links** (stock console links only), **baseline** (dashboard and operational
-alarms), or **enhanced** (baseline plus business-health checks), with an SNS
-topic or EventBridge event bus ARN as an optional notification handoff.
+templates, per-deployment resource tags, and an optional observability choice.
+The planner is organized as a small deployment journey: deployment details,
+specialists, routing, tags, monitoring, and CLI review.
 
 It is intentionally separate from deployment: the planner binds only to
 `127.0.0.1`, saves desired state locally, and shows the CLI handoff command.
-The resource count displayed for observability is an estimate, not an AWS
-query; a future observability deploy command must preflight live account
-inventory, CloudWatch quotas, and destination permissions. The planner has no
-deployment endpoint and does not access AWS credentials.
+The planner has no deployment endpoint and does not access AWS credentials.
+On the next CLI deployment, the selected posture is reconciled by a dedicated
+final CDK stage:
+
+| Posture | Deployed coverage |
+| --- | --- |
+| **No added CloudWatch resources** | No dashboard or alarms. |
+| **Baseline** | One CloudWatch dashboard, plus aggregated specialist Lambda error and throttle alarms. Full and Headless add workflow failed and timed-out alarms. |
+| **Enhanced** | Baseline plus a workflow execution-time p95 alarm. This requires Full or Headless. |
+
+Alarms are visible in CloudWatch by default. An SNS topic or EventBridge event
+bus is only needed when the customer elects a notification handoff. The
+dashboard includes investigation hints as a starting point; customers should
+own and maintain the escalation and recovery runbook for their environment.
 
 Use the returned `./deploy.sh <profile> resume` command to apply a reviewed
-change. The CLI remains the sole executor, re-runs preflight, validates the
-saved selection and routing, and asks for confirmation before AWS changes.
+change. When prompted, select the same deployment ID shown by the planner. The
+CLI remains the sole executor, re-runs preflight, validates the saved selection
+and routing, and asks for confirmation before AWS changes. Changing tags marks
+every enabled stack for reconciliation, so review the handoff before running it.
 
 ![BADGERS local configuration planner](../.github/assets/local-configuration-planner.png)
 
@@ -230,9 +241,9 @@ steps. The profile determines the menu:
 
 | Profile | Steps shown |
 | ------ | ----------- |
-| Full | 1 layers; 2 foundation; 3 immutable configuration release; 4 specialists; 5 Gateway; 6 Runtime; 7 UI image; 8 UI ECS |
-| Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime; the runner requires the Step 3 SHA |
-| Specialists | 1 layers; 2 foundation; 3 immutable configuration release; 4 selected direct-invocation specialists |
+| Full | 1 layers; 2 foundation; 3 immutable configuration release; 4 specialists; 5 Gateway; 6 Runtime; 7 UI image; 8 UI ECS; final observability reconciliation |
+| Headless | 1 layers; 2 foundation; 3 immutable configuration release; 4 curated specialists; 5 Gateway; 6 Runtime; final observability reconciliation; the runner requires the Step 3 SHA |
+| Specialists | 1 layers; 2 foundation; 3 immutable configuration release; 4 selected direct-invocation specialists; final observability reconciliation |
 
 All profiles include **`s`** (specialist selection: Space toggles, `a` selects
 all, `d` deselects all, and Enter saves), **`w`** (validated workflow-routing
@@ -1144,21 +1155,22 @@ DEPLOYMENT_ID=dev STACK_SUFFIX=a1b uv run cdk deploy --all
 
 ## 🏷️ Resource Tagging
 
-All resources are tagged using a centralized configuration in `app.py`. Customize the `deployment_tags` dict before deployment:
+Use the local configuration planner to set up to 40 customer-defined tags for
+each deployment ID. New planner configurations begin with no customer tags, so
+add the ownership, cost-allocation, and organization-required values that apply
+to the POC. The deployment adds stable identity tags such as `deployment_id`,
+`product_profile`, `stack_suffix`,
+`configuration_fingerprint`, and `managed_by=cdk` automatically. AWS-reserved
+`aws:` keys and BADGERS-generated identity keys cannot be edited in the
+planner.
 
-```python
-deployment_tags = {
-    "application_name": "badgers",
-    "application_description": "BADGERS (Broad Agentic Document Generative Extraction & Recognition System)",
-    "environment": "dev",
-    "owner": "your-team",
-    "cost_center": "your-cost-center",
-    "project_code": "your-project-code",
-    "cdk_stack_prefix": STACK_PREFIX,
-    "team": "your-team",
-    "team_contact_email": "team@company.com",
-}
-```
+Saving a tag change marks the deployment for reconciliation. Run the
+planner's `./deploy.sh <profile> resume` handoff to apply it; tag configuration
+is local until the CLI deploys the affected stacks.
+
+For direct CDK use only, `app.py` applies the same truthful deployment identity
+tags but no placeholder ownership or cost-allocation metadata. Use the planner
+when customer-defined tags are needed.
 
 These tags are applied to all resources across all stacks. Additionally, each resource gets:
 - `resource_name` - Identifier for the specific resource

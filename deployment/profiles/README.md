@@ -95,11 +95,14 @@ Every agent profile also has a persisted desired routing configuration. Use `w`
 to choose validated templates: the default PDF/image workflow, plus native
 DOCX and PPTX workflows when their processors are selected and the
 Headless XLSX workflow when the Workbook Analysis pack is selected. The optional
-`./deploy.sh configure --ui` planner presents both desired-state records and
-an optional observability posture in one local review flow. The observability
-screen records links, baseline, or enhanced monitoring plus an optional SNS or
-EventBridge handoff, but its resource count is a local estimate only. It saves
-no AWS state and hands execution back to `deploy.sh`; the future observability
-deployer must run account and quota preflight before it creates alarms.
+`./deploy.sh configure --ui` planner presents desired specialist, routing,
+tag, and observability records in one local review flow. The planner keeps its
+desired state local; `deploy.sh` applies the reviewed choice. The no-added-
+CloudWatch-resources option deploys no monitoring resources. Baseline deploys a CloudWatch dashboard and visible
+aggregate specialist error/throttle alarms; Full and Headless also add
+workflow failed and timed-out alarms. Enhanced, available to Full and
+Headless, adds workflow latency monitoring. An SNS or EventBridge handoff is
+optional, so a POC can start by reviewing alarms in CloudWatch and later
+attach the organization's notification and runbook process.
 
 ![BADGERS local pack library](../../.github/assets/local-configuration-pack-library.png)

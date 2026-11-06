@@ -93,5 +93,5 @@ the separate Headless template is only needed for durable workflow execution.
 | Understand the agent container and Gateway connection | [Runtime guide](../deployment/runtime/RUNTIME_README.md) |
 | Follow document intake, specialist execution, and results | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
 | See the Full capability definition | [Deployment profiles](../deployment/profiles/README.md) |
-| Plan packs, specialists, or document routing locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
+| Plan packs, specialists, routing, tags, or CloudWatch monitoring locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-a-deployment-locally) |
 | Choose the correct source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

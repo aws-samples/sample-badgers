@@ -103,7 +103,7 @@ also private by default; public UI access is an explicit deployment choice.
 | If you want to… | Start here |
 | --- | --- |
 | Select a product and deploy it | [Deployment reference](deployment/DEPLOYMENT_README.md) |
-| Plan packs, specialists, and workflow routing before deployment | [Local configuration planner](deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
+| Plan packs, specialists, workflow routing, deployment tags, and monitoring before deployment | [Local configuration planner](deployment/DEPLOYMENT_README.md#configure-a-deployment-locally) |
 | Run the complete application and browser workbench | [BADGERS Full](badgers-full/README.md) |
 | Integrate a durable, authenticated document API | [BADGERS Headless](badgers-headless/README.md) |
 | Invoke analyzers directly from AWS code | [BADGERS Specialists](badger-specialists/README.md) |

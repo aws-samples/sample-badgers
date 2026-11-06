@@ -115,7 +115,7 @@ Guide](../RELEASE_GUIDE.md#release-terminology) for the lifecycle.
 | Follow specialist invocation, input, output, and error behavior | [Lambda specialists](../deployment/lambdas/LAMBDA_SPECIALISTS.md) |
 | Understand the shared runtime framework | [Foundation layer](../deployment/lambdas/FOUNDATION_LAYER_README.md) |
 | Select profiles and compose specialist packs | [Deployment profiles](../deployment/profiles/README.md) |
-| Use the local pack and specialist planner | [Deployment reference](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
+| Plan packs, specialists, tags, or monitoring locally | [Deployment reference](../deployment/DEPLOYMENT_README.md#configure-a-deployment-locally) |
 | Author prompts and specialist manifests | [Prompting system](../deployment/s3_files/prompts/PROMPTING_SYSTEM_README.md) |
 | Consume structured document output | [Schema and vocabulary](../schemas/VOCABULARY.md) |
 | Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |

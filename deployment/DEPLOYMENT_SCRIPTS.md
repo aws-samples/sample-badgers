@@ -41,14 +41,21 @@ the menu.
 ### Local configuration planner
 
 Use `./deploy.sh configure --ui` to manage reusable packs, select specialists,
-choose reviewed workflow-routing templates, and save an optional observability
-posture before a deployment. The observability screen offers **links** (no new
-resources), **baseline** (dashboard and operational alarms), or **enhanced**
-(baseline plus business-health checks), with an optional SNS topic or
-EventBridge bus ARN for notification handoff. Its footprint is a local
-candidate estimate only: the future observability CLI deployer must inspect
-live account inventory, service quotas, and destination permissions before it
-creates AWS resources.
+choose reviewed workflow-routing templates, set recommended or organization-
+specific resource tags, and select an observability posture before deployment.
+The CLI deploys that saved observability selection as the final deployment
+stage:
+
+| Mode | What the CLI deploys |
+| --- | --- |
+| **No added CloudWatch resources** | No CloudWatch dashboard or alarms. |
+| **Baseline** | One deployment dashboard and aggregated specialist Lambda error and throttle alarms. Full and Headless also receive workflow failed and timed-out alarms. |
+| **Enhanced** | Baseline coverage plus a workflow execution-time p95 alarm. Available to Full and Headless. |
+
+CloudWatch alarms are useful without an alerting endpoint. A customer may
+optionally route only these alarms to an SNS topic or EventBridge event bus.
+The dashboard provides investigation hints, but the customer owns escalation,
+recovery, and its production runbook.
 
 The planner starts a short-lived service on a random `127.0.0.1` port, opens a
 browser, and stores only desired state in `.deploy-state/{DEPLOYMENT_ID}.json`.
@@ -56,9 +63,12 @@ It does not load AWS credentials, invoke the AWS CLI or CDK, run a shell
 command, or create AWS resources.
 
 The planner generates a reconciliation preview and a `deploy.sh … resume`
-handoff command. Run that normal CLI command to select the deployment identity
-and confirm the update; it repeats preflight and validates the desired state
-before it changes AWS. Stop the planner with `Ctrl-C`.
+handoff command. Run that normal CLI command, select the same deployment ID
+shown by the planner, and confirm the update; it repeats preflight, validates
+desired selections, tags, routing, and monitoring, then reconciles the
+matching AWS resources. A tag change reconciles every enabled stack, so review
+that broader impact before continuing.
+Stop the planner with `Ctrl-C`.
 
 **`DEPLOYMENT_ID` is unset on startup and never read from the environment.** The script
 scans `.deploy-state/` and offers every deployment it finds — complete and in progress —
@@ -76,8 +86,9 @@ deployment ID; they may be used with any current product profile. The future BAD
 profile or menu option until its implementation is complete.
 
 Steps: 1 layers, 2 foundational infra, 3 upload config, 4 specialist Lambdas,
-5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service. Then 9 full deployment, `r` resume,
-10 status, 11 reset state (keeps the suffix, deletes nothing in AWS), `m` models (prints
+5 Gateway, 6 Runtime, 7 UI image, 8 UI ECS service, and final observability.
+Then 9 full deployment, `r` resume, 10 status, 11 reset state (keeps the suffix,
+deletes nothing in AWS), `m` models (prints
 the registry and which steps a registry edit requires), 0 exit.
 
 For Headless, Step 3 is a release gate rather than merely an upload: it creates

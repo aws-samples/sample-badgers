@@ -166,5 +166,5 @@ as a Gateway tool. The normal CLI remains the only AWS executor.
 | Operate the agent container in Headless mode | [Runtime guide](../deployment/runtime/RUNTIME_README.md#headless-request-mode) |
 | Deploy individual stacks, resume a deployment, or clean up | [Deployment reference](../deployment/DEPLOYMENT_README.md) |
 | Inspect product capability and selected packs | [Deployment profiles](../deployment/profiles/README.md) |
-| Plan specialist and routing changes locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-packs-and-routing-locally) |
+| Plan specialist, routing, tag, or monitoring changes locally | [Local configuration planner](../deployment/DEPLOYMENT_README.md#configure-a-deployment-locally) |
 | Choose a source tag and understand releases | [Release guide](../RELEASE_GUIDE.md) |

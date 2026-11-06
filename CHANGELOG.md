@@ -23,6 +23,41 @@
 
 ### Added
 
+- **Clarified the deployment handoff.** The local planner now requires an
+  explicit deployment ID and profile, recommends Full for POC starts, names
+  the deployment ID to select in the CLI, and explains that tag updates
+  reconcile every enabled stack. Monitoring now calls the empty option “No
+  added CloudWatch resources,” disables Enhanced for the Specialists profile,
+  and shows final observability reconciliation in the terminal menu and
+  profile documentation. The Full application’s tag tab is guidance-only, so
+  it no longer implies that editing `app.py` changes a deployed configuration.
+  Its admin stack list now resolves full deployment-aware stack names and
+  includes the Observability stack. The hosted application now presents that
+  stack list as a read-only inventory and routes deployment mutations to the
+  local CLI, where the intended deployment ID and desired state are validated.
+  New planner configurations start with no customer tags, avoiding accidental
+  deployment of placeholder ownership or cost-allocation values.
+
+- **Security hardening from static analysis.** Local interactive selectors now
+  clear the terminal without invoking a shell; CDK configuration invariants
+  raise explicit errors instead of relying on optimizable assertions; and the
+  PDF decryption path now enforces a timeout, checks the converter result, and
+  removes its temporary output. Temporary-file cleanup and malformed PDF
+  property handling now emit bounded diagnostic logs rather than silently
+  discarding errors.
+
+- **Deployable observability and per-deployment tags.** The local configuration
+  planner now captures recommended and customer-defined resource tags plus a
+  CloudWatch posture for each deployment ID. `deploy.sh … resume` reconciles
+  tags and the selected monitoring stack: the no-added-CloudWatch-resources
+  option creates no dashboard or
+  alarms; Baseline creates a deployment dashboard and aggregated specialist
+  Lambda health alarms, with workflow failure/timeout alarms for Full and
+  Headless; Enhanced adds workflow execution-time p95 monitoring. Alarm
+  visibility works without a required alerting endpoint; SNS and EventBridge
+  delivery remain optional. The dashboard provides investigation hints while
+  customers retain ownership of their production runbooks.
+
 - **Opt-in native XLSX workbook analysis.** The new `workbook-analysis` pack
   adds the single `xlsx_processor` container for macro-free `.xlsx` routing
   when the Workbook Analysis pack is selected. The
@@ -57,10 +92,11 @@
   reconciliation.
 
 - **Optional local configuration planner.** `./deploy.sh configure --ui`
-  provides a browser-based planner for packs, direct specialists, and workflow
-  templates. It binds only to an ephemeral `127.0.0.1` port, uses a per-run
-  session capability, persists local desired state, and produces a CLI
-  handoff—AWS preflight and mutations remain exclusively in `deploy.sh`.
+  provides a browser-based planner for packs, direct specialists, workflow
+  templates, deployment tags, and observability. It binds only to an ephemeral
+  `127.0.0.1` port, uses a per-run session capability, persists local desired
+  state, and produces a CLI handoff—AWS preflight and mutations remain
+  exclusively in `deploy.sh`.
 
 - **Resumable deployment preflights.** The deployment CLI now presents a
   profile-aware preflight report before AWS changes, records the completed
