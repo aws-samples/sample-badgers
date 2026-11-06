@@ -279,6 +279,12 @@ def _read_key() -> str:
     return {"\x1b[A": "UP", "\x1b[B": "DOWN"}.get(first + second + third, "ESC")
 
 
+def _clear_terminal() -> None:
+    """Clear an interactive terminal without invoking a shell."""
+
+    print("\033[2J\033[H", end="", flush=True)
+
+
 def configure(state_path: Path, profile: str) -> tuple[dict[str, Any], bool]:
     state = _read(state_path)
     saved = state.get("desired_routing_configuration")
@@ -299,7 +305,7 @@ def configure(state_path: Path, profile: str) -> tuple[dict[str, Any], bool]:
     try:
         tty.setraw(sys.stdin.fileno())
         while True:
-            os.system("clear")
+            _clear_terminal()
             print("BADGERS WORKFLOW & ROUTING")
             print("Space toggle  a select available  d deselect all  ↑↓ move  Enter save  q cancel")
             print("")

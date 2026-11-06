@@ -178,7 +178,8 @@ class CognitoStack(Stack):
             )
             self.headless_client.node.add_dependency(self.headless_resource_server)
             cfn_headless_client = self.headless_client.node.default_child
-            assert isinstance(cfn_headless_client, cognito.CfnUserPoolClient)
+            if not isinstance(cfn_headless_client, cognito.CfnUserPoolClient):
+                raise TypeError("Expected a Cognito User Pool Client L1 resource.")
             cfn_headless_client.add_property_override(
                 "ExplicitAuthFlows", ["ALLOW_CUSTOM_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
             )
@@ -273,7 +274,8 @@ class CognitoStack(Stack):
         # protects against an L2 implementation change that reintroduces its
         # legacy user-password/SRP defaults.
         cfn_gateway_client = self.user_pool_client.node.default_child
-        assert isinstance(cfn_gateway_client, cognito.CfnUserPoolClient)
+        if not isinstance(cfn_gateway_client, cognito.CfnUserPoolClient):
+            raise TypeError("Expected a Cognito User Pool Client L1 resource.")
         cfn_gateway_client.add_property_override(
             "ExplicitAuthFlows", ["ALLOW_CUSTOM_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
         )

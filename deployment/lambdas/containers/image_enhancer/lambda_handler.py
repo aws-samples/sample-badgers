@@ -162,8 +162,8 @@ def lambda_handler(event: Dict[str, Any], _context) -> Dict[str, Any]:
         # Clean up temp file
         try:
             os.unlink(output_path)
-        except Exception:
-            pass
+        except OSError as error:
+            logger.warning("Could not remove temporary enhanced image %s: %s", output_path, error)
 
         return {
             "statusCode": 200,

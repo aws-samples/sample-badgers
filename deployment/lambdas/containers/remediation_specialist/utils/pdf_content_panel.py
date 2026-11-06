@@ -10,14 +10,17 @@ Usage:
     python pdf_content_panel.py document.pdf --json
 """
 
-import sys
 import json
+import logging
+import sys
 from pathlib import Path
 
 try:
     import pikepdf
 except ImportError:
     sys.exit("pikepdf not installed. Run:  pip install pikepdf")
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_text(val):
@@ -68,8 +71,10 @@ def extract_page_content_tree(page):
                     for k, v in prop_obj.items():
                         try:
                             props[str(k)] = str(v)
-                        except Exception:
-                            pass
+                        except (TypeError, ValueError) as error:
+                            logger.debug(
+                                "Skipping unreadable marked-content property %r: %s", k, error
+                            )
 
             node = {
                 "type": "container",

@@ -43,6 +43,12 @@ CATALOG_PATH = DEPLOYMENT_DIR / "deployment_config.json"
 _PACK_NAME = re.compile(r"[a-z0-9-]+")
 
 
+def _clear_terminal() -> None:
+    """Clear an interactive terminal without invoking a shell."""
+
+    print("\033[2J\033[H", end="", flush=True)
+
+
 class SelectionError(ValueError):
     """Raised when a saved desired selection cannot be resolved safely."""
 
@@ -382,7 +388,7 @@ def _interactive_picker(
     try:
         tty.setraw(sys.stdin.fileno())
         while True:
-            os.system("clear")
+            _clear_terminal()
             print("BADGERS SPECIALIST SELECTION")
             print(
                 f"Deployment product: {profile_name}  |  Space toggle  "

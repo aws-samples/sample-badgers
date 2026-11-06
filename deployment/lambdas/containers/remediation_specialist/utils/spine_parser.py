@@ -647,6 +647,10 @@ def _normalize_type_for_resolver(tag: str) -> str:
 def _self_test():
     """Verify parser works against the example spine."""
 
+    def check(condition: bool, message: str) -> None:
+        if not condition:
+            raise RuntimeError(message)
+
     v2_xml = """
     <unified_document session_id="test" page="1" schema_version="2.0">
         <metadata>
@@ -725,8 +729,8 @@ def _self_test():
 
     tree, page_elements = parse_correlation_xml(v2_xml)
 
-    assert tree is not None, "Tree should not be None"
-    assert tree.tag == "Document", f"Root should be Document, got {tree.tag}"
+    check(tree is not None, "Tree should not be None")
+    check(tree.tag == "Document", f"Root should be Document, got {tree.tag}")
 
     # Count nodes
     total = sum(1 for _ in tree.walk())
@@ -734,7 +738,7 @@ def _self_test():
 
     # Verify nesting
     sect_root = tree.children[0]
-    assert sect_root.tag == "Sect", f"First child should be Sect, got {sect_root.tag}"
+    check(sect_root.tag == "Sect", f"First child should be Sect, got {sect_root.tag}")
 
     # Find the H2 section
     h2_sect = None
@@ -742,18 +746,18 @@ def _self_test():
         if child.tag == "Sect" and child.id == "sect_methods":
             h2_sect = child
             break
-    assert h2_sect is not None, "Should find sect_methods"
+    check(h2_sect is not None, "Should find sect_methods")
 
     # Verify H2 is inside sect_methods
     h2 = h2_sect.children[0]
-    assert h2.tag == "H2", f"First child of sect_methods should be H2, got {h2.tag}"
-    assert h2.text == "Methods"
+    check(h2.tag == "H2", f"First child of sect_methods should be H2, got {h2.tag}")
+    check(h2.text == "Methods", "Expected Methods heading text")
 
     # Verify inline formula in elem_002
     elem_002 = sect_root.children[1]  # P after H1
-    assert len(elem_002.inline_children) == 1, "P should have 1 inline child"
-    assert elem_002.inline_children[0].tag == "Formula"
-    assert elem_002.inline_children[0].text == "v = d/t"
+    check(len(elem_002.inline_children) == 1, "P should have 1 inline child")
+    check(elem_002.inline_children[0].tag == "Formula", "Expected Formula inline child")
+    check(elem_002.inline_children[0].text == "v = d/t", "Expected formula text")
 
     # Verify table substructure
     table = None
@@ -761,19 +765,19 @@ def _self_test():
         if child.tag == "Table":
             table = child
             break
-    assert table is not None, "Should find Table in sect_methods"
-    assert len(table.children) == 2, "Table should have THead + TBody"
-    assert table.children[0].tag == "THead"
-    assert table.children[1].tag == "TBody"
+    check(table is not None, "Should find Table in sect_methods")
+    check(len(table.children) == 2, "Table should have THead + TBody")
+    check(table.children[0].tag == "THead", "Expected THead")
+    check(table.children[1].tag == "TBody", "Expected TBody")
 
     # Verify TH has scope
     thead = table.children[0]
     tr = thead.children[0]
     th = tr.children[0]
-    assert th.scope == "Column", f"TH scope should be Column, got {th.scope}"
+    check(th.scope == "Column", f"TH scope should be Column, got {th.scope}")
 
     # Verify flat elements for bbox resolution
-    assert 1 in page_elements, "Should have elements for page 1"
+    check(1 in page_elements, "Should have elements for page 1")
     flat = page_elements[1]
     print(f"Flat elements for bbox resolution: {len(flat)}")
     for e in flat:
@@ -781,7 +785,7 @@ def _self_test():
 
     # Verify Artifact is in flat list (for content stream marking)
     artifact_ids = [e["id"] for e in flat if e["type"] == "footer"]
-    assert "artifact_001" in artifact_ids, "Artifact should be in flat list"
+    check("artifact_001" in artifact_ids, "Artifact should be in flat list")
 
     # --- V1 backwards compat test ---
     v1_xml = """
@@ -804,8 +808,8 @@ def _self_test():
     """
 
     tree_v1, pages_v1 = parse_correlation_xml(v1_xml)
-    assert tree_v1 is not None, "V1 tree should not be None"
-    assert tree_v1.tag == "Document"
+    check(tree_v1 is not None, "V1 tree should not be None")
+    check(tree_v1.tag == "Document", "Expected Document root for V1")
     total_v1 = sum(1 for _ in tree_v1.walk())
     print(f"\nV1 backwards compat: {total_v1} tree nodes")
 

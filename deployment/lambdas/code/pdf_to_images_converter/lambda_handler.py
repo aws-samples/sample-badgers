@@ -4,6 +4,8 @@ import json
 import logging
 import base64
 import os
+import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 from foundation import job_state, operation_state
@@ -18,8 +20,6 @@ logger.setLevel(logging.INFO)
 
 # Output bucket from environment (set by Lambda stack)
 OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "")
-import subprocess
-import tempfile
 
 
 def lambda_handler(event, context):
@@ -28,9 +28,6 @@ def lambda_handler(event, context):
     logger.info("/opt/etc/fonts exists: %s", os.path.exists("/opt/etc/fonts"))
     logger.info("/opt/share/fonts exists: %s", os.path.exists("/opt/share/fonts"))
     """Convert PDF to images and store base64 in S3 temp location."""
-    result = subprocess.run(["/opt/bin/pdftoppm", "-v"], capture_output=True, text=True)
-    logger.info("pdftoppm version: %s %s", result.stdout, result.stderr)
-
     import shutil
 
     logger.info("pdf2image will use pdftoppm at: %s", shutil.which("pdftoppm"))
@@ -159,24 +156,30 @@ def _decrypt_pdf_if_needed(pdf_data: bytes) -> bytes:
         tempfile.NamedTemporaryFile(suffix=".pdf") as infile,
         tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as outfile,
     ):
-        infile.write(pdf_data)
-        infile.flush()
-        logger.info("Input PDF size: %d bytes", len(pdf_data))
-        result = subprocess.run(
-            ["/opt/bin/qpdf", "--decrypt", infile.name, outfile.name],
-            capture_output=True,
-            text=True,
-        )
-        logger.info(
-            "qpdf returncode: %d, stdout: %s, stderr: %s",
-            result.returncode,
-            result.stdout,
-            result.stderr,
-        )
-        with open(outfile.name, "rb") as f:
-            decrypted = f.read()
-        logger.info("Decrypted PDF size: %d bytes", len(decrypted))
-        return decrypted
+        output_path = Path(outfile.name)
+        try:
+            infile.write(pdf_data)
+            infile.flush()
+            logger.info("Input PDF size: %d bytes", len(pdf_data))
+            result = subprocess.run(
+                ["/opt/bin/qpdf", "--decrypt", infile.name, outfile.name],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout).strip()
+                raise RuntimeError(f"qpdf decryption failed: {detail[:500]}")
+            decrypted = output_path.read_bytes()
+            logger.info("Decrypted PDF size: %d bytes", len(decrypted))
+            return decrypted
+        except FileNotFoundError as error:
+            raise RuntimeError("qpdf is not installed in this runtime.") from error
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("qpdf decryption exceeded the 60-second limit.") from error
+        finally:
+            output_path.unlink(missing_ok=True)
 
 
 def _get_document_data(document_path: str) -> bytes:
