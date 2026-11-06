@@ -1,97 +1,42 @@
-import React, { useState, useEffect } from 'react'
-
-const TAG_LABELS = {
-  application_name: 'Application Name',
-  application_description: 'Description',
-  environment: 'Environment',
-  owner: 'Owner',
-  cost_center: 'Cost Center',
-  project_code: 'Project Code',
-  cdk_stack_prefix: 'Stack Prefix',
-  team: 'Team',
-  team_contact_email: 'Team Email',
-}
+import { useEffect } from 'react'
 
 export default function ConfigEditor({ dirtyRef }) {
-  const [tags, setTags] = useState({})
-  const [savedTags, setSavedTags] = useState({})
-  const [region, setRegion] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const isDirty = JSON.stringify(tags) !== JSON.stringify(savedTags)
-
   useEffect(() => {
-    if (dirtyRef) dirtyRef.current = isDirty
+    if (dirtyRef) dirtyRef.current = false
     return () => { if (dirtyRef) dirtyRef.current = false }
-  }, [isDirty, dirtyRef])
-
-  useEffect(() => {
-    fetch('/api/config').then(r => r.json()).then(data => {
-      setTags(data.tags || {})
-      setSavedTags(data.tags || {})
-      setRegion(data.region || '')
-    })
-  }, [])
-
-  const save = async () => {
-    setSaving(true)
-    setSaved(false)
-    await fetch('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tags }),
-    })
-    setSavedTags({ ...tags })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
-
-  const update = (key, value) => {
-    setTags(prev => ({ ...prev, [key]: value }))
-  }
+  }, [dirtyRef])
 
   return (
-    <div>
-      <div style={{
-        padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius)',
-        border: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>Deployment Tags</span>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>✓ Saved</span>}
-            <button className="primary" onClick={save} disabled={saving}>
-              {saving ? 'Saving...' : 'Save to app.py'}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius)' }}>
-          Region: <span style={{ color: 'var(--accent)' }}>{region}</span> (set via CDK_DEFAULT_REGION env var)
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '8px 12px', alignItems: 'center' }}>
-          {Object.entries(tags).map(([key, value]) => (
-            <React.Fragment key={key}>
-              <label style={{ fontSize: 13, color: 'var(--text-dim)', textAlign: 'right' }}>
-                {TAG_LABELS[key] || key}
-              </label>
-              <input
-                value={value}
-                onChange={e => update(key, e.target.value)}
-                disabled={key === 'cdk_stack_prefix' || key === 'application_name'}
-                style={key === 'cdk_stack_prefix' || key === 'application_name' ? { opacity: 0.5 } : {}}
-              />
-            </React.Fragment>
-          ))}
-        </div>
-
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
-          These tags are applied to all AWS resources across all stacks. Changes are written directly to deployment/app.py.
-        </p>
+    <div style={{
+      padding: 16, background: 'var(--surface)', borderRadius: 'var(--radius)',
+      border: '1px solid var(--border)', maxWidth: 720,
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>
+        Deployment tag configuration
       </div>
+
+      <p style={{ fontSize: 13, color: 'var(--text-dim)', margin: '0 0 14px', lineHeight: 1.55 }}>
+        Tags are configured per deployment ID in the local deployment planner. This
+        application view is intentionally read-only: it does not modify source files,
+        local desired state, or AWS resources.
+      </p>
+
+      <div style={{
+        fontFamily: 'SF Mono, Menlo, monospace', fontSize: 13, padding: '10px 12px',
+        background: 'var(--bg)', borderRadius: 'var(--radius)', marginBottom: 14,
+      }}>
+        ./deploy.sh configure --ui
+      </div>
+
+      <ol style={{ fontSize: 13, color: 'var(--text-dim)', margin: 0, paddingLeft: 22, lineHeight: 1.7 }}>
+        <li>Open an existing deployment ID or explicitly create a new local configuration.</li>
+        <li>Choose resource tags and review the resulting deployment plan.</li>
+        <li>Run the displayed resume command and select the same deployment ID in the CLI.</li>
+      </ol>
+
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '14px 0 0' }}>
+        Tag changes are reconciled across every enabled stack when the CLI deployment runs.
+      </p>
     </div>
   )
 }

@@ -35,7 +35,17 @@ shortcut, so requests fail rather than silently running unauthenticated.
 | Row     | Tabs                                                                                                          | Who sees it       |
 | ------- | ------------------------------------------------------------------------------------------------------------- | ----------------- |
 | Testing | 🏠 Home, 💬 Chat, ✏️ Edit Specialist, 🧙 Create Specialist, 🧪 Evaluations, 💰 Pricing, 📊 Observability, 📝 Chat Log | All users         |
-| Deploy  | 📦 Stacks, 🔬 Specialists, 📄 S3 Configs, ⚙️ Deploy Tags                                                          | `admin` role only |
+| Deploy  | 📦 Stacks, 🔬 Specialists, 📄 S3 Configs, 🏷️ Deployment Tags                                                     | `admin` role only |
+
+The application **Observability** tab is a trace and CloudWatch Logs Insights
+view for application sessions. It is separate from the local deployment
+planner's CloudWatch dashboard and alarms. Choose deployment tags and the
+monitoring posture with `./deploy.sh configure --ui`, then run the planner's
+CLI handoff to apply them.
+
+The admin **Stacks** tab is a read-only inventory of the deployment hosting
+the application. Run deployment, resume, and teardown actions through the
+local CLI so the selected deployment ID and reviewed desired state are used.
 
 ## Product Tour
 
@@ -330,10 +340,10 @@ ui/
 │       ├── PricingCalculator.jsx  # Cost estimator
 │       ├── Observability.jsx      # CloudWatch queries
 │       ├── ChatLog.jsx            # Session log viewer
-│       ├── StackList.jsx          # CDK stack deploy/destroy
+│       ├── StackList.jsx          # Read-only deployed stack inventory
 │       ├── SpecialistSelector.jsx # Specialist browser
 │       ├── S3ConfigEditor.jsx     # S3 config file editor
-│       ├── ConfigEditor.jsx       # Deployment tag editor
+│       ├── ConfigEditor.jsx       # Deployment tag configuration guidance
 │       ├── JsonHighlighter.jsx    # JSON syntax highlighting
 │       ├── Header.jsx             # App header with user/role badge, sign out
 │       └── LogPanel.jsx           # Streaming log output

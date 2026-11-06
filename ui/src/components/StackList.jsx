@@ -28,10 +28,9 @@ function StatusBadge({ status }) {
   )
 }
 
-export default function StackList({ runSSE, runSSEGet, running }) {
+export default function StackList({ running }) {
   const [stacks, setStacks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [deploymentId, setDeploymentId] = useState('')
   const [expanded, setExpanded] = useState(null)
   const [outputs, setOutputs] = useState({})
 
@@ -95,33 +94,20 @@ export default function StackList({ runSSE, runSSEGet, running }) {
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            placeholder="Deployment ID (optional)"
-            value={deploymentId}
-            onChange={e => setDeploymentId(e.target.value)}
-            style={{ width: 200 }}
-          />
-          <button className="primary" disabled={running}
-            onClick={() => {
-              if (confirm('Deploy all stacks from scratch? This runs the full deploy.sh workflow.'))
-                runSSEGet('/api/deploy-all')
-            }}>
-            🚀 Deploy All
-          </button>
-          <button onClick={() => {
-              if (confirm('Sync local s3_files/ to the S3 config bucket?'))
-                runSSE('/api/sync-s3', {})
-            }} disabled={running}>
-            ☁️ Sync S3
-          </button>
         </div>
       </div>
+
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 12px' }}>
+        Read-only inventory for the deployment that hosts this application. Configure,
+        deploy, resume, or destroy through the local deployment CLI so its reviewed
+        per-deployment state is validated first.
+      </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {stacks.map(s => (
           <div key={s.id}>
             <div style={{
-              display: 'grid', gridTemplateColumns: '1fr auto auto',
+              display: 'grid', gridTemplateColumns: '1fr auto',
               alignItems: 'center', gap: 12,
               padding: '10px 14px',
               background: 'var(--surface)',
@@ -146,23 +132,6 @@ export default function StackList({ runSSE, runSSEGet, running }) {
                 </div>
               </div>
               <StatusBadge status={s.status} />
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button disabled={running} style={{ fontSize: 12, padding: '3px 10px' }}
-                  onClick={() => {
-                    if (confirm(`Deploy ${s.stackName}?`))
-                      runSSE('/api/deploy', { stackId: s.id, deploymentId })
-                  }}>
-                  Deploy
-                </button>
-                <button className="danger" disabled={running}
-                  style={{ fontSize: 12, padding: '3px 10px' }}
-                  onClick={() => {
-                    if (confirm(`Destroy ${s.stackName}? This will permanently delete all resources in this stack.`))
-                      runSSE('/api/destroy', { stackId: s.id })
-                  }}>
-                  Destroy
-                </button>
-              </div>
             </div>
             {expanded === s.id && (
               <div style={{

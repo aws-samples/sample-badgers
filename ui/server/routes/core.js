@@ -228,8 +228,8 @@ export function mountCoreRoutes(app, PROJECT_ROOT) {
     // DynamoDB or AgentCore directly — the server does, with the task role. Even the
     // region identifies the deployment, so nothing is sent.
     //
-    // Note /api/config is already taken by an admin route (routes/admin.js) for the
-    // deployment tag editor, behind requireAdmin.
+    // Note /api/config is reserved by an admin guidance route (routes/admin.js).
+    // Per-deployment tags are changed only through the local configuration planner.
 
     // ── Tools ──
 

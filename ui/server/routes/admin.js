@@ -6,16 +6,23 @@ import { requireAdmin } from '../auth.js';
 
 export function mountAdminRoutes(app, PROJECT_ROOT) {
     const DEPLOY_DIR = resolve(PROJECT_ROOT, 'deployment');
-    const APP_PY = resolve(DEPLOY_DIR, 'app.py');
     const S3_FILES_DIR = resolve(DEPLOY_DIR, 's3_files');
     const DEPLOY_CONFIG = resolve(DEPLOY_DIR, 'deployment_config.json');
 
-    // Stack names are BADGERS-{Name}-{suffix}. The suffix is per-deployment, so it
-    // cannot be baked in — the ECS stack injects STACK_SUFFIX into this container.
+    // Stack names carry the whole deployment identity:
+    // BADGERS-{Name}-{deployment-id}-{suffix}. ECS supplies DEPLOYMENT_ID as that
+    // composite resource identity; local development supplies both parts separately.
     // `id` is the PascalCase stack name; `key` is the stable id used by the client
     // and by the deploy/destroy routes.
     const STACK_PREFIX = 'BADGERS';
     const STACK_SUFFIX = process.env.STACK_SUFFIX || '';
+    const DEPLOYMENT_ID = process.env.DEPLOYMENT_ID || '';
+    const RESOURCE_ID = !DEPLOYMENT_ID || !STACK_SUFFIX || DEPLOYMENT_ID.endsWith(`-${STACK_SUFFIX}`)
+        ? DEPLOYMENT_ID
+        : `${DEPLOYMENT_ID}-${STACK_SUFFIX}`;
+    const DEPLOYMENT_LABEL = STACK_SUFFIX && DEPLOYMENT_ID.endsWith(`-${STACK_SUFFIX}`)
+        ? DEPLOYMENT_ID.slice(0, -(STACK_SUFFIX.length + 1))
+        : DEPLOYMENT_ID;
     const STACKS = [
         { key: 's3', id: 'S3', name: 'S3 Buckets', description: 'Config + source + output buckets' },
         { key: 'cognito', id: 'Cognito', name: 'Cognito Auth', description: 'User pool with UI (OIDC/PKCE) and Gateway (M2M) clients' },
@@ -31,10 +38,10 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         { key: 'vpc', id: 'Vpc', name: 'VPC', description: 'Private subnets and VPC endpoints for the UI service' },
         { key: 'ecs', id: 'ECS', name: 'UI (ECS)', description: 'Unified UI on an ECS Express Gateway service' },
         { key: 'custom-specialists', id: 'CustomSpecialists', name: 'Custom Specialists', description: 'Wizard-created specialists (optional)' },
+        { key: 'observability', id: 'Observability', name: 'Observability', description: 'Optional CloudWatch dashboard, alarms, and notification handoff' },
     ];
 
-    // BADGERS-{Name}-{suffix}
-    const stackName = (id) => `${STACK_PREFIX}-${id}-${STACK_SUFFIX}`;
+    const stackName = (id) => `${STACK_PREFIX}-${id}-${RESOURCE_ID}`;
 
     const stackByKey = (key) => STACKS.find(s => s.key === key || s.id === key);
 
@@ -48,7 +55,7 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         });
     }
 
-    function sseStream(res, cmd, args, extraEnv = {}) {
+    function sseStream(res, cmd, args) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -56,26 +63,23 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         const resolvedArgs = args.map(a => a.endsWith('.sh') && !a.startsWith('/') && !a.startsWith('./') ? `./${a}` : a);
         const proc = spawn(cmd, resolvedArgs, {
             cwd: DEPLOY_DIR,
-            // stdin is closed, so any interactive `read` in the script sees EOF.
-            // Scripts must be driven non-interactively (see BADGERS_ASSUME_YES).
             stdio: ['ignore', 'pipe', 'pipe'],
             env: {
                 ...process.env,
-                PATH: [`${process.env.HOME}/.local/bin`, `${process.env.HOME}/.cargo/bin`, '/usr/local/bin', '/opt/homebrew/bin', process.env.PATH].join(':'),
-                TERM: 'dumb',
-                ...extraEnv,
+                // sync_s3_files.sh expects the human deployment label and suffix
+                // separately, while ECS passes this service the composite ID.
+                DEPLOYMENT_ID: DEPLOYMENT_LABEL,
             },
         });
         res.write(`data: ${JSON.stringify({ type: 'stdout', text: `▶ Running: ${cmd} ${resolvedArgs.join(' ')}\n` })}\n\n`);
-        const heartbeat = setInterval(() => { try { res.write(`: heartbeat\n\n`); } catch { } }, 15000);
-        const timeout = setTimeout(() => { if (!proc.killed) { proc.kill('SIGTERM'); setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 5000); } }, 45 * 60 * 1000);
+        const heartbeat = setInterval(() => { try { res.write(': heartbeat\n\n'); } catch { } }, 15000);
+        const timeout = setTimeout(() => { if (!proc.killed) proc.kill('SIGTERM'); }, 45 * 60 * 1000);
         const cleanup = () => { clearInterval(heartbeat); clearTimeout(timeout); };
         proc.stdout.on('data', d => { try { res.write(`data: ${JSON.stringify({ type: 'stdout', text: d.toString() })}\n\n`); } catch { } });
         proc.stderr.on('data', d => { try { res.write(`data: ${JSON.stringify({ type: 'stderr', text: d.toString() })}\n\n`); } catch { } });
         proc.on('error', (err) => { cleanup(); try { res.write(`data: ${JSON.stringify({ type: 'stderr', text: `Process error: ${err.message}` })}\n\n`); res.write(`data: ${JSON.stringify({ type: 'done', code: 1 })}\n\n`); res.end(); } catch { } });
         proc.on('close', (code, signal) => { cleanup(); try { res.write(`data: ${JSON.stringify({ type: 'done', code: code ?? (signal ? 1 : 0) })}\n\n`); res.end(); } catch { } });
-        res.on('close', () => { cleanup(); });
-        return proc;
+        res.on('close', cleanup);
     }
 
     async function findJsonFiles(dir, rel) {
@@ -90,36 +94,20 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         return results;
     }
 
-    async function parseDeploymentTags() {
-        const src = await readFile(APP_PY, 'utf-8');
-        const match = src.match(/deployment_tags\s*=\s*\{([^}]+)\}/s);
-        if (!match) return {};
-        const tags = {};
-        for (const line of match[1].split('\n')) { const m = line.match(/"(\w+)":\s*"([^"]*)"/); if (m) tags[m[1]] = m[2]; }
-        return tags;
-    }
-
-    async function writeDeploymentTags(tags) {
-        let src = await readFile(APP_PY, 'utf-8');
-        const entries = Object.entries(tags).map(([k, v]) => `    "${k}": "${v}",`).join('\n');
-        src = src.replace(/deployment_tags\s*=\s*\{[^}]+\}/s, `deployment_tags = {\n${entries}\n}`);
-        await writeFile(APP_PY, src);
-    }
-
     // ── All admin routes use requireAdmin middleware ──
 
-    app.get('/api/config', requireAdmin, async (_req, res) => {
-        try {
-            const tags = await parseDeploymentTags();
-            const src = await readFile(APP_PY, 'utf-8');
-            const m = src.match(/CDK_DEFAULT_REGION.*?"(\S+?)"/);
-            res.json({ tags, region: m ? m[1] : 'us-west-2' });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+    app.get('/api/config', requireAdmin, (_req, res) => {
+        res.json({
+            configuration: 'local-planner',
+            command: './deploy.sh configure --ui',
+            message: 'Deployment tags are configured per deployment ID in the local planner.',
+        });
     });
 
-    app.put('/api/config', requireAdmin, async (req, res) => {
-        try { if (req.body.tags) await writeDeploymentTags(req.body.tags); res.json({ ok: true }); }
-        catch (e) { res.status(500).json({ error: e.message }); }
+    app.put('/api/config', requireAdmin, (_req, res) => {
+        res.status(410).json({
+            error: 'Deployment tags are configured with ./deploy.sh configure --ui; this application does not edit deployment source files.',
+        });
     });
 
     app.get('/api/stacks', requireAdmin, async (_req, res) => {
@@ -152,40 +140,9 @@ export function mountAdminRoutes(app, PROJECT_ROOT) {
         } catch { res.status(404).json({ error: `Stack ${name} not found` }); }
     });
 
-    // Resolve a client-supplied stack key to its real, suffixed stack name.
-    function resolveStackName(stackId) {
-        if (!stackId) return null;
-        const entry = stackByKey(stackId);
-        return entry ? stackName(entry.id) : null;
-    }
-
-    app.post('/api/deploy', requireAdmin, (req, res) => {
-        const { stackId } = req.body;
-        const target = resolveStackName(stackId);
-        if (stackId && !target) return res.status(400).json({ error: `Unknown stack ${stackId}` });
-        const args = ['run', 'cdk', 'deploy', target || '--all', '--require-approval', 'never'];
-        sseStream(res, 'uv', args);
+    app.post('/api/sync-s3', requireAdmin, (_req, res) => {
+        sseStream(res, 'bash', ['sync_s3_files.sh']);
     });
-
-    app.post('/api/destroy', requireAdmin, (req, res) => {
-        const target = resolveStackName(req.body.stackId);
-        if (req.body.stackId && !target) {
-            return res.status(400).json({ error: `Unknown stack ${req.body.stackId}` });
-        }
-        sseStream(res, 'uv', ['run', 'cdk', 'destroy', target || '--all', '--force']);
-    });
-
-    app.post('/api/sync-s3', requireAdmin, (_req, res) => { sseStream(res, 'bash', ['sync_s3_files.sh']); });
-
-    // Full deploy runs the root deploy.sh in non-interactive mode (option 9).
-    // BADGERS_ASSUME_YES skips its confirmation prompts, which would otherwise block
-    // on a stream with no tty attached.
-    const fullDeploy = (_req, res) => sseStream(
-        res, 'bash', [resolve(PROJECT_ROOT, 'deploy.sh'), '9'],
-        { BADGERS_ASSUME_YES: '1' },
-    );
-    app.post('/api/deploy-all', requireAdmin, fullDeploy);
-    app.get('/api/deploy-all', requireAdmin, fullDeploy);
 
     app.get('/api/deployment-config', requireAdmin, async (_req, res) => {
         try { res.json(JSON.parse(await readFile(DEPLOY_CONFIG, 'utf-8'))); }

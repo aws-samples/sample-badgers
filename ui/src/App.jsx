@@ -36,7 +36,7 @@ const TABS = [
     { id: 'stacks', label: '📦 Stacks', adminOnly: true },
     { id: 'specialists', label: '🔬 Specialists', adminOnly: true },
     { id: 's3configs', label: '📄 S3 Configs', adminOnly: true },
-    { id: 'config', label: '⚙️ Deploy Tags', adminOnly: true },
+    { id: 'config', label: '🏷️ Deployment Tags', adminOnly: true },
 ]
 
 // Cognito OIDC values baked in at build time (see generate_ui_env.sh).
@@ -113,30 +113,6 @@ export default function App() {
         clearLogs()
         setRunning(true)
         fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal })
-            .then(async (res) => {
-                const reader = res.body.getReader()
-                const decoder = new TextDecoder()
-                let buffer = ''
-                while (true) {
-                    const { done, value } = await reader.read()
-                    if (done) break
-                    buffer += decoder.decode(value, { stream: true })
-                    const lines = buffer.split('\n')
-                    buffer = lines.pop()
-                    for (const line of lines) parseSSELine(line)
-                }
-            })
-            .catch(e => { if (e.name === 'AbortError') return; appendLog(`\n❌ Error: ${e.message}`) })
-            .finally(() => { abortRef.current = null; setRunning(false) })
-    }
-
-    const runSSEGet = (url) => {
-        if (abortRef.current) abortRef.current.abort()
-        const controller = new AbortController()
-        abortRef.current = controller
-        clearLogs()
-        setRunning(true)
-        fetch(url, { signal: controller.signal })
             .then(async (res) => {
                 const reader = res.body.getReader()
                 const decoder = new TextDecoder()
@@ -260,7 +236,7 @@ export default function App() {
             {tab === 'chatlog' && <ChatLog />}
 
             {/* Admin tabs */}
-            {role === 'admin' && tab === 'stacks' && <StackList runSSE={runSSE} runSSEGet={runSSEGet} running={running} />}
+            {role === 'admin' && tab === 'stacks' && <StackList running={running} />}
             {role === 'admin' && tab === 'specialists' && <SpecialistSelector dirtyRef={dirtyRef} />}
             {role === 'admin' && tab === 's3configs' && <S3ConfigEditor runSSE={runSSE} running={running} dirtyRef={dirtyRef} />}
             {role === 'admin' && tab === 'config' && <ConfigEditor dirtyRef={dirtyRef} />}
