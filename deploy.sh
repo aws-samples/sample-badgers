@@ -4,12 +4,13 @@ set -euo pipefail
 # ── BADGERS — Interactive Deployment Menu ──────────────────────────────────
 #
 # Usage:
-#   ./deploy.sh             # Pick a deployment, then the interactive menu
+#   ./deploy.sh             # Open the local deployment wizard
+#   ./deploy.sh --cli       # Open the legacy interactive deployment menu
 #   ./deploy.sh headless    # Pick a deployment, then deploy the Headless product
 #   ./deploy.sh headless 9  # Run every Headless deployment step
 #   ./deploy.sh full 9      # Run every Full deployment step
 #   ./deploy.sh specialists --pack tables-and-forms 9
-#   ./deploy.sh configure --ui # Open the local configuration planner (no AWS actions)
+#   ./deploy.sh configure --ui # Open the local deployment wizard
 #   ./deploy.sh preflight   # Validate the selected product before deployment
 #   ./deploy.sh resume      # Pick a deployment, then run only its remaining steps
 #   ./deploy.sh 4           # Pick a deployment, then run option 4 directly
@@ -31,14 +32,58 @@ source "${SCRIPT_DIR}/deployment/scripts/preflight.sh"
 
 trap 'echo ""; log_error "deploy.sh failed at line ${LINENO}: ${BASH_COMMAND}"; exit 1' ERR
 
+BADGERS_PROFILE="${BADGERS_PROFILE:-}"
+LOCAL_UI_EXECUTION=0
+LOCAL_UI_ACTION=""
+LOCAL_UI_DEPLOYMENT_ID=""
+
+# The local configuration UI invokes this constrained entry point with an argument
+# vector built by its loopback-only server. It deliberately accepts no arbitrary
+# command, flags, profile inference, or deployment identity from the environment.
+# It exists so the UI can remain the POC's primary wizard while this interactive
+# CLI stays available for automation and advanced operators.
+if [ "${1:-}" = "--local-ui-execute" ]; then
+  if [ "$#" -ne 4 ]; then
+    log_error "Invalid local UI deployment request."
+    exit 1
+  fi
+  case "$2" in
+    full|headless|specialists) ;;
+    *) log_error "Invalid local UI product profile."; exit 1 ;;
+  esac
+  if ! _valid_deployment_id "$3"; then
+    log_error "Invalid local UI deployment ID."
+    exit 1
+  fi
+  case "$4" in
+    preflight|resume) ;;
+    *) log_error "Invalid local UI deployment operation."; exit 1 ;;
+  esac
+  LOCAL_UI_EXECUTION=1
+  BADGERS_PROFILE="$2"
+  LOCAL_UI_DEPLOYMENT_ID="$3"
+  LOCAL_UI_ACTION="$4"
+  shift 4
+fi
+
 launch_configuration_ui() {
-  log_info "Opening the local configuration planner. Press Ctrl-C there to return to this menu."
+  log_info "Opening the local deployment wizard. Keep this terminal available for advanced CLI use."
   python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
 }
 
-# Configuration UI is deliberately a local planning surface. It starts a
-# loopback-only server which can edit and validate desired state, but cannot
-# deploy or access AWS credentials. The regular CLI remains the executor.
+# The local deployment wizard is loopback-only. Browser code can request only
+# fixed, server-owned preflight or resume operations; credentials and command
+# construction remain in its local executor.
+CLI_MODE=0
+if [ "${1:-}" = "--cli" ]; then
+  CLI_MODE=1
+  shift
+fi
+
+if [ "$#" -eq 0 ] && [ "${CLI_MODE}" = "0" ] && [ "${LOCAL_UI_EXECUTION}" = "0" ]; then
+  exec python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
+fi
+
 if [ "${1:-}" = "configure" ]; then
   if [ "${2:-}" != "--ui" ] || [ "$#" -ne 2 ]; then
     log_error "Usage: ./deploy.sh configure --ui"
@@ -54,8 +99,6 @@ fi
 # An explicit argument (including the three product wrapper scripts) always wins.
 # An interactive bare ./deploy.sh exposes the product chooser. Non-interactive
 # callers retain the legacy Full default unless BADGERS_PROFILE is set.
-BADGERS_PROFILE="${BADGERS_PROFILE:-}"
-
 show_product_chooser() {
   clear
   echo -e "${CYAN}${BOLD}"
@@ -66,8 +109,8 @@ show_product_chooser() {
 ╚══════════════════════════════════════════════════════════════════╝
 EOF
   echo -e "${NC}"
-  echo -e "  ${BLUE}${BOLD}C  CONFIGURATION PLANNER${NC}"
-  echo -e "     Local UI for specialists, workflow routing, and deployment planning"
+  echo -e "  ${BLUE}${BOLD}C  LOCAL DEPLOYMENT WIZARD${NC}"
+  echo -e "     Configure, preflight, and deploy locally with saved progress and live output"
   echo ""
   echo -e "  ${CYAN}${BOLD}1  FULL EXPERIENCE${NC}"
   echo -e "     Agent API  •  internal gateway  •  all specialists  •  browser UI"
@@ -204,12 +247,21 @@ UI_CONTAINER_PORT="${UI_CONTAINER_PORT:-7860}"
 # _confirm() comes from deployment/scripts/common.sh, so preflight checks there can
 # prompt too. Honours BADGERS_ASSUME_YES=1 for non-interactive runs.
 
-# DEPLOYMENT_ID is always chosen interactively here, never inherited from the
-# environment. A value left exported in the shell silently targets another
-# deployment's stacks and state file, which is how you end up deploying into the
-# wrong suffix. destroy.sh still accepts it explicitly.
-unset DEPLOYMENT_ID
-choose_deployment || exit 1
+# DEPLOYMENT_ID is always chosen interactively in ordinary CLI use, never inherited
+# from the environment. The only exception is the fixed local UI executor above:
+# it may use the exact saved identity that the UI server already validated.
+if [ "${LOCAL_UI_EXECUTION}" = "1" ]; then
+  DEPLOYMENT_ID="${LOCAL_UI_DEPLOYMENT_ID}"
+  export DEPLOYMENT_ID
+  if [ ! -f "$(state_file)" ]; then
+    log_error "Local UI deployment '${DEPLOYMENT_ID}' no longer has saved configuration."
+    exit 1
+  fi
+  log_success "Selected deployment from local UI: ${DEPLOYMENT_ID}"
+else
+  unset DEPLOYMENT_ID
+  choose_deployment || exit 1
+fi
 require_deployment_id
 ensure_region || { log_error "ensure_region failed"; exit 1; }
 log_info "Region OK: ${AWS_REGION}"
@@ -1580,7 +1632,7 @@ EOF
   echo -e "  ${GREEN}▶${NC} ${BOLD} r)${NC} Resume remaining stages only"
   echo ""
   echo -e "  ${BOLD}SELECTION${NC}   s) Configure specialists   w) Configure workflow routing   k) Manage reusable packs"
-  echo -e "  ${BOLD}TOOLS${NC}       c) Open configuration planner (local UI)   p) Preflight report   10) Status"
+  echo -e "  ${BOLD}TOOLS${NC}       c) Open local deployment wizard   p) Preflight report   10) Status"
   echo -e "               11) Reset local state (does not delete AWS)   m) Model registry   0) Exit"
   echo ""
   echo -e "${BLUE}  ═════════════════════════════════════════════════════════════════${NC}"
@@ -1647,6 +1699,24 @@ _valid_option() {
     *) return 1 ;;
   esac
 }
+
+if [ "${LOCAL_UI_EXECUTION}" = "1" ]; then
+  CURRENT_STEP_LABEL=""
+  CURRENT_STEP_SUBMENU=""
+  case "${LOCAL_UI_ACTION}" in
+    preflight)
+      run_preflight all
+      exit $?
+      ;;
+    resume)
+      # The UI has its own preflight gate, but the executor always repeats the
+      # complete check immediately before mutating AWS resources.
+      run_preflight all || exit 1
+      step_resume
+      exit $?
+      ;;
+  esac
+fi
 
 if [ $# -gt 0 ]; then
   _valid_option "$1" || { log_error "Invalid option: $1"; exit 1; }

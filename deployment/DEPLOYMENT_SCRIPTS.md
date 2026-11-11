@@ -22,28 +22,32 @@ Interactive deployment menu, resumable and idempotent. Step completion is record
 `.deploy-state/{DEPLOYMENT_ID}.json`, so re-running after a failure continues from where
 it stopped rather than starting over.
 
-The terminal menu is profile-aware: it identifies the selected product and its capabilities,
-groups actions into **Build & Configure**, **Deploy Services**, and **Launch**, and renders a
-stage-progress bar. A green `●` is complete; a yellow `○` is still pending. This is display
-only—the state file remains the source of truth and no deployment action is implied by viewing
-the menu.
+`./deploy.sh` opens the local deployment wizard by default. The wizard is the
+recommended POC path: it saves configuration progress, runs preflight, and
+starts confirmed deployment with simple progress and technical output. The
+legacy terminal menu remains available through `./deploy.sh --cli`; it is
+profile-aware, groups actions into **Build & Configure**, **Deploy Services**,
+and **Launch**, and renders a stage-progress bar. A green `●` is complete; a
+yellow `○` is still pending.
 
 ```bash
-./deploy.sh           # choose Full, Headless, or Specialists; then choose a deployment
+./deploy.sh           # open the local deployment wizard (recommended)
+./deploy.sh --cli     # open the legacy interactive terminal menu
 ./deploy.sh 9         # choose a deployment, then run option 9 (full deployment)
 ./deploy.sh resume    # choose a deployment, then run only outstanding steps
 ./deploy.sh headless  # select Headless explicitly, then choose a deployment
 ./deploy.sh specialists --pack tables-and-forms 9
 ./deploy.sh specialists --specialist docx_processor 9
-./deploy.sh configure --ui # loopback-only local configuration planner; no AWS actions
+./deploy.sh configure --ui # loopback-only local deployment wizard
 ```
 
-### Local configuration planner
+### Local deployment wizard
 
 Use `./deploy.sh configure --ui` to manage reusable packs, select specialists,
 choose reviewed workflow-routing templates, set recommended or organization-
-specific resource tags, and select an observability posture before deployment.
-The CLI deploys that saved observability selection as the final deployment
+specific resource tags, select an observability posture, run preflight, and
+deploy the saved configuration. The wizard saves each configuration page
+locally and deploys the saved observability selection as the final deployment
 stage:
 
 | Mode | What the CLI deploys |
@@ -57,26 +61,29 @@ optionally route only these alarms to an SNS topic or EventBridge event bus.
 The dashboard provides investigation hints, but the customer owns escalation,
 recovery, and its production runbook.
 
-The planner starts a short-lived service on a random `127.0.0.1` port, opens a
-browser, and stores only desired state in `.deploy-state/{DEPLOYMENT_ID}.json`.
-It does not load AWS credentials, invoke the AWS CLI or CDK, run a shell
-command, or create AWS resources.
+The wizard starts a short-lived service on a random `127.0.0.1` port and
+stores desired state in `.deploy-state/{DEPLOYMENT_ID}.json`. AWS credentials
+remain in the local executor and are never sent to browser code. The browser
+can request only two fixed operations for a validated saved configuration:
+preflight and resume deployment. It cannot supply a shell command, arbitrary
+arguments, or a deployment identity outside the saved local configuration.
 
-The planner generates a reconciliation preview and a `deploy.sh … resume`
-handoff command. Run that normal CLI command, select the same deployment ID
-shown by the planner, and confirm the update; it repeats preflight, validates
-desired selections, tags, routing, and monitoring, then reconciles the
-matching AWS resources. A tag change reconciles every enabled stack, so review
-that broader impact before continuing.
-Stop the planner with `Ctrl-C`.
+Preflight must pass for the current configuration, expires after 15 minutes,
+and is invalidated by any configuration change. Starting deployment also
+requires an exact typed deployment ID and repeats preflight immediately before
+AWS changes. The wizard provides plain-language lifecycle progress plus an
+expandable technical output pane from the local executor. A tag change
+reconciles every enabled stack, so review that broader impact before
+continuing. Stop the wizard with `Ctrl-C` only when no deployment operation is
+running; the CLI remains available for automation and advanced operator work.
 
 **`DEPLOYMENT_ID` is unset on startup and never read from the environment.** The script
 scans `.deploy-state/` and offers every deployment it finds — complete and in progress —
 newest activity first, plus `n` to start a new one. A new id must match
 `^[a-z][a-z0-9-]{0,15}$` and must not already have state; pick it from the list instead.
 
-With a terminal, a bare `./deploy.sh` first presents the three supported
-product profiles: Full, Headless, and Specialists. The product wrappers
+With a terminal, `./deploy.sh --cli` presents the three supported product
+profiles: Full, Headless, and Specialists. The product wrappers
 (`badgers-full/deploy.sh`, `badgers-headless/deploy.sh`, and
 `badger-specialists/deploy.sh`) select the corresponding profile explicitly.
 Automated callers without a terminal retain the legacy Full default unless

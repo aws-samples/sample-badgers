@@ -172,8 +172,9 @@ Run the product entry point from the repository root:
 ```
 
 The entry point selects its product profile before asking for a deployment ID.
-Bare `./deploy.sh` presents the Full, Headless, and Specialists chooser in an
-interactive terminal. The three product wrappers select one explicitly.
+Bare `./deploy.sh` opens the local deployment wizard. Use `./deploy.sh --cli`
+for the legacy Full, Headless, and Specialists chooser in an interactive
+terminal. The three product wrappers select one explicitly.
 Non-interactive callers retain the legacy Full default unless they pass a
 profile argument or set `BADGERS_PROFILE`. It presents only the steps supported
 by that profile. **`deploy.sh` does not read
@@ -188,17 +189,20 @@ the authoritative record of completion.
 
 ### Configure a deployment locally
 
-Before deploying, `./deploy.sh configure --ui` opens an optional local planner
-for specialist packs, specialist selection, approved workflow-routing
+Before deploying, `./deploy.sh configure --ui` opens the local deployment
+wizard for specialist packs, specialist selection, approved workflow-routing
 templates, per-deployment resource tags, and an optional observability choice.
-The planner is organized as a small deployment journey: deployment details,
-specialists, routing, tags, monitoring, and CLI review.
+The wizard saves progress locally as each configuration page is completed:
+deployment details, specialists, routing, tags, monitoring, review, then
+preflight and deployment.
 
-It is intentionally separate from deployment: the planner binds only to
-`127.0.0.1`, saves desired state locally, and shows the CLI handoff command.
-The planner has no deployment endpoint and does not access AWS credentials.
-On the next CLI deployment, the selected posture is reconciled by a dedicated
-final CDK stage:
+The wizard binds only to `127.0.0.1`. AWS credentials never enter the browser:
+the browser may request only fixed, server-owned preflight or resume operations
+for the exact saved deployment ID and product profile. A successful preflight
+is valid for 15 minutes and is invalidated when the saved configuration changes.
+Deployment also requires the user to type the deployment ID, and repeats
+preflight immediately before any AWS mutation. The selected observability
+posture is reconciled by a dedicated final CDK stage:
 
 | Posture | Deployed coverage |
 | --- | --- |
@@ -211,11 +215,11 @@ bus is only needed when the customer elects a notification handoff. The
 dashboard includes investigation hints as a starting point; customers should
 own and maintain the escalation and recovery runbook for their environment.
 
-Use the returned `./deploy.sh <profile> resume` command to apply a reviewed
-change. When prompted, select the same deployment ID shown by the planner. The
-CLI remains the sole executor, re-runs preflight, validates the saved selection
-and routing, and asks for confirmation before AWS changes. Changing tags marks
-every enabled stack for reconciliation, so review the handoff before running it.
+Use **Preflight & deploy** in the wizard to apply a reviewed change. It shows
+plain-language progress and an expandable technical output pane from the fixed
+local executor. Changing tags marks every enabled stack for reconciliation, so
+review that broader impact and re-run preflight before deploying. The original
+CLI remains available for automation and advanced operator workflows.
 
 ![BADGERS local configuration planner](../.github/assets/local-configuration-planner.png)
 
@@ -1164,9 +1168,9 @@ to the POC. The deployment adds stable identity tags such as `deployment_id`,
 `aws:` keys and BADGERS-generated identity keys cannot be edited in the
 planner.
 
-Saving a tag change marks the deployment for reconciliation. Run the
-planner's `./deploy.sh <profile> resume` handoff to apply it; tag configuration
-is local until the CLI deploys the affected stacks.
+Saving a tag change marks the deployment for reconciliation. Run **Preflight &
+deploy** in the local wizard to apply it; tag configuration is local until the
+wizard's guarded local executor deploys the affected stacks.
 
 For direct CDK use only, `app.py` applies the same truthful deployment identity
 tags but no placeholder ownership or cost-allocation metadata. Use the planner

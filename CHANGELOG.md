@@ -23,6 +23,18 @@
 
 ### Added
 
+- **Guided local deployment wizard.** The loopback-only configuration UI now
+  saves configuration progress, runs required preflight for the exact saved
+  deployment state, and can resume deployment from the browser after a typed
+  deployment-ID confirmation. It presents plain-language lifecycle progress
+  and expandable local-executor output for technical diagnosis. The browser
+  cannot construct commands or access AWS credentials: it can request only
+  fixed preflight and resume operations for its saved deployment/profile.
+  Preflight expires after 15 minutes, is invalidated by saved configuration
+  changes, and is repeated immediately before AWS mutation. The default Full
+  UI remains internal-only; public browser access is an explicit, confirmed
+  local-wizard choice.
+
 - **Clarified the deployment handoff.** The local planner now requires an
   explicit deployment ID and profile, recommends Full for POC starts, names
   the deployment ID to select in the CLI, and explains that tag updates

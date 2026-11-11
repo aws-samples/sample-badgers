@@ -72,6 +72,18 @@ def test_ecs_endpoint_is_not_prefixed_with_a_second_scheme() -> None:
 def test_deployment_menu_offers_the_local_configuration_planner() -> None:
     deploy_script = (REPO_ROOT / "deploy.sh").read_text()
 
-    assert 'C  CONFIGURATION PLANNER' in deploy_script
+    assert 'C  LOCAL DEPLOYMENT WIZARD' in deploy_script
     assert 'c|C|configure)' in deploy_script
     assert 'python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"' in deploy_script
+    assert 'if [ "$#" -eq 0 ] && [ "${CLI_MODE}" = "0" ]' in deploy_script
+    assert 'if [ "${1:-}" = "--cli" ]; then' in deploy_script
+
+
+def test_local_ui_executor_has_a_constrained_noninteractive_entry_point() -> None:
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+
+    assert "--local-ui-execute" in deploy_script
+    assert "Invalid local UI deployment operation." in deploy_script
+    assert "LOCAL_UI_DEPLOYMENT_ID" in deploy_script
+    assert "run_preflight all || exit 1" in deploy_script
+    assert "step_resume" in deploy_script
