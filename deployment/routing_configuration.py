@@ -102,7 +102,6 @@ _TEMPLATES: dict[str, dict[str, Any]] = {
     },
     "native-xlsx-analysis": {
         "label": "Native XLSX workbook analysis",
-        "supported_profiles": {"headless"},
         "required_specialists": {"xlsx_processor"},
         "workflow": {
             "schema_version": 1,

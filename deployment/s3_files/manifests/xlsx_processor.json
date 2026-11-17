@@ -32,7 +32,7 @@
       "xlsx_visual_format.xml"
     ],
     "model_selections": {
-      "primary": "us.anthropic.claude-sonnet-4-6",
+      "primary": "us.anthropic.claude-sonnet-5-5",
       "fallback_list": [],
       "expected_output_tokens": 1200
     }

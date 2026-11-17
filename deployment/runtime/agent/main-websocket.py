@@ -413,7 +413,7 @@ class SanitizingSessionManager:
 # =============================================================================
 
 DEFAULT_MODEL_CONFIG = {
-    "model_id": "us.anthropic.claude-opus-4-6-v1",
+    "model_id": "us.anthropic.claude-opus-4-7",
     "temperature": 1.0,
     "max_tokens": 16000,
     "thinking": {"type": "adaptive"},

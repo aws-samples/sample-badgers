@@ -33,7 +33,7 @@
         "description": "Analyzes clinical decision trees and medical workflow diagrams",
         "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
-            "../shared/gestalt_perception_foundation.xml",
+            "shared/gestalt_perception_foundation.xml",
             "decision_tree_gestalt.xml",
             "decision_tree_job_role.xml",
             "decision_tree_context.xml",
@@ -48,7 +48,7 @@
         "analysis_text": "clinical decision tree",
         "expected_output_tokens": 2500,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-6",
+            "primary": "us.anthropic.claude-sonnet-5-5",
             "fallback_list": [
                 "us.openai.gpt-5.6-terra",
                 "us.amazon.nova-2-lite-v1:0"

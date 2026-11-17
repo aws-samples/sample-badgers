@@ -105,7 +105,7 @@
         "enhancement_eligible": false,
         "is_gateway_tool": true,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-6",
+            "primary": "us.anthropic.claude-sonnet-5-5",
             "fallback_list": [
                 "us.amazon.nova-2-lite-v1:0"
             ]

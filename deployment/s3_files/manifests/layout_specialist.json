@@ -33,7 +33,7 @@
         "description": "Analyzes document images to extract layout structure and spatial organization",
         "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
-            "../shared/gestalt_perception_foundation.xml",
+            "shared/gestalt_perception_foundation.xml",
             "layout_gestalt.xml",
             "layout_job_role.xml",
             "layout_context.xml",
@@ -48,7 +48,7 @@
         "analysis_text": "document layout and structure",
         "expected_output_tokens": 1500,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-6",
+            "primary": "us.anthropic.claude-sonnet-5-5",
             "fallback_list": [
                 "us.openai.gpt-5.6-terra",
                 "us.amazon.nova-2-lite-v1:0"

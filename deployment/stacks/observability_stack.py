@@ -23,6 +23,8 @@ from constructs import Construct
 class ObservabilityStack(Stack):
     """Deploy the selected CloudWatch posture without requiring alert delivery."""
 
+    MAX_METRICS_PER_ALARM = 10
+
     def __init__(
         self,
         scope: Construct,
@@ -85,16 +87,32 @@ class ObservabilityStack(Stack):
             period=period,
             label="Specialist Lambda throttles",
         )
-        alarms = [
+        alarms = []
+        for group_index, start in enumerate(range(0, len(functions), self.MAX_METRICS_PER_ALARM), 1):
+            group = functions[start : start + self.MAX_METRICS_PER_ALARM]
+            suffix = "" if group_index == 1 else str(group_index)
+            group_errors = cloudwatch.MathExpression(
+                expression="SUM(METRICS())",
+                using_metrics={f"error{start + index}": function.metric_errors(period=period, statistic="sum") for index, function in enumerate(group)},
+                period=period,
+                label="Specialist Lambda errors",
+            )
+            group_throttles = cloudwatch.MathExpression(
+                expression="SUM(METRICS())",
+                using_metrics={f"throttle{start + index}": function.metric_throttles(period=period, statistic="sum") for index, function in enumerate(group)},
+                period=period,
+                label="Specialist Lambda throttles",
+            )
+            alarms.extend([
             cloudwatch.Alarm(
                 self,
-                "SpecialistErrorsAlarm",
-                alarm_name=f"badgers-{deployment_id}-specialist-errors",
+                f"SpecialistErrorsAlarm{suffix}",
+                alarm_name=f"badgers-{deployment_id}-specialist-errors{('-' + suffix) if suffix else ''}",
                 alarm_description=(
                     "Suggested investigation: inspect specialist Lambda logs and the "
                     "correlated BADGERS job/workflow before defining escalation."
                 ),
-                metric=errors,
+                metric=group_errors,
                 threshold=1,
                 evaluation_periods=1,
                 comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
@@ -102,19 +120,19 @@ class ObservabilityStack(Stack):
             ),
             cloudwatch.Alarm(
                 self,
-                "SpecialistThrottlesAlarm",
-                alarm_name=f"badgers-{deployment_id}-specialist-throttles",
+                f"SpecialistThrottlesAlarm{suffix}",
+                alarm_name=f"badgers-{deployment_id}-specialist-throttles{('-' + suffix) if suffix else ''}",
                 alarm_description=(
                     "Suggested investigation: inspect Lambda concurrency, service quotas, "
                     "and traffic before defining escalation."
                 ),
-                metric=throttles,
+                metric=group_throttles,
                 threshold=1,
                 evaluation_periods=1,
                 comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
                 treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
             ),
-        ]
+            ])
 
         dashboard_widgets: list[cloudwatch.IWidget] = [
             cloudwatch.TextWidget(

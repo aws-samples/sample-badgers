@@ -111,7 +111,7 @@ const PROMPT_TYPE_INSTRUCTIONS = {
 // from the same constant the task role's Bedrock grant was built from
 // (deployment/stacks/ecs_stack.py), so the call and the grant cannot name different
 // models. This literal is what local development uses.
-const DEFAULT_GENERATOR_MODEL_ID = 'us.anthropic.claude-sonnet-4-6';
+const DEFAULT_GENERATOR_MODEL_ID = 'us.anthropic.claude-sonnet-5-5';
 
 // The client now submits model IDs, not display labels, because the dropdown is populated
 // from GET /api/models. The label -> ID map that used to live here is gone: it was a second

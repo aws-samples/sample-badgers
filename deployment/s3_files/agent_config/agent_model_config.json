@@ -1,5 +1,5 @@
 {
-    "model_id": "us.anthropic.claude-opus-4-6-v1",
+    "model_id": "us.anthropic.claude-opus-4-7",
     "temperature": 1,
     "max_tokens": 60000,
     "thinking": {

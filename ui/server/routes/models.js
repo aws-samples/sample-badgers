@@ -27,9 +27,9 @@ let cache = { at: 0, models: null };
 
 // Presentation order for the wizard: workhorse, then heavy reasoning, then ascending price.
 const RANK_FIRST = [
-    'us.anthropic.claude-sonnet-4-6',
-    'us.anthropic.claude-opus-4-6-v1',
-    'us.anthropic.claude-opus-5',
+    'us.anthropic.claude-sonnet-5-5',
+    'us.anthropic.claude-opus-4-7',
+    'us.anthropic.claude-opus-5-5',
 ];
 
 /**

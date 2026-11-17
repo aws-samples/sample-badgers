@@ -48,7 +48,7 @@
     "expected_output_tokens": 3000,
     "model_selections": {
       "primary": {
-        "model_id": "us.anthropic.claude-sonnet-4-6",
+        "model_id": "us.anthropic.claude-sonnet-5-5",
         "adaptive_thinking": true,
         "effort": "medium"
       },

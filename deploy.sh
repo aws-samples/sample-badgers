@@ -106,6 +106,11 @@ if [ "${1:-}" = "configure" ]; then
   exec python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
 fi
 
+if [ "${1:-}" = "models" ]; then
+  shift
+  exec python3 "${SCRIPT_DIR}/deployment/model_discovery.py" "$@"
+fi
+
 # Product profile is selected before deployment identity so its safety checks happen
 # before any AWS preflight or resource creation. A deployment ID can belong to only
 # one product profile; this prevents a Headless run from reusing Full stack state.
@@ -502,6 +507,7 @@ export RUNTIME_IMAGE_TAG
 log_info "Runtime image tag: ${RUNTIME_IMAGE_TAG}"
 
 ensure_cdk_deps || { log_error "ensure_cdk_deps failed — check node/cdk/uv installation"; exit 1; }
+use_private_docker_config || { log_error "Docker credential configuration failed."; exit 1; }
 
 ECR_BASE="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 # One repository per deployment, named badgers-{DEPLOYMENT_ID}-{suffix} by the ECR
@@ -554,7 +560,8 @@ step_layers() {
 
   if [ -f "${DEPLOYMENT_DIR}/lambdas/build_poppler_qdf_layer.sh" ]; then
     log_info "Building Poppler/qpdf layer..."
-    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_poppler_qdf_layer.sh)
+    (cd "${DEPLOYMENT_DIR}/lambdas" && ./build_poppler_qdf_layer.sh) \
+      || { log_error "Poppler/qpdf layer build failed."; return 1; }
   fi
 
   mark_complete "layers_built"

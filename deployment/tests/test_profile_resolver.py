@@ -235,14 +235,14 @@ def test_xlsx_pack_stages_its_single_container_contract() -> None:
         ).is_file()
 
 
-def test_full_profile_does_not_implicitly_add_opt_in_xlsx_processor() -> None:
+def test_full_profile_includes_xlsx_processor_by_default() -> None:
     resolved = resolve_profile(
         "full",
         profiles_dir=PROFILES_DIR,
         deployment_config_path=DEPLOYMENT_CONFIG,
     )
 
-    assert "xlsx_processor" not in resolved.specialists
+    assert "xlsx_processor" in resolved.specialists
 
 
 def test_direct_specialists_staging_omits_workflow_control_plane() -> None:

@@ -74,7 +74,7 @@ CONTAINER_PORT = 7860
 # is the only model the task role is granted. The same value is exported to the container
 # as WIZARD_GENERATOR_MODEL_ID, so the grant and the call cannot name different models.
 # Must be a model the registry provisions; InferenceProfilesStack raises at synth if not.
-WIZARD_GENERATOR_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
+WIZARD_GENERATOR_MODEL_ID = "us.anthropic.claude-sonnet-5-5"
 
 
 class ECSStack(Stack):

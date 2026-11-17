@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 //
 // Defaults are model IDs, not indexes into the fetched list, so the order the endpoint
 // returns cannot change what a new specialist defaults to.
-const DEFAULT_PRIMARY = 'us.anthropic.claude-sonnet-4-6'
+const DEFAULT_PRIMARY = 'us.anthropic.claude-sonnet-5-5'
 const DEFAULT_FALLBACK_1 = 'us.openai.gpt-5.6-terra'
 const DEFAULT_FALLBACK_2 = 'us.amazon.nova-2-lite-v1:0'
 

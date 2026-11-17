@@ -33,7 +33,7 @@
         "description": "Analyze educational transcripts of various sorts.",
         "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
-            "../shared/gestalt_perception_foundation.xml",
+            "shared/gestalt_perception_foundation.xml",
             "edu_transcript_gestalt.xml",
             "edu_transcript_job_role.xml",
             "edu_transcript_context.xml",
@@ -47,7 +47,7 @@
         "analysis_text": "educational transcripts",
         "expected_output_tokens": 5000,
         "model_selections": {
-            "primary": "us.anthropic.claude-sonnet-4-6",
+            "primary": "us.anthropic.claude-sonnet-5-5",
             "fallback_list": [
                 "us.openai.gpt-5.6-terra",
                 "us.amazon.nova-2-lite-v1:0"

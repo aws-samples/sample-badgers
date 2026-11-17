@@ -196,11 +196,12 @@ def thinking_default_on(model_id: str) -> bool:
     a thinking request. Without this, a wizard-created specialist on such a model inherits
     the specialist default temperature of 0.1 and every call is rejected.
 
-    Claude Opus 5 is the one such model in the current set -- its model card reads
-    "adaptive thinking is on by default; can be disabled". Add here whenever the registry
-    flag is set on a new entry.
+    The Claude 5 model families use default-on adaptive thinking. Keep this expression
+    aligned with the release-pinned model registry.
     """
-    return "claude-opus-5" in model_id.lower()
+    return bool(
+        re.search(r"claude-(?:opus|sonnet|haiku)-(?:[5-9]|[1-9]\d)(?!\d)", model_id.lower())
+    )
 
 
 class BedrockClient:

@@ -936,7 +936,18 @@ ensure_cdk_deps() {
   unset VIRTUAL_ENV
   (cd "${REPO_ROOT}" && uv sync --quiet)
   export VIRTUAL_ENV="${REPO_ROOT}/.venv"
-  export PATH="${REPO_ROOT}/.venv/bin:${PATH}"
+  export PATH="${REPO_ROOT}/.venv/Scripts:${REPO_ROOT}/.venv/bin:${PATH}"
+}
+
+use_private_docker_config() {
+  local docker_config
+  docker_config="$(python3 "${REPO_ROOT}/deployment/scripts/docker_private_config.py" "${REPO_ROOT}")" || {
+    log_error "Could not create the private Docker credential configuration."
+    return 1
+  }
+  export DOCKER_CONFIG="${docker_config}"
+  export PATH="${DOCKER_CONFIG}/bin:${PATH}"
+  log_info "Using isolated Docker credential configuration."
 }
 
 # ── CDK Bootstrap Preflight ──────────────────────────────────────────────────

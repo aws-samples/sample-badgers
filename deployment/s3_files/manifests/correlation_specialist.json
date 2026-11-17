@@ -61,15 +61,15 @@
         "enhancement_eligible": false,
         "model_selections": {
             "primary": {
-                "model_id": "us.anthropic.claude-opus-4-6-v1",
+                "model_id": "us.anthropic.claude-opus-4-7",
                 "adaptive_thinking": true,
                 "effort": "high"
             },
             "fallback_list": [
                 {
-                    "model_id": "us.anthropic.claude-sonnet-4-6",
-                    "extended_thinking": true,
-                    "budget_tokens": 8192
+                    "model_id": "us.anthropic.claude-sonnet-5-5",
+                    "adaptive_thinking": true,
+                    "effort": "medium"
                 }
             ]
         },

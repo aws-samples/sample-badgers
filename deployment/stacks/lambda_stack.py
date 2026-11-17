@@ -421,11 +421,11 @@ class LambdaSpecialistStack(Stack):
         # a single env var rather than reading the map.
         if self.inference_profiles_stack and func_name == "image_enhancer":
             environment["VISION_MODEL"] = self.inference_profiles_stack.profile_arn(
-                "us.anthropic.claude-sonnet-4-6"
+                "us.anthropic.claude-sonnet-5-5"
             )
         if self.inference_profiles_stack and func_name == "xlsx_processor":
             environment["XLSX_VISION_MODEL"] = self.inference_profiles_stack.profile_arn(
-                "us.anthropic.claude-sonnet-4-6"
+                "us.anthropic.claude-sonnet-5-5"
             )
 
         # DOCX rendering needs a writable LibreOffice profile and temporary PDF

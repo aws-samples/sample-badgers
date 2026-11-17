@@ -43,9 +43,9 @@ RUN for bin in /opt/layer/bin/*; do \
 RUN cd /opt/layer/lib && rm -f libc.so* libm.so* libpthread.so* libdl.so* librt.so* 2>/dev/null || true
 
 # Copy fonts and fontconfig
-RUN cp -r /etc/fonts /opt/layer/etc/ && \
-    cp -r /usr/share/fonts /opt/layer/share/ && \
-    cp -r /usr/share/fontconfig /opt/layer/share/ 2>/dev/null || true
+RUN cp -rL /etc/fonts /opt/layer/etc/ && \
+    cp -rL /usr/share/fonts /opt/layer/share/ && \
+    cp -rL /usr/share/fontconfig /opt/layer/share/ 2>/dev/null || true
 
 # Fix font paths in fonts.conf to point to /opt/share/fonts
 RUN sed -i 's|/usr/share/fonts|/opt/share/fonts|g' /opt/layer/etc/fonts/fonts.conf
@@ -66,7 +66,11 @@ docker rm "$CONTAINER_ID"
 # Create the layer zip
 echo "🗜️  Creating layer zip..."
 cd poppler_build/layer
-zip -r "../../$OUTPUT_FILE" . -q
+if command -v zip >/dev/null 2>&1; then
+    zip -r "../../$OUTPUT_FILE" . -q
+else
+    python3 "../../zip_dir.py" . "../../$OUTPUT_FILE"
+fi
 cd ../..
 
 # Cleanup

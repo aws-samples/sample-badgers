@@ -78,11 +78,6 @@ cp ../badgers-foundation/config/config.py "${LAYER_DIR}/python/config/"
 # Don't copy specialist_config.json - each function has its own manifest
 touch "${LAYER_DIR}/python/config/__init__.py"
 
-# Copy core system prompts (used by all specialists)
-echo "📋 Copying core system prompts..."
-mkdir -p "${LAYER_DIR}/python/prompts/core_system_prompts"
-cp -r ../badgers-foundation/foundation/core_system_prompts/* "${LAYER_DIR}/python/prompts/core_system_prompts/"
-
 # Create layer info file
 echo "📝 Creating layer info..."
 cat > "${LAYER_DIR}/python/LAYER_INFO.txt" << EOF
@@ -108,7 +103,11 @@ EOF
 echo "🗜️  Creating layer package..."
 (
     cd "${LAYER_DIR}"
-    zip -r "${SCRIPT_DIR}/layer.zip" . -q
+    if command -v zip >/dev/null 2>&1; then
+        zip -r "${SCRIPT_DIR}/layer.zip" . -q
+    else
+        python3 "${SCRIPT_DIR}/zip_dir.py" . "${SCRIPT_DIR}/layer.zip"
+    fi
 )
 
 # Get size info

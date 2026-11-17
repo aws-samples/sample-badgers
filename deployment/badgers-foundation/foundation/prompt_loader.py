@@ -89,18 +89,10 @@ class PromptLoader:
             # Step 1: Load all core system files
             core_prompt_files = self.load_core_system_files()
 
-            # Step 2: Load and compose specialist-specific prompts
-            # Get the prompt base path from config (could be prompt_base_path or prompt_specialist_prompt_base_path)
-            prompt_base_key = None
-            for key in ["prompt_base_path", "prompt_specialist_prompt_base_path"]:
-                if key in specialist_config:
-                    prompt_base_key = key
-                    break
-
-            if not prompt_base_key:
-                raise PromptLoadError("No prompt base path found in specialist config")
-
-            specialist_prompt_base_path = specialist_config[prompt_base_key]
+            # Prompt files are manifest-declared. "prompts" remains the local default.
+            specialist_prompt_base_path = specialist_config.get("prompt_base_path", "prompts")
+            if not isinstance(specialist_prompt_base_path, str):
+                raise PromptLoadError("Prompt base path must be a string")
             composed_specialist_prompt = self.load_prompt_files(
                 specialist_prompt_base_path,
                 specialist_config["prompt_files"],
@@ -230,9 +222,9 @@ class PromptLoader:
                     loaded_files += 1
                     self.logger.debug("Loaded prompt file from S3: %s", file_path)
                 else:
-                    self.logger.warning("Empty prompt file: %s", file_path)
+                    raise PromptLoadError(f"Prompt file is empty: {file_path}")
             except self._S3ConfigError as e:
-                self.logger.warning("Could not load prompt file %s: %s", file_path, e)
+                raise PromptLoadError(f"Could not load prompt file {file_path}: {e}") from e
 
         if loaded_files == 0:
             raise PromptLoadError("No valid prompt files were loaded from S3")
@@ -263,9 +255,9 @@ class PromptLoader:
                     loaded_files += 1
                     self.logger.debug("Loaded prompt file: %s", file_path)
                 else:
-                    self.logger.warning("Empty prompt file: %s", file_path)
+                    raise PromptLoadError(f"Prompt file is empty: {full_path}")
             else:
-                self.logger.warning("Prompt file not found: %s", full_path)
+                raise PromptLoadError(f"Prompt file not found: {full_path}")
 
         if loaded_files == 0:
             raise PromptLoadError("No valid prompt files were loaded")

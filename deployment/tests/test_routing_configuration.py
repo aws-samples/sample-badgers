@@ -91,10 +91,11 @@ def test_native_xlsx_route_requires_the_xlsx_processor(tmp_path: Path) -> None:
     assert workflow["invariant_capabilities"] == {"native_document": "xlsx_analysis"}
 
 
-def test_native_xlsx_route_is_headless_only() -> None:
-    with pytest.raises(RoutingConfigurationError, match="available only for: headless"):
-        _routing_payload(
-            "full",
-            ["native-xlsx-analysis"],
-            {"xlsx_processor"},
-        )
+def test_native_xlsx_route_is_available_in_full_when_processor_is_selected() -> None:
+    payload = _routing_payload("full", ["native-xlsx-analysis"], {"xlsx_processor"})
+    assert "native-xlsx-analysis" in payload["workflows"]
+
+
+def test_native_xlsx_route_requires_its_processor_in_full() -> None:
+    with pytest.raises(RoutingConfigurationError, match="requires selected specialists"):
+        _routing_payload("full", ["native-xlsx-analysis"], set())

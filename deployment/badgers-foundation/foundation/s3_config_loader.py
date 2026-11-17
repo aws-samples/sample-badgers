@@ -97,10 +97,14 @@ def load_prompt_from_s3(
     """
     try:
         s3 = boto3.client("s3")
+        from foundation.prompt_keys import prompt_key
+
         if custom:
+            if prompt_file.startswith("shared/"):
+                raise S3ConfigError("Custom specialist prompts cannot reference shared prompts")
             key = f"custom-specialists/prompts/{specialist_name}/{prompt_file}"
         else:
-            key = f"prompts/{specialist_name}/{prompt_file}"
+            key = prompt_key(specialist_name, prompt_file)
         key = config_key(key)
 
         logger.debug("Loading prompt from s3://%s/%s", bucket, key)
@@ -109,6 +113,8 @@ def load_prompt_from_s3(
 
         logger.debug("Loaded prompt %s (%d bytes)", prompt_file, len(content))
 
+        if not content.strip():
+            raise S3ConfigError(f"Prompt is empty: s3://{bucket}/{key}")
         return content
 
     except ClientError as e:

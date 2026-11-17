@@ -24,6 +24,7 @@ if str(_FOUNDATION_DIR) not in sys.path:
     sys.path.insert(0, str(_FOUNDATION_DIR))
 
 from foundation.workflow_planner import validate_release_configuration
+from foundation.prompt_keys import prompt_key
 
 
 class ConfigurationStagingError(ValueError):
@@ -128,6 +129,29 @@ def _stage_workflow_configuration(
         ) from error
 
 
+def _validate_manifest_prompts(source_root: Path, specialists: tuple[str, ...]) -> None:
+    """Fail before upload when a manifest names a missing or invalid prompt object."""
+    for specialist in specialists:
+        manifest_path = source_root / "manifests" / f"{specialist}.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            files = manifest.get("specialist", {}).get("prompt_files", [])
+        except (OSError, json.JSONDecodeError) as error:
+            raise ConfigurationStagingError(f"Could not validate manifest: {manifest_path}") from error
+        if not isinstance(files, list):
+            raise ConfigurationStagingError(f"{manifest_path}: prompt_files must be a list")
+        for entry in files:
+            try:
+                key = prompt_key(specialist, entry)
+            except ValueError as error:
+                raise ConfigurationStagingError(f"{manifest_path}: {error}") from error
+            prompt = source_root / key
+            if not prompt.is_file() or not prompt.read_text(encoding="utf-8").strip():
+                raise ConfigurationStagingError(
+                    f"{manifest_path}: required prompt is missing or empty: {key}"
+                )
 def stage_profile_config(
     profile: ResolvedProfile,
     destination: Path,
@@ -146,6 +170,7 @@ def stage_profile_config(
             f"Destination must be empty before staging profile configuration: {destination}"
         )
     destination.mkdir(parents=True, exist_ok=True)
+    _validate_manifest_prompts(source_root, profile.specialists)
 
     # Agent and prompt-core files are shared runtime dependencies. They are
     # included as whole directories because their internal references are owned by

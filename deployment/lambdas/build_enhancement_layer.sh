@@ -72,7 +72,11 @@ EOF
 # Create zip file
 echo "🗜️  Creating layer package..."
 cd enhancement_build/layer
-zip -r "../../$OUTPUT_FILE" . -q
+if command -v zip >/dev/null 2>&1; then
+    zip -r "../../$OUTPUT_FILE" . -q
+else
+    python3 "../../zip_dir.py" . "../../$OUTPUT_FILE"
+fi
 cd ../..
 
 # Cleanup build directory

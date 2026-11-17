@@ -17,6 +17,7 @@ a Lambda under load.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -273,6 +274,44 @@ def _validate(models: dict[str, Any], source: Path) -> None:
                 f"{where}: long-context pricing is partial — has {present}, "
                 f"needs all of {list(long_fields)}"
             )
+        inference = spec.get("inference")
+        if inference is not None:
+            if not isinstance(inference, dict):
+                raise RegistryError(f"{where}: 'inference' must be an object")
+            maximum = inference.get("max_output_tokens")
+            if maximum is not None and (
+                not isinstance(maximum, int) or isinstance(maximum, bool) or maximum <= 0
+            ):
+                raise RegistryError(
+                    f"{where}: inference.max_output_tokens must be a positive integer"
+                )
+            params = inference.get("params")
+            if params is not None and (
+                not isinstance(params, list) or not all(isinstance(item, str) for item in params)
+            ):
+                raise RegistryError(f"{where}: inference.params must be a list of strings")
+
+
+def _validate_pricing(pricing: Any, models: dict[str, Any], source: Path) -> None:
+    """Validate the provenance that accompanies user-facing price information."""
+    if not isinstance(pricing, dict):
+        raise RegistryError(f"{source}: 'pricing' must be an object")
+    for field in ("currency", "as_of", "url"):
+        if not isinstance(pricing.get(field), str) or not pricing[field].strip():
+            raise RegistryError(f"{source}: pricing.{field} must be a non-empty string")
+    try:
+        date.fromisoformat(pricing["as_of"])
+    except ValueError as error:
+        raise RegistryError(f"{source}: pricing.as_of must be an ISO date") from error
+    if not pricing["url"].startswith("https://"):
+        raise RegistryError(f"{source}: pricing.url must use https")
+    not_verified = pricing.get("not_verified", [])
+    if not isinstance(not_verified, list) or not all(
+        isinstance(model_id, str) and model_id in models for model_id in not_verified
+    ):
+        raise RegistryError(
+            f"{source}: pricing.not_verified must contain only registry model IDs"
+        )
 
 
 def load_registry(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
@@ -302,7 +341,20 @@ def load_registry(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
         raise RegistryError(f"{source}: 'models' must be an object")
 
     _validate(models, source)
+    _validate_pricing(raw.get("pricing"), models, source)
     return models
+
+
+def pricing_notice(path: Path | str | None = None) -> dict[str, Any]:
+    """Return validated pricing provenance for reports and the local UI."""
+    source = Path(path) if path else _DEFAULT_PATH
+    try:
+        raw = json.loads(source.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise RegistryError(f"{source}: invalid JSON — {error}") from error
+    models = raw.get("models", {})
+    _validate_pricing(raw.get("pricing"), models, source)
+    return dict(raw["pricing"])
 
 
 def active_models(models: dict[str, Any]) -> dict[str, Any]:

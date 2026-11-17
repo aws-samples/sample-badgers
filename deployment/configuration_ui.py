@@ -97,7 +97,10 @@ def _bash_executable() -> tuple[str, str]:
     )
     for candidate in candidates:
         if candidate and not _is_windows_wsl_launcher(candidate) and Path(candidate).is_file():
-            return candidate, "BADGERS_BASH" if candidate.startswith(override) else "Git Bash"
+            configured = candidate == override or (
+                bool(override) and candidate == f"{override}.exe"
+            )
+            return candidate, "BADGERS_BASH" if configured else "Git Bash"
     raise UIError(
         "Git Bash was not found. Install Git for Windows or set BADGERS_BASH to its bash.exe path."
     )
@@ -121,7 +124,20 @@ def _executor_status() -> dict[str, object]:
 def _configuration_fingerprint(path: Path) -> str:
     """Bind a preflight result to the exact saved local desired state."""
 
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    state = _read_json(path)
+    desired = {
+        key: value
+        for key, value in state.items()
+        if key.startswith("desired_") or key in {"product_profile", "deployment_id"}
+    }
+    mapping = desired.get("desired_model_mapping")
+    if isinstance(mapping, dict):
+        mapping = dict(mapping)
+        mapping.pop("generated_at", None)
+        mapping.pop("availability_generated_at", None)
+        desired["desired_model_mapping"] = mapping
+    encoded = json.dumps(desired, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _execution_identity(repo_root: Path, payload: dict[str, Any]) -> tuple[str, str, Path, str]:
@@ -794,7 +810,7 @@ const wizardSteps=[
   {view:'review',next:'deploy',previous:'observability',label:'Step 6 of 7',title:'Review the deployment plan',detail:'Confirm the change set before running the required preflight.'}
 ];
 function wizardStepByView(view){return wizardSteps.find(step=>step.view===view)}
-function showWizardStep(view){switchTo(view);document.querySelector('main').scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav').forEach(node=>node.classList.toggle('wizard-step-active',node.dataset.v===view))}
+function showWizardStep(view){switchTo(view);if(view==='deploy')refreshExecution();document.querySelector('main').scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav').forEach(node=>node.classList.toggle('wizard-step-active',node.dataset.v===view))}
 async function saveWizardStep(view){
   window.clearTimeout(configurationSaveTimer);
   if(view==='overview'){
@@ -1027,6 +1043,38 @@ _HTML = (
     .replace("</script></body></html>", _CONFIGURATION_INDEX_SCRIPT + "\n</script></body></html>")
     .replace("</script></body></html>", _DEPLOYMENT_WIZARD_SCRIPT + "\n</script></body></html>")
     .replace("</script></body></html>", _LINEAR_WIZARD_SCRIPT + "\n</script></body></html>")
+    .replace(
+        '<div class="deploy-actions"><button class="btn primary" id="run-preflight">Run preflight</button></div>',
+        '<p class="field-help" id="executor-note" role="status">Checking local executor…</p>'
+        '<div class="deploy-actions"><button class="btn primary" id="run-preflight">Run preflight</button></div>',
+    )
+    .replace(
+        '<pre id="execution-output">No deployment output yet.</pre>',
+        '<div class="output-actions"><button class="btn" id="copy-output" type="button">Copy output</button>'
+        '<button class="btn" id="expand-output" type="button">Expand</button></div>'
+        '<pre id="execution-output">No deployment output yet.</pre>',
+    )
+    .replace(
+        "</style>",
+        ".output-actions{display:flex;gap:8px;margin:8px 0}.output-popout{position:fixed;inset:4vh 4vw;"
+        "z-index:200;background:#fff;padding:20px;overflow:auto;box-shadow:0 10px 50px #0008}.output-popout pre{"
+        "min-height:75vh}.output-backdrop{position:fixed;inset:0;background:#0008;z-index:199}"
+        "\n</style>",
+    )
+    .replace(
+        "</script></body></html>",
+        r"""
+const baseRenderExecution=renderExecution;
+function ansiNodes(text){let fragment=document.createDocumentFragment(),pattern=/\x1b\[([0-9;]*)m/g,last=0,match,classes={30:'ansi-black',31:'ansi-red',32:'ansi-green',33:'ansi-yellow',34:'ansi-blue',35:'ansi-magenta',36:'ansi-cyan',37:'ansi-white',90:'ansi-gray',91:'ansi-red',92:'ansi-green',93:'ansi-yellow',94:'ansi-blue',95:'ansi-magenta',96:'ansi-cyan',97:'ansi-white'},className='';while((match=pattern.exec(text))){if(match.index>last){let node=document.createElement('span');node.className=className;node.textContent=text.slice(last,match.index);fragment.append(node)}for(let code of match[1].split(';').filter(Boolean)){className=code==='0'||code==='39'||code==='22'?'':(classes[code]||className)}last=pattern.lastIndex}if(last<text.length||!fragment.childNodes.length){let node=document.createElement('span');node.className=className;node.textContent=text.slice(last);fragment.append(node)}return fragment}
+function setExecutionOutput(text){let output=document.querySelector('#execution-output'),nearBottom=output.scrollHeight-output.scrollTop-output.clientHeight<24;if(output.dataset.output!==text){output.textContent='';output.append(ansiNodes(text));output.dataset.output=text}if(nearBottom)output.scrollTop=output.scrollHeight}
+renderExecution=function(run){baseRenderExecution(run);let executor=run.executor||{ok:true,message:'Local executor status unavailable.'};let note=document.querySelector('#executor-note'),button=document.querySelector('#run-preflight');note.textContent=executor.message||'';button.disabled=button.disabled||!executor.ok;setExecutionOutput(run.output||'No deployment output yet.')};
+document.querySelector('#copy-output').onclick=async()=>{let text=document.querySelector('#execution-output').textContent;try{await navigator.clipboard.writeText(text)}catch(_error){let area=document.createElement('textarea');area.value=text;document.body.append(area);area.select();document.execCommand('copy');area.remove()}toast('Output copied.')};
+function closeOutputPopout(){let output=document.querySelector('#execution-output'),holder=document.querySelector('.technical-details');document.querySelector('#output-backdrop')?.remove();document.querySelector('#output-popout')?.remove();holder.append(output);output.parentElement?.classList.remove('output-popout')}
+document.querySelector('#expand-output').onclick=()=>{let output=document.querySelector('#execution-output'),details=output.closest('details'),popout=document.createElement('div'),backdrop=document.createElement('div');popout.id='output-popout';popout.className='output-popout';backdrop.id='output-backdrop';backdrop.className='output-backdrop';let close=document.createElement('button');close.className='btn';close.textContent='Close';close.onclick=closeOutputPopout;popout.append(close,output);document.body.append(backdrop,popout);details.open=true;output.scrollTop=output.scrollHeight};
+document.addEventListener('keydown',event=>{if(event.key==='Escape')closeOutputPopout()});
+"""
+        + "\n</script></body></html>",
+    )
 )
 
 
