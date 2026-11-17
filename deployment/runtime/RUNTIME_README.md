@@ -138,7 +138,7 @@ Edit `agent/main-websocket.py` to change:
 aws logs tail /aws/bedrock-agentcore/runtimes/<runtime_id> --follow
 
 # Check container locally
-docker run -p 8080:8080 pdf-analysis-agent
+docker run -p 127.0.0.1:8080:8080 pdf-analysis-agent
 
 # Verify ECR image
 aws ecr describe-images --repository-name pdf-analysis-agent-<deployment_id>

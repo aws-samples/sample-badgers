@@ -119,7 +119,7 @@ image — the deployed container gets those values from SSM.
 ```bash
 npm run build                    # build static assets into dist/
 docker build -t badgers-ui .     # build container
-docker run -p 7860:7860 badgers-ui
+docker run -p 127.0.0.1:7860:7860 badgers-ui
 ```
 
 In production the container runs on an ECS Express Gateway service, which provisions and

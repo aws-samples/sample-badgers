@@ -108,7 +108,7 @@ docker build --platform linux/amd64 -t "${IMAGE_NAME}:${IMAGE_TAG}" .
 if [ "$ACTION" = "build-only" ]; then
     echo "==> Build complete. Image: ${IMAGE_NAME}:${IMAGE_TAG}"
     echo "    To test locally, run:"
-    echo "    docker run -p 9000:8080 ${IMAGE_NAME}:${IMAGE_TAG}"
+    echo "    docker run -p 127.0.0.1:9000:8080 ${IMAGE_NAME}:${IMAGE_TAG}"
     exit 0
 fi
 
