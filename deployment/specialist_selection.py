@@ -14,11 +14,14 @@ import json
 import os
 import re
 import sys
-import termios
-import tty
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from .terminal_input import raw_terminal, read_key
+except ImportError:
+    from terminal_input import raw_terminal, read_key
 
 try:
     from .profile_resolver import (
@@ -343,27 +346,11 @@ def delete_pack(name: str, state_dir: Path, *, confirmed: bool) -> list[str]:
     return references
 
 
-def _read_key() -> str:
-    first = sys.stdin.read(1)
-    if first != "\x1b":
-        return first
-    second = sys.stdin.read(1)
-    third = sys.stdin.read(1)
-    if second == "[":
-        return {"A": "UP", "B": "DOWN"}.get(third, "")
-    return "ESC"
-
-
 def _interactive_picker(
     profile_name: str, desired: dict[str, Any], *, include_packs: bool = True
 ) -> tuple[list[str], list[str]]:
     """Render a compact keyboard picker for packs and direct specialists."""
 
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        raise SelectionError(
-            "Interactive specialist selection requires a terminal. "
-            "Use --pack and --specialist for scripted selection."
-        )
     catalog = _catalog()
     packs = pack_definitions(profile_name)
     items = (
@@ -384,65 +371,63 @@ def _interactive_picker(
     selected_packs = set(desired["packs"])
     selected_direct = set(desired["direct_specialists"])
     cursor = 0
-    old = termios.tcgetattr(sys.stdin.fileno())
     try:
-        tty.setraw(sys.stdin.fileno())
-        while True:
-            _clear_terminal()
-            print("BADGERS SPECIALIST SELECTION")
-            print(
-                f"Deployment product: {profile_name}  |  Space toggle  "
-                "a select all  d deselect all  ↑↓ move  Enter save  q cancel"
-            )
-            print("")
-            for index, (kind, identifier, label, detail) in enumerate(items):
-                selected = identifier in (selected_packs if kind == "pack" else selected_direct)
-                marker = "[x]" if selected else "[ ]"
-                pointer = "›" if index == cursor else " "
-                kind_label = "PACK" if kind == "pack" else "SPECIALIST"
-                print(f"{pointer} {marker} {label:<30} {kind_label:<11} {detail}")
-            print("")
-            preview = resolve_selection(
-                profile_name, sorted(selected_packs), sorted(selected_direct)
-            ) if selected_packs or selected_direct else None
-            if preview:
-                suffix = (
-                    f" · containers: {', '.join(preview['container_specialists'])}"
-                    if preview["container_specialists"]
-                    else ""
+        with raw_terminal():
+            while True:
+                _clear_terminal()
+                print("BADGERS SPECIALIST SELECTION")
+                print(
+                    f"Deployment product: {profile_name}  |  Space toggle  "
+                    "a select all  d deselect all  ↑↓ move  Enter save  q cancel"
                 )
-                print(f"  {len(preview['resolved_specialists'])} resolved specialists{suffix}")
-            else:
-                print("  Select at least one pack or specialist.")
-            key = _read_key()
-            if key == "UP":
-                cursor = (cursor - 1) % len(items)
-            elif key == "DOWN":
-                cursor = (cursor + 1) % len(items)
-            elif key == " ":
-                kind, identifier, _, _ = items[cursor]
-                target = selected_packs if kind == "pack" else selected_direct
-                if identifier in target:
-                    target.remove(identifier)
-                else:
-                    target.add(identifier)
-            elif key in {"a", "A"}:
-                selected_packs = {
-                    identifier for kind, identifier, _, _ in items if kind == "pack"
-                }
-                selected_direct = {
-                    identifier for kind, identifier, _, _ in items if kind == "specialist"
-                }
-            elif key in {"d", "D"}:
-                selected_packs.clear()
-                selected_direct.clear()
-            elif key in ("\r", "\n"):
+                print("")
+                for index, (kind, identifier, label, detail) in enumerate(items):
+                    selected = identifier in (selected_packs if kind == "pack" else selected_direct)
+                    marker = "[x]" if selected else "[ ]"
+                    pointer = "›" if index == cursor else " "
+                    kind_label = "PACK" if kind == "pack" else "SPECIALIST"
+                    print(f"{pointer} {marker} {label:<30} {kind_label:<11} {detail}")
+                print("")
+                preview = resolve_selection(
+                    profile_name, sorted(selected_packs), sorted(selected_direct)
+                ) if selected_packs or selected_direct else None
                 if preview:
-                    return sorted(selected_packs), sorted(selected_direct)
-            elif key in ("q", "Q", "ESC"):
-                raise SelectionError("Specialist selection cancelled.")
+                    suffix = (
+                        f" · containers: {', '.join(preview['container_specialists'])}"
+                        if preview["container_specialists"]
+                        else ""
+                    )
+                    print(f"  {len(preview['resolved_specialists'])} resolved specialists{suffix}")
+                else:
+                    print("  Select at least one pack or specialist.")
+                key = read_key()
+                if key == "UP":
+                    cursor = (cursor - 1) % len(items)
+                elif key == "DOWN":
+                    cursor = (cursor + 1) % len(items)
+                elif key == " ":
+                    kind, identifier, _, _ = items[cursor]
+                    target = selected_packs if kind == "pack" else selected_direct
+                    if identifier in target:
+                        target.remove(identifier)
+                    else:
+                        target.add(identifier)
+                elif key in {"a", "A"}:
+                    selected_packs = {
+                        identifier for kind, identifier, _, _ in items if kind == "pack"
+                    }
+                    selected_direct = {
+                        identifier for kind, identifier, _, _ in items if kind == "specialist"
+                    }
+                elif key in {"d", "D"}:
+                    selected_packs.clear()
+                    selected_direct.clear()
+                elif key in ("\r", "\n"):
+                    if preview:
+                        return sorted(selected_packs), sorted(selected_direct)
+                elif key in ("q", "Q", "ESC"):
+                    raise SelectionError("Specialist selection cancelled.")
     finally:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old)
         print("")
 
 

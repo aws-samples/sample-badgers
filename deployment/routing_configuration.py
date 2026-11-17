@@ -7,11 +7,14 @@ import hashlib
 import json
 import os
 import sys
-import termios
-import tty
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from .terminal_input import raw_terminal, read_key
+except ImportError:
+    from terminal_input import raw_terminal, read_key
 
 
 DEPLOYMENT_DIR = Path(__file__).parent
@@ -271,14 +274,6 @@ def record_applied(state_path: Path, config_release_id: str) -> None:
     _write(state_path, state)
 
 
-def _read_key() -> str:
-    first = sys.stdin.read(1)
-    if first != "\x1b":
-        return first
-    second, third = sys.stdin.read(1), sys.stdin.read(1)
-    return {"\x1b[A": "UP", "\x1b[B": "DOWN"}.get(first + second + third, "ESC")
-
-
 def _clear_terminal() -> None:
     """Clear an interactive terminal without invoking a shell."""
 
@@ -295,53 +290,49 @@ def configure(state_path: Path, profile: str) -> tuple[dict[str, Any], bool]:
     )
     if profile == "specialists":
         return _routing_payload(profile, [], _selection(state)), False
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        raise RoutingConfigurationError("Interactive routing configuration requires a terminal.")
     selected = _selection(state)
     selected_templates = set(templates)
     options = list(_TEMPLATES)
     cursor = 0
-    old = termios.tcgetattr(sys.stdin.fileno())
     try:
-        tty.setraw(sys.stdin.fileno())
-        while True:
-            _clear_terminal()
-            print("BADGERS WORKFLOW & ROUTING")
-            print("Space toggle  a select available  d deselect all  ↑↓ move  Enter save  q cancel")
-            print("")
-            for index, template_id in enumerate(options):
-                template = _TEMPLATES[template_id]
-                required = template["required_specialists"]
-                available = required.issubset(selected)
-                marker = "[x]" if template_id in selected_templates else "[ ]"
-                pointer = "›" if index == cursor else " "
-                suffix = "" if available else " (select required specialists first)"
-                print(f"{pointer} {marker} {template['label']}{suffix}")
-            print("")
-            print("  Template routing is validated and release-pinned; custom execution graphs are not accepted.")
-            key = _read_key()
-            if key == "UP":
-                cursor = (cursor - 1) % len(options)
-            elif key == "DOWN":
-                cursor = (cursor + 1) % len(options)
-            elif key == " ":
-                template_id = options[cursor]
-                if _TEMPLATES[template_id]["required_specialists"].issubset(selected):
-                    selected_templates.symmetric_difference_update({template_id})
-            elif key in {"a", "A"}:
-                selected_templates = {
-                    template_id
-                    for template_id in options
-                    if _TEMPLATES[template_id]["required_specialists"].issubset(selected)
-                }
-            elif key in {"d", "D"}:
-                selected_templates.clear()
-            elif key in {"\r", "\n"}:
-                return save_templates(state_path, profile, sorted(selected_templates))
-            elif key in {"q", "Q", "ESC"}:
-                raise RoutingConfigurationError("Routing configuration cancelled.")
+        with raw_terminal():
+            while True:
+                _clear_terminal()
+                print("BADGERS WORKFLOW & ROUTING")
+                print("Space toggle  a select available  d deselect all  ↑↓ move  Enter save  q cancel")
+                print("")
+                for index, template_id in enumerate(options):
+                    template = _TEMPLATES[template_id]
+                    required = template["required_specialists"]
+                    available = required.issubset(selected)
+                    marker = "[x]" if template_id in selected_templates else "[ ]"
+                    pointer = "›" if index == cursor else " "
+                    suffix = "" if available else " (select required specialists first)"
+                    print(f"{pointer} {marker} {template['label']}{suffix}")
+                print("")
+                print("  Template routing is validated and release-pinned; custom execution graphs are not accepted.")
+                key = read_key()
+                if key == "UP":
+                    cursor = (cursor - 1) % len(options)
+                elif key == "DOWN":
+                    cursor = (cursor + 1) % len(options)
+                elif key == " ":
+                    template_id = options[cursor]
+                    if _TEMPLATES[template_id]["required_specialists"].issubset(selected):
+                        selected_templates.symmetric_difference_update({template_id})
+                elif key in {"a", "A"}:
+                    selected_templates = {
+                        template_id
+                        for template_id in options
+                        if _TEMPLATES[template_id]["required_specialists"].issubset(selected)
+                    }
+                elif key in {"d", "D"}:
+                    selected_templates.clear()
+                elif key in {"\r", "\n"}:
+                    return save_templates(state_path, profile, sorted(selected_templates))
+                elif key in {"q", "Q", "ESC"}:
+                    raise RoutingConfigurationError("Routing configuration cancelled.")
     finally:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old)
         print("")
 
 
