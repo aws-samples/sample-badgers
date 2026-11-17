@@ -14,6 +14,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -63,6 +64,60 @@ class UIError(ValueError):
     """A safe, user-facing local configuration error."""
 
 
+_IS_WINDOWS = os.name == "nt"
+
+
+def _is_windows_wsl_launcher(path: str) -> bool:
+    """Return whether *path* is the legacy System32 WSL bash launcher."""
+
+    normalized = path.replace("/", "\\").lower()
+    return normalized.endswith("\\windows\\system32\\bash.exe") or normalized.endswith(
+        "\\windows\\system32\\bash"
+    )
+
+
+def _bash_executable() -> tuple[str, str]:
+    """Resolve Git Bash on Windows and the ordinary Bash executable elsewhere."""
+
+    if not _IS_WINDOWS:
+        return shutil.which("bash") or "bash", "PATH"
+    override = os.environ.get("BADGERS_BASH", "")
+    candidates = [override] if override else []
+    if override and not override.lower().endswith(".exe"):
+        candidates.append(f"{override}.exe")
+    path_bash = shutil.which("bash")
+    if path_bash:
+        candidates.append(path_bash)
+    candidates.extend(
+        [
+            r"C:\Program Files\Git\bin\bash.exe",
+            r"C:\Program Files\Git\usr\bin\bash.exe",
+            str(Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/Git/bin/bash.exe"),
+        ]
+    )
+    for candidate in candidates:
+        if candidate and not _is_windows_wsl_launcher(candidate) and Path(candidate).is_file():
+            return candidate, "BADGERS_BASH" if candidate.startswith(override) else "Git Bash"
+    raise UIError(
+        "Git Bash was not found. Install Git for Windows or set BADGERS_BASH to its bash.exe path."
+    )
+
+
+def _executor_status() -> dict[str, object]:
+    """Return a safe description of whether the local executor can start."""
+
+    try:
+        executable, source = _bash_executable()
+    except UIError as error:
+        return {"ok": False, "path": "", "source": "", "message": str(error)}
+    return {
+        "ok": True,
+        "path": executable,
+        "source": source,
+        "message": f"Using {source}: {executable}",
+    }
+
+
 def _configuration_fingerprint(path: Path) -> str:
     """Bind a preflight result to the exact saved local desired state."""
 
@@ -90,9 +145,11 @@ def _deployment_command(repo_root: Path, profile: str, deployment_id: str, actio
 
     if action not in {"preflight", "resume"}:
         raise UIError("Unsupported local deployment operation.")
+    bash, _source = _bash_executable()
+    script = (repo_root / "deploy.sh").as_posix() if _IS_WINDOWS else str(repo_root / "deploy.sh")
     return [
-        "bash",
-        str(repo_root / "deploy.sh"),
+        bash,
+        script,
         "--local-ui-execute",
         profile,
         deployment_id,
@@ -274,6 +331,7 @@ class DeploymentRunner:
                 except (OSError, UIError):
                     preflight["matches_current_configuration"] = False
             return {
+                "executor": _executor_status(),
                 "status": self._status,
                 "action": self._action,
                 "deployment_id": self._deployment_id,

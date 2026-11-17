@@ -68,7 +68,19 @@ fi
 
 launch_configuration_ui() {
   log_info "Opening the local deployment wizard. Keep this terminal available for advanced CLI use."
+  export_running_bash
   python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
+}
+
+export_running_bash() {
+  [ -n "${BADGERS_BASH:-}" ] && return 0
+  local bash_path="${BASH:-}"
+  [ -n "${bash_path}" ] || bash_path="$(command -v bash)"
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) bash_path="$(cygpath -w "${bash_path}")" ;;
+  esac
+  export BADGERS_BASH="${bash_path}"
+  log_info "Local wizard will use: ${BADGERS_BASH}"
 }
 
 # The local deployment wizard is loopback-only. Browser code can request only
@@ -81,6 +93,7 @@ if [ "${1:-}" = "--cli" ]; then
 fi
 
 if [ "$#" -eq 0 ] && [ "${CLI_MODE}" = "0" ] && [ "${LOCAL_UI_EXECUTION}" = "0" ]; then
+  export_running_bash
   exec python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
 fi
 
@@ -89,6 +102,7 @@ if [ "${1:-}" = "configure" ]; then
     log_error "Usage: ./deploy.sh configure --ui"
     exit 1
   fi
+  export_running_bash
   exec python3 "${SCRIPT_DIR}/deployment/configuration_ui.py" --repo "${SCRIPT_DIR}"
 fi
 
