@@ -326,6 +326,7 @@ def lambda_handler(
                 correlation_uri,
                 parsed["specialists"],
             )
+            keywords = _page_keywords(s3, audit, output_bucket)
             report_pages.append(
                 {
                     "page_number": page_number,
@@ -334,6 +335,7 @@ def lambda_handler(
                     "specialists": parsed["specialists"],
                     "elements": parsed["elements"],
                     "audit": audit,
+                    "keywords": keywords,
                     "image_key": image_key,
                     # "" when the page was never enhanced. Consumers must treat it
                     # as optional; older reports predate it entirely.
@@ -359,6 +361,7 @@ def lambda_handler(
         )
         element_count = sum(len(page["elements"]) for page in report_pages)
         execution_counts = _execution_counts(job_records)
+        document_index = build_document_index(report_pages)
         title = document_title or source_document_path.rstrip("/").rsplit("/", 1)[-1]
         summary = (
             f"BADGERS analyzed {len(report_pages)} pages using {len(specialists)} "
@@ -380,6 +383,7 @@ def lambda_handler(
             "specialist_count": len(specialists),
             "specialists": specialists,
             "element_count": element_count,
+            "document_index": document_index,
             **execution_counts,
             "pages": report_pages,
         }
@@ -851,6 +855,92 @@ def _execution_counts(records: list[dict[str, Any]]) -> dict[str, int]:
             if record.get("subtask_id") != "orchestrator"
         ),
     }
+
+
+def _page_keywords(
+    s3: Any, audit: list[dict[str, Any]], output_bucket: str
+) -> dict[str, Any]:
+    """Read the latest successful keyword artifact without blocking a report."""
+    record = next(
+        (
+            entry
+            for entry in audit
+            if entry.get("specialist") == "keyword_topic_specialist"
+            and any(
+                attempt.get("status") == "COMPLETE"
+                for attempt in reversed(entry.get("attempts") or [])
+            )
+        ),
+        None,
+    )
+    if not record:
+        return {}
+    attempts = record.get("attempts") or []
+    uri = next(
+        (
+            str(attempt.get("result_s3_key") or "")
+            for attempt in reversed(attempts)
+            if attempt.get("status") == "COMPLETE"
+            and str(attempt.get("result_s3_key") or "").startswith("s3://")
+        ),
+        str(record.get("result_s3_key") or ""),
+    )
+    if not uri.startswith("s3://"):
+        return {}
+    try:
+        parsed = json.loads(_get_text(s3, uri, output_bucket, max_bytes=1024 * 1024))
+        return parsed if isinstance(parsed, dict) else {}
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        logger.warning("Keyword result omitted from report index: %s", error)
+        return {}
+
+
+def build_document_index(pages: list[dict[str, Any]]) -> str:
+    """Build a compact, safe XML index from correlated pages and keyword results."""
+    root = ET.Element("document_index", {"pages": str(len(pages))})
+    remaining_headings = 60
+    for page in pages:
+        page_element = ET.SubElement(
+            root, "page", {"number": str(page.get("page_number") or "")}
+        )
+        ET.SubElement(page_element, "summary").text = str(page.get("summary") or "")
+        outline = ET.SubElement(page_element, "outline")
+        counts: dict[str, int] = {}
+        for element in page.get("elements") or []:
+            tag = str(element.get("tag") or "P").upper()
+            counts[tag] = counts.get(tag, 0) + 1
+            if remaining_headings and (tag in {"TITLE"} or re.fullmatch(r"H[1-6]", tag)):
+                heading = ET.SubElement(outline, "heading", {"tag": tag})
+                heading.text = str(element.get("text") or "")[:160]
+                remaining_headings -= 1
+        count_element = ET.SubElement(page_element, "element_counts")
+        for tag, count in sorted(counts.items()):
+            ET.SubElement(count_element, "element", {"tag": tag, "count": str(count)})
+        keywords = page.get("keywords") or {}
+        keyword_element = ET.SubElement(page_element, "keywords")
+        for item in keywords.get("primary_keywords") or []:
+            if not isinstance(item, dict):
+                continue
+            entry = ET.SubElement(
+                keyword_element,
+                "keyword",
+                {
+                    "prominence": str(item.get("prominence") or ""),
+                    "intent": str(item.get("intent") or ""),
+                },
+            )
+            entry.text = str(item.get("keyword") or "")[:160]
+        for item in keywords.get("topics") or []:
+            if isinstance(item, dict):
+                ET.SubElement(keyword_element, "topic").text = str(
+                    item.get("topic") or ""
+                )[:160]
+        for item in keywords.get("semantic_clusters") or []:
+            if isinstance(item, dict):
+                ET.SubElement(keyword_element, "cluster").text = str(
+                    item.get("cluster_name") or ""
+                )[:160]
+    return ET.tostring(root, encoding="unicode")
 
 
 def _page_audit(

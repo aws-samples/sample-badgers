@@ -187,6 +187,7 @@ export default function Reports() {
   const pageSpecialists = useMemo(() => currentPage?.specialists || [], [currentPage])
   const documentSpine = useMemo(() => {
     if (!manifest?.pages) return ''
+    if (manifest.document_index) return manifest.document_index
     return `<document_spine job_id="${manifest.job_id || manifest.report_id}" pages="${manifest.pages.length}">\n${manifest.pages.map(page => `  <page number="${page.page_number}" source="${page.spine_key}">\n    <summary>${page.summary || ''}</summary>\n  </page>`).join('\n')}\n</document_spine>`
   }, [manifest])
 

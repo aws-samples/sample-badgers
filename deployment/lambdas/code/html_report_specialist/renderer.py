@@ -51,7 +51,7 @@ def render_report(report: dict[str, Any]) -> str:
         f"""<div class="audit-row"><b>P{_e(page['page_number'])}</b><span>{len(page['specialists'])} specialists · {len(page['elements'])} elements · page spine retained</span><button data-open="{index}">View →</button></div>"""
         for index, page in enumerate(pages)
     )
-    document_spine = '<document_spine pages="%d">\n%s\n</document_spine>' % (
+    document_spine = report.get("document_index") or '<document_spine pages="%d">\n%s\n</document_spine>' % (
         len(pages),
         "\n".join(
             f"  <page number={quoteattr(str(page['page_number']))} source={quoteattr(str(page['spine_key']))}><summary>{xml_escape(str(page['summary']))}</summary></page>"
