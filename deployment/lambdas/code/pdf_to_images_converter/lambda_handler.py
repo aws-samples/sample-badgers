@@ -168,10 +168,17 @@ def _decrypt_pdf_if_needed(pdf_data: bytes) -> bytes:
                 timeout=60,
                 check=False,
             )
-            if result.returncode != 0:
+            if result.returncode not in {0, 3}:
                 detail = (result.stderr or result.stdout).strip()
                 raise RuntimeError(f"qpdf decryption failed: {detail[:500]}")
             decrypted = output_path.read_bytes()
+            if not decrypted:
+                raise RuntimeError("qpdf completed without producing a decrypted PDF.")
+            if result.returncode == 3:
+                logger.warning(
+                    "qpdf completed with warnings: %s",
+                    (result.stderr or result.stdout).strip()[:500],
+                )
             logger.info("Decrypted PDF size: %d bytes", len(decrypted))
             return decrypted
         except FileNotFoundError as error:
