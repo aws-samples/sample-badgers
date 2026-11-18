@@ -140,6 +140,11 @@ def main() -> int:
     parser.add_argument("--no-probe", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--repo", type=Path, default=DEPLOYMENT_DIR.parent)
+    parser.add_argument(
+        "--state",
+        type=Path,
+        help="Also record the account check in this saved deployment state.",
+    )
     args = parser.parse_args()
     registry = _registry_module().load_registry(REGISTRY_FILE)
     if args.command == "report":
@@ -147,6 +152,15 @@ def main() -> int:
     else:
         payload = discover(registry, args.region, probe=not args.no_probe)
         payload["saved_to"] = str(save_availability(args.repo, payload))
+        if args.state:
+            try:
+                state = json.loads(args.state.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as error:
+                parser.error(f"Could not read --state: {error}")
+            state["model_availability"] = payload
+            args.state.write_text(
+                json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     elif args.command == "report":

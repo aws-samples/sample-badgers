@@ -8,11 +8,16 @@ immutable staged release, never written back into source configuration.
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from . import model_discovery
+except ImportError:
+    import model_discovery
 
 DEPLOYMENT_DIR = Path(__file__).resolve().parent
 MANIFESTS = DEPLOYMENT_DIR / "s3_files" / "manifests"
@@ -131,8 +136,16 @@ def main() -> int:
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--specialist")
     parser.add_argument("--model")
+    parser.add_argument("--discover", action="store_true")
+    parser.add_argument(
+        "--region",
+        default=os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-west-2",
+    )
     args = parser.parse_args()
     state = _state(args.state)
+    if args.discover:
+        registry = model_discovery._registry_module().load_registry(model_discovery.REGISTRY_FILE)
+        state["model_availability"] = model_discovery.discover(registry, args.region)
     if args.command == "resolve":
         state["desired_model_mapping"] = resolve(state)
         args.state.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
