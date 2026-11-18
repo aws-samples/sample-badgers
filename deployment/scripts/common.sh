@@ -1250,6 +1250,57 @@ use_pushed_runtime_image_tag() {
   return 1
 }
 
+# Keep the UI subnet choice stable across every CDK invocation.  The ECS stack
+# imports the selected VPC subnet exports, so synthesizing a later stack with a
+# different default can make CloudFormation try to remove exports in active use.
+resolve_ui_public_access() {
+  case "${UI_PUBLIC_ACCESS:-}" in
+    true|false)
+      log_info "UI_PUBLIC_ACCESS=${UI_PUBLIC_ACCESS} (from the environment)"
+      return 0
+      ;;
+    "")
+      ;;
+    *)
+      log_error "UI_PUBLIC_ACCESS must be true or false."
+      return 1
+      ;;
+  esac
+
+  local saved_access
+  saved_access="$(get_state "ui_public_access")"
+  case "${saved_access}" in
+    True|true) export UI_PUBLIC_ACCESS=true ;;
+    False|false) export UI_PUBLIC_ACCESS=false ;;
+  esac
+  if [ -n "${UI_PUBLIC_ACCESS:-}" ]; then
+    log_info "UI_PUBLIC_ACCESS=${UI_PUBLIC_ACCESS} (from saved deployment state)"
+    return 0
+  fi
+
+  # A deployment created before ui_public_access was persisted can still be
+  # safely resumed.  Its processed template identifies the existing subnet
+  # export without querying or changing the service itself.
+  local template
+  template="$(aws cloudformation get-template \
+    --stack-name "$(_sn ECS)" \
+    --template-stage Processed \
+    --region "${AWS_REGION}" \
+    --query 'TemplateBody' --output text 2>/dev/null || true)"
+  if [ -z "${template}" ] || [ "${template}" = "None" ]; then
+    return 0
+  fi
+  if printf '%s' "${template}" | grep -q 'PublicSubnet'; then
+    export UI_PUBLIC_ACCESS=true
+  elif printf '%s' "${template}" | grep -q 'PrivateSubnet'; then
+    export UI_PUBLIC_ACCESS=false
+  else
+    log_error "Could not determine UI subnet exposure from the deployed ECS template."
+    return 1
+  fi
+  log_info "UI_PUBLIC_ACCESS=${UI_PUBLIC_ACCESS} (from deployed ECS template)"
+}
+
 export_cdk_env() {
   ensure_account
   export DEPLOYMENT_ID
@@ -1259,6 +1310,7 @@ export_cdk_env() {
   export CDK_DEFAULT_REGION="${AWS_REGION}"
   export TYPEGUARD_DISABLE=1
   export PYTHONWARNINGS="ignore::UserWarning:aws_cdk"
+  resolve_ui_public_access || return 1
   # app.py reads RUNTIME_IMAGE_TAG to point the runtime at the image the build
   # step pushed. Default it here so CDK-only entry points stay in sync with the
   # build without every caller having to set it.

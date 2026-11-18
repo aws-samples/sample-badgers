@@ -99,3 +99,15 @@ def test_runtime_resume_uses_the_image_tag_that_was_pushed() -> None:
     assert "Recovered pushed runtime image tag from ECR" in common
     assert "use_pushed_runtime_image_tag || return 1" in common
     assert 'set_state "runtime_image_tag" "\\"${RUNTIME_IMAGE_TAG}\\""' in deploy_script
+
+
+def test_cdk_environment_reuses_the_existing_ui_exposure_choice() -> None:
+    common = COMMON_SH.read_text()
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+
+    assert "resolve_ui_public_access()" in common
+    assert 'get_state "ui_public_access"' in common
+    assert "cloudformation get-template" in common
+    assert "PublicSubnet" in common
+    assert "resolve_ui_public_access || return 1" in common
+    assert 'set_state "ui_public_access" "${UI_PUBLIC_ACCESS}"' in deploy_script

@@ -1029,6 +1029,7 @@ step_ui_build() {
 _prompt_ui_public_access() {
   [ "${_UI_ACCESS_RESOLVED:-0}" = "1" ] && return 0
 
+  resolve_ui_public_access || return 1
   if [ -n "${UI_PUBLIC_ACCESS:-}" ]; then
     log_info "UI_PUBLIC_ACCESS=${UI_PUBLIC_ACCESS} (from the environment)"
     _UI_ACCESS_RESOLVED=1
@@ -1111,6 +1112,7 @@ step_ui_deploy() {
     _ui_deploy_failed "ECS deploy failed."
     return 1
   fi
+  set_state "ui_public_access" "${UI_PUBLIC_ACCESS}"
 
   # The stack references the image by a static tag, so pushing a new image to that same
   # tag leaves the template unchanged — cdk reports "no changes" and the service keeps
