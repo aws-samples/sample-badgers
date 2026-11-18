@@ -64,6 +64,10 @@ def test_report_attempt_helpers_preserve_legacy_rows() -> None:
 
 def test_report_ui_lists_attempts_and_retry_count() -> None:
     report_ui = (DEPLOYMENT.parent / "ui" / "src" / "components" / "Reports.jsx").read_text()
+    renderer = (
+        DEPLOYMENT / "lambdas" / "code" / "html_report_specialist" / "renderer.py"
+    ).read_text()
 
     assert "Attempt {attemptIndex + 1}" in report_ui
     assert 'Metric label="Retried"' in report_ui
+    assert "Attempt ${n+1}:" in renderer
