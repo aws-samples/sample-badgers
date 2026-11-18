@@ -111,3 +111,13 @@ def test_cdk_environment_reuses_the_existing_ui_exposure_choice() -> None:
     assert "PublicSubnet" in common
     assert "resolve_ui_public_access || return 1" in common
     assert 'set_state "ui_public_access" "${UI_PUBLIC_ACCESS}"' in deploy_script
+
+
+def test_usage_examples_name_the_product_before_the_action() -> None:
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+    scripts_doc = (DEPLOYMENT_DIR / "DEPLOYMENT_SCRIPTS.md").read_text()
+
+    assert "./deploy.sh full preflight" in deploy_script
+    assert "./deploy.sh full resume" in deploy_script
+    assert "./deploy.sh full 4" in deploy_script
+    assert "./deploy.sh full resume" in scripts_doc

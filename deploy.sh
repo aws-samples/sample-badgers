@@ -11,9 +11,9 @@ set -euo pipefail
 #   ./deploy.sh full 9      # Run every Full deployment step
 #   ./deploy.sh specialists --pack tables-and-forms 9
 #   ./deploy.sh configure --ui # Open the local deployment wizard
-#   ./deploy.sh preflight   # Validate the selected product before deployment
-#   ./deploy.sh resume      # Pick a deployment, then run only its remaining steps
-#   ./deploy.sh 4           # Pick a deployment, then run option 4 directly
+#   ./deploy.sh full preflight  # Validate a Full deployment before changing AWS
+#   ./deploy.sh full resume     # Run only the Full deployment's remaining steps
+#   ./deploy.sh full 4          # Run Full deployment option 4 directly
 #
 # DEPLOYMENT_ID is always chosen interactively and is ignored if exported, so a stale
 # value in your shell cannot target the wrong deployment.

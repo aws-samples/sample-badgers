@@ -33,8 +33,8 @@ yellow `○` is still pending.
 ```bash
 ./deploy.sh           # open the local deployment wizard (recommended)
 ./deploy.sh --cli     # open the legacy interactive terminal menu
-./deploy.sh 9         # choose a deployment, then run option 9 (full deployment)
-./deploy.sh resume    # choose a deployment, then run only outstanding steps
+./deploy.sh full 9       # choose a Full deployment, then run option 9
+./deploy.sh full resume  # choose a Full deployment, then run only outstanding steps
 ./deploy.sh headless  # select Headless explicitly, then choose a deployment
 ./deploy.sh specialists --pack tables-and-forms 9
 ./deploy.sh specialists --specialist docx_processor 9
