@@ -121,3 +121,15 @@ def test_usage_examples_name_the_product_before_the_action() -> None:
     assert "./deploy.sh full resume" in deploy_script
     assert "./deploy.sh full 4" in deploy_script
     assert "./deploy.sh full resume" in scripts_doc
+
+
+def test_ecs_deploy_waits_for_the_service_linked_role_to_propagate() -> None:
+    common = COMMON_SH.read_text()
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+
+    assert "aws iam list-roles" in common
+    assert "--path-prefix /aws-service-role/ecs.amazonaws.com/" in common
+    assert "MSYS_NO_PATHCONV=1" in common
+    assert "ECS_SLR_SETTLE_SECONDS" in common
+    assert "read-only preflight will not create it" in common
+    assert "PREFLIGHT_READ_ONLY=0 preflight_ecs_slr || return 1" in deploy_script

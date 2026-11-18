@@ -1972,58 +1972,104 @@ preflight_model_invocation() {
 preflight_ecs_slr() {
   log_info "Checking ECS service-linked role..."
 
-  local slr_arn get_err get_rc
-  get_err="$(aws iam get-role \
-    --role-name AWSServiceRoleForECS \
-    --query 'Role.Arn' --output text 2>&1 >/dev/null)"
-  get_rc=$?
-  slr_arn="$(aws iam get-role \
-    --role-name AWSServiceRoleForECS \
-    --query 'Role.Arn' --output text 2>/dev/null)"
-
-  if [ "${get_rc}" -eq 0 ] && [ -n "${slr_arn}" ] && [ "${slr_arn}" != "None" ]; then
-    log_info "  ✓ ECS service-linked role exists: ${slr_arn}"
-    return 0
-  fi
-
-  # get-role failed. Only "NoSuchEntity" means it truly isn't there — anything
-  # else (AccessDenied, wrong account/profile, expired creds) means we can't
-  # see it, and creating would be wrong.
-  if ! printf '%s' "${get_err}" | grep -qi 'NoSuchEntity'; then
-    log_error "  Cannot verify ECS service-linked role — get-role did not return NoSuchEntity."
-    log_error "  AWS error: ${get_err:-<none>}"
-    log_error "  Confirm the CLI is using the same account/region as the console:"
-    aws sts get-caller-identity \
-      --query '{Account:Account,Arn:Arn}' --output text 2>&1 | sed 's/^/    /'
-    log_error "  Region: ${AWS_REGION:-$(aws configure get region 2>/dev/null)}"
+  local role_json list_err list_rc role_details slr_arn created_at
+  list_err="$(mktemp "${TMPDIR:-/tmp}/badgers-ecs-slr.XXXXXX")" || return 1
+  # PowerUserAccess allows ListRoles under this service-role path but can deny
+  # GetRole. MSYS_NO_PATHCONV preserves the IAM path prefix in Git Bash.
+  list_rc=0
+  role_json="$(MSYS_NO_PATHCONV=1 aws iam list-roles \
+    --path-prefix /aws-service-role/ecs.amazonaws.com/ \
+    --query "Roles[?RoleName=='AWSServiceRoleForECS'].{arn:Arn,created_at:CreateDate}" \
+    --output json 2>"${list_err}")" || list_rc=$?
+  if [ "${list_rc}" -ne 0 ]; then
+    log_error "Cannot verify the ECS service-linked role with iam:ListRoles."
+    sed 's/^/  AWS error: /' "${list_err}"
+    rm -f "${list_err}"
     return 1
   fi
+  rm -f "${list_err}"
 
+  role_details="$(printf '%s' "${role_json}" | python3 -c '
+import json
+import sys
+try:
+    roles = json.load(sys.stdin)
+    role = roles[0] if roles else {}
+    print("{}\t{}".format(role.get("arn", ""), role.get("created_at", "")))
+except (IndexError, TypeError, ValueError, json.JSONDecodeError):
+    print("\t")
+')"
+  IFS=$'\t' read -r slr_arn created_at <<< "${role_details}"
+
+  if [ -z "${slr_arn}" ] || [ "${slr_arn}" = "None" ]; then
+    if [ "${PREFLIGHT_READ_ONLY:-}" = "1" ]; then
+      log_error "ECS service-linked role is absent; read-only preflight will not create it."
+      log_error "Create it deliberately, then re-run: aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com"
+      return 1
+    fi
+    log_warn "ECS service-linked role not found — creating it..."
+    local create_err
+    local create_rc=0
+    create_err="$(aws iam create-service-linked-role \
+      --aws-service-name ecs.amazonaws.com 2>&1 >/dev/null)" || create_rc=$?
+    if [ "${create_rc}" -ne 0 ] && ! printf '%s' "${create_err}" | grep -qiE 'has been taken|InvalidInput|EntityAlreadyExists'; then
+      log_error "Failed to create ECS service-linked role."
+      log_error "AWS error: ${create_err:-<none>}"
+      return 1
+    fi
+
+    # IAM can return from CreateServiceLinkedRole before ListRoles sees the
+    # role. Poll instead of immediately asking ECS to assume it.
+    local attempt
+    for attempt in $(seq 1 30); do
+      sleep 2
+      role_json="$(MSYS_NO_PATHCONV=1 aws iam list-roles \
+        --path-prefix /aws-service-role/ecs.amazonaws.com/ \
+        --query "Roles[?RoleName=='AWSServiceRoleForECS'].{arn:Arn,created_at:CreateDate}" \
+        --output json 2>/dev/null)" || continue
+      role_details="$(printf '%s' "${role_json}" | python3 -c '
+import json
+import sys
+try:
+    roles = json.load(sys.stdin)
+    role = roles[0] if roles else {}
+    print("{}\t{}".format(role.get("arn", ""), role.get("created_at", "")))
+except (IndexError, TypeError, ValueError, json.JSONDecodeError):
+    print("\t")
+')"
+      IFS=$'\t' read -r slr_arn created_at <<< "${role_details}"
+      [ -n "${slr_arn}" ] && [ "${slr_arn}" != "None" ] && break
+    done
+  fi
+
+  if [ -z "${slr_arn}" ] || [ "${slr_arn}" = "None" ]; then
+    log_error "ECS service-linked role was not visible after waiting for IAM propagation."
+    return 1
+  fi
+  log_success "ECS service-linked role exists: ${slr_arn}"
+
+  # Read-only preflight reports availability but never delays it. The deploy
+  # path waits until a newly-created role is old enough for ECS to assume.
   if [ "${PREFLIGHT_READ_ONLY:-}" = "1" ]; then
-    log_error "ECS service-linked role is absent; preflight will not create it."
-    log_error "Create it deliberately, then re-run: aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com"
-    return 1
-  fi
-
-  log_warn "  ECS service-linked role not found — creating..."
-  local create_err
-  create_err="$(aws iam create-service-linked-role \
-    --aws-service-name ecs.amazonaws.com 2>&1 >/dev/null)"
-  if [ $? -eq 0 ]; then
-    log_success "  Created ECS service-linked role."
     return 0
   fi
-
-  # Create failed. "already exists" is benign (race, or it was there all along).
-  if printf '%s' "${create_err}" | grep -qiE 'has been taken|InvalidInput|EntityAlreadyExists'; then
-    log_info "  ✓ ECS service-linked role already exists (confirmed)."
-    return 0
+  local settle_seconds age_seconds remaining_seconds
+  settle_seconds="${ECS_SLR_SETTLE_SECONDS:-20}"
+  age_seconds="$(python3 - "${created_at}" <<'PY'
+from datetime import datetime, timezone
+import sys
+try:
+    value = sys.argv[1].replace("Z", "+00:00")
+    print(max(0, int((datetime.now(timezone.utc) - datetime.fromisoformat(value)).total_seconds())))
+except (IndexError, ValueError):
+    print(0)
+PY
+)"
+  remaining_seconds=$((settle_seconds - age_seconds))
+  if [ "${remaining_seconds}" -gt 0 ]; then
+    log_info "Waiting ${remaining_seconds}s for ECS role propagation..."
+    sleep "${remaining_seconds}"
   fi
-
-  log_error "  Failed to create ECS service-linked role."
-  log_error "  AWS error: ${create_err:-<none>}"
-  log_error "  Retry manually: aws iam create-service-linked-role --aws-service-name ecs.amazonaws.com"
-  return 1
 }
 
 ecr_login() {

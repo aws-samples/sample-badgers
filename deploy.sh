@@ -1085,6 +1085,7 @@ step_ui_deploy() {
   _prompt_ui_public_access || return 1
 
   ensure_xray_decision || return 1
+  PREFLIGHT_READ_ONLY=0 preflight_ecs_slr || return 1
 
   local service_name="badgers-ui-$(resource_id)"
   local service_arn="arn:aws:ecs:${AWS_REGION}:${ACCOUNT_ID}:service/default/${service_name}"
