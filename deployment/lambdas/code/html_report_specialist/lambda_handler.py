@@ -358,12 +358,7 @@ def lambda_handler(
             }
         )
         element_count = sum(len(page["elements"]) for page in report_pages)
-        complete_count = (
-            sum(1 for record in job_records if record.get("status") == "COMPLETE") + 1
-        )
-        failed_count = sum(
-            1 for record in job_records if record.get("status") == "FAILED"
-        )
+        execution_counts = _execution_counts(job_records)
         title = document_title or source_document_path.rstrip("/").rsplit("/", 1)[-1]
         summary = (
             f"BADGERS analyzed {len(report_pages)} pages using {len(specialists)} "
@@ -385,11 +380,7 @@ def lambda_handler(
             "specialist_count": len(specialists),
             "specialists": specialists,
             "element_count": element_count,
-            "invocation_count": len(
-                [r for r in job_records if r.get("subtask_id") != "orchestrator"]
-            ),
-            "complete_count": complete_count,
-            "failed_count": failed_count,
+            **execution_counts,
             "pages": report_pages,
         }
         html_report = render_report(report_model)
@@ -817,12 +808,57 @@ def _enhanced_source(records: list[dict[str, Any]], image_uri: str) -> str:
     return ""
 
 
+def _attempts(record: dict[str, Any]) -> list[dict[str, str]]:
+    """Return every recorded execution, with one synthetic legacy attempt."""
+    attempts = record.get("attempts")
+    if isinstance(attempts, list) and attempts:
+        return [
+            {
+                "status": str(attempt.get("status") or ""),
+                "started_at": str(attempt.get("started_at") or ""),
+                "completed_at": str(attempt.get("completed_at") or ""),
+                "result_s3_key": str(attempt.get("result_s3_key") or ""),
+                "error": str(attempt.get("error") or ""),
+            }
+            for attempt in attempts
+            if isinstance(attempt, dict)
+        ]
+    return [
+        {
+            "status": str(record.get("status") or ""),
+            "started_at": str(record.get("started_at") or ""),
+            "completed_at": str(record.get("completed_at") or ""),
+            "result_s3_key": str(record.get("result_s3_key") or ""),
+            "error": str(record.get("error") or ""),
+        }
+    ]
+
+
+def _execution_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    attempts = [
+        attempt
+        for record in records
+        if record.get("subtask_id") != "orchestrator"
+        for attempt in _attempts(record)
+    ]
+    return {
+        "invocation_count": len(attempts),
+        "complete_count": sum(attempt["status"] == "COMPLETE" for attempt in attempts),
+        "failed_count": sum(attempt["status"] == "FAILED" for attempt in attempts),
+        "retried_count": sum(
+            max(0, len(_attempts(record)) - 1)
+            for record in records
+            if record.get("subtask_id") != "orchestrator"
+        ),
+    }
+
+
 def _page_audit(
     records: list[dict[str, Any]],
     image_uri: str,
     correlation_uri: str,
     specialists: list[dict[str, str]],
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     image_id = job_state.image_identifier(image_uri)
     result_uris = {item.get("s3_uri", "") for item in specialists}
     result_uris.add(correlation_uri)
@@ -834,6 +870,7 @@ def _page_audit(
             "completed_at": str(record.get("completed_at") or ""),
             "result_s3_key": str(record.get("result_s3_key") or ""),
             "error": str(record.get("error") or ""),
+            "attempts": _attempts(record),
         }
         for record in records
         if record.get("image_identifier") == image_id

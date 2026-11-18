@@ -113,9 +113,25 @@ def mark_running(
     if not (enabled() and job_id and subtask):
         return
 
-    sets = ["#s = :s", "started_at = :t", "#ttl = :ttl"]
+    started_at = _now_iso()
+    attempt = {"status": "RUNNING", "started_at": started_at}
+    sets = [
+        "#s = :s",
+        "started_at = :t",
+        "#ttl = :ttl",
+        "attempts = list_append(if_not_exists(attempts, :empty), :attempt)",
+        "attempt_count = if_not_exists(attempt_count, :zero) + :one",
+    ]
     names: dict[str, str] = {"#s": "status", "#ttl": "ttl"}
-    values: dict[str, Any] = {":s": "RUNNING", ":t": _now_iso(), ":ttl": _ttl()}
+    values: dict[str, Any] = {
+        ":s": "RUNNING",
+        ":t": started_at,
+        ":ttl": _ttl(),
+        ":empty": [],
+        ":attempt": [attempt],
+        ":zero": 0,
+        ":one": 1,
+    }
 
     for attr, val in (
         ("doc_id", doc_id),
@@ -130,12 +146,75 @@ def mark_running(
     try:
         _table().update_item(
             Key={"job_id": job_id, "subtask_id": subtask},
-            UpdateExpression="SET " + ", ".join(sets),
-            ExpressionAttributeNames=names,
+            UpdateExpression="SET " + ", ".join(sets) + " REMOVE #e, completed_at",
+            ExpressionAttributeNames={**names, "#e": "error"},
             ExpressionAttributeValues=values,
         )
     except Exception as e:  # never fail the analysis because tracking failed
         logger.warning("job_state.mark_running failed (job=%s): %s", job_id, e)
+
+
+def _close_attempt(
+    job_id: str, subtask: str, *, status: str, result_s3_key: str = "", error: str = ""
+) -> None:
+    """Close the latest recorded attempt while retaining legacy row support."""
+    record = get_record(job_id, subtask)
+    attempts = record.get("attempts")
+    completed_at = _now_iso()
+    try:
+        if not isinstance(attempts, list) or not attempts:
+            raise ValueError("legacy job-state row")
+        index = len(attempts) - 1
+        names = {"#s": "status", "#ttl": "ttl", "#e": "error", "#as": "status"}
+        values: dict[str, Any] = {
+            ":s": status,
+            ":t": completed_at,
+            ":ttl": _ttl(),
+        }
+        fields = [
+            "#s = :s",
+            "completed_at = :t",
+            "#ttl = :ttl",
+            f"attempts[{index}].#as = :s",
+            f"attempts[{index}].completed_at = :t",
+        ]
+        if result_s3_key:
+            fields.extend(
+                [f"attempts[{index}].result_s3_key = :k", "result_s3_key = :k"]
+            )
+            values[":k"] = result_s3_key
+        if error:
+            fields.extend([f"attempts[{index}].#e = :e", "#e = :e"])
+            values[":e"] = error[:1024]
+        update = "SET " + ", ".join(fields)
+        if not error:
+            update += " REMOVE #e"
+        _table().update_item(
+            Key={"job_id": job_id, "subtask_id": subtask},
+            UpdateExpression=update,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
+    except Exception as e:
+        # Rows written before attempt history exist must remain reportable.
+        logger.debug("Falling back to legacy job-state row (job=%s): %s", job_id, e)
+        values = {":s": status, ":t": completed_at, ":ttl": _ttl()}
+        update = "SET #s = :s, completed_at = :t, #ttl = :ttl"
+        names = {"#s": "status", "#ttl": "ttl", "#e": "error"}
+        if result_s3_key:
+            update += ", result_s3_key = :k"
+            values[":k"] = result_s3_key
+        if error:
+            update += ", #e = :e"
+            values[":e"] = error[:1024]
+        else:
+            update += " REMOVE #e"
+        _table().update_item(
+            Key={"job_id": job_id, "subtask_id": subtask},
+            UpdateExpression=update,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
+        )
 
 
 def mark_complete(job_id: str, subtask: str, result_s3_key: str = "") -> None:
@@ -143,18 +222,8 @@ def mark_complete(job_id: str, subtask: str, result_s3_key: str = "") -> None:
     if not (enabled() and job_id and subtask):
         return
     try:
-        _table().update_item(
-            Key={"job_id": job_id, "subtask_id": subtask},
-            UpdateExpression=(
-                "SET #s = :s, completed_at = :t, result_s3_key = :k, #ttl = :ttl"
-            ),
-            ExpressionAttributeNames={"#s": "status", "#ttl": "ttl"},
-            ExpressionAttributeValues={
-                ":s": "COMPLETE",
-                ":t": _now_iso(),
-                ":k": result_s3_key,
-                ":ttl": _ttl(),
-            },
+        _close_attempt(
+            job_id, subtask, status="COMPLETE", result_s3_key=result_s3_key
         )
     except Exception as e:
         logger.warning("job_state.mark_complete failed (job=%s): %s", job_id, e)
@@ -165,17 +234,7 @@ def mark_failed(job_id: str, subtask: str, error: str) -> None:
     if not (enabled() and job_id and subtask):
         return
     try:
-        _table().update_item(
-            Key={"job_id": job_id, "subtask_id": subtask},
-            UpdateExpression="SET #s = :s, completed_at = :t, #e = :e, #ttl = :ttl",
-            ExpressionAttributeNames={"#s": "status", "#e": "error", "#ttl": "ttl"},
-            ExpressionAttributeValues={
-                ":s": "FAILED",
-                ":t": _now_iso(),
-                ":e": str(error)[:1024],
-                ":ttl": _ttl(),
-            },
-        )
+        _close_attempt(job_id, subtask, status="FAILED", error=str(error))
     except Exception as e:
         logger.warning("job_state.mark_failed failed (job=%s): %s", job_id, e)
 
