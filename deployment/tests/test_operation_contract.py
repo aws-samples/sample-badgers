@@ -121,9 +121,12 @@ def test_versioned_agent_request_rejects_control_plane_inputs() -> None:
         }
     )
 
-    assert request.versioned is True
-    assert request.routing_mode == "manual"
-    assert request.document_uri.endswith("msa.pdf")
+    if not (request.versioned is True):
+        raise AssertionError
+    if not (request.routing_mode == "manual"):
+        raise AssertionError
+    if not (request.document_uri.endswith("msa.pdf")):
+        raise AssertionError
 
     for forbidden_field in ("output_prefix", "role_arn", "config_uri"):
         with pytest.raises(
@@ -162,9 +165,12 @@ def test_completion_manifest_is_bounded_and_schema_valid() -> None:
         summary=summary,
     )
 
-    assert len(result["summary"]) == 2_000
-    assert result["original_pdf_s3_uri"].endswith("msa.pdf")
-    assert "artifact_body" not in result
+    if not (len(result["summary"]) == 2_000):
+        raise AssertionError
+    if not (result["original_pdf_s3_uri"].endswith("msa.pdf")):
+        raise AssertionError
+    if not ("artifact_body" not in result):
+        raise AssertionError
     Draft202012Validator(_load_schema("badgers-operation-result-v1.json")).validate(
         result
     )
@@ -199,13 +205,17 @@ def test_result_schema_supports_terminal_pdf_image_and_trace_variants(
     )
 
     if source_uri.endswith(".pdf"):
-        assert result["original_pdf_s3_uri"] == source_uri
+        if not (result["original_pdf_s3_uri"] == source_uri):
+            raise AssertionError
     else:
-        assert "original_pdf_s3_uri" not in result
+        if not ("original_pdf_s3_uri" not in result):
+            raise AssertionError
     if trace_id:
-        assert result["trace_id"] == trace_id
+        if not (result["trace_id"] == trace_id):
+            raise AssertionError
     else:
-        assert "trace_id" not in result
+        if not ("trace_id" not in result):
+            raise AssertionError
     Draft202012Validator(_load_schema("badgers-operation-result-v1.json")).validate(
         result
     )
@@ -265,11 +275,16 @@ def test_operation_state_persists_private_status_and_completion(
         deployment_id="test",
     )
 
-    assert created["config_release_id"] == "c" * 64
-    assert created["status_manifest_uri"].startswith("s3://badgers-output-test/")
-    assert created["plan_uri"].endswith("plan/plan.json")
-    assert len(s3.objects) == 2
-    assert operation_state.get_operation(operation_id, owner_sub="tenant-a-workload")
+    if not (created["config_release_id"] == "c" * 64):
+        raise AssertionError
+    if not (created["status_manifest_uri"].startswith("s3://badgers-output-test/")):
+        raise AssertionError
+    if not (created["plan_uri"].endswith("plan/plan.json")):
+        raise AssertionError
+    if not (len(s3.objects) == 2):
+        raise AssertionError
+    if not (operation_state.get_operation(operation_id, owner_sub="tenant-a-workload")):
+        raise AssertionError
 
     with pytest.raises(operation_state.OperationOwnershipError):
         operation_state.get_operation(operation_id, owner_sub="tenant-b-workload")
@@ -281,10 +296,13 @@ def test_operation_state_persists_private_status_and_completion(
         summary="Completed document analysis.",
     )
 
-    assert completed["status"] == "completed"
-    assert completed["s3_classification_uri"].endswith("classification.xml")
-    assert completed["s3_correlated_uri"].endswith("correlated.xml")
-    assert completed["individual_specialists"] == [
+    if not (completed["status"] == "completed"):
+        raise AssertionError
+    if not (completed["s3_classification_uri"].endswith("classification.xml")):
+        raise AssertionError
+    if not (completed["s3_correlated_uri"].endswith("correlated.xml")):
+        raise AssertionError
+    if not (completed["individual_specialists"] == [
         {
             "specialist": "full_text_specialist",
             "s3_uri": (
@@ -293,17 +311,22 @@ def test_operation_state_persists_private_status_and_completion(
             ),
             "content_type": "application/xml",
         }
-    ]
-    assert completed["completion_manifest_uri"].endswith("completion.json")
-    assert completed["plan_uri"].endswith("plan/plan.json")
-    assert len(s3.objects) == 3
+    ]):
+        raise AssertionError
+    if not (completed["completion_manifest_uri"].endswith("completion.json")):
+        raise AssertionError
+    if not (completed["plan_uri"].endswith("plan/plan.json")):
+        raise AssertionError
+    if not (len(s3.objects) == 3):
+        raise AssertionError
     status_body = s3.objects[
         (
             "badgers-output-test",
             f"operations/tenant-a-workload/{operation_id}/status.json",
         )
     ]["Body"]
-    assert json.loads(status_body)["status"] == "completed"
+    if not (json.loads(status_body)["status"] == "completed"):
+        raise AssertionError
     Draft202012Validator(_load_schema("badgers-operation-result-v1.json")).validate(
         completed
     )
@@ -337,11 +360,15 @@ def test_operation_state_persists_cancelled_pointer_manifest(
         reason="User cancelled before specialist execution.",
     )
 
-    assert cancelled["status"] == "cancelled"
-    assert cancelled["completion_manifest_uri"].endswith("cancelled.json")
-    assert cancelled["error"]["code"] == "CANCELLED"
+    if not (cancelled["status"] == "cancelled"):
+        raise AssertionError
+    if not (cancelled["completion_manifest_uri"].endswith("cancelled.json")):
+        raise AssertionError
+    if not (cancelled["error"]["code"] == "CANCELLED"):
+        raise AssertionError
     record = operation_state.get_operation(operation_id, owner_sub="tenant-a-workload")
-    assert record["status"] == "cancelled"
+    if not (record["status"] == "cancelled"):
+        raise AssertionError
 
 
 def test_operation_stage_persists_lifecycle_and_execution_identity(
@@ -378,9 +405,12 @@ def test_operation_stage_persists_lifecycle_and_execution_identity(
         execution_arn=execution_arn,
     )
 
-    assert updated["status"] == "validating"
-    assert updated["current_stage"] == "validate_source"
-    assert updated["workflow_execution_arn"] == execution_arn
+    if not (updated["status"] == "validating"):
+        raise AssertionError
+    if not (updated["current_stage"] == "validate_source"):
+        raise AssertionError
+    if not (updated["workflow_execution_arn"] == execution_arn):
+        raise AssertionError
     status_body = s3.objects[
         (
             "badgers-output-test",
@@ -388,10 +418,14 @@ def test_operation_stage_persists_lifecycle_and_execution_identity(
         )
     ]["Body"]
     status = json.loads(status_body)
-    assert status["current_stage"] == "validate_source"
-    assert "ConditionExpression" in table.update_calls[-1]
-    assert "owner_sub = :owner" in table.update_calls[-1]["ConditionExpression"]
-    assert "#status IN" in table.update_calls[-1]["ConditionExpression"]
+    if not (status["current_stage"] == "validate_source"):
+        raise AssertionError
+    if not ("ConditionExpression" in table.update_calls[-1]):
+        raise AssertionError
+    if not ("owner_sub = :owner" in table.update_calls[-1]["ConditionExpression"]):
+        raise AssertionError
+    if not ("#status IN" in table.update_calls[-1]["ConditionExpression"]):
+        raise AssertionError
 
 
 def test_operation_manifest_ignores_out_of_prefix_artifact_records(
@@ -433,7 +467,8 @@ def test_operation_manifest_ignores_out_of_prefix_artifact_records(
         owner_sub="tenant-a-workload",
     )
 
-    assert result["individual_specialists"] == []
+    if not (result["individual_specialists"] == []):
+        raise AssertionError
 
 
 def test_terminal_operation_state_cannot_be_overwritten(
@@ -497,12 +532,14 @@ def test_runner_managed_specialist_result_uses_server_derived_operation_prefix(
         job_id=operation_id,
     )
 
-    assert s3_uri.startswith(
+    if not (s3_uri.startswith(
         "s3://badgers-output-test/operations/tenant-a/" + operation_id + "/specialists/"
-    )
-    assert result_s3.puts[0]["Key"].startswith(
+    )):
+        raise AssertionError
+    if not (result_s3.puts[0]["Key"].startswith(
         "operations/tenant-a/" + operation_id + "/specialists/full_text_specialist/"
-    )
+    )):
+        raise AssertionError
 
 
 def test_runner_managed_specialist_rejects_unknown_operation(
@@ -536,7 +573,8 @@ def test_runner_managed_converter_pages_use_server_derived_operation_prefix(
         / "lambda_handler.py"
     )
     spec = spec_from_file_location("badgers_pdf_converter", converter_path)
-    assert spec and spec.loader
+    if not (spec and spec.loader):
+        raise AssertionError
     converter = module_from_spec(spec)
     spec.loader.exec_module(converter)
 
@@ -566,14 +604,17 @@ def test_runner_managed_converter_pages_use_server_derived_operation_prefix(
     )
 
     expected_key = f"operations/tenant-a/{operation_id}/pages/page_007.b64"
-    assert pages == [
+    if not (pages == [
         {
             "page_number": 7,
             "image_path": f"s3://badgers-output-test/{expected_key}",
         }
-    ]
-    assert page_s3.puts[0]["Key"] == expected_key
-    assert page_s3.puts[0]["IfNoneMatch"] == "*"
+    ]):
+        raise AssertionError
+    if not (page_s3.puts[0]["Key"] == expected_key):
+        raise AssertionError
+    if not (page_s3.puts[0]["IfNoneMatch"] == "*"):
+        raise AssertionError
 
 
 def test_runner_managed_converter_reuses_existing_page_on_retry(
@@ -589,7 +630,8 @@ def test_runner_managed_converter_reuses_existing_page_on_retry(
         / "lambda_handler.py"
     )
     spec = spec_from_file_location("badgers_pdf_converter_retry", converter_path)
-    assert spec and spec.loader
+    if not (spec and spec.loader):
+        raise AssertionError
     converter = module_from_spec(spec)
     spec.loader.exec_module(converter)
 
@@ -611,7 +653,7 @@ def test_runner_managed_converter_reuses_existing_page_on_retry(
         lambda _id: {"owner_sub": "tenant-a"},
     )
 
-    assert converter._store_images_to_s3(
+    if not (converter._store_images_to_s3(
         [(1, "cGFnZS0x")], "untrusted-session", job_id=operation_id
     ) == [
         {
@@ -621,4 +663,5 @@ def test_runner_managed_converter_reuses_existing_page_on_retry(
                 f"operations/tenant-a/{operation_id}/pages/page_001.b64"
             ),
         }
-    ]
+    ]):
+        raise AssertionError

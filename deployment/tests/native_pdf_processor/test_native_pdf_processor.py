@@ -25,10 +25,14 @@ def test_linear_digital_text_stays_native_and_emits_valid_spine(native_pdf):
         decision=decision,
     )
 
-    assert decision["route"] == "native_pdf"
-    assert decision["native_fidelity"] == "complete"
-    assert native_pdf._validate_native_spine(xml, 1)
-    assert "native_pdf_text" in xml
+    if not (decision["route"] == "native_pdf"):
+        raise AssertionError
+    if not (decision["native_fidelity"] == "complete"):
+        raise AssertionError
+    if not (native_pdf._validate_native_spine(xml, 1)):
+        raise AssertionError
+    if not ("native_pdf_text" in xml):
+        raise AssertionError
 
 
 def test_native_spine_validation_rejects_entity_declaration(native_pdf):
@@ -38,7 +42,8 @@ def test_native_spine_validation_rejects_entity_declaration(native_pdf):
       <content_tree><sect id="sect_root" /></content_tree>
     </unified_document>"""
 
-    assert native_pdf._validate_native_spine(malicious_xml, 1) is False
+    if not (native_pdf._validate_native_spine(malicious_xml, 1) is False):
+        raise AssertionError
 
 
 def test_semantic_visual_reference_routes_to_hybrid(native_pdf):
@@ -48,8 +53,10 @@ def test_semantic_visual_reference_routes_to_hybrid(native_pdf):
 
     decision = native_pdf._decide_route(native_pdf._analyze_page(page, 1, tagged=False))
 
-    assert decision["route"] == "hybrid"
-    assert decision["visual_semantic_signal"] is True
+    if not (decision["route"] == "hybrid"):
+        raise AssertionError
+    if not (decision["visual_semantic_signal"] is True):
+        raise AssertionError
 
 
 def test_no_native_text_routes_to_textract_before_vision(native_pdf):
@@ -58,8 +65,10 @@ def test_no_native_text_routes_to_textract_before_vision(native_pdf):
 
     decision = native_pdf._decide_route(native_pdf._analyze_page(page, 1, tagged=False))
 
-    assert decision["route"] == "textract_ocr"
-    assert decision["native_fidelity"] == "incomplete"
+    if not (decision["route"] == "textract_ocr"):
+        raise AssertionError
+    if not (decision["native_fidelity"] == "incomplete"):
+        raise AssertionError
 
 
 def test_password_protected_pdf_is_detectable_before_page_analysis(tmp_path):
@@ -76,6 +85,7 @@ def test_password_protected_pdf_is_detectable_before_page_analysis(tmp_path):
 
     opened = fitz.open(protected)
     try:
-        assert bool(opened.needs_pass) is True
+        if not (bool(opened.needs_pass) is True):
+            raise AssertionError
     finally:
         opened.close()

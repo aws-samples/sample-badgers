@@ -13,7 +13,8 @@ _SPEC = importlib.util.spec_from_file_location(
     "textract_ocr_handler",
     DEPLOYMENT / "lambdas" / "code" / "textract_ocr" / "lambda_handler.py",
 )
-assert _SPEC and _SPEC.loader
+if not (_SPEC and _SPEC.loader):
+    raise AssertionError
 textract_ocr_handler = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = textract_ocr_handler
 _SPEC.loader.exec_module(textract_ocr_handler)

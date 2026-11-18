@@ -27,16 +27,19 @@ def _graph():
 def test_derives_alignment_containment_and_connector_evidence(gestalt_module):
     evidence = gestalt_module._derive_evidence(_graph())
 
-    assert {"kind": "left_aligned", "shapes": ["title", "value"]} in evidence["alignment_pairs"]
-    assert {"container": "container", "member": "title"} in evidence["containment_pairs"]
-    assert evidence["connector_edges"] == [
+    if not ({"kind": "left_aligned", "shapes": ["title", "value"]} in evidence["alignment_pairs"]):
+        raise AssertionError
+    if not ({"container": "container", "member": "title"} in evidence["containment_pairs"]):
+        raise AssertionError
+    if not (evidence["connector_edges"] == [
         {
             "connector": "arrow",
             "from_shape": "value",
             "to_shape": "next",
             "direction": "right",
         }
-    ]
+    ]):
+        raise AssertionError
 
 
 @pytest.mark.parametrize(

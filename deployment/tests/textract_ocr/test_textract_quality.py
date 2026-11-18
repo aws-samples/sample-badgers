@@ -6,12 +6,16 @@ def test_coherent_textract_lines_pass_quality_gate(textract_ocr):
 
     result = textract_ocr._quality(lines)
 
-    assert result["quality_passed"] is True
-    assert result["quality_score"] >= 80
+    if not (result["quality_passed"] is True):
+        raise AssertionError
+    if not (result["quality_score"] >= 80):
+        raise AssertionError
 
 
 def test_short_or_low_confidence_ocr_escalates_to_vision(textract_ocr):
     result = textract_ocr._quality([{"Text": "x", "Confidence": 42.0}])
 
-    assert result["quality_passed"] is False
-    assert "too_little_recovered_text" in result["reasons"]
+    if not (result["quality_passed"] is False):
+        raise AssertionError
+    if not ("too_little_recovered_text" in result["reasons"]):
+        raise AssertionError

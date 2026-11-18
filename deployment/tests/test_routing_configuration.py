@@ -24,9 +24,12 @@ def test_default_headless_routing_is_the_valid_pdf_image_template(
 
     routing, changed = ensure(state, "headless")
 
-    assert changed is True
-    assert routing["templates"] == ["standard-document-analysis"]
-    assert "standard-document-analysis" in routing["workflows"]
+    if not (changed is True):
+        raise AssertionError
+    if not (routing["templates"] == ["standard-document-analysis"]):
+        raise AssertionError
+    if not ("standard-document-analysis" in routing["workflows"]):
+        raise AssertionError
 
 
 def test_native_docx_route_stages_as_part_of_the_immutable_release(
@@ -50,13 +53,15 @@ def test_native_docx_route_stages_as_part_of_the_immutable_release(
         routing_state=state,
     )
 
-    assert len(release_id) == 64
+    if not (len(release_id) == 64):
+        raise AssertionError
     workflow = json.loads(
         (tmp_path / "release/workflows/native-docx-analysis.json").read_text(
             encoding="utf-8"
         )
     )
-    assert workflow["execution_mode"] == "native_document"
+    if not (workflow["execution_mode"] == "native_document"):
+        raise AssertionError
 
 
 def test_native_xlsx_route_requires_the_xlsx_processor(tmp_path: Path) -> None:
@@ -88,12 +93,14 @@ def test_native_xlsx_route_requires_the_xlsx_processor(tmp_path: Path) -> None:
             encoding="utf-8"
         )
     )
-    assert workflow["invariant_capabilities"] == {"native_document": "xlsx_analysis"}
+    if not (workflow["invariant_capabilities"] == {"native_document": "xlsx_analysis"}):
+        raise AssertionError
 
 
 def test_native_xlsx_route_is_available_in_full_when_processor_is_selected() -> None:
     payload = _routing_payload("full", ["native-xlsx-analysis"], {"xlsx_processor"})
-    assert "native-xlsx-analysis" in payload["workflows"]
+    if not ("native-xlsx-analysis" in payload["workflows"]):
+        raise AssertionError
 
 
 def test_native_xlsx_route_requires_its_processor_in_full() -> None:

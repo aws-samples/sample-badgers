@@ -31,12 +31,18 @@ def test_configuration_creates_local_desired_state_with_private_permissions(
     result = configuration(tmp_path, "beta", "headless")
     state_path = tmp_path / ".deploy-state/beta.json"
 
-    assert result["selection"]["profile"] == "headless"
-    assert result["routing"]["templates"] == ["standard-document-analysis"]
-    assert result["observability"]["mode"] == "links"
-    assert result["observability"]["candidate_plan"]["resources"]["standard_alarms"] == 0
-    assert result["tags"]["tags"] == {}
-    assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
+    if not (result["selection"]["profile"] == "headless"):
+        raise AssertionError
+    if not (result["routing"]["templates"] == ["standard-document-analysis"]):
+        raise AssertionError
+    if not (result["observability"]["mode"] == "links"):
+        raise AssertionError
+    if not (result["observability"]["candidate_plan"]["resources"]["standard_alarms"] == 0):
+        raise AssertionError
+    if not (result["tags"]["tags"] == {}):
+        raise AssertionError
+    if not (stat.S_IMODE(state_path.stat().st_mode) == 0o600):
+        raise AssertionError
 
 
 def test_deployment_runner_records_missing_process_as_a_failure(tmp_path: Path) -> None:
@@ -45,20 +51,27 @@ def test_deployment_runner_records_missing_process_as_a_failure(tmp_path: Path) 
     runner._consume("configuration-fingerprint")
 
     status = runner.status()
-    assert status["status"] == "failed"
-    assert "did not start a process" in status["output"]
+    if not (status["status"] == "failed"):
+        raise AssertionError
+    if not ("did not start a process" in status["output"]):
+        raise AssertionError
 
 
 def test_plan_describes_the_local_wizard_and_cli_fallback(tmp_path: Path) -> None:
     result = plan(tmp_path, "beta", "headless")
 
-    assert result["cli_next_step"] == "./deploy.sh headless resume"
-    assert "preflight" in result["apply_note"].lower()
-    assert "local wizard deploys the selected observability posture" in result[
+    if not (result["cli_next_step"] == "./deploy.sh headless resume"):
+        raise AssertionError
+    if not ("preflight" in result["apply_note"].lower()):
+        raise AssertionError
+    if not ("local wizard deploys the selected observability posture" in result[
         "observability_handoff"
-    ]
-    assert "publish configuration" in result["required_stages"]
-    assert "deploy selected observability posture" in result["required_stages"]
+    ]):
+        raise AssertionError
+    if not ("publish configuration" in result["required_stages"]):
+        raise AssertionError
+    if not ("deploy selected observability posture" in result["required_stages"]):
+        raise AssertionError
 
 
 def test_delete_configuration_requires_exact_confirmation(tmp_path: Path) -> None:
@@ -68,15 +81,19 @@ def test_delete_configuration_requires_exact_confirmation(tmp_path: Path) -> Non
     try:
         delete_configuration(tmp_path, {"deployment_id": "beta", "confirmation": "wrong"})
     except UIError as error:
-        assert "exact deployment ID" in str(error)
+        if not ("exact deployment ID" in str(error)):
+            raise AssertionError
     else:
         raise AssertionError("Deleting without exact confirmation must fail.")
-    assert state_path.is_file()
+    if not (state_path.is_file()):
+        raise AssertionError
 
-    assert delete_configuration(tmp_path, {"deployment_id": "beta", "confirmation": "beta"}) == {
+    if not (delete_configuration(tmp_path, {"deployment_id": "beta", "confirmation": "beta"}) == {
         "deleted": "beta"
-    }
-    assert not state_path.exists()
+    }):
+        raise AssertionError
+    if not (not state_path.exists()):
+        raise AssertionError
 
 
 def test_configurations_lists_valid_local_deployment_records(tmp_path: Path) -> None:
@@ -86,79 +103,137 @@ def test_configurations_lists_valid_local_deployment_records(tmp_path: Path) -> 
 
     result = configurations(tmp_path)
 
-    assert [(item["deployment_id"], item["profile"]) for item in result] == [
+    if not ([(item["deployment_id"], item["profile"]) for item in result] == [
         ("beta", "headless"),
         ("demo", "specialists"),
-    ]
-    assert all(item["started_at"] for item in result)
+    ]):
+        raise AssertionError
+    if not (all(item["started_at"] for item in result)):
+        raise AssertionError
 
 
 def test_local_planner_offers_xlsx_as_one_processor_workflow() -> None:
-    assert "native-xlsx-analysis" in _HTML
-    assert "XLSX',['xlsx_processor'],'headless" in _HTML
-    assert "Workbook Analysis pack first" in _HTML
+    if not ("native-xlsx-analysis" in _HTML):
+        raise AssertionError
+    if not ("XLSX',['xlsx_processor'],'headless" in _HTML):
+        raise AssertionError
+    if not ("Workbook Analysis pack first" in _HTML):
+        raise AssertionError
 
 
 def test_specialist_bulk_selection_is_independent_and_reactive() -> None:
-    assert 'id="select-all-packs"' in _HTML
-    assert 'id="select-all-direct-specialists"' in _HTML
-    assert 'id="select-all-specialists"' in _HTML
-    assert 'id="deselect-all-specialists"' in _HTML
-    assert "Select all capabilities" in _HTML
-    assert "Deselect all capabilities" in _HTML
-    assert "syncSpecialistSectionToggles" in _HTML
-    assert "toggleSelectionSection('[data-pack],[data-specialist]',true)" in _HTML
-    assert "toggleSelectionSection('[data-pack],[data-specialist]',false)" in _HTML
-    assert "control.indeterminate=false;control.checked=allSelected" in _HTML
-    assert ".selection-section + .selection-section .selection-head{margin-top:22px" in _HTML
-    assert "--cg:#addfc4" in _HTML
-    assert ".on .check{border-color:var(--cg-border);background:var(--cg)}" in _HTML
-    assert ".row:not(.on) .check,.selection-toggle input:not(:checked):not(:indeterminate)" in _HTML
-    assert ".selection-toggle input:checked{border-color:var(--cg-border);background-color:var(--cg)" in _HTML
-    assert ".selection-toggle input{-webkit-appearance:none;appearance:none" in _HTML
-    assert 'id="delete-configuration"' in _HTML
-    assert "/api/configuration/delete" in _HTML
-    assert "Open a configuration from Deployment details" in _HTML
+    if not ('id="select-all-packs"' in _HTML):
+        raise AssertionError
+    if not ('id="select-all-direct-specialists"' in _HTML):
+        raise AssertionError
+    if not ('id="select-all-specialists"' in _HTML):
+        raise AssertionError
+    if not ('id="deselect-all-specialists"' in _HTML):
+        raise AssertionError
+    if not ("Select all capabilities" in _HTML):
+        raise AssertionError
+    if not ("Deselect all capabilities" in _HTML):
+        raise AssertionError
+    if not ("syncSpecialistSectionToggles" in _HTML):
+        raise AssertionError
+    if not ("toggleSelectionSection('[data-pack],[data-specialist]',true)" in _HTML):
+        raise AssertionError
+    if not ("toggleSelectionSection('[data-pack],[data-specialist]',false)" in _HTML):
+        raise AssertionError
+    if not ("control.indeterminate=false;control.checked=allSelected" in _HTML):
+        raise AssertionError
+    if not (".selection-section + .selection-section .selection-head{margin-top:22px" in _HTML):
+        raise AssertionError
+    if not ("--cg:#addfc4" in _HTML):
+        raise AssertionError
+    if not (".on .check{border-color:var(--cg-border);background:var(--cg)}" in _HTML):
+        raise AssertionError
+    if not (".row:not(.on) .check,.selection-toggle input:not(:checked):not(:indeterminate)" in _HTML):
+        raise AssertionError
+    if not (".selection-toggle input:checked{border-color:var(--cg-border);background-color:var(--cg)" in _HTML):
+        raise AssertionError
+    if not (".selection-toggle input{-webkit-appearance:none;appearance:none" in _HTML):
+        raise AssertionError
+    if not ('id="delete-configuration"' in _HTML):
+        raise AssertionError
+    if not ("/api/configuration/delete" in _HTML):
+        raise AssertionError
+    if not ("Open a configuration from Deployment details" in _HTML):
+        raise AssertionError
 
 
 def test_configuration_ui_starts_with_a_welcome_screen_and_tutorial() -> None:
-    assert '<section id="welcome" class="view on">' in _HTML
-    assert "Use an existing local configuration" in _HTML
-    assert "I’d prefer a visual guide to configuring my deployment" in _HTML
-    assert 'data-config-intent="existing"' in _HTML
-    assert 'data-config-intent="guided"' in _HTML
-    assert 'data-to="tutorial">Preview the visual guide</button>' in _HTML
-    assert 'id="tutorial"' in _HTML
-    assert 'data-v="tutorial">How it works</button>' in _HTML
-    assert 'data-v="overview">1. Deployment details</button>' in _HTML
-    assert 'data-v="tags">4. Resource tags</button>' in _HTML
-    assert 'data-v="observability">5. Observability' in _HTML
-    assert 'id="active-config">No configuration loaded</span>' in _HTML
-    assert "/api/configurations" in _HTML
-    assert "<b>Open or create a configuration</b>" in _HTML
-    assert "<b>1. Open" not in _HTML
+    if not ('<section id="welcome" class="view on">' in _HTML):
+        raise AssertionError
+    if not ("Use an existing local configuration" in _HTML):
+        raise AssertionError
+    if not ("I’d prefer a visual guide to configuring my deployment" in _HTML):
+        raise AssertionError
+    if not ('data-config-intent="existing"' in _HTML):
+        raise AssertionError
+    if not ('data-config-intent="guided"' in _HTML):
+        raise AssertionError
+    if not ('data-to="tutorial">Preview the visual guide</button>' in _HTML):
+        raise AssertionError
+    if not ('id="tutorial"' in _HTML):
+        raise AssertionError
+    if not ('data-v="tutorial">How it works</button>' in _HTML):
+        raise AssertionError
+    if not ('data-v="overview">1. Deployment details</button>' in _HTML):
+        raise AssertionError
+    if not ('data-v="tags">4. Resource tags</button>' in _HTML):
+        raise AssertionError
+    if not ('data-v="observability">5. Observability' in _HTML):
+        raise AssertionError
+    if not ('id="active-config">No configuration loaded</span>' in _HTML):
+        raise AssertionError
+    if not ("/api/configurations" in _HTML):
+        raise AssertionError
+    if not ("<b>Open or create a configuration</b>" in _HTML):
+        raise AssertionError
+    if not ("<b>1. Open" not in _HTML):
+        raise AssertionError
 
 
 def test_configuration_ui_requires_an_explicit_profile_and_clear_cli_handoff() -> None:
-    assert 'placeholder="e.g. poc-demo"' in _HTML
-    assert 'Select a product profile' in _HTML
-    assert 'Full experience — recommended POC start' in _HTML
-    assert "Choose a product profile first." in _HTML
-    assert "Preflight and deploy" in _HTML
-    assert "Type the exact deployment ID" in _HTML
-    assert "Saving changed tags marks every enabled stack for reconciliation" in _HTML
-    assert "New configurations begin empty" in _HTML
-    assert 'id="run-preflight"' in _HTML
-    assert 'id="start-deployment"' in _HTML
-    assert "Technical details" in _HTML
-    assert "/api/deployment/preflight" in _HTML
-    assert "/api/deployment/apply" in _HTML
-    assert "function saveProgress(selector)" in _HTML
-    assert "Validate, save & continue" in _HTML
-    assert "Step 1 of 7" in _HTML
-    assert "Validate & continue to specialists" in _HTML
-    assert "function saveWizardStep(view)" in _HTML
-    assert "function beginConfiguration(intent)" in _HTML
+    if not ('placeholder="e.g. poc-demo"' in _HTML):
+        raise AssertionError
+    if not ('Select a product profile' in _HTML):
+        raise AssertionError
+    if not ('Full experience — recommended POC start' in _HTML):
+        raise AssertionError
+    if not ("Choose a product profile first." in _HTML):
+        raise AssertionError
+    if not ("Preflight and deploy" in _HTML):
+        raise AssertionError
+    if not ("Type the exact deployment ID" in _HTML):
+        raise AssertionError
+    if not ("Saving changed tags marks every enabled stack for reconciliation" in _HTML):
+        raise AssertionError
+    if not ("New configurations begin empty" in _HTML):
+        raise AssertionError
+    if not ('id="run-preflight"' in _HTML):
+        raise AssertionError
+    if not ('id="start-deployment"' in _HTML):
+        raise AssertionError
+    if not ("Technical details" in _HTML):
+        raise AssertionError
+    if not ("/api/deployment/preflight" in _HTML):
+        raise AssertionError
+    if not ("/api/deployment/apply" in _HTML):
+        raise AssertionError
+    if not ("function saveProgress(selector)" in _HTML):
+        raise AssertionError
+    if not ("Validate, save & continue" in _HTML):
+        raise AssertionError
+    if not ("Step 1 of 7" in _HTML):
+        raise AssertionError
+    if not ("Validate & continue to specialists" in _HTML):
+        raise AssertionError
+    if not ("function saveWizardStep(view)" in _HTML):
+        raise AssertionError
+    if not ("function beginConfiguration(intent)" in _HTML):
+        raise AssertionError
 
 
 def test_local_deployment_runner_uses_fixed_commands_and_fresh_preflight(
@@ -185,11 +260,16 @@ def test_local_deployment_runner_uses_fixed_commands_and_fresh_preflight(
         time.sleep(0.01)
 
     status = runner.status()
-    assert status["status"] == "succeeded"
-    assert status["preflight"]["matches_current_configuration"] is True
-    assert calls[0][0] == _deployment_command(tmp_path, "headless", "beta", "preflight")
-    assert calls[0][1]["stdin"] is not None
-    assert "shell" not in calls[0][1]
+    if not (status["status"] == "succeeded"):
+        raise AssertionError
+    if not (status["preflight"]["matches_current_configuration"] is True):
+        raise AssertionError
+    if not (calls[0][0] == _deployment_command(tmp_path, "headless", "beta", "preflight")):
+        raise AssertionError
+    if not (calls[0][1]["stdin"] is not None):
+        raise AssertionError
+    if not ("shell" not in calls[0][1]):
+        raise AssertionError
 
     runner.start_deployment(
         {
@@ -199,9 +279,12 @@ def test_local_deployment_runner_uses_fixed_commands_and_fresh_preflight(
             "ui_public_access": False,
         }
     )
-    assert calls[1][0] == _deployment_command(tmp_path, "headless", "beta", "resume")
-    assert calls[1][1]["env"]["BADGERS_ASSUME_YES"] == "1"
-    assert calls[1][1]["env"]["UI_PUBLIC_ACCESS"] == "false"
+    if not (calls[1][0] == _deployment_command(tmp_path, "headless", "beta", "resume")):
+        raise AssertionError
+    if not (calls[1][1]["env"]["BADGERS_ASSUME_YES"] == "1"):
+        raise AssertionError
+    if not (calls[1][1]["env"]["UI_PUBLIC_ACCESS"] == "false"):
+        raise AssertionError
 
 
 def test_local_deployment_requires_typed_confirmation_and_current_preflight(
@@ -219,7 +302,8 @@ def test_local_deployment_requires_typed_confirmation_and_current_preflight(
             }
         )
     except UIError as error:
-        assert "preflight" in str(error).lower()
+        if not ("preflight" in str(error).lower()):
+            raise AssertionError
     else:
         raise AssertionError("Deployment must require fresh preflight.")
 
@@ -232,7 +316,8 @@ def test_local_deployment_requires_typed_confirmation_and_current_preflight(
             }
         )
     except UIError as error:
-        assert "exact deployment ID" in str(error)
+        if not ("exact deployment ID" in str(error)):
+            raise AssertionError
     else:
         raise AssertionError("Deployment must require typed confirmation.")
 
@@ -252,10 +337,14 @@ def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path
     )
 
     observability = result["observability"]
-    assert observability["mode"] == "baseline"
-    assert observability["notification"]["kind"] == "sns"
-    assert observability["candidate_plan"]["resources"]["cloudwatch_dashboards"] == 1
-    assert observability["candidate_plan"]["resources"]["notification_routes"] == 1
+    if not (observability["mode"] == "baseline"):
+        raise AssertionError
+    if not (observability["notification"]["kind"] == "sns"):
+        raise AssertionError
+    if not (observability["candidate_plan"]["resources"]["cloudwatch_dashboards"] == 1):
+        raise AssertionError
+    if not (observability["candidate_plan"]["resources"]["notification_routes"] == 1):
+        raise AssertionError
 
     try:
         save_observability(
@@ -270,21 +359,31 @@ def test_observability_plan_is_local_and_validates_notification_handoff(tmp_path
             },
         )
     except UIError as error:
-        assert "requires baseline or enhanced" in str(error)
+        if not ("requires baseline or enhanced" in str(error)):
+            raise AssertionError
     else:
         raise AssertionError("Links mode must not allow a notification handoff.")
 
 
 def test_observability_screen_explains_local_deployment_and_optional_handoff() -> None:
-    assert 'data-v="observability"' in _HTML
-    assert "Applied during deployment" in _HTML
-    assert "CloudWatch alarms remain visible without a notification destination" in _HTML
-    assert "/api/observability" in _HTML
-    assert "Observability add-on" in _HTML
-    assert "no aws inventory" in _HTML.lower()
-    assert "No added CloudWatch resources — no dashboard or alarms" in _HTML
-    assert "Enhanced — requires Full or Headless" in _HTML
-    assert "Enhanced is unavailable for Specialists" in _HTML
+    if not ('data-v="observability"' in _HTML):
+        raise AssertionError
+    if not ("Applied during deployment" in _HTML):
+        raise AssertionError
+    if not ("CloudWatch alarms remain visible without a notification destination" in _HTML):
+        raise AssertionError
+    if not ("/api/observability" in _HTML):
+        raise AssertionError
+    if not ("Observability add-on" in _HTML):
+        raise AssertionError
+    if not ("no aws inventory" in _HTML.lower()):
+        raise AssertionError
+    if not ("No added CloudWatch resources — no dashboard or alarms" in _HTML):
+        raise AssertionError
+    if not ("Enhanced — requires Full or Headless" in _HTML):
+        raise AssertionError
+    if not ("Enhanced is unavailable for Specialists" in _HTML):
+        raise AssertionError
 
 
 def test_tags_are_saved_per_deployment_and_require_reconciliation(tmp_path: Path) -> None:
@@ -303,15 +402,18 @@ def test_tags_are_saved_per_deployment_and_require_reconciliation(tmp_path: Path
         },
     )
 
-    assert result["tags"]["tags"] == {
+    if not (result["tags"]["tags"] == {
         "customer:program": "claims",
         "environment": "poc",
         "owner": "customer-team",
-    }
-    assert plan(tmp_path, "beta", "headless")["tags_changed"]
-    assert "reconcile deployment tags across enabled stacks" in plan(
+    }):
+        raise AssertionError
+    if not (plan(tmp_path, "beta", "headless")["tags_changed"]):
+        raise AssertionError
+    if not ("reconcile deployment tags across enabled stacks" in plan(
         tmp_path, "beta", "headless"
-    )["required_stages"]
+    )["required_stages"]):
+        raise AssertionError
 
     try:
         save_tags(
@@ -324,7 +426,8 @@ def test_tags_are_saved_per_deployment_and_require_reconciliation(tmp_path: Path
             },
         )
     except UIError as error:
-        assert "reserved by AWS" in str(error)
+        if not ("reserved by AWS" in str(error)):
+            raise AssertionError
     else:
         raise AssertionError("AWS-reserved tag keys must be rejected.")
 
@@ -338,8 +441,10 @@ def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path
         unauthenticated = http.client.HTTPConnection("127.0.0.1", port)
         unauthenticated.request("GET", "/api/packs")
         response = unauthenticated.getresponse()
-        assert response.status == 403
-        assert json.loads(response.read())["error"] == "Local session verification failed."
+        if not (response.status == 403):
+            raise AssertionError
+        if not (json.loads(response.read())["error"] == "Local session verification failed."):
+            raise AssertionError
         unauthenticated.close()
 
         capability_only = http.client.HTTPConnection("127.0.0.1", port)
@@ -349,8 +454,10 @@ def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path
             headers={"X-Badgers-Session": server.session_token},
         )
         response = capability_only.getresponse()
-        assert response.status == 200
-        assert isinstance(json.loads(response.read()), list)
+        if not (response.status == 200):
+            raise AssertionError
+        if not (isinstance(json.loads(response.read()), list)):
+            raise AssertionError
         capability_only.close()
 
         read_with_unexpected_origin = http.client.HTTPConnection("127.0.0.1", port)
@@ -363,8 +470,10 @@ def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path
             },
         )
         response = read_with_unexpected_origin.getresponse()
-        assert response.status == 200
-        assert isinstance(json.loads(response.read()), list)
+        if not (response.status == 200):
+            raise AssertionError
+        if not (isinstance(json.loads(response.read()), list)):
+            raise AssertionError
         read_with_unexpected_origin.close()
 
         wrong_origin_write = http.client.HTTPConnection("127.0.0.1", port)
@@ -380,10 +489,14 @@ def test_api_requires_session_capability_and_same_loopback_origin(tmp_path: Path
             },
         )
         response = wrong_origin_write.getresponse()
-        assert response.status == 403
-        assert json.loads(response.read())["error"] == "Unexpected request origin."
-        assert response.getheader("Access-Control-Allow-Origin") is None
-        assert response.getheader("Cache-Control") == "no-store"
+        if not (response.status == 403):
+            raise AssertionError
+        if not (json.loads(response.read())["error"] == "Unexpected request origin."):
+            raise AssertionError
+        if not (response.getheader("Access-Control-Allow-Origin") is None):
+            raise AssertionError
+        if not (response.getheader("Cache-Control") == "no-store"):
+            raise AssertionError
         response.read()
         wrong_origin_write.close()
     finally:

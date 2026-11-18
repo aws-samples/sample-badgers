@@ -23,9 +23,12 @@ def test_mark_running_appends_attempt_and_clears_stale_completion(monkeypatch) -
     job_state.mark_running("job", "specialist#page", specialist="specialist")
 
     expression = calls[0]["UpdateExpression"]
-    assert "list_append" in expression
-    assert "attempt_count" in expression
-    assert "REMOVE #e, completed_at" in expression
+    if not ("list_append" in expression):
+        raise AssertionError
+    if not ("attempt_count" in expression):
+        raise AssertionError
+    if not ("REMOVE #e, completed_at" in expression):
+        raise AssertionError
 
 
 def test_report_attempt_helpers_preserve_legacy_rows() -> None:
@@ -36,7 +39,8 @@ def test_report_attempt_helpers_preserve_legacy_rows() -> None:
     spec = importlib.util.spec_from_file_location(
         "report_attempt_handler", report_dir / "lambda_handler.py"
     )
-    assert spec and spec.loader
+    if not (spec and spec.loader):
+        raise AssertionError
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 
@@ -53,13 +57,15 @@ def test_report_attempt_helpers_preserve_legacy_rows() -> None:
     ]
     counts = module._execution_counts(records)
 
-    assert counts == {
+    if not (counts == {
         "invocation_count": 3,
         "complete_count": 1,
         "failed_count": 2,
         "retried_count": 1,
-    }
-    assert module._attempts(records[1])[0]["status"] == "FAILED"
+    }):
+        raise AssertionError
+    if not (module._attempts(records[1])[0]["status"] == "FAILED"):
+        raise AssertionError
 
 
 def test_report_ui_lists_attempts_and_retry_count() -> None:
@@ -68,6 +74,9 @@ def test_report_ui_lists_attempts_and_retry_count() -> None:
         DEPLOYMENT / "lambdas" / "code" / "html_report_specialist" / "renderer.py"
     ).read_text()
 
-    assert "Attempt {attemptIndex + 1}" in report_ui
-    assert 'Metric label="Retried"' in report_ui
-    assert "Attempt ${n+1}:" in renderer
+    if not ("Attempt {attemptIndex + 1}" in report_ui):
+        raise AssertionError
+    if not ('Metric label="Retried"' in report_ui):
+        raise AssertionError
+    if not ("Attempt ${n+1}:" in renderer):
+        raise AssertionError

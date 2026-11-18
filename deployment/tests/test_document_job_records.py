@@ -34,12 +34,15 @@ def test_merge_document_records_retains_attempts_from_retry_jobs() -> None:
         ]
     )
 
-    assert len(records) == 1
-    assert records[0]["status"] == "COMPLETE"
-    assert [item["status"] for item in records[0]["attempts"]] == [
+    if not (len(records) == 1):
+        raise AssertionError
+    if not (records[0]["status"] == "COMPLETE"):
+        raise AssertionError
+    if not ([item["status"] for item in records[0]["attempts"]] == [
         "FAILED",
         "COMPLETE",
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_report_prompt_and_iam_allow_document_history_reads() -> None:
@@ -48,5 +51,7 @@ def test_report_prompt_and_iam_allow_document_history_reads() -> None:
     ).read_text()
     iam = (DEPLOYMENT / "stacks" / "iam_stack.py").read_text()
 
-    assert "After a successful re-run of a document" in prompt
-    assert 'f"{jobs_table.table_arn}/index/doc-index"' in iam
+    if not ("After a successful re-run of a document" in prompt):
+        raise AssertionError
+    if not ('f"{jobs_table.table_arn}/index/doc-index"' in iam):
+        raise AssertionError

@@ -22,7 +22,8 @@ foundation_stub = ModuleType("foundation")
 foundation_stub.job_state = SimpleNamespace()
 sys.modules.setdefault("foundation", foundation_stub)
 spec = importlib.util.spec_from_file_location("textract_ocr_handler", HANDLER_PATH)
-assert spec and spec.loader
+if not (spec and spec.loader):
+    raise AssertionError
 textract_ocr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(textract_ocr)
 
@@ -46,9 +47,12 @@ def test_quality_gate_accepts_readable_textract_lines() -> None:
 
     quality = textract_ocr.assess_ocr_quality(response)
 
-    assert quality["status"] == "passed"
-    assert quality["line_count"] == 2
-    assert quality["mean_line_confidence"] == 97.75
+    if not (quality["status"] == "passed"):
+        raise AssertionError
+    if not (quality["line_count"] == 2):
+        raise AssertionError
+    if not (quality["mean_line_confidence"] == 97.75):
+        raise AssertionError
 
 
 def test_quality_gate_escalates_blank_or_unreliable_ocr() -> None:
@@ -56,10 +60,14 @@ def test_quality_gate_escalates_blank_or_unreliable_ocr() -> None:
         {"Blocks": [_line("%%", 42.0, 0.1)]}
     )
 
-    assert quality["status"] == "escalate_to_vision"
-    assert quality["fallback_route"] == "vision_ai"
-    assert "insufficient_readable_text" in quality["reasons"]
-    assert "low_mean_line_confidence" in quality["reasons"]
+    if not (quality["status"] == "escalate_to_vision"):
+        raise AssertionError
+    if not (quality["fallback_route"] == "vision_ai"):
+        raise AssertionError
+    if not ("insufficient_readable_text" in quality["reasons"]):
+        raise AssertionError
+    if not ("low_mean_line_confidence" in quality["reasons"]):
+        raise AssertionError
 
 
 def test_accepted_ocr_builds_a_schema_valid_badgers_spine(
@@ -81,9 +89,12 @@ def test_accepted_ocr_builds_a_schema_valid_badgers_spine(
     )
     valid, errors = textract_ocr.validate_content_tree(xml_payload)
 
-    assert valid is True
-    assert errors == []
-    assert xml_payload.index(b"First line") < xml_payload.index(b"Second line")
+    if not (valid is True):
+        raise AssertionError
+    if not (errors == []):
+        raise AssertionError
+    if not (xml_payload.index(b"First line") < xml_payload.index(b"Second line")):
+        raise AssertionError
 
 
 def test_content_tree_validation_rejects_entity_declaration() -> None:
@@ -92,5 +103,7 @@ def test_content_tree_validation_rejects_entity_declaration() -> None:
 
     valid, errors = textract_ocr.validate_content_tree(malicious_xml)
 
-    assert valid is False
-    assert errors[0].startswith("Invalid XML:")
+    if not (valid is False):
+        raise AssertionError
+    if not (errors[0].startswith("Invalid XML:")):
+        raise AssertionError

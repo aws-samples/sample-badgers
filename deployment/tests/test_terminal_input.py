@@ -12,7 +12,8 @@ def test_windows_arrow_keys_are_normalized(monkeypatch) -> None:
     values = iter(("\xe0", "H"))
     monkeypatch.setitem(sys.modules, "msvcrt", SimpleNamespace(getwch=lambda: next(values)))
 
-    assert terminal_input.read_key() == "UP"
+    if not (terminal_input.read_key() == "UP"):
+        raise AssertionError
 
 
 def test_windows_ctrl_c_raises_keyboard_interrupt(monkeypatch) -> None:
@@ -31,7 +32,8 @@ def test_line_input_maps_j_and_k(monkeypatch) -> None:
     monkeypatch.setattr(terminal_input.sys.stdin, "isatty", lambda: False)
     monkeypatch.setattr("builtins.input", lambda _prompt: "j")
 
-    assert terminal_input.read_key() == "DOWN"
+    if not (terminal_input.read_key() == "DOWN"):
+        raise AssertionError
 
 
 def test_picker_modules_import_without_termios(monkeypatch) -> None:

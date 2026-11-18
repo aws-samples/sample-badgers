@@ -40,6 +40,7 @@ def structure_module():
     )
     spec = importlib.util.spec_from_file_location("docx_structure_handler", path)
     module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
+    if not (spec.loader is not None):
+        raise AssertionError
     spec.loader.exec_module(module)
     return module

@@ -24,7 +24,8 @@ RUNNER_PATH = (
 sys.path.insert(0, str(FOUNDATION_DIR))
 
 SPEC = importlib.util.spec_from_file_location("badgers_workflow_runner", RUNNER_PATH)
-assert SPEC and SPEC.loader
+if not (SPEC and SPEC.loader):
+    raise AssertionError
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 
@@ -102,16 +103,21 @@ def test_validate_stage_requires_tenant_scoped_source(
 
     result = runner.lambda_handler(_event(), SimpleNamespace())
 
-    assert result["operation_id"] == "op_" + ("a" * 32)
-    assert result["source_content_type"] == "application/pdf"
-    assert result["source_size_bytes"] == 1024
-    assert fake_s3.requests == [
+    if not (result["operation_id"] == "op_" + ("a" * 32)):
+        raise AssertionError
+    if not (result["source_content_type"] == "application/pdf"):
+        raise AssertionError
+    if not (result["source_size_bytes"] == 1024):
+        raise AssertionError
+    if not (fake_s3.requests == [
         {
             "Bucket": "badgers-source",
             "Key": "tenants/tenant-a/contracts/msa.pdf",
         }
-    ]
-    assert stages[0]["status"] == "validating"
+    ]):
+        raise AssertionError
+    if not (stages[0]["status"] == "validating"):
+        raise AssertionError
 
 
 def test_validate_stage_rejects_cross_tenant_source_before_s3_read(
@@ -146,7 +152,8 @@ def test_cancelled_operation_short_circuits_before_any_stage_work(
 
     result = runner.lambda_handler(_event(), SimpleNamespace())
 
-    assert result["cancelled"] is True
+    if not (result["cancelled"] is True):
+        raise AssertionError
 
 
 def test_runner_requires_readable_artifact_in_private_operation_prefix(
@@ -166,7 +173,7 @@ def test_runner_requires_readable_artifact_in_private_operation_prefix(
         owner_sub="tenant-a",
     )
 
-    assert fake_s3.requests == [
+    if not (fake_s3.requests == [
         {
             "Bucket": "badgers-output",
             "Key": (
@@ -174,7 +181,8 @@ def test_runner_requires_readable_artifact_in_private_operation_prefix(
                 "full_text_specialist/page_001.xml"
             ),
         }
-    ]
+    ]):
+        raise AssertionError
 
     with pytest.raises(
         runner.WorkflowRunnerError, match="private operation prefix"
@@ -229,8 +237,9 @@ def test_native_processor_result_is_retained_in_the_private_operation_prefix(
         f"s3://badgers-output/operations/tenant-a/{operation_id}/"
         "specialists/docx_processor/native-result.json"
     )
-    assert result["native_result_uri"] == expected_uri
-    assert completed == [
+    if not (result["native_result_uri"] == expected_uri):
+        raise AssertionError
+    if not (completed == [
         (
             operation_id,
             runner.job_state.subtask_id(
@@ -238,11 +247,14 @@ def test_native_processor_result_is_retained_in_the_private_operation_prefix(
             ),
             expected_uri,
         )
-    ]
-    assert artifact_store.objects[0]["Key"].endswith(
+    ]):
+        raise AssertionError
+    if not (artifact_store.objects[0]["Key"].endswith(
         "specialists/docx_processor/native-result.json"
-    )
-    assert stages[0]["stage"] == "native_document"
+    )):
+        raise AssertionError
+    if not (stages[0]["stage"] == "native_document"):
+        raise AssertionError
 
 
 def test_xlsx_native_workflow_returns_the_single_processor_result(
@@ -302,9 +314,12 @@ def test_xlsx_native_workflow_returns_the_single_processor_result(
         }
     )
 
-    assert [name for name, _ in calls] == ["xlsx_processor"]
-    assert verified == [content_tree]
-    assert result["content_tree_uri"] == content_tree
+    if not ([name for name, _ in calls] == ["xlsx_processor"]):
+        raise AssertionError
+    if not (verified == [content_tree]):
+        raise AssertionError
+    if not (result["content_tree_uri"] == content_tree):
+        raise AssertionError
 
 
 def test_native_workflow_finalizes_without_a_correlation_artifact(
@@ -345,6 +360,9 @@ def test_native_workflow_finalizes_without_a_correlation_artifact(
         }
     )
 
-    assert verified == [uri]
-    assert result["result"]["status"] == "completed"
-    assert result["result"]["summary"].startswith("Native document processing")
+    if not (verified == [uri]):
+        raise AssertionError
+    if not (result["result"]["status"] == "completed"):
+        raise AssertionError
+    if not (result["result"]["summary"].startswith("Native document processing")):
+        raise AssertionError

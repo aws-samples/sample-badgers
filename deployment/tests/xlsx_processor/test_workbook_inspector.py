@@ -96,16 +96,23 @@ def _workbook(*, macro: bool = False) -> bytes:
 def test_inspect_xlsx_preserves_formula_inputs_without_calculating() -> None:
     result = inspect_xlsx(_workbook())
 
-    assert result["schema_version"] == "badgers-xlsx-analysis/v1"
+    if not (result["schema_version"] == "badgers-xlsx-analysis/v1"):
+        raise AssertionError
     sheet = result["sheets"][0]
     formula = sheet["formulas"][0]
-    assert sheet["name"] == "Revenue"
-    assert formula["coordinate"] == "B4"
-    assert formula["formula"] == "=SUM(B2:B3)"
-    assert formula["cached_value"] == "30"
-    assert formula["cached_value_state"] == "present"
-    assert formula["functions"] == ["SUM"]
-    assert formula["references"] == [
+    if not (sheet["name"] == "Revenue"):
+        raise AssertionError
+    if not (formula["coordinate"] == "B4"):
+        raise AssertionError
+    if not (formula["formula"] == "=SUM(B2:B3)"):
+        raise AssertionError
+    if not (formula["cached_value"] == "30"):
+        raise AssertionError
+    if not (formula["cached_value_state"] == "present"):
+        raise AssertionError
+    if not (formula["functions"] == ["SUM"]):
+        raise AssertionError
+    if not (formula["references"] == [
         {
             "reference": "Revenue!B2:B3",
             "kind": "cell_or_range",
@@ -115,70 +122,96 @@ def test_inspect_xlsx_preserves_formula_inputs_without_calculating() -> None:
                 {"coordinate": "B3", "value": "20", "formula": ""},
             ],
         }
-    ]
+    ]):
+        raise AssertionError
     interpretation = formula["interpretation"]
-    assert interpretation["how_it_works"].startswith("Adds the values")
-    assert interpretation["appears_to_do"] == "Appears to produce the value labelled 'Total revenue'."
-    assert "why" not in interpretation
-    assert interpretation["confidence_percent"] == 100
-    assert interpretation["confidence_grade"] == "A"
-    assert result["analysis_metadata"]["formula_calculation"] == "not_performed"
-    assert result["analysis_metadata"]["formula_interpretation_confidence_scale"]["ratings"][-1] == {
+    if not (interpretation["how_it_works"].startswith("Adds the values")):
+        raise AssertionError
+    if not (interpretation["appears_to_do"] == "Appears to produce the value labelled 'Total revenue'."):
+        raise AssertionError
+    if not ("why" not in interpretation):
+        raise AssertionError
+    if not (interpretation["confidence_percent"] == 100):
+        raise AssertionError
+    if not (interpretation["confidence_grade"] == "A"):
+        raise AssertionError
+    if not (result["analysis_metadata"]["formula_calculation"] == "not_performed"):
+        raise AssertionError
+    if not (result["analysis_metadata"]["formula_interpretation_confidence_scale"]["ratings"][-1] == {
         "minimum_percent": 100,
         "maximum_percent": 100,
         "grade": "A",
         "meaning": "PERFECT — complete native evidence supports the interpretation",
-    }
+    }):
+        raise AssertionError
 
 
 def test_inspect_xlsx_records_image_overlay_and_native_cells() -> None:
     result = inspect_xlsx(_workbook())
 
     image = result["sheets"][0]["visual_objects"][0]
-    assert image["kind"] == "image"
-    assert image["object_id"] == "drawing-7"
-    assert image["vision_status"] == "pending_contextual_analysis"
-    assert image["covered_cells"] == [
+    if not (image["kind"] == "image"):
+        raise AssertionError
+    if not (image["object_id"] == "drawing-7"):
+        raise AssertionError
+    if not (image["vision_status"] == "pending_contextual_analysis"):
+        raise AssertionError
+    if not (image["covered_cells"] == [
         {"coordinate": "A2", "value": "Total revenue"},
         {"coordinate": "B2", "value": "10"},
         {"coordinate": "A3", "value": "March"},
         {"coordinate": "B3", "value": "20"},
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_inspect_xlsx_wraps_table_cells_with_native_context() -> None:
     result = inspect_xlsx(_workbook())
 
     table = result["sheets"][0]["tables"][0]
-    assert table["object_type"] == "table"
-    assert table["object_id"] == "table-1"
-    assert table["headers"] == ["Period", "Amount"]
-    assert table["header_row"] == {
+    if not (table["object_type"] == "table"):
+        raise AssertionError
+    if not (table["object_id"] == "table-1"):
+        raise AssertionError
+    if not (table["headers"] == ["Period", "Amount"]):
+        raise AssertionError
+    if not (table["header_row"] == {
         "worksheet_row": 1,
         "cells": [
             {"column": "A", "coordinate": "A1", "value": "Amount", "data_type": "s", "style_id": ""},
             {"column": "B", "coordinate": "B1", "value": "Amount", "data_type": "s", "style_id": ""},
         ],
-    }
-    assert [row["worksheet_row"] for row in table["data_rows"]] == [2, 3, 4]
-    assert table["data_rows"][0] == {
+    }):
+        raise AssertionError
+    if not ([row["worksheet_row"] for row in table["data_rows"]] == [2, 3, 4]):
+        raise AssertionError
+    if not (table["data_rows"][0] == {
         "row_index": 1,
         "worksheet_row": 2,
         "cells": [
             {"column": "A", "coordinate": "A2", "value": "Total revenue", "data_type": "s", "style_id": ""},
             {"column": "B", "coordinate": "B2", "value": "10", "data_type": "n", "style_id": ""},
         ],
-    }
-    assert table["total_row"] is None
-    assert table["self_context"]["formula_cells"] == ["B4"]
-    assert [cell["coordinate"] for cell in table["data_rows"][-1]["cells"]] == [
+    }):
+        raise AssertionError
+    if not (table["total_row"] is None):
+        raise AssertionError
+    if not (table["self_context"]["formula_cells"] == ["B4"]):
+        raise AssertionError
+    if not ([cell["coordinate"] for cell in table["data_rows"][-1]["cells"]] == [
         "A4", "B4"
-    ]
-    assert table["structured_formatting"]["style_name"] == "TableStyleMedium2"
-    assert table["structured_formatting"]["show_row_stripes"] is True
-    assert table["self_context"]["data_row_count"] == 3
-    assert "Period, Amount" in table["self_context"]["summary"]
-    assert table["sheet_context"]["sheet_name"] == "Revenue"
+    ]):
+        raise AssertionError
+    if not (table["structured_formatting"]["style_name"] == "TableStyleMedium2"):
+        raise AssertionError
+    if not (table["structured_formatting"]["show_row_stripes"] is True):
+        raise AssertionError
+    if not (table["self_context"]["data_row_count"] == 3):
+        raise AssertionError
+    if not ("Period, Amount" in table["self_context"]["summary"]):
+        raise AssertionError
+    if not (table["sheet_context"]["sheet_name"] == "Revenue"):
+        raise AssertionError
 
 
 def test_inspect_xlsx_rejects_macro_parts_without_executing_them() -> None:

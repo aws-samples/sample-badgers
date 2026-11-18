@@ -31,13 +31,20 @@ def test_prepares_embedded_image_with_native_context_only() -> None:
 
     prepared, skipped = prepare_visual_analysis(_workbook(), inspection, max_objects=1)
 
-    assert skipped == []
-    assert len(prepared) == 1
-    assert prepared[0]["object"]["object_id"] == "drawing-7"
-    assert prepared[0]["content_type"] == "image/png"
-    assert prepared[0]["image_bytes"].startswith(b"\x89PNG")
-    assert '"object_kind": "image"' in prepared[0]["runtime_context"]
-    assert '"formula_calculation"' not in prepared[0]["runtime_context"]
+    if not (skipped == []):
+        raise AssertionError
+    if not (len(prepared) == 1):
+        raise AssertionError
+    if not (prepared[0]["object"]["object_id"] == "drawing-7"):
+        raise AssertionError
+    if not (prepared[0]["content_type"] == "image/png"):
+        raise AssertionError
+    if not (prepared[0]["image_bytes"].startswith(b"\x89PNG")):
+        raise AssertionError
+    if not ('"object_kind": "image"' in prepared[0]["runtime_context"]):
+        raise AssertionError
+    if not ('"formula_calculation"' not in prepared[0]["runtime_context"]):
+        raise AssertionError
 
 
 def test_keeps_chart_as_a_distinct_pending_visual_type() -> None:
@@ -48,8 +55,9 @@ def test_keeps_chart_as_a_distinct_pending_visual_type() -> None:
 
     prepared, skipped = prepare_visual_analysis(_workbook(), inspection)
 
-    assert prepared == []
-    assert skipped == [
+    if not (prepared == []):
+        raise AssertionError
+    if not (skipped == [
         {
             "object_id": "drawing-9",
             "kind": "chart",
@@ -59,7 +67,8 @@ def test_keeps_chart_as_a_distinct_pending_visual_type() -> None:
                 "for Vision analysis."
             ),
         }
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_validates_model_response_and_school_style_grade() -> None:
@@ -92,9 +101,11 @@ def test_validates_model_response_and_school_style_grade() -> None:
         sheet_name="Revenue",
     )
 
-    assert result["analysis_scope"] == "non_authoritative_visual_evidence"
-    assert result["confidence_grade"] == "A"
-    assert result["spatial_coverage"] == {
+    if not (result["analysis_scope"] == "non_authoritative_visual_evidence"):
+        raise AssertionError
+    if not (result["confidence_grade"] == "A"):
+        raise AssertionError
+    if not (result["spatial_coverage"] == {
         "relation": "drawn_above_native_cells",
         "from": {"column": "B", "row": 6, "cell": "B6"},
         "to": {"column": "D", "row": 13, "cell": "D13"},
@@ -102,9 +113,12 @@ def test_validates_model_response_and_school_style_grade() -> None:
         "coordinate_delta": {"columns": 2, "rows": 7},
         "covered_native_cell_count": 2,
         "confidence": "deterministic",
-    }
-    assert result["visual_effect"]["semantic_replacement_suspected"] is True
-    assert grade_for_confidence(89) == "B"
+    }):
+        raise AssertionError
+    if not (result["visual_effect"]["semantic_replacement_suspected"] is True):
+        raise AssertionError
+    if not (grade_for_confidence(89) == "B"):
+        raise AssertionError
 
 
 def test_rejects_a_model_response_with_an_inconsistent_grade() -> None:
@@ -131,7 +145,7 @@ def test_rejects_a_model_response_with_an_inconsistent_grade() -> None:
 
 
 def test_reads_the_manifest_primary_model_id() -> None:
-    assert _model_selection(
+    if not (_model_selection(
         {
             "model_selections": {
                 "primary": {"model_id": "us.anthropic.claude-sonnet-4-6"},
@@ -142,7 +156,8 @@ def test_reads_the_manifest_primary_model_id() -> None:
     ) == {
         "model_id": "us.anthropic.claude-sonnet-4-6",
         "max_tokens": 1200,
-    }
+    }):
+        raise AssertionError
 
 
 def test_merges_native_and_vision_evidence_into_badgers_xml() -> None:
@@ -191,19 +206,27 @@ def test_merges_native_and_vision_evidence_into_badgers_xml() -> None:
         )
     )
 
-    assert root.tag == "unified_document"
-    assert root.get("schema_version") == "2.0"
+    if not (root.tag == "unified_document"):
+        raise AssertionError
+    if not (root.get("schema_version") == "2.0"):
+        raise AssertionError
     vision = root.find(".//vision_analysis")
-    assert vision is not None
-    assert vision.get("classification") == "data_overlay"
-    assert vision.find("./visual_effect").get("semantic_replacement_suspected") == "true"
+    if not (vision is not None):
+        raise AssertionError
+    if not (vision.get("classification") == "data_overlay"):
+        raise AssertionError
+    if not (vision.find("./visual_effect").get("semantic_replacement_suspected") == "true"):
+        raise AssertionError
     coverage = vision.find("./spatial_coverage")
-    assert coverage is not None
-    assert coverage.get("grid_span") == "A2:B3"
+    if not (coverage is not None):
+        raise AssertionError
+    if not (coverage.get("grid_span") == "A2:B3"):
+        raise AssertionError
     references = root.findall("./cross_reference_index/cross_reference")
-    assert {item.get("target") for item in references} == {
+    if not ({item.get("target") for item in references} == {
         "xlsx-sheet-1-cell-A2",
         "xlsx-sheet-1-cell-B2",
         "xlsx-sheet-1-cell-A3",
         "xlsx-sheet-1-cell-B3",
-    }
+    }):
+        raise AssertionError

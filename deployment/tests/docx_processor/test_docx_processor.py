@@ -75,16 +75,26 @@ def test_inspect_docx_extracts_heading_list_table_and_drawing() -> None:
 
     blocks, metadata = inspect_docx(payload)
 
-    assert [block.kind for block in blocks] == ["heading", "list", "table", "paragraph"]
-    assert blocks[0].level == 1
-    assert blocks[1].list_id == "4"
-    assert blocks[1].list_level == 2
-    assert blocks[2].has_merged_cells is True
-    assert blocks[2].table_cells[0][0]["text"] == "Header"
-    assert blocks[2].table_cells[1][0]["column_span"] == 2
-    assert blocks[3].has_floating_drawing is True
-    assert blocks[3].image_descriptions == ["Architecture diagram"]
-    assert metadata["source_format"] == "docx"
+    if not ([block.kind for block in blocks] == ["heading", "list", "table", "paragraph"]):
+        raise AssertionError
+    if not (blocks[0].level == 1):
+        raise AssertionError
+    if not (blocks[1].list_id == "4"):
+        raise AssertionError
+    if not (blocks[1].list_level == 2):
+        raise AssertionError
+    if not (blocks[2].has_merged_cells is True):
+        raise AssertionError
+    if not (blocks[2].table_cells[0][0]["text"] == "Header"):
+        raise AssertionError
+    if not (blocks[2].table_cells[1][0]["column_span"] == 2):
+        raise AssertionError
+    if not (blocks[3].has_floating_drawing is True):
+        raise AssertionError
+    if not (blocks[3].image_descriptions == ["Architecture diagram"]):
+        raise AssertionError
+    if not (metadata["source_format"] == "docx"):
+        raise AssertionError
 
 
 def test_native_content_tree_is_valid_badgers_xml() -> None:
@@ -106,10 +116,14 @@ def test_native_content_tree_is_valid_badgers_xml() -> None:
 
     valid, errors = validate_content_tree(xml_payload, SCHEMA_DIRECTORY)
 
-    assert valid is True
-    assert errors == []
-    assert b'tag="TR"' in xml_payload
-    assert b'tag="TH"' in xml_payload
+    if not (valid is True):
+        raise AssertionError
+    if not (errors == []):
+        raise AssertionError
+    if not (b'tag="TR"' in xml_payload):
+        raise AssertionError
+    if not (b'tag="TH"' in xml_payload):
+        raise AssertionError
 
 
 def test_page_route_is_independent_and_explainable() -> None:
@@ -146,14 +160,18 @@ def test_page_route_is_independent_and_explainable() -> None:
         ],
     )
 
-    assert (simple_score, simple_route, simple_reasons) == (
+    if not ((simple_score, simple_route, simple_reasons) == (
         0,
         "native_docx",
         ["aligned_native_text"],
-    )
-    assert visual_score >= 60
-    assert visual_route == "vision_ai"
-    assert "floating_or_wrapped_visual" in visual_reasons
+    )):
+        raise AssertionError
+    if not (visual_score >= 60):
+        raise AssertionError
+    if not (visual_route == "vision_ai"):
+        raise AssertionError
+    if not ("floating_or_wrapped_visual" in visual_reasons):
+        raise AssertionError
 
 
 def test_text_only_columns_and_alignment_uncertainty_do_not_force_vision() -> None:
@@ -179,13 +197,16 @@ def test_text_only_columns_and_alignment_uncertainty_do_not_force_vision() -> No
         page, [uncertain_block], 1
     )
 
-    assert (column_score, column_route, column_reasons) == (
+    if not ((column_score, column_route, column_reasons) == (
         5,
         "native_docx",
         ["multi_column_layout"],
-    )
-    assert (uncertain_score, uncertain_route) == (20, "native_docx")
-    assert uncertain_reasons == ["low_alignment_confidence"]
+    )):
+        raise AssertionError
+    if not ((uncertain_score, uncertain_route) == (20, "native_docx")):
+        raise AssertionError
+    if not (uncertain_reasons == ["low_alignment_confidence"]):
+        raise AssertionError
 
 
 def test_complex_native_table_requires_review_but_not_full_vision() -> None:
@@ -202,8 +223,10 @@ def test_complex_native_table_requires_review_but_not_full_vision() -> None:
 
     score, route, reasons = decide_page_route(page, [table], 1)
 
-    assert (score, route) == (35, "native_docx")
-    assert reasons == ["highly_complex_table"]
+    if not ((score, route) == (35, "native_docx")):
+        raise AssertionError
+    if not (reasons == ["highly_complex_table"]):
+        raise AssertionError
 
 
 def test_captioned_photo_does_not_become_vision_without_semantic_visual_evidence() -> None:
@@ -229,9 +252,12 @@ def test_captioned_photo_does_not_become_vision_without_semantic_visual_evidence
         page, [photograph], 1, relationships
     )
 
-    assert (score, route) == (50, "hybrid")
-    assert "referenced_embedded_visual" in reasons
-    assert "semantic_embedded_visual" not in reasons
+    if not ((score, route) == (50, "hybrid")):
+        raise AssertionError
+    if not ("referenced_embedded_visual" in reasons):
+        raise AssertionError
+    if not ("semantic_embedded_visual" not in reasons):
+        raise AssertionError
 
 
 def test_image_only_page_routes_to_textract_before_vision() -> None:
@@ -246,12 +272,15 @@ def test_image_only_page_routes_to_textract_before_vision() -> None:
 
     score, route, reasons = decide_page_route(page, [image_only_block], 1)
 
-    assert score == 15
-    assert route == "textract_ocr"
-    assert reasons == [
+    if not (score == 15):
+        raise AssertionError
+    if not (route == "textract_ocr"):
+        raise AssertionError
+    if not (reasons == [
         "image_only_page_without_native_text",
         "textract_ocr_first_pass",
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_explicit_page_break_advances_alignment_without_lowering_confidence() -> None:
@@ -265,10 +294,14 @@ def test_explicit_page_break_advances_alignment_without_lowering_confidence() ->
 
     align_blocks_to_pages([first, page_break, second], pages)
 
-    assert first.page_numbers == [1]
-    assert page_break.page_numbers == [1]
-    assert page_break.alignment_confidence == 1.0
-    assert second.page_numbers == [2]
+    if not (first.page_numbers == [1]):
+        raise AssertionError
+    if not (page_break.page_numbers == [1]):
+        raise AssertionError
+    if not (page_break.alignment_confidence == 1.0):
+        raise AssertionError
+    if not (second.page_numbers == [2]):
+        raise AssertionError
 
 
 def test_columns_are_scoped_to_their_word_section() -> None:
@@ -284,8 +317,10 @@ def test_columns_are_scoped_to_their_word_section() -> None:
 
     blocks, metadata = inspect_docx(payload)
 
-    assert [block.column_count for block in blocks] == [1, 1, 2]
-    assert metadata["columns"] == 2
+    if not ([block.column_count for block in blocks] == [1, 1, 2]):
+        raise AssertionError
+    if not (metadata["columns"] == 2):
+        raise AssertionError
 
 
 def test_macro_enabled_and_legacy_documents_are_rejected() -> None:
@@ -318,13 +353,14 @@ def test_native_relationships_connect_caption_and_cross_reference() -> None:
 
     relationships = build_native_relationships([figure, caption, reference])
 
-    assert {
+    if not ({
         (relationship["type"], relationship["source_id"], relationship["target_id"])
         for relationship in relationships
     } >= {
         ("captioned_by", figure.source_id, caption.source_id),
         ("references", reference.source_id, figure.source_id),
-    }
+    }):
+        raise AssertionError
 
     xml_payload = build_content_tree_xml(
         1,
@@ -334,10 +370,14 @@ def test_native_relationships_connect_caption_and_cross_reference() -> None:
     )
     valid, errors = validate_content_tree(xml_payload, SCHEMA_DIRECTORY)
 
-    assert valid is True
-    assert errors == []
-    assert b"<caption>Figure 2" in xml_payload
-    assert b'cross_reference target="word/document.xml:block-2" type="references"' in xml_payload
+    if not (valid is True):
+        raise AssertionError
+    if not (errors == []):
+        raise AssertionError
+    if not (b"<caption>Figure 2" in xml_payload):
+        raise AssertionError
+    if not (b'cross_reference target="word/document.xml:block-2" type="references"' in xml_payload):
+        raise AssertionError
 
 
 def test_page_plan_rasterizes_only_the_visual_page() -> None:
@@ -367,15 +407,21 @@ def test_page_plan_rasterizes_only_the_visual_page() -> None:
         SCHEMA_DIRECTORY,
     )
 
-    assert [page["route"] for page in page_plan["pages"]] == [
+    if not ([page["route"] for page in page_plan["pages"]] == [
         "native_docx",
         "hybrid",
-    ]
-    assert set(images) == {2}
-    assert page_plan["pages"][0]["content_tree_schema_valid"] is True
-    assert page_plan["pages"][0]["native_fidelity"] == "complete"
-    assert page_plan["pages"][0]["deterministic_review_required"] is False
-    assert any(
+    ]):
+        raise AssertionError
+    if not (set(images) == {2}):
+        raise AssertionError
+    if not (page_plan["pages"][0]["content_tree_schema_valid"] is True):
+        raise AssertionError
+    if not (page_plan["pages"][0]["native_fidelity"] == "complete"):
+        raise AssertionError
+    if not (page_plan["pages"][0]["deterministic_review_required"] is False):
+        raise AssertionError
+    if not (any(
         relationship["type"] == "captioned_by"
         for relationship in page_plan["pages"][1]["relationships"]
-    )
+    )):
+        raise AssertionError

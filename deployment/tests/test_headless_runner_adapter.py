@@ -20,7 +20,8 @@ RUNTIME_PATH = DEPLOYMENT_DIR / "runtime" / "agent" / "main-websocket.py"
 sys.path.insert(0, str(FOUNDATION_DIR))
 
 SPEC = importlib.util.spec_from_file_location("badgers_headless_runtime", RUNTIME_PATH)
-assert SPEC and SPEC.loader
+if not (SPEC and SPEC.loader):
+    raise AssertionError
 runtime = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = runtime
 SPEC.loader.exec_module(runtime)
@@ -91,18 +92,23 @@ def test_versioned_headless_request_starts_runner_with_verified_client_identity(
         _collect(runtime.invoke(_request(), _context(_bearer_token("abc123"))))
     )
 
-    assert created["owner_sub"] == "headless-abc123"
-    assert created["principal_id"] == "abc123"
-    assert created["identity_provider"] == "cognito-jwt"
-    assert created["executor"] == "workflow_runner"
-    assert started == {
+    if not (created["owner_sub"] == "headless-abc123"):
+        raise AssertionError
+    if not (created["principal_id"] == "abc123"):
+        raise AssertionError
+    if not (created["identity_provider"] == "cognito-jwt"):
+        raise AssertionError
+    if not (created["executor"] == "workflow_runner"):
+        raise AssertionError
+    if not (started == {
         "operation_id": "op_" + ("a" * 32),
         "owner_sub": "headless-abc123",
         "requested_capabilities": (),
         "audit_mode": False,
         "runtime_session_id": "agentcore-session-104",
-    }
-    assert events == [
+    }):
+        raise AssertionError
+    if not (events == [
         {
             "type": "status",
             "status": "accepted",
@@ -115,7 +121,8 @@ def test_versioned_headless_request_starts_runner_with_verified_client_identity(
             "plan_uri": "s3://output/operations/headless-abc123/op/plan/plan.json",
             "status_manifest_uri": "s3://output/operations/headless-abc123/op/status.json",
         }
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_omitted_workflow_uses_deployment_configured_docx_route(
@@ -157,7 +164,8 @@ def test_omitted_workflow_uses_deployment_configured_docx_route(
 
     asyncio.run(_collect(runtime.invoke(request, _context(_bearer_token("abc123")))))
 
-    assert created["workflow_id"] == "native-docx-analysis"
+    if not (created["workflow_id"] == "native-docx-analysis"):
+        raise AssertionError
 
 
 def test_versioned_headless_request_rejects_missing_verified_identity(
@@ -178,13 +186,14 @@ def test_versioned_headless_request_rejects_missing_verified_identity(
 
     events = asyncio.run(_collect(runtime.invoke(_request(), _context())))
 
-    assert events == [
+    if not (events == [
         {
             "type": "error",
             "code": "UNAUTHENTICATED",
             "message": "A validated bearer token is required",
         }
-    ]
+    ]):
+        raise AssertionError
 
 
 async def _collect(stream: Any) -> list[dict[str, Any]]:

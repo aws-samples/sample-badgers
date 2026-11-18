@@ -25,20 +25,28 @@ def norm(x1, y1, x2, y2, w=1030, h=558):
 
 
 def test_fixture_dimensions(page_bytes):
-    assert Image.open(io.BytesIO(page_bytes)).size == (1030, 558)
+    if not (Image.open(io.BytesIO(page_bytes)).size == (1030, 558)):
+        raise AssertionError
 
 
 def test_tonnage_region_metadata(page_bytes):
     r = ri.inspect_regions(
         page_bytes, [ri.RegionRequest("t", *norm(948, 105, 1000, 150))]
     )[0]
-    assert r.source_px_box == [940, 98, 1008, 157]
-    assert r.source_px_size == [68, 59]
-    assert max(r.output_px_size) == ri.TARGET_LONG_SIDE
-    assert r.detail == "interpolated"
-    assert r.scale_factor > 20
-    assert any("Enlarged" in n for n in r.notes)
-    assert any("near the resolution limit" in n for n in r.notes)
+    if not (r.source_px_box == [940, 98, 1008, 157]):
+        raise AssertionError
+    if not (r.source_px_size == [68, 59]):
+        raise AssertionError
+    if not (max(r.output_px_size) == ri.TARGET_LONG_SIDE):
+        raise AssertionError
+    if not (r.detail == "interpolated"):
+        raise AssertionError
+    if not (r.scale_factor > 20):
+        raise AssertionError
+    if not (any("Enlarged" in n for n in r.notes)):
+        raise AssertionError
+    if not (any("near the resolution limit" in n for n in r.notes)):
+        raise AssertionError
 
 
 def test_output_png_decodes_to_reported_size(page_bytes):
@@ -46,26 +54,31 @@ def test_output_png_decodes_to_reported_size(page_bytes):
         page_bytes, [ri.RegionRequest("c", *norm(335, 396, 395, 428))]
     )[0]
     img = Image.open(io.BytesIO(base64.b64decode(r.png_base64)))
-    assert list(img.size) == r.output_px_size
-    assert img.format == "PNG"
+    if not (list(img.size) == r.output_px_size):
+        raise AssertionError
+    if not (img.format == "PNG"):
+        raise AssertionError
 
 
 def test_padding_is_15_percent_each_side(page_bytes):
     r = ri.inspect_regions(page_bytes, [ri.RegionRequest("p", 0.4, 0.4, 0.6, 0.6)])[0]
     # region 0.2 wide -> pad 0.03 each side -> 0.37..0.63
-    assert r.source_px_box == [
+    if not (r.source_px_box == [
         round(0.37 * 1030),
         round(0.37 * 558),
         round(0.63 * 1030),
         round(0.63 * 558),
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_edge_region_is_clamped(page_bytes):
     r = ri.inspect_regions(page_bytes, [ri.RegionRequest("e", 0.95, 0.95, 1.0, 1.0)])[0]
-    assert r.source_px_box[2] == 1030 and r.source_px_box[3] == 558
+    if not (r.source_px_box[2] == 1030 and r.source_px_box[3] == 558):
+        raise AssertionError
     # property 2: source box lies within the page
-    assert r.source_px_box[0] >= 0 and r.source_px_box[1] >= 0
+    if not (r.source_px_box[0] >= 0 and r.source_px_box[1] >= 0):
+        raise AssertionError
 
 
 def test_page_pixel_coordinates_are_normalized_before_cropping():
@@ -77,9 +90,12 @@ def test_page_pixel_coordinates_are_normalized_before_cropping():
         buf.getvalue(), [ri.RegionRequest("diag_center_jpg", 300, 300, 700, 700)]
     )[0]
 
-    assert r.error is None
-    assert r.page_px_size == [1600, 1237]
-    assert r.source_px_box == [240, 240, 760, 760]
+    if not (r.error is None):
+        raise AssertionError
+    if not (r.page_px_size == [1600, 1237]):
+        raise AssertionError
+    if not (r.source_px_box == [240, 240, 760, 760]):
+        raise AssertionError
 
 
 # --- Delta 1: a bad region yields a per-region error instead of raising ---
@@ -88,9 +104,12 @@ def test_page_pixel_coordinates_are_normalized_before_cropping():
 @pytest.mark.parametrize("box", [(0.5, 0.5, 0.4, 0.6), (0.5, 0.5, 0.5, 0.6)])
 def test_inverted_or_empty_region_gets_error_not_raise(page_bytes, box):
     r = ri.inspect_regions(page_bytes, [ri.RegionRequest("bad", *box)])[0]
-    assert r.error is not None
-    assert r.png_base64 == ""
-    assert r.source_px_box is None
+    if not (r.error is not None):
+        raise AssertionError
+    if not (r.png_base64 == ""):
+        raise AssertionError
+    if not (r.source_px_box is None):
+        raise AssertionError
 
 
 def test_bad_region_does_not_stop_the_others(page_bytes):
@@ -101,10 +120,14 @@ def test_bad_region_does_not_stop_the_others(page_bytes):
     ]
     res = ri.inspect_regions(page_bytes, reqs)
     # property 6: results returned in request order with their IDs
-    assert [r.region_id for r in res] == ["good1", "bad", "good2"]
-    assert res[0].error is None and res[0].png_base64
-    assert res[1].error is not None
-    assert res[2].error is None and res[2].png_base64
+    if not ([r.region_id for r in res] == ["good1", "bad", "good2"]):
+        raise AssertionError
+    if not (res[0].error is None and res[0].png_base64):
+        raise AssertionError
+    if not (res[1].error is not None):
+        raise AssertionError
+    if not (res[2].error is None and res[2].png_base64):
+        raise AssertionError
 
 
 # --- Delta 2: task drives the grid overlay (no separate grid flag) ---
@@ -114,8 +137,10 @@ def test_large_region_has_no_small_region_note(page_bytes):
     r = ri.inspect_regions(
         page_bytes, [ri.RegionRequest("big", *norm(620, 440, 1000, 558))]
     )[0]
-    assert r.source_px_size == [467, 136]
-    assert not any("near the resolution limit" in n for n in r.notes)
+    if not (r.source_px_size == [467, 136]):
+        raise AssertionError
+    if not (not any("near the resolution limit" in n for n in r.notes)):
+        raise AssertionError
 
 
 def test_assign_rows_task_overlays_grid(page_bytes):
@@ -126,8 +151,10 @@ def test_assign_rows_task_overlays_grid(page_bytes):
     grid = ri.inspect_regions(
         page_bytes, [ri.RegionRequest("b", *box, task="assign_rows")]
     )[0]
-    assert plain.output_px_size == grid.output_px_size
-    assert plain.png_base64 != grid.png_base64
+    if not (plain.output_px_size == grid.output_px_size):
+        raise AssertionError
+    if not (plain.png_base64 != grid.png_base64):
+        raise AssertionError
 
 
 # --- Delta 3: image_uri is recorded on every result ---
@@ -140,7 +167,8 @@ def test_image_uri_recorded_on_every_result(page_bytes):
         ri.RegionRequest("bad", 0.5, 0.5, 0.4, 0.6),
     ]
     res = ri.inspect_regions(page_bytes, reqs, image_uri=uri)
-    assert all(r.image_uri == uri for r in res)
+    if not (all(r.image_uri == uri for r in res)):
+        raise AssertionError
 
 
 def test_passthrough_fields_recorded(page_bytes):
@@ -156,9 +184,12 @@ def test_passthrough_fields_recorded(page_bytes):
             )
         ],
     )[0]
-    assert r.flagged_by == "tables"
-    assert r.concern == "87 vs 67"
-    assert r.task == "transcribe"
+    if not (r.flagged_by == "tables"):
+        raise AssertionError
+    if not (r.concern == "87 vs 67"):
+        raise AssertionError
+    if not (r.task == "transcribe"):
+        raise AssertionError
 
 
 # --- §4.5 geometry properties ---
@@ -169,15 +200,18 @@ def test_detail_interpolated_iff_scale_over_one(page_bytes):
     # (the fixture is smaller than the default 1568 long side, so nothing downsamples there).
     box = norm(620, 440, 1000, 558)  # source long side 467 px
     interp = ri.inspect_regions(page_bytes, [ri.RegionRequest("i", *box)])[0]
-    assert interp.scale_factor > 1.0 and interp.detail == "interpolated"
+    if not (interp.scale_factor > 1.0 and interp.detail == "interpolated"):
+        raise AssertionError
     native = ri.inspect_regions(
         page_bytes, [ri.RegionRequest("n", *box)], target_long_side=467
     )[0]
-    assert native.scale_factor == 1.0 and native.detail == "native"
+    if not (native.scale_factor == 1.0 and native.detail == "native"):
+        raise AssertionError
     down = ri.inspect_regions(
         page_bytes, [ri.RegionRequest("d", *box)], target_long_side=100
     )[0]
-    assert down.scale_factor < 1.0 and down.detail == "downsampled"
+    if not (down.scale_factor < 1.0 and down.detail == "downsampled"):
+        raise AssertionError
 
 
 def test_every_output_long_side_is_target(page_bytes):
@@ -190,4 +224,5 @@ def test_every_output_long_side_is_target(page_bytes):
         page_bytes, [ri.RegionRequest(str(i), *b) for i, b in enumerate(boxes)]
     )
     for r in res:
-        assert max(r.output_px_size) == ri.TARGET_LONG_SIDE
+        if not (max(r.output_px_size) == ri.TARGET_LONG_SIDE):
+            raise AssertionError

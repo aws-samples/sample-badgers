@@ -29,11 +29,16 @@ def test_docx_selects_the_native_page_plan_processor() -> None:
     body = _body(response)
     result = json.loads(str(body["result"]))
 
-    assert response["statusCode"] == 200
-    assert result["input_type"] == "docx"
-    assert result["processor_tool"] == "process_docx_tool"
-    assert result["result_contract"] == "page_plan"
-    assert result["session_id"] == "session-1"
+    if not (response["statusCode"] == 200):
+        raise AssertionError
+    if not (result["input_type"] == "docx"):
+        raise AssertionError
+    if not (result["processor_tool"] == "process_docx_tool"):
+        raise AssertionError
+    if not (result["result_contract"] == "page_plan"):
+        raise AssertionError
+    if not (result["session_id"] == "session-1"):
+        raise AssertionError
 
 
 def test_legacy_document_pptx_and_xlsx_return_actionable_routing() -> None:
@@ -47,10 +52,15 @@ def test_legacy_document_pptx_and_xlsx_return_actionable_routing() -> None:
         lambda_handler({"document_path": "s3://input-bucket/budget.xlsx"}, None)
     )
 
-    assert "Save the document as .docx or PDF" in str(legacy["error"])
+    if not ("Save the document as .docx or PDF" in str(legacy["error"])):
+        raise AssertionError
     result = json.loads(str(pptx["result"]))
-    assert result["processor_tool"] == "process_pptx_tool"
-    assert result["result_contract"] == "page_plan"
+    if not (result["processor_tool"] == "process_pptx_tool"):
+        raise AssertionError
+    if not (result["result_contract"] == "page_plan"):
+        raise AssertionError
     xlsx_result = json.loads(str(xlsx["result"]))
-    assert xlsx_result["processor_tool"] == "process_xlsx_tool"
-    assert xlsx_result["result_contract"] == "native_workbook"
+    if not (xlsx_result["processor_tool"] == "process_xlsx_tool"):
+        raise AssertionError
+    if not (xlsx_result["result_contract"] == "native_workbook"):
+        raise AssertionError

@@ -26,11 +26,16 @@ def test_direct_docx_selection_requires_its_container_path(tmp_path: Path) -> No
         direct_specialists=["docx_processor"],
     )
 
-    assert changed is True
-    assert desired["resolved_specialists"] == ["docx_processor"]
-    assert desired["container_specialists"] == ["docx_processor"]
-    assert desired["capabilities"]["container_images"] is True
-    assert reconciliation(state, desired)["in_sync"] is False
+    if not (changed is True):
+        raise AssertionError
+    if not (desired["resolved_specialists"] == ["docx_processor"]):
+        raise AssertionError
+    if not (desired["container_specialists"] == ["docx_processor"]):
+        raise AssertionError
+    if not (desired["capabilities"]["container_images"] is True):
+        raise AssertionError
+    if not (reconciliation(state, desired)["in_sync"] is False):
+        raise AssertionError
 
 
 def test_reconciliation_tracks_additions_removals_and_applied_fingerprint(
@@ -53,11 +58,16 @@ def test_reconciliation_tracks_additions_removals_and_applied_fingerprint(
     )
     plan = reconciliation(state, second)
 
-    assert first["fingerprint"] != second["fingerprint"]
-    assert changed is True
-    assert plan["in_sync"] is False
-    assert plan["add"] == ["pptx_processor"]
-    assert plan["remove"] == ["docx_processor"]
+    if not (first["fingerprint"] != second["fingerprint"]):
+        raise AssertionError
+    if not (changed is True):
+        raise AssertionError
+    if not (plan["in_sync"] is False):
+        raise AssertionError
+    if not (plan["add"] == ["pptx_processor"]):
+        raise AssertionError
+    if not (plan["remove"] == ["docx_processor"]):
+        raise AssertionError
 
 
 def test_pack_name_validation_uses_an_explicit_ascii_pattern(
@@ -67,6 +77,7 @@ def test_pack_name_validation_uses_an_explicit_ascii_pattern(
 
     saved = save_pack("review-pack-2", "test pack", ["full_text_specialist"])
 
-    assert saved.name == "review-pack-2.json"
+    if not (saved.name == "review-pack-2.json"):
+        raise AssertionError
     with pytest.raises(SelectionError, match="lowercase letters"):
         save_pack("Review pack", "test pack", ["full_text_specialist"])

@@ -100,23 +100,26 @@ def test_fixed_release_and_classifier_facts_resolve_identical_plans() -> None:
     first = _auto_plan()
     second = _auto_plan()
 
-    assert first == second
-    assert first["recommended_capabilities"] == [
+    if not (first == second):
+        raise AssertionError
+    if not (first["recommended_capabilities"] == [
         "source_conversion",
         "classification",
         "full_text",
         "elements",
         "table",
         "correlation",
-    ]
-    assert first["resolved_specialists"] == [
+    ]):
+        raise AssertionError
+    if not (first["resolved_specialists"] == [
         "pdf_to_images_converter",
         "classify_pdf_content",
         "full_text_specialist",
         "elements_specialist",
         "table_specialist",
         "correlation_specialist",
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_workflow_catalog_validates_against_full_and_headless_profiles() -> None:
@@ -182,7 +185,8 @@ def test_native_workflow_auto_plan_needs_no_pdf_classifier_artifact() -> None:
         routing_mode="auto",
     )
 
-    assert plan["resolved_specialists"] == ["docx_processor"]
+    if not (plan["resolved_specialists"] == ["docx_processor"]):
+        raise AssertionError
 
 
 def test_resolved_plan_replaces_initial_private_plan(
@@ -213,11 +217,14 @@ def test_resolved_plan_replaces_initial_private_plan(
         operation_id, owner_sub="tenant-a-workload", plan=plan
     )
 
-    assert plan_uri.endswith("/plan/plan.json")
+    if not (plan_uri.endswith("/plan/plan.json")):
+        raise AssertionError
     stored = s3.objects[(
         "badgers-output-test",
         "operations/tenant-a-workload/" + operation_id + "/plan/plan.json",
     )]
-    assert json.loads(stored["Body"]) == plan
+    if not (json.loads(stored["Body"]) == plan):
+        raise AssertionError
     record = operation_state.get_operation(operation_id, owner_sub="tenant-a-workload")
-    assert record["routing_policy_id"] == "standard-document-routing"
+    if not (record["routing_policy_id"] == "standard-document-routing"):
+        raise AssertionError

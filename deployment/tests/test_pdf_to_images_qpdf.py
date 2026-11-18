@@ -16,7 +16,8 @@ _SPEC = importlib.util.spec_from_file_location(
     "pdf_to_images_qpdf_handler",
     DEPLOYMENT / "lambdas" / "code" / "pdf_to_images_converter" / "lambda_handler.py",
 )
-assert _SPEC and _SPEC.loader
+if not (_SPEC and _SPEC.loader):
+    raise AssertionError
 handler = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = handler
 _SPEC.loader.exec_module(handler)
@@ -36,7 +37,8 @@ def test_qpdf_accepts_success_and_success_with_warnings(
 ) -> None:
     monkeypatch.setattr(handler.subprocess, "run", _qpdf_result(returncode))
 
-    assert handler._decrypt_pdf_if_needed(b"%PDF-test") == b"repaired"
+    if not (handler._decrypt_pdf_if_needed(b"%PDF-test") == b"repaired"):
+        raise AssertionError
 
 
 def test_qpdf_rejects_a_real_error(monkeypatch: pytest.MonkeyPatch) -> None:

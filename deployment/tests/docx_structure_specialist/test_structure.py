@@ -63,19 +63,24 @@ def _graph():
 def test_derives_native_hierarchy_list_anchor_and_reference_evidence(structure_module):
     evidence = structure_module._derive_evidence(_graph())
 
-    assert {"parent": "heading-1", "child": "paragraph-1"} in evidence["parent_edges"]
-    assert evidence["list_groups"] == [
+    if not ({"parent": "heading-1", "child": "paragraph-1"} in evidence["parent_edges"]):
+        raise AssertionError
+    if not (evidence["list_groups"] == [
         {"list_id": "list-42", "level": 0, "items": ["list-1", "list-2"]}
-    ]
-    assert {"node": "chart-1", "anchor": "paragraph-1"} in evidence["anchor_edges"]
-    assert {"node": "reference-1", "target": "chart-1"} in evidence["explicit_references"]
-    assert evidence["heading_scopes"] == [
+    ]):
+        raise AssertionError
+    if not ({"node": "chart-1", "anchor": "paragraph-1"} in evidence["anchor_edges"]):
+        raise AssertionError
+    if not ({"node": "reference-1", "target": "chart-1"} in evidence["explicit_references"]):
+        raise AssertionError
+    if not (evidence["heading_scopes"] == [
         {
             "heading": "heading-1",
             "level": 0,
             "members": ["paragraph-1", "list-1", "list-2", "chart-1", "reference-1"],
         }
-    ]
+    ]):
+        raise AssertionError
 
 
 def test_does_not_compare_layout_across_unknown_pages(structure_module):
@@ -84,7 +89,8 @@ def test_does_not_compare_layout_across_unknown_pages(structure_module):
     for node in graph["nodes"]:
         node.pop("page_number", None)
 
-    assert structure_module._derive_evidence(graph)["layout_pairs"] == []
+    if not (structure_module._derive_evidence(graph)["layout_pairs"] == []):
+        raise AssertionError
 
 
 def test_rejects_unknown_native_reference(structure_module):

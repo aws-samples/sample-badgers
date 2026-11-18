@@ -13,7 +13,8 @@ _SPEC = importlib.util.spec_from_file_location(
     "native_pdf_processor_handler",
     DEPLOYMENT / "lambdas" / "containers" / "native_pdf_processor" / "lambda_handler.py",
 )
-assert _SPEC and _SPEC.loader
+if not (_SPEC and _SPEC.loader):
+    raise AssertionError
 native_pdf_processor_handler = importlib.util.module_from_spec(_SPEC)
 sys.modules[_SPEC.name] = native_pdf_processor_handler
 _SPEC.loader.exec_module(native_pdf_processor_handler)
