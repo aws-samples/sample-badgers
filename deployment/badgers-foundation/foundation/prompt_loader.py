@@ -207,6 +207,20 @@ class PromptLoader:
         except Exception as e:
             raise PromptLoadError(f"Failed to load prompt files: {e}") from e
 
+    def load_prompt_with_default(
+        self, base_path: str, prompt_file: str, default_file: str | None = None
+    ) -> str:
+        """Load one declared prompt, using a declared stand-in only if it is absent."""
+        try:
+            return self.load_prompt_files(base_path, [prompt_file])
+        except PromptLoadError:
+            if not default_file:
+                raise
+            self.logger.warning(
+                "Using declared prompt default %s because %s is absent", default_file, prompt_file
+            )
+            return self.load_prompt_files(base_path, [default_file])
+
     def _load_prompt_files_from_s3(self, files: List[str]) -> str:
         """Load and combine prompt files from S3."""
         combined_prompt = ""

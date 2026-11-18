@@ -142,10 +142,15 @@ def _validate_manifest_prompts(source_root: Path, specialists: tuple[str, ...]) 
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             files = manifest.get("specialist", {}).get("prompt_files", [])
+            defaults = manifest.get("specialist", {}).get("prompt_defaults", {})
         except (OSError, json.JSONDecodeError) as error:
             raise ConfigurationStagingError(f"Could not validate manifest: {manifest_path}") from error
         if not isinstance(files, list):
             raise ConfigurationStagingError(f"{manifest_path}: prompt_files must be a list")
+        if not isinstance(defaults, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in defaults.items()
+        ):
+            raise ConfigurationStagingError(f"{manifest_path}: prompt_defaults must be a string map")
         for entry in files:
             try:
                 key = prompt_key(specialist, entry)
@@ -153,9 +158,12 @@ def _validate_manifest_prompts(source_root: Path, specialists: tuple[str, ...]) 
                 raise ConfigurationStagingError(f"{manifest_path}: {error}") from error
             prompt = source_root / key
             if not prompt.is_file() or not prompt.read_text(encoding="utf-8").strip():
-                raise ConfigurationStagingError(
-                    f"{manifest_path}: required prompt is missing or empty: {key}"
-                )
+                fallback = defaults.get(entry)
+                fallback_path = source_root / "defaults" / fallback if fallback else None
+                if fallback_path is None or not fallback_path.is_file() or not fallback_path.read_text(encoding="utf-8").strip():
+                    raise ConfigurationStagingError(
+                        f"{manifest_path}: required prompt is missing or empty: {key}"
+                    )
 def stage_profile_config(
     profile: ResolvedProfile,
     destination: Path,

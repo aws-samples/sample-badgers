@@ -138,5 +138,5 @@ def max_tokens_from(config: Dict[str, Any], default: Optional[int] = None) -> Op
     ``model_selections`` block — ``correlation_specialist`` reads it from
     ``expected_output_tokens`` at the top level.
     """
-    value = config.get("expected_output_tokens", default)
+    value = config.get("max_output_tokens", config.get("expected_output_tokens", default))
     return int(value) if value is not None else None
