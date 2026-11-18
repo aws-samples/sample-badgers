@@ -5,13 +5,21 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "image_path": {
+        "full_text_uri": {
           "type": "string",
-          "description": "S3 URL (s3://bucket/key) or absolute file path to the image."
+          "description": "S3 URI for the page's full-text extraction."
         },
-        "image_data": {
+        "correlation_specialist_uri": {
           "type": "string",
-          "description": "Base64-encoded image data. Use this OR image_path, not both."
+          "description": "Optional S3 URI for the page's correlated content spine."
+        },
+        "source_image_path": {
+          "type": "string",
+          "description": "Optional source image URI retained for audit correlation."
+        },
+        "page_number": {
+          "type": "string",
+          "description": "Page number represented by the text artifacts."
         },
         "aws_profile": {
           "type": "string",
@@ -31,6 +39,7 @@
         }
       },
       "required": [
+        "full_text_uri",
         "session_id"
       ]
     },

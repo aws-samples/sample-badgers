@@ -5,9 +5,21 @@
         "inputSchema": {
             "type": "object",
             "properties": {
-                "image_path": {
+                "full_text_uri": {
                     "type": "string",
-                    "description": "Absolute file path to the image to analyze."
+                    "description": "S3 URI for the page's full-text extraction."
+                },
+                "correlation_specialist_uri": {
+                    "type": "string",
+                    "description": "Optional S3 URI for the correlated page spine."
+                },
+                "source_image_path": {
+                    "type": "string",
+                    "description": "Optional source page image URI used only for audit correlation."
+                },
+                "page_number": {
+                    "type": "string",
+                    "description": "Page number represented by the text artifacts."
                 },
                 "aws_profile": {
                     "type": "string",
@@ -23,7 +35,7 @@
                 }
             },
             "required": [
-                "image_path",
+                "full_text_uri",
                 "session_id"
             ]
         }
@@ -31,10 +43,7 @@
     "specialist": {
         "name": "keyword_topic_specialist",
         "description": "This specialist extracts semantic keywords and topics from source material. ",
-        "prompt_specialist_prompt_base_path": "prompts",
         "prompt_files": [
-            "shared/gestalt_perception_foundation.xml",
-            "keyword_topic_gestalt.xml",
             "keyword_topic_job_role.xml",
             "keyword_topic_context.xml",
             "keyword_topic_rules.xml",

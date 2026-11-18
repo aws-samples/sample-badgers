@@ -1,8 +1,7 @@
-"""Charts Specialist Lambda - S3-based config version with AgentCore Gateway session tracking."""
+"""Text-grounded keyword and topic extraction Lambda."""
 
 import json
 import logging
-import base64
 import os
 from pathlib import Path
 
@@ -74,13 +73,16 @@ def lambda_handler(event, context):
         # JOBS_TABLE_NAME is unset, so untracked deployments are unaffected.
         job_id = body.get("job_id") or ""
         doc_id = body.get("doc_id") or ""
-        subtask = job_state.subtask_id(specialist_name, body.get("image_path"))
+        source_image_path = str(body.get("source_image_path") or "")
+        subtask = job_state.subtask_id(
+            specialist_name, source_image_path or body.get("full_text_uri")
+        )
         job_state.mark_running(
             job_id,
             subtask,
             doc_id=doc_id,
             specialist=specialist_name,
-            image_id=job_state.image_identifier(body.get("image_path")),
+            image_id=job_state.image_identifier(source_image_path),
             session_id=session_id,
         )
 
@@ -96,8 +98,18 @@ def lambda_handler(event, context):
         else:
             os.environ["DYNAMIC_TOKENS_ENABLED"] = "false"
 
-        # Get image data
-        image_data = _get_image_data(body)
+        if "image_path" in body or "image_data" in body:
+            raise ValidationError(
+                message=(
+                    "Keyword analysis accepts full_text_uri and optional "
+                    "correlation_specialist_uri, not image_path or image_data."
+                ),
+                details={"provided_keys": list(body.keys())},
+            )
+        full_text = _load_text_input(body, "full_text_uri", required=True)
+        correlated_text = _load_text_input(
+            body, "correlation_specialist_uri", required=False
+        )
 
         # Load configuration
         if config_source == "s3":
@@ -110,8 +122,31 @@ def lambda_handler(event, context):
             config, config_source, config_bucket, specialist_name
         )
 
-        # Run analysis
-        result = specialist.analyze(image_data, body.get("aws_profile"), audit_mode)
+        # Keyword extraction is text-only.  It still uses the same foundation
+        # prompt, model selection/fallback, and response cleanup steps as visual
+        # specialists, but never attempts to decode a correlated XML file as an
+        # image.
+        system_prompt = specialist._load_system_prompt(audit_mode=audit_mode)
+        user_message = (
+            "Extract grounded keywords and topics from the supplied page text.\n"
+            f"Page number: {body.get('page_number', '')}\n"
+            f"Source image identifier: {source_image_path}\n\n"
+            "<full_text>\n"
+            f"{full_text}"
+            "\n</full_text>\n"
+        )
+        if correlated_text:
+            user_message += (
+                "\n<correlated_spine>\n"
+                f"{correlated_text}"
+                "\n</correlated_spine>\n"
+            )
+        response = specialist._invoke_bedrock_model(
+            system_prompt,
+            [{"role": "user", "content": user_message}],
+            body.get("aws_profile"),
+        )
+        result = specialist._finalize_result(specialist._process_response(response))
 
         # Log result to CloudWatch
         logger.info("Analysis completed successfully for session: %s", session_id)
@@ -134,7 +169,8 @@ def lambda_handler(event, context):
             specialist_name=specialist_name,
             output_bucket=output_bucket,
             session_id=session_id,
-            image_path=body.get("image_path"),
+            image_path=source_image_path,
+            job_id=job_id,
         )
         result = f"{result}\n<!-- S3_RESULT_URI: {s3_uri} -->"
         job_state.mark_complete(job_id, subtask, s3_uri)
@@ -151,67 +187,34 @@ def lambda_handler(event, context):
         return create_error_response(e)
 
 
-def _get_image_data(body: dict) -> bytes:
-    """Extract image data from request body."""
-    if "image_data" in body:
-        try:
-            return base64.b64decode(body["image_data"])
-        except Exception as e:
+def _load_text_input(body: dict, field: str, *, required: bool) -> str:
+    """Read a bounded UTF-8 text artifact from S3 for keyword extraction."""
+    uri = body.get(field)
+    if not uri:
+        if required:
             raise ValidationError(
-                message="Invalid base64-encoded image data.",
-                details={"error": str(e)},
+                message=f"Missing required parameter: {field}.",
+                details={"provided_keys": list(body.keys())},
             )
+        return ""
+    if not isinstance(uri, str) or not uri.startswith("s3://"):
+        raise ValidationError(
+            message=f"{field} must be an S3 URI.",
+            details={field: uri},
+        )
+    bucket, separator, key = uri[5:].partition("/")
+    if not bucket or not separator or not key:
+        raise ValidationError(
+            message=f"Invalid {field} S3 URI.",
+            details={field: uri},
+        )
+    try:
+        import boto3
 
-    if "image_path" in body:
-        image_path = body["image_path"]
-
-        if image_path.startswith("s3://"):
-            # Download from S3
-            import boto3
-
-            try:
-                s3 = boto3.client("s3")
-                parts = image_path.replace("s3://", "").split("/", 1)
-                if len(parts) != 2:
-                    raise ValidationError(
-                        message="Invalid S3 path format.",
-                        details={
-                            "image_path": image_path,
-                            "expected_format": "s3://bucket/key",
-                        },
-                    )
-                bucket, key = parts
-                response = s3.get_object(Bucket=bucket, Key=key)
-                data = response["Body"].read()
-
-                # Handle .b64 files (pre-encoded base64 from pdf_to_images)
-                if key.endswith(".b64"):
-                    logger.info("Loading pre-encoded base64 from %s", image_path)
-                    return base64.b64decode(data.decode("utf-8"))
-
-                return bytes(data)
-            except ValidationError:
-                raise
-            except Exception as e:
-                raise handle_s3_error(e, bucket, key)
-
-        # Local file in Lambda environment
-        file_path = Path("/var/task") / image_path
-        logger.info("Reading local file: %s", file_path)
-
-        if not file_path.exists():
-            raise ResourceNotFoundError(
-                message="Image file not found.",
-                details={"image_path": image_path},
-            )
-
-        with open(file_path, "rb") as f:
-            return f.read()
-
-    raise ValidationError(
-        message="Missing required parameter: image_data or image_path.",
-        details={"provided_keys": list(body.keys())},
-    )
+        value = boto3.client("s3").get_object(Bucket=bucket, Key=key)["Body"].read()
+    except Exception as error:
+        raise handle_s3_error(error, bucket, key) from error
+    return value.decode("utf-8", errors="replace")[:400000]
 
 
 def _load_config_from_s3(bucket: str, specialist_name: str) -> dict:
@@ -238,8 +241,10 @@ def _load_config_from_local() -> dict:
     config: dict[str, Any] = manifest["specialist"]
 
     # Resolve all paths relative to /var/task
-    config["prompt_base_path"] = str(Path("/var/task") / config["prompt_base_path"])
-    config["examples_path"] = str(Path("/var/task") / config["examples_path"])
+    config["prompt_base_path"] = str(
+        Path("/var/task") / config.get("prompt_base_path", "prompts")
+    )
+    config["examples_path"] = str(Path("/var/task") / config.get("examples_path", ""))
 
     logger.info("Loaded config from local filesystem")
     return config
