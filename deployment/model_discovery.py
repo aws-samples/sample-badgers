@@ -113,6 +113,22 @@ def save_availability(repo: Path, availability: dict[str, Any]) -> Path:
     return path
 
 
+def latest_availability(repo: Path, region: str | None = None) -> dict[str, Any] | None:
+    """Return the newest saved local account check, optionally for one Region."""
+    directory = repo / ".deploy-state" / "model-availability"
+    if not directory.is_dir():
+        return None
+    candidates = sorted(directory.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for path in candidates:
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if region is None or record.get("region") == region:
+            return record
+    return None
+
+
 def pricing_lines(registry: dict[str, dict[str, Any]]) -> list[str]:
     return [f"{spec['display_name']}: ${spec['price_in']}/M input, ${spec['price_out']}/M output" for spec in registry.values() if spec["status"] == "active"]
 

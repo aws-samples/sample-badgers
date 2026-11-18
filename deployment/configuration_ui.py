@@ -40,6 +40,11 @@ except ImportError:
     import specialist_selection
     import tag_configuration
 
+try:
+    from . import model_discovery
+except ImportError:
+    import model_discovery
+
 
 _DEPLOYMENT_ID = re.compile(r"^[a-z][a-z0-9-]{0,15}$")
 _PROFILES = frozenset({"full", "headless", "specialists"})
@@ -699,6 +704,36 @@ def catalog(repo_root: Path) -> list[dict[str, str | bool]]:
     ]
 
 
+def models_overview(repo_root: Path, region: str | None = None) -> dict[str, Any]:
+    """Return registry facts plus the latest local account check for the Model guide."""
+    registry_module = model_discovery._registry_module()
+    registry = registry_module.load_registry()
+    availability = model_discovery.latest_availability(repo_root, region)
+    checked = availability.get("models", {}) if availability else {}
+    rows = []
+    for model_id, spec in registry_module.active_models(registry).items():
+        status = checked.get(model_id, {})
+        rows.append(
+            {
+                "model_id": model_id,
+                "display_name": spec["display_name"],
+                "provider": spec["provider"],
+                "thinking": spec["thinking"],
+                "price_in": spec["price_in"],
+                "price_out": spec["price_out"],
+                "availability": status.get("state", "unverified"),
+                "reason": status.get("reason", "No local account check has been run."),
+                "vision": status.get("vision"),
+            }
+        )
+    return {
+        "region": region or (availability or {}).get("region") or os.environ.get("AWS_REGION", ""),
+        "generated_at": (availability or {}).get("generated_at"),
+        "pricing": registry_module.pricing_notice(),
+        "models": rows,
+    }
+
+
 def save_pack(repo_root: Path, payload: dict[str, Any]) -> list[dict[str, Any]]:
     del repo_root
     name = str(payload.get("name") or "")
@@ -1075,6 +1110,30 @@ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeOutputP
 """
         + "\n</script></body></html>",
     )
+    .replace(
+        '<button class="nav" data-v="packs">Pack library</button>',
+        '<button class="nav" data-v="models">Model guide</button>'
+        '<button class="nav" data-v="packs">Pack library</button>',
+    )
+    .replace(
+        "</main></div><div id=\"pack-modal\"",
+        '<section id="models" class="view"><p class="ey">Account-aware choices</p>'
+        '<div class="head"><div><h1>Model guide</h1><p class="sub">Availability is read from the latest local account check. '
+        'Run <code>./deploy.sh models discover --region REGION</code> in a terminal to refresh it.</p></div>'
+        '<button class="btn" id="refresh-model-guide">Refresh</button></div>'
+        '<div class="card"><div class="pad"><p id="models-note">Loading model information…</p>'
+        '<div id="models-list"></div></div></div></section>'
+        "</main></div><div id=\"pack-modal\"",
+    )
+    .replace(
+        "</script></body></html>",
+        r"""
+async function renderModelGuide(){try{let data=await api('/api/models');let list=document.querySelector('#models-list'),note=document.querySelector('#models-note');note.textContent=data.generated_at?`Account check: ${data.region} at ${data.generated_at}. Prices: ${data.pricing.currency}, as of ${data.pricing.as_of}.`:`No account check is saved. Prices: ${data.pricing.currency}, as of ${data.pricing.as_of}.`;list.textContent='';for(let model of data.models){let row=document.createElement('div');row.className='row';let copy=document.createElement('div');copy.className='copy';let title=document.createElement('b');title.textContent=model.display_name;let detail=document.createElement('small');detail.textContent=`${model.model_id} · ${model.provider} · $${model.price_in}/M in, $${model.price_out}/M out · ${model.availability}${model.vision===true?' · vision':''}`;copy.append(title,detail);let why=document.createElement('span');why.className='pill '+(model.availability==='available'?'g':'a');why.textContent=model.availability;row.append(copy,why);list.append(row)}}catch(error){document.querySelector('#models-note').textContent=error.message}}
+document.querySelector('#refresh-model-guide').onclick=renderModelGuide;
+document.querySelectorAll('[data-v="models"]').forEach(button=>button.addEventListener('click',renderModelGuide));
+"""
+        + "\n</script></body></html>",
+    )
 )
 
 
@@ -1147,6 +1206,8 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
             return packs(root, requested_profile)
         if action == "catalog":
             return catalog(root)
+        if action == "models":
+            return models_overview(root, str(query.get("region", [""])[0]) or None)
         if action == "configurations":
             return configurations(root)
         if action == "save_pack":
@@ -1199,6 +1260,8 @@ class ConfigurationHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self._route("packs"))
             elif parsed.path == "/api/catalog":
                 self._json(HTTPStatus.OK, self._route("catalog"))
+            elif parsed.path == "/api/models":
+                self._json(HTTPStatus.OK, self._route("models"))
             elif parsed.path == "/api/configurations":
                 self._json(HTTPStatus.OK, self._route("configurations"))
             elif parsed.path == "/api/configuration":
