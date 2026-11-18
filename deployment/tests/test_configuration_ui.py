@@ -39,6 +39,16 @@ def test_configuration_creates_local_desired_state_with_private_permissions(
     assert stat.S_IMODE(state_path.stat().st_mode) == 0o600
 
 
+def test_deployment_runner_records_missing_process_as_a_failure(tmp_path: Path) -> None:
+    runner = DeploymentRunner(tmp_path)
+
+    runner._consume("configuration-fingerprint")
+
+    status = runner.status()
+    assert status["status"] == "failed"
+    assert "did not start a process" in status["output"]
+
+
 def test_plan_describes_the_local_wizard_and_cli_fallback(tmp_path: Path) -> None:
     result = plan(tmp_path, "beta", "headless")
 

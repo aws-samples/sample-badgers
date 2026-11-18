@@ -242,12 +242,25 @@ class DeploymentRunner:
 
     def _consume(self, fingerprint: str) -> None:
         process = self._process
-        assert process is not None
-        assert process.stdout is not None
-        for line in process.stdout:
+        if process is None:
+            self._fail_consumer("Deployment executor did not start a process.")
+            return
+        output = process.stdout
+        if output is None:
+            self._fail_consumer("Deployment executor did not provide an output stream.")
+            return
+        for line in output:
             with self._lock:
                 self._append_output(line.rstrip("\n"))
         self._complete(fingerprint)
+
+    def _fail_consumer(self, message: str) -> None:
+        """Record an executor setup failure instead of crashing its output thread."""
+
+        with self._lock:
+            self._status = "failed"
+            self._completed_at = _now()
+            self._append_output(message)
 
     def _start(
         self,
