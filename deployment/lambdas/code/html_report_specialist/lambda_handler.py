@@ -112,20 +112,21 @@ def lambda_handler(
         if not output_bucket:
             raise RuntimeError("OUTPUT_BUCKET is not configured")
         s3 = boto3.client("s3")
-        job_records = job_state.get_job_records(job_id)
+        current_job_records = job_state.get_job_records(job_id)
+        job_records = job_state.get_document_records(doc_id, user_id) or current_job_records
         if not job_records:
             raise ValueError("No job records found for report generation")
-        job_row = next(
+        current_job_row = next(
             (
                 record
-                for record in job_records
+                for record in current_job_records
                 if record.get("subtask_id") == "orchestrator"
             ),
             {},
         )
-        if job_row.get("doc_id") != doc_id:
+        if current_job_row.get("doc_id") != doc_id:
             raise ValueError("Report document does not match the analysis job")
-        if job_row.get("owner_sub") != user_id:
+        if current_job_row.get("owner_sub") != user_id:
             raise ValueError("Report user does not own the analysis job")
         correlation_records = {
             str(record.get("result_s3_key") or ""): record

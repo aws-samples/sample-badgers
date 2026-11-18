@@ -380,3 +380,77 @@ def get_job_records(job_id: str) -> list[dict[str, Any]]:
     except Exception as e:
         logger.warning("job_state.get_job_records failed (job=%s): %s", job_id, e)
         return []
+
+
+def get_document_job_ids(
+    doc_id: str, owner_sub: str, *, limit: int = 25
+) -> list[str]:
+    """Return the newest jobs that belong to one owner/document pair."""
+    if not (enabled() and doc_id and owner_sub):
+        return []
+    try:
+        response = _table().query(
+            IndexName="doc-index",
+            KeyConditionExpression="doc_id = :doc_id",
+            ExpressionAttributeValues={":doc_id": doc_id},
+            ScanIndexForward=False,
+            Limit=max(1, min(limit * 8, 200)),
+        )
+        candidates: list[str] = []
+        for item in response.get("Items", []) or []:
+            job_id = str(item.get("job_id") or "")
+            if job_id and job_id not in candidates:
+                candidates.append(job_id)
+            if len(candidates) >= limit:
+                break
+        matched: list[str] = []
+        for job_id in candidates:
+            job = get_record(job_id, ORCHESTRATOR_SUBTASK)
+            if job.get("doc_id") == doc_id and job.get("owner_sub") == owner_sub:
+                matched.append(job_id)
+        return matched
+    except Exception as e:
+        logger.warning("job_state.get_document_job_ids failed (doc=%s): %s", doc_id, e)
+        return []
+
+
+def merge_job_records(job_records: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Merge repeated subtasks across jobs while retaining every attempt."""
+    merged: dict[str, dict[str, Any]] = {}
+    for records in job_records:
+        for record in records:
+            key = str(record.get("subtask_id") or "")
+            if not key:
+                continue
+            candidate = dict(record)
+            candidate_attempts = candidate.get("attempts")
+            if not isinstance(candidate_attempts, list):
+                candidate_attempts = []
+            existing = merged.get(key)
+            if existing is None:
+                candidate["attempts"] = list(candidate_attempts)
+                merged[key] = candidate
+                continue
+            previous_attempts = existing.get("attempts")
+            if not isinstance(previous_attempts, list):
+                previous_attempts = []
+            all_attempts = [*previous_attempts, *candidate_attempts]
+            newest = max(
+                (existing, candidate),
+                key=lambda item: str(
+                    item.get("completed_at") or item.get("started_at") or ""
+                ),
+            )
+            merged[key] = {**existing, **newest, "attempts": all_attempts}
+            merged[key]["attempt_count"] = len(all_attempts) or int(
+                newest.get("attempt_count") or 0
+            )
+    return list(merged.values())
+
+
+def get_document_records(doc_id: str, owner_sub: str) -> list[dict[str, Any]]:
+    """Get a caller-owned document's records, including earlier retry jobs."""
+    job_ids = get_document_job_ids(doc_id, owner_sub)
+    if not job_ids:
+        return []
+    return merge_job_records([get_job_records(job_id) for job_id in job_ids])

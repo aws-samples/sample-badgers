@@ -218,7 +218,10 @@ class IAMStack(Stack):
                         "dynamodb:GetItem",
                         "dynamodb:Query",
                     ],
-                    resources=[jobs_table.table_arn],
+                    resources=[
+                        jobs_table.table_arn,
+                        f"{jobs_table.table_arn}/index/doc-index",
+                    ],
                 )
             )
 

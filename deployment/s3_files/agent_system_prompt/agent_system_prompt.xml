@@ -142,6 +142,7 @@
             <rule>Each visual/hybrid entry must contain page_number, correlation_specialist_uri, and source_image_path. A native-only PDF or DOCX entry uses native_output_uri as correlation_specialist_uri and may omit source_image_path. A successful textract_ocr entry uses content_tree_uri as correlation_specialist_uri, includes its source_image_path, and sets processing_mode=textract_ocr.</rule>
             <rule>The report tool is document-level and does not count against the per-page tool budget.</rule>
             <rule>Report the returned summary and tell the user the report is available in the Reports tab.</rule>
+            <rule>After a successful re-run of a document, call the report tool again so the refreshed report includes the latest attempts and outputs.</rule>
         </step>
         <step number="8">Provide conversational summary of findings and report availability to user</step>
         <step number="9">If error occurs, report error clearly and stop - do not attempt workarounds</step>
