@@ -949,6 +949,7 @@ step_runtime() {
     return 1
   fi
   log_success "Image verified in ECR: ${RUNTIME_IMAGE_TAG}"
+  set_state "runtime_image_tag" "\"${RUNTIME_IMAGE_TAG}\""
   mark_complete "runtime_image_pushed"
 
   ensure_xray_decision || return 1

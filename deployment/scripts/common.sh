@@ -1211,6 +1211,45 @@ runtime_image_tag() {
   echo "websocket-$(date -u +%Y%m%d%H%M%S)"
 }
 
+# A resumed deployment must use the tag that step 6 actually pushed.  A fresh
+# tag is minted when deploy.sh starts; using it after step 6 has been skipped
+# would ask CloudFormation for an image that does not exist in ECR.
+use_pushed_runtime_image_tag() {
+  check_completed "runtime_image_pushed" || return 0
+
+  local pushed_tag
+  pushed_tag="$(get_state "runtime_image_tag")"
+  if [[ "${pushed_tag}" =~ ^websocket-[0-9]{14}$ ]]; then
+    export RUNTIME_IMAGE_TAG="${pushed_tag}"
+    log_info "Reusing pushed runtime image tag: ${RUNTIME_IMAGE_TAG}"
+    return 0
+  fi
+
+  # State files written before runtime_image_tag existed can still resume.  In
+  # that case recover the most recently pushed immutable runtime tag rather
+  # than switching back to the floating websocket tag.
+  local repository_name latest_tag
+  repository_name="badgers-$(resource_id)"
+  latest_tag="$(
+    aws ecr describe-images \
+      --repository-name "${repository_name}" \
+      --region "${AWS_REGION}" \
+      --query 'reverse(sort_by(imageDetails,&imagePushedAt))[].imageTags[]' \
+      --output text 2>/dev/null \
+      | tr '\t' '\n' \
+      | awk '/^websocket-[0-9]{14}$/ { print; exit }'
+  )"
+  if [[ "${latest_tag}" =~ ^websocket-[0-9]{14}$ ]]; then
+    set_state "runtime_image_tag" "\"${latest_tag}\""
+    export RUNTIME_IMAGE_TAG="${latest_tag}"
+    log_info "Recovered pushed runtime image tag from ECR: ${RUNTIME_IMAGE_TAG}"
+    return 0
+  fi
+
+  log_error "Runtime image was marked pushed, but no immutable websocket image tag was found."
+  return 1
+}
+
 export_cdk_env() {
   ensure_account
   export DEPLOYMENT_ID
@@ -1223,6 +1262,7 @@ export_cdk_env() {
   # app.py reads RUNTIME_IMAGE_TAG to point the runtime at the image the build
   # step pushed. Default it here so CDK-only entry points stay in sync with the
   # build without every caller having to set it.
+  use_pushed_runtime_image_tag || return 1
   export RUNTIME_IMAGE_TAG="${RUNTIME_IMAGE_TAG:-websocket}"
   export BADGERS_CONFIG_RELEASE_ID="$(get_state "config_release_id")"
   export BADGERS_TAG_STATE="$(state_file)"

@@ -87,3 +87,15 @@ def test_local_ui_executor_has_a_constrained_noninteractive_entry_point() -> Non
     assert "LOCAL_UI_DEPLOYMENT_ID" in deploy_script
     assert "run_preflight all || exit 1" in deploy_script
     assert "step_resume" in deploy_script
+
+
+def test_runtime_resume_uses_the_image_tag_that_was_pushed() -> None:
+    common = COMMON_SH.read_text()
+    deploy_script = (REPO_ROOT / "deploy.sh").read_text()
+
+    assert "use_pushed_runtime_image_tag()" in common
+    assert 'get_state "runtime_image_tag"' in common
+    assert "describe-images" in common
+    assert "Recovered pushed runtime image tag from ECR" in common
+    assert "use_pushed_runtime_image_tag || return 1" in common
+    assert 'set_state "runtime_image_tag" "\\"${RUNTIME_IMAGE_TAG}\\""' in deploy_script
