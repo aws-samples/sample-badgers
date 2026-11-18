@@ -25,6 +25,10 @@ if str(_FOUNDATION_DIR) not in sys.path:
 
 from foundation.workflow_planner import validate_release_configuration
 from foundation.prompt_keys import prompt_key
+try:
+    from .model_mapping import apply_mapping
+except ImportError:
+    from model_mapping import apply_mapping
 
 
 class ConfigurationStagingError(ValueError):
@@ -158,6 +162,7 @@ def stage_profile_config(
     *,
     source_root: Path = _DEFAULT_SOURCE,
     routing_configuration: dict[str, object] | None = None,
+    model_mapping: dict[str, object] | None = None,
 ) -> tuple[str, ...]:
     """Create a minimal, complete runtime configuration directory.
 
@@ -197,6 +202,8 @@ def stage_profile_config(
             _copy_file(source_root, f"manifests/{specialist}.json", destination)
         _copy_tree_if_present(source_root, f"prompts/{specialist}", destination)
         staged.append(specialist)
+    if model_mapping is not None:
+        apply_mapping(destination, model_mapping)
 
     # Direct specialist packs need no workflow control plane. Any profile that
     # owns agent orchestration or a deterministic workflow runner stages these

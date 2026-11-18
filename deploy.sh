@@ -108,6 +108,10 @@ fi
 
 if [ "${1:-}" = "models" ]; then
   shift
+  if [ "${1:-}" = "map" ]; then
+    shift
+    exec python3 "${SCRIPT_DIR}/deployment/model_mapping.py" "$@"
+  fi
   exec python3 "${SCRIPT_DIR}/deployment/model_discovery.py" "$@"
 fi
 

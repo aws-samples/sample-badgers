@@ -33,10 +33,12 @@ def build_release(
         selection_override=selection_override or bool(packs or direct_specialists),
     )
     routing_configuration = None
+    model_mapping = None
     if routing_state is not None:
         try:
             state = json.loads(routing_state.read_text(encoding="utf-8"))
             routing_configuration = state.get("desired_routing_configuration")
+            model_mapping = state.get("desired_model_mapping")
         except (OSError, json.JSONDecodeError) as error:
             raise ValueError(f"Could not read routing deployment state: {error}") from error
         if not isinstance(routing_configuration, dict):
@@ -46,6 +48,7 @@ def build_release(
         destination,
         source_root=source_root or (Path(__file__).parent / "s3_files"),
         routing_configuration=routing_configuration,
+        model_mapping=model_mapping if isinstance(model_mapping, dict) else None,
     )
     files = {
         path.relative_to(destination).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()

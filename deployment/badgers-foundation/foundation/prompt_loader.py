@@ -317,22 +317,21 @@ class PromptLoader:
 
     def _load_core_system_files_from_s3(self) -> Dict[str, str]:
         """Load core system files from S3."""
-        result = {}
+        from foundation.prompt_keys import CORE_PROMPT_FILES
 
-        # Load the wrapper file
+        result: Dict[str, str] = {}
         try:
-            wrapper_content = self._load_wrapper_from_s3(self.s3_bucket)
-            result["prompt_system_wrapper"] = wrapper_content
-        except self._S3ConfigError as e:
-            self.logger.warning("Could not load wrapper from S3: %s", e)
-            result["prompt_system_wrapper"] = ""
+            import boto3
 
-        # For S3, we use simplified core rules stored in wrapper
-        # These are placeholders that get replaced in load_system_prompt
-        result["core_rules_rules"] = ""
-        result["error_handling_error_handler"] = ""
-        result["error_handling_not_found_handler"] = ""
-
+            s3 = boto3.client("s3")
+            for name, key in CORE_PROMPT_FILES.items():
+                response = s3.get_object(Bucket=self.s3_bucket, Key=self._config_key(key))
+                content = response["Body"].read().decode("utf-8")
+                if not content.strip():
+                    raise PromptLoadError(f"Core prompt is empty: {key}")
+                result[name] = content
+        except Exception as error:
+            raise PromptLoadError(f"Could not load required core prompt from S3: {error}") from error
         return result
 
     def _load_core_system_files_from_local(self) -> Dict[str, str]:
